@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PIC Admin - Productos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50: '#f0f9ff', 100: '#e0f2fe', 500: '#0ea5e9', 600: '#0284c7', 800: '#075985', 900: '#0c4a6e' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        /* Estilo para inputs deshabilitados o readonly */
+        input:read-only { background-color: #f8fafc; color: #94a3b8; cursor: not-allowed; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-screen flex overflow-hidden">
+
+    <!-- SIDEBAR (Navegación) -->
+    <aside class="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col shrink-0 z-20">
+        <div class="p-6 border-b border-slate-100 flex items-center gap-3 text-brand-800 font-bold text-xl">
+            <div class="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white shadow-sm">
+                <i class="fa-solid fa-layer-group"></i>
+            </div>
+            PIC Admin
+        </div>
+        <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+            <p class="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 mt-2">Gestión (v2)</p>
+            <a href="#" class="flex items-center gap-3 px-4 py-2.5 text-slate-600 hover:bg-slate-50 hover:text-brand-600 rounded-lg transition-colors group">
+                <i class="fa-solid fa-users w-5 text-slate-400 group-hover:text-brand-500"></i> Usuarios
+            </a>
+            <!-- Item Activo -->
+            <a href="#" class="flex items-center gap-3 px-4 py-2.5 bg-brand-50 text-brand-700 rounded-lg font-medium shadow-sm border border-brand-100">
+                <i class="fa-solid fa-boxes-stacked w-5 text-brand-600"></i> Productos
+            </a>
+            <a href="#" class="flex items-center gap-3 px-4 py-2.5 text-slate-600 hover:bg-slate-50 hover:text-brand-600 rounded-lg transition-colors group">
+                <i class="fa-solid fa-store w-5 text-slate-400 group-hover:text-brand-500"></i> Clientes
+            </a>
+        </nav>
+    </aside>
+
+    <!-- CONTENIDO -->
+    <main class="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50/50">
+        
+        <!-- Header -->
+        <header class="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-6 lg:px-8 shrink-0">
+            <div class="flex items-center gap-4">
+                <h1 class="text-xl font-bold text-slate-800">Catálogo de Productos</h1>
+                <span class="bg-slate-100 text-slate-500 text-xs px-2 py-1 rounded-full border border-slate-200">4,205 Items</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="relative">
+                    <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input type="text" placeholder="Buscar por SKU o Nombre..." class="pl-9 pr-4 py-2 bg-slate-100 border-none rounded-lg text-sm focus:ring-2 focus:ring-brand-500 w-64 transition-all focus:bg-white focus:shadow-sm">
+                </div>
+                <button onclick="openProductModal()" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm flex items-center gap-2 transition-colors">
+                    <i class="fa-solid fa-plus"></i> Nuevo Producto
+                </button>
+            </div>
+        </header>
+
+        <!-- Lista de Productos (Placeholder) -->
+        <div class="flex-1 overflow-y-auto p-6 lg:p-8">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-semibold">
+                        <tr>
+                            <th class="px-6 py-3 w-20">ID</th>
+                            <th class="px-6 py-3">SKU Real / Muliix</th>
+                            <th class="px-6 py-3">Nombre</th>
+                            <th class="px-6 py-3">Marca</th>
+                            <th class="px-6 py-3">Peso (Kg)</th>
+                            <th class="px-6 py-3 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 text-sm">
+                        <tr class="hover:bg-slate-50 transition-colors group">
+                            <td class="px-6 py-3 text-slate-400 font-mono">1024</td>
+                            <td class="px-6 py-3">
+                                <div class="font-bold text-slate-700">JAM-P001</div>
+                                <div class="text-xs text-slate-400 font-mono">MUL-100</div>
+                            </td>
+                            <td class="px-6 py-3 text-slate-600">Jamón Serrano Premium</td>
+                            <td class="px-6 py-3"><span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-100">CORONA</span></td>
+                            <td class="px-6 py-3 text-slate-600">0.250</td>
+                            <td class="px-6 py-3 text-right">
+                                <button class="text-brand-600 hover:text-brand-800 font-medium text-xs">Editar</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL DE CREACIÓN/EDICIÓN DE PRODUCTO -->
+    <div id="productModal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onclick="closeProductModal()"></div>
+
+        <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+            <!-- Modal Panel (Más ancho para acomodar el grid: max-w-4xl) -->
+            <div class="relative transform overflow-hidden rounded-xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-4xl border border-slate-200 flex flex-col max-h-[90vh]">
+                
+                <!-- Header -->
+                <div class="bg-white px-6 py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-800">Registrar Nuevo Producto</h3>
+                        <p class="text-xs text-slate-500">Los campos marcados con <span class="text-red-500">*</span> son obligatorios.</p>
+                    </div>
+                    <button onclick="closeProductModal()" class="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-md hover:bg-slate-100">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+
+                <!-- Body (Scrollable) -->
+                <div class="p-6 overflow-y-auto bg-slate-50/50">
+                    <form id="productForm" class="space-y-6">
+                        
+                        <!-- Sección 1: Identificación -->
+                        <div class="bg-white p-5 rounded-lg border border-slate-200 shadow-sm">
+                            <h4 class="text-xs font-bold text-brand-600 uppercase tracking-wide mb-4 flex items-center gap-2">
+                                <i class="fa-solid fa-barcode"></i> Identificación
+                            </h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">SKU Real <span class="text-red-500">*</span></label>
+                                    <input type="text" name="SkuReal" class="w-full rounded-lg border-slate-300 text-sm focus:border-brand-500 focus:ring-brand-500 shadow-sm uppercase" placeholder="EJ: JAM-001">
+                                    <p class="text-[10px] text-slate-400 mt-1">Código principal de familia</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">SKU Muliix</label>
+                                    <input type="text" name="SKUMuliix" class="w-full rounded-lg border-slate-300 text-sm focus:border-brand-500 focus:ring-brand-500 shadow-sm" placeholder="EJ: MUL-999">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">ID Retail</label>
+                                    <input type="text" name="Id_SkuRetail" class="w-full rounded-lg border-slate-300 text-sm focus:border-brand-500 focus:ring-brand-500 shadow-sm">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sección 2: Datos Básicos -->
+                        <div class="bg-white p-5 rounded-lg border border-slate-200 shadow-sm">
+                            <h4 class="text-xs font-bold text-brand-600 uppercase tracking-wide mb-4 flex items-center gap-2">
+                                <i class="fa-regular fa-file-lines"></i> Información General
+                            </h4>
+                            <div class="grid grid-cols-1 md:grid-cols-12 gap-5">
+                                <div class="md:col-span-8">
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Nombre del Producto <span class="text-red-500">*</span></label>
+                                    <input type="text" name="Nombre" class="w-full rounded-lg border-slate-300 text-sm focus:border-brand-500 focus:ring-brand-500 shadow-sm" placeholder="Ej: Jamón Serrano Reserva 250g">
+                                </div>
+                                <div class="md:col-span-4">
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Peso (Kg)</label>
+                                    <div class="relative">
+                                        <input type="number" step="0.001" name="Peso" class="w-full rounded-lg border-slate-300 text-sm focus:border-brand-500 focus:ring-brand-500 shadow-sm pr-8" placeholder="0.000">
+                                        <span class="absolute right-3 top-2 text-xs text-slate-400 font-bold">Kg</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sección 3: Clasificación -->
+                        <div class="bg-white p-5 rounded-lg border border-slate-200 shadow-sm">
+                            <h4 class="text-xs font-bold text-brand-600 uppercase tracking-wide mb-4 flex items-center gap-2">
+                                <i class="fa-solid fa-tags"></i> Clasificación
+                            </h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Marca</label>
+                                    <select name="Marca" class="w-full rounded-lg border-slate-300 text-sm focus:border-brand-500 focus:ring-brand-500 shadow-sm">
+                                        <option value="">Seleccionar...</option>
+                                        <option>CORONA</option>
+                                        <option>SAN RAFAEL</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Grupo</label>
+                                    <input type="text" name="Grupo" class="w-full rounded-lg border-slate-300 text-sm focus:border-brand-500 focus:ring-brand-500 shadow-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Categoría</label>
+                                    <input type="text" name="Categorias" class="w-full rounded-lg border-slate-300 text-sm focus:border-brand-500 focus:ring-brand-500 shadow-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Tipo Comercial</label>
+                                    <input type="text" name="TipoCom" class="w-full rounded-lg border-slate-300 text-sm focus:border-brand-500 focus:ring-brand-500 shadow-sm">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sección 4: Logística y Detalles -->
+                        <div class="bg-white p-5 rounded-lg border border-slate-200 shadow-sm">
+                            <h4 class="text-xs font-bold text-brand-600 uppercase tracking-wide mb-4 flex items-center gap-2">
+                                <i class="fa-solid fa-truck-ramp-box"></i> Logística
+                            </h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Empaque A</label>
+                                    <input type="text" name="EmpaqueA" class="w-full rounded-lg border-slate-300 text-sm focus:border-brand-500 focus:ring-brand-500 shadow-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Empaque B</label>
+                                    <input type="text" name="EmpaqueB" class="w-full rounded-lg border-slate-300 text-sm focus:border-brand-500 focus:ring-brand-500 shadow-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Grupo OP</label>
+                                    <input type="text" name="GrupoOP" class="w-full rounded-lg border-slate-300 text-sm focus:border-brand-500 focus:ring-brand-500 shadow-sm">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-5 mt-4 pt-4 border-t border-slate-50">
+                                <label class="inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" name="Status" class="form-checkbox h-4 w-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500" checked>
+                                    <span class="ml-2 text-sm text-slate-700">Activo (Status)</span>
+                                </label>
+                                <label class="inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" name="Contol" class="form-checkbox h-4 w-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500">
+                                    <span class="ml-2 text-sm text-slate-700">Controlado</span>
+                                </label>
+                            </div>
+                        </div>
+
+                    </form>
+                </div>
+
+                <!-- Footer -->
+                <div class="bg-slate-50 px-6 py-4 flex justify-between items-center border-t border-slate-200 shrink-0">
+                    <button onclick="closeProductModal()" class="text-slate-500 hover:text-slate-700 text-sm font-medium px-4 py-2">
+                        Cancelar
+                    </button>
+                    <div class="flex gap-3">
+                        <button class="bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors">
+                            Guardar y Crear Otro
+                        </button>
+                        <button class="bg-brand-600 hover:bg-brand-700 text-white px-6 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors flex items-center gap-2">
+                            <i class="fa-regular fa-floppy-disk"></i> Guardar Producto
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openProductModal() {
+            document.getElementById('productModal').classList.remove('hidden');
+        }
+        function closeProductModal() {
+            document.getElementById('productModal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
