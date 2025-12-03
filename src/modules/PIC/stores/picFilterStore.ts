@@ -46,6 +46,8 @@ export const usePicFilterStore = defineStore('picFilter', () => {
     const isGenerating = ref(false);   // Loading específico del botón generar
 
     const isComparisonFrozen = ref(true); //Candado de comparación - por defecto activado. 
+    const selectedClients = reactive(new Map<string, string>());
+
 
 
     // 3. ACCIONES
@@ -138,7 +140,54 @@ export const usePicFilterStore = defineStore('picFilter', () => {
         }
     }
 
-    // NUEVA ACCIÓN: Generar Reporte
+   //  // NUEVA ACCIÓN: Generar Reporte
+   //  async function generateReport() {
+   //      isGenerating.value = true;
+   //      try {
+   //          // 1. Construir filtros limpios para la API
+   //          const apiFilters: Record<string, any> = {};
+            
+   //          // Mapeo de filtros UI -> API Columns
+   //          const mappings: Record<string, string> = {
+   //              'Transaccion': 'TRANSACCION',
+   //              'FormatoCliente': 'formatocte',
+   //              'grupo': 'grupo',
+   //              'Categorias': 'Categorias',
+   //              'SKU': 'SKU_NOMBRE'
+   //          };
+
+   //          for (const key in selected) {
+   //              const val = selected[key as keyof typeof selected];
+   //              // Si es un array y tiene valores
+   //              if (Array.isArray(val) && val.length > 0) {
+   //                  const dbKey = mappings[key] || key;
+   //                  if(key !== 'MesInicial' && key !== 'MesFinal') {
+   //                       apiFilters[dbKey] = val;
+   //                  }
+   //              }
+   //          }
+            
+   //          // Asegurar rango de meses
+   //          apiFilters['MesInicial'] = selected.MesInicial;
+   //          apiFilters['MesFinal'] = selected.MesFinal;
+
+   //          // 2. Llamada a la API
+   //          const data = await picApi.getDashboardData(apiFilters, ['Año', 'Mes']);
+   //          reportData.value = data;
+            
+   //          return true; // Éxito
+
+   //      } catch (error) {
+   //          console.error("Error generando reporte:", error);
+   //          return false;
+   //      } finally {
+   //          isGenerating.value = false;
+   //      }
+   //  }
+
+   // ... dentro de src/modules/PIC/stores/picFilterStore.ts
+
+    // NUEVA ACCIÓN: Generar Reporte (CORREGIDA)
     async function generateReport() {
         isGenerating.value = true;
         try {
@@ -154,22 +203,33 @@ export const usePicFilterStore = defineStore('picFilter', () => {
                 'SKU': 'SKU_NOMBRE'
             };
 
+            // A. Agregar filtros estándar (Dropdowns)
             for (const key in selected) {
                 const val = selected[key as keyof typeof selected];
                 // Si es un array y tiene valores
                 if (Array.isArray(val) && val.length > 0) {
                     const dbKey = mappings[key] || key;
+                    // Excluimos mes/año aquí porque se tratan aparte o ya tienen su lógica
                     if(key !== 'MesInicial' && key !== 'MesFinal') {
                          apiFilters[dbKey] = val;
                     }
                 }
             }
             
-            // Asegurar rango de meses
+            // B. Agregar rango de meses
             apiFilters['MesInicial'] = selected.MesInicial;
             apiFilters['MesFinal'] = selected.MesFinal;
 
+            // C. AGREGRAR CLIENTES SELECCIONADOS (¡ESTO FALTABA!)
+            if (selectedClients.size > 0) {
+                // Convertimos las llaves del Map (IDs) a un Array simple
+                apiFilters['IDCLIENTE'] = Array.from(selectedClients.keys());
+                console.log("Filtro de clientes aplicado:", apiFilters['IDCLIENTE']);
+            }
+
             // 2. Llamada a la API
+            // Nota: El backend en 'picController.js' ya está programado para recibir 'IDCLIENTE'
+            // y filtrar por la columna [IDCLIENTE] IN (...)
             const data = await picApi.getDashboardData(apiFilters, ['Año', 'Mes']);
             reportData.value = data;
             
@@ -182,12 +242,88 @@ export const usePicFilterStore = defineStore('picFilter', () => {
             isGenerating.value = false;
         }
     }
+    
     //Toggle Candado
     function toggleComparisonLock() {
         isComparisonFrozen.value = !isComparisonFrozen.value;
     }
 
+     // ACCIONES DE CLIENTES
+    function toggleClientSelection(id: string, name: string) {
+        if (selectedClients.has(id)) {
+            selectedClients.delete(id);
+        } else {
+            selectedClients.set(id, name);
+        }
+    }
+
+    function clearSelectedClients() {
+        selectedClients.clear();
+    }
+
+    // Helper para formatear filtros para la API de Clientes
+    // (Excluye mes/año porque los clientes son entidades estáticas, no transaccionales)
+    function getFiltersForClientSearch() {
+        const apiFilters: Record<string, any> = {};
+        
+        // Mapeo manual de lo que espera el backend vs lo que tenemos
+        // Basado en filterController.js: allowedFilterColumns
+        const keys = ['canal', 'Gerencia', 'Jefatura', 'Ruta', 'FormatoCliente'];
+        const backendKeys: Record<string, string> = { 'FormatoCliente': 'formatocte' };
+
+        keys.forEach(key => {
+            const val = selected[key as keyof typeof selected];
+            if (Array.isArray(val) && val.length > 0) {
+                const dbKey = backendKeys[key] || key;
+                apiFilters[dbKey] = val;
+            }
+        });
+        return apiFilters;
+    }
+     function resetFilters() {
+        // 1. Limpiar arrays de selección
+        selected.canal = [];
+        selected.Gerencia = [];
+        selected.Jefatura = [];
+        selected.Ruta = [];
+        selected.Marca = [];
+        selected.grupo = [];
+        selected.Categorias = [];
+        selected.SKU = [];
+        selected.FormatoCliente = [];
+        
+        // 2. Restaurar Defaults
+        selected.Transaccion = ['Venta', 'Metas', 'NC'];
+        selected.MesInicial = '1';
+        selected.MesFinal = '12';
+
+        // 3. Restaurar Años (Últimos 3)
+        if (options.anios.length > 0) {
+            const sortedYears = [...options.anios].sort();
+            selected.Anio = sortedYears.slice(-3);
+        } else {
+            selected.Anio = [];
+        }
+
+        // 4. Limpiar Clientes
+        selectedClients.clear();
+
+        // 5. Limpiar opciones dependientes (Cascada)
+        depOptions.jefaturas = [];
+        depOptions.rutas = [];
+        depOptions.grupos = [];
+        depOptions.categorias = [];
+        depOptions.skus = [];
+    }
+
     return {
+
+        selectedClients,
+        toggleClientSelection,
+        clearSelectedClients,
+        getFiltersForClientSearch, 
+        
+        resetFilters,
 
         isComparisonFrozen, 
         toggleComparisonLock,
