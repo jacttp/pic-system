@@ -1,6 +1,5 @@
 /* src/router/index.ts */
 import { createRouter, createWebHistory } from 'vue-router'
-// import { useAuthStore } from '@/modules/Auth/stores/authStore'
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 
 const router = createRouter({
@@ -33,7 +32,6 @@ const router = createRouter({
                 name: 'products',
                 component: () => import('@/modules/Products/views/ProductList.vue')
             },
-            // NUEVAS RUTAS FASE 6
             {
                 path: 'clients',
                 name: 'clients',
@@ -43,17 +41,35 @@ const router = createRouter({
                 path: 'audit',
                 name: 'audit',
                 component: () => import('@/modules/Audit/views/AuditLog.vue')
+            },
+            // NUEVA RUTA: Módulo PIC (Fase 2)
+            {
+                path: 'pic', 
+                name: 'pic-report',
+                component: () => import('@/modules/PIC/views/PicDashboardView.vue')
             }
         ]
     },
+    // Ruta comodín para redirigir cualquier URL no encontrada al inicio
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })
 
+// Guardia de navegación global
 router.beforeEach((to, from, next) => {
+    // AGREGA ESTO PARA DEPURAR
+    console.log('Navegando a:', to.path); 
+    console.log('Ruta macheada:', to.matched);
+
     const authStore = useAuthStore();
-    if (to.meta.requiresAuth && !authStore.isAuthenticated) return next('/login');
+    
+    if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+        console.log('Bloqueado por Auth, redirigiendo a login');
+        return next('/login');
+    }
+    
     if (to.meta.guestOnly && authStore.isAuthenticated) return next('/');
+    
     next();
 });
 

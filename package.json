@@ -12,6 +12,7 @@
     "@fortawesome/fontawesome-free": "^7.1.0",
     "autoprefixer": "^10.4.22",
     "axios": "^1.13.2",
+    "chart.js": "^4.5.1",
     "pinia": "^3.0.4",
     "postcss": "^8.5.6",
     "vue": "^3.5.24",

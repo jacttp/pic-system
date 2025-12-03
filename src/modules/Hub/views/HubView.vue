@@ -67,7 +67,7 @@ const handleLogout = () => {
                     title="Reporte PIC"
                     description="Dashboard analítico de ventas, cumplimiento de metas y análisis por zona."
                     icon="fa-solid fa-chart-pie"
-                    href="http://127.0.0.1:5500/index.html" 
+                    to="/admin/pic"
                     color-class="text-brand-600"
                     bg-class="bg-brand-50"
                 />
