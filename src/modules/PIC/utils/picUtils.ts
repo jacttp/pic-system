@@ -46,9 +46,30 @@ export function processChartData(rawData: any[], years: string[], metricType: 'p
 }
 
 /**
- * Genera la configuración para Chart.js
+ * Genera la configuración para Chart.js con escalas inteligentes y seguras.
  */
-export function getChartConfig(labels: string[], datasets: any[], type: 'bar' | 'lizne' = 'bar') {
+export function getChartConfig(labels: string[], datasets: any[], type: 'bar' | 'line' = 'bar') {
+    
+    // 1. APLANAR DATOS: Obtenemos todos los valores numéricos de todos los datasets para analizarlos
+    const allValues = datasets.flatMap(ds => ds.data).filter(v => v !== null && v !== undefined);
+    
+    const minVal = Math.min(...allValues);
+    const maxVal = Math.max(...allValues);
+    const range = maxVal - minVal;
+    
+    // 2. CÁLCULO DE GRACE (MARGEN): 25% del rango
+    const graceVal = range * 0.25;
+
+    // 3. DECISIÓN DE PISO (La lógica "Que no floten")
+    // Si al restar el margen (grace) al valor más bajo, cruzamos el cero...
+    // ...entonces FORZAMOS el inicio en 0 para evitar el eje negativo (-500k).
+    // Si no cruzamos el cero (ej: ventas de 2M a 2.5M), dejamos que el zoom actúe.
+    let forcedMin = undefined;
+    
+    if (minVal >= 0 && (minVal - graceVal) < 0) {
+        forcedMin = 0; // Anclar al piso si el margen nos llevaría a negativos
+    }
+
     return {
         type,
         data: { labels, datasets },
@@ -61,14 +82,12 @@ export function getChartConfig(labels: string[], datasets: any[], type: 'bar' | 
                     mode: 'index' as const,
                     intersect: false,
                     callbacks: {
-                        // Usamos los formatters importados
                         label: function(context: any) {
                             let label = context.dataset.label || '';
                             if (label) {
                                 label += ': ';
                             }
                             if (context.parsed.y !== null) {
-                                // Detección simple para saber qué formato usar
                                 if (context.dataset.label.includes('KG') || context.dataset.label.includes('Meta')) {
                                     label += formatNumber(context.parsed.y) + ' KG';
                                 } else {
@@ -82,10 +101,12 @@ export function getChartConfig(labels: string[], datasets: any[], type: 'bar' | 
             },
             scales: {
                 y: {
-                    beginAtZero: true,
+                    beginAtZero: false, // Siempre intentamos hacer zoom...
+                    min: forcedMin,     // ...pero respetamos el piso 0 si es necesario.
+                    grace: '25%',       // Mantenemos el aire visual arriba/abajo.
+                    
                     grid: { color: '#f1f5f9' },
                     ticks: {
-                        // Formato compacto para el eje Y
                         callback: function(value: any) {
                             if (value >= 1000000) return (value/1000000).toFixed(1) + 'M';
                             if (value >= 1000) return (value/1000).toFixed(0) + 'k';
@@ -100,7 +121,6 @@ export function getChartConfig(labels: string[], datasets: any[], type: 'bar' | 
         }
     };
 }
-
 /* Calcula la estructura completa para una tabla de datos (Filas + Totales + Comparativas)*/
 
 export function calculateTableData(
@@ -202,4 +222,43 @@ export function calculateTableData(
     }
 
     return { rows, footer, sortedYears, currentYear, prevYear };
+}
+
+/* Calcula los totales anuales para gráficos simples.*/
+
+export function processAnnualData(rawData: any[], years: string[], metricType: 'pesos' | 'kilos' | 'promedio') {
+    // Inicializar acumuladores por año
+    const totals: Record<string, number> = {};
+    years.forEach(y => totals[y] = 0);
+
+    // Sumarizar
+    rawData.forEach(item => {
+        const anio = String(item.Año);
+        if (years.includes(anio)) {
+            if (metricType === 'pesos') {
+                totals[anio] += (item.TotalVentaPesos || 0);
+            } else if (metricType === 'kilos') {
+                totals[anio] += (item.TotalVentaKG || 0);
+            } else if (metricType === 'promedio') {
+                // Para promedio anual necesitamos acumuladores auxiliares, no se pueden sumar promedios
+                // Pero como rawData ya viene desagregado, necesitamos lógica extra. 
+                // TRUCO: Usaremos acumuladores de ventas y kilos temporales
+                if (!totals[`_ventas_${anio}`]) totals[`_ventas_${anio}`] = 0;
+                if (!totals[`_kilos_${anio}`]) totals[`_kilos_${anio}`] = 0;
+                
+                totals[`_ventas_${anio}`] += (item.TotalVentaPesos || 0);
+                totals[`_kilos_${anio}`] += (item.TotalVentaKG || 0);
+            }
+        }
+    });
+
+    // Calcular valores finales para el array de datos
+    return years.map(year => {
+        if (metricType === 'promedio') {
+            const v = totals[`_ventas_${year}`] || 0;
+            const k = totals[`_kilos_${year}`] || 0;
+            return k !== 0 ? v / k : 0;
+        }
+        return totals[year];
+    });
 }

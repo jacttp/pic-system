@@ -31,6 +31,12 @@ const handleUpdate = async () => {
     await store.generateReport();
 };
 
+const handleReset = () => {
+    store.resetFilters();
+    // Opcional: Si quieres que se recargue el reporte vacío o con defaults:
+    // await store.generateReport(); 
+};
+
 watch(isCollapsed, (newVal) => {
     if (newVal) {
         overflowVisible.value = false; 
@@ -40,6 +46,8 @@ watch(isCollapsed, (newVal) => {
         }, 350); 
     }
 });
+
+
 </script>
 
 <template>
@@ -63,7 +71,10 @@ watch(isCollapsed, (newVal) => {
                         Parámetros de Reporte
                     </h2>
                     <div class="flex gap-3">
-                        <button class="text-xs font-medium text-slate-500 hover:text-brand-600 flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200">
+                        <button 
+                            @click="handleReset"
+                            class="text-xs font-medium text-slate-500 hover:text-brand-600 flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200"
+                        >
                             <i class="fa-solid fa-rotate-left"></i> Limpiar Filtros
                         </button>
                         

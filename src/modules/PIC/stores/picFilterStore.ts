@@ -140,53 +140,6 @@ export const usePicFilterStore = defineStore('picFilter', () => {
         }
     }
 
-   //  // NUEVA ACCIÓN: Generar Reporte
-   //  async function generateReport() {
-   //      isGenerating.value = true;
-   //      try {
-   //          // 1. Construir filtros limpios para la API
-   //          const apiFilters: Record<string, any> = {};
-            
-   //          // Mapeo de filtros UI -> API Columns
-   //          const mappings: Record<string, string> = {
-   //              'Transaccion': 'TRANSACCION',
-   //              'FormatoCliente': 'formatocte',
-   //              'grupo': 'grupo',
-   //              'Categorias': 'Categorias',
-   //              'SKU': 'SKU_NOMBRE'
-   //          };
-
-   //          for (const key in selected) {
-   //              const val = selected[key as keyof typeof selected];
-   //              // Si es un array y tiene valores
-   //              if (Array.isArray(val) && val.length > 0) {
-   //                  const dbKey = mappings[key] || key;
-   //                  if(key !== 'MesInicial' && key !== 'MesFinal') {
-   //                       apiFilters[dbKey] = val;
-   //                  }
-   //              }
-   //          }
-            
-   //          // Asegurar rango de meses
-   //          apiFilters['MesInicial'] = selected.MesInicial;
-   //          apiFilters['MesFinal'] = selected.MesFinal;
-
-   //          // 2. Llamada a la API
-   //          const data = await picApi.getDashboardData(apiFilters, ['Año', 'Mes']);
-   //          reportData.value = data;
-            
-   //          return true; // Éxito
-
-   //      } catch (error) {
-   //          console.error("Error generando reporte:", error);
-   //          return false;
-   //      } finally {
-   //          isGenerating.value = false;
-   //      }
-   //  }
-
-   // ... dentro de src/modules/PIC/stores/picFilterStore.ts
-
     // NUEVA ACCIÓN: Generar Reporte (CORREGIDA)
     async function generateReport() {
         isGenerating.value = true;
