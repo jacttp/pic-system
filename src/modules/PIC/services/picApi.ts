@@ -1,8 +1,9 @@
 /* src/modules/PIC/services/picApi.ts */
 import axios from 'axios';
+import { setupAuthInterceptors } from '@/api/interceptorSetup';
 import type { PicFilterOptions, PicDataPoint, AiChatResponse, AiQueryConfig } from '../types/picTypes';
 
-// 1. Instancia dedicada a la API V1
+// Instancia para API V1
 const picClient = axios.create({
     baseURL: 'http://localhost:3000/api', 
     headers: {
@@ -10,18 +11,9 @@ const picClient = axios.create({
     }
 });
 
-picClient.interceptors.request.use(
-    (config) => {
-        const token = localStorage.getItem('pic_auth_token');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-    },
-    (error) => Promise.reject(error)
-);
+// Aplicamos la misma configuración de seguridad que en V2
+setupAuthInterceptors(picClient);
 
-// CAMBIO: Usamos 'export const' en lugar de 'export default'
 export const picApi = {
     
     // --- FILTROS ---
@@ -74,21 +66,6 @@ export const picApi = {
     },
 
     // --- INTELIGENCIA ARTIFICIAL ---
-   //  async sendChatPrompt(userPrompt: string): Promise<AiChatResponse> {
-   //      const { data } = await picClient.post('/gemini-proxy', { userPrompt });
-        
-   //      const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-   //      if (!textResponse) throw new Error("IA no devolvió respuesta válida.");
-
-   //      try {
-   //          const cleanedJson = textResponse.replace(/```json\n?|```/g, '').trim();
-   //          return JSON.parse(cleanedJson);
-   //      } catch (e) {
-   //          console.error("Error parseando respuesta IA", textResponse);
-   //          throw new Error("Error al interpretar la respuesta de la IA.");
-   //      }
-   //  },
-   // --- INTELIGENCIA ARTIFICIAL ---
     async sendChatPrompt(userPrompt: string): Promise<AiChatResponse> {
         console.log("📡 [Front] Enviando prompt:", userPrompt);
         
@@ -103,15 +80,8 @@ export const picApi = {
             
             console.log("✅ [Front] JSON Original:", parsed);
 
-            // --- NORMALIZACIÓN (El Arreglo) ---
-            
-            // CASO A: Estructura Perfecta (Tiene explanation)
-            if (parsed.explanation) {
-                return parsed;
-            }
+            if (parsed.explanation) return parsed;
 
-            // CASO B: Estructura Plana (Solo devolvió la query config)
-            // Si vemos que tiene 'metric' o 'filters', asumimos que es una query
             if (parsed.metric || parsed.filters || parsed.dimensions) {
                 console.warn("⚠️ [Front] Formato plano detectado. Normalizando...");
                 return {
@@ -120,8 +90,6 @@ export const picApi = {
                 };
             }
 
-            // CASO C: Texto plano disfrazado de JSON u otro error
-            // Devolvemos lo que haya como explicación
             return {
                 explanation: JSON.stringify(parsed),
                 queryConfig: null
@@ -129,7 +97,6 @@ export const picApi = {
 
         } catch (e) {
             console.error("❌ [Front] Error parseando JSON:", textResponse);
-            // Si falla el parseo JSON, devolvemos el texto crudo como respuesta del chat
             return {
                 explanation: textResponse,
                 queryConfig: null

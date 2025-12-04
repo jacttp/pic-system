@@ -57,18 +57,21 @@ const router = createRouter({
 
 // Guardia de navegación global
 router.beforeEach((to, from, next) => {
-    // AGREGA ESTO PARA DEPURAR
-    console.log('Navegando a:', to.path); 
-    console.log('Ruta macheada:', to.matched);
-
     const authStore = useAuthStore();
     
-    if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-        console.log('Bloqueado por Auth, redirigiendo a login');
+    // Verificación de doble capa: Store o LocalStorage
+    const hasToken = authStore.isAuthenticated || !!localStorage.getItem('pic_auth_token');
+
+    // 1. Si la ruta requiere auth y no hay token
+    if (to.meta.requiresAuth && !hasToken) {
+        console.log('⛔ Acceso denegado: Usuario no autenticado.');
         return next('/login');
     }
     
-    if (to.meta.guestOnly && authStore.isAuthenticated) return next('/');
+    // 2. Si la ruta es solo para invitados (Login) y ya hay token
+    if (to.meta.guestOnly && hasToken) {
+        return next('/');
+    }
     
     next();
 });
