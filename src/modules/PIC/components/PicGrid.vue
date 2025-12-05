@@ -4,6 +4,7 @@ import { usePicFilterStore } from '../stores/picFilterStore';
 import { processChartData, processAnnualData, getChartConfig, CHART_COLORS, CHART_COLORS_GREEN, MONTH_NAMES } from '../utils/picUtils';
 import BaseChart from './charts/BaseChart.vue';
 import PicDataTable from './tables/PicDataTable.vue';
+import PicProjectionTable from './tables/PicProjectionTable.vue';
 
 const store = usePicFilterStore();
 const selectedYears = computed(() => store.selected.Anio.sort());
@@ -144,6 +145,39 @@ const configPromedioAnual = computed(() => {
             </div>
         </div>
         <PicDataTable title="Detalle Precio Promedio" type="promedio" :processed-data="dataPromedio" :years="selectedYears" />
+
+        <div class="pt-8 border-t-2 border-slate-200 border-dashed mt-12">
+            <h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2 px-1">
+                <i class="fa-solid fa-layer-group text-brand-500"></i>
+                Desglose Operativo
+            </h2>
+
+            <div class="space-y-6">
+                <PicProjectionTable 
+                    title="Proyección por Marcas" 
+                    dimensionKey="marcas" 
+                />
+                
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    <PicProjectionTable title="Proyección por Gerencia" dimensionKey="gerencia" />
+                    <PicProjectionTable title="Proyección por Zona" dimensionKey="zona" />
+                </div>
+
+                <PicProjectionTable title="Proyección por Canal" dimensionKey="canal" />
+                <PicProjectionTable title="Proyección por Familias" dimensionKey="familias" />
+                
+                <PicProjectionTable 
+                    title="Proyección por Clientes" 
+                    dimensionKey="clientes" 
+                    :initial-collapsed="true"
+                />
+                <PicProjectionTable 
+                    title="Proyección por Artículos" 
+                    dimensionKey="articulos" 
+                    :initial-collapsed="true"
+                />
+            </div>
+        </div>
 
     </div>
 </template>

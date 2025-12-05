@@ -40,6 +40,16 @@ export const usePicFilterStore = defineStore('picFilter', () => {
         MesFinal: '12'
     });
 
+    // Almacén para las tablas
+    const projectionData = reactive({
+        familias: [] as any[],
+        marcas: [] as any[],
+        gerencia: [] as any[],
+        zona: [] as any[],
+        canal: [] as any[],
+        clientes: [] as any[],
+        articulos: [] as any[]
+    });
     const isLoading = ref(false);
     
     const reportData = ref<any[]>([]); // Datos crudos de la API
@@ -47,6 +57,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
 
     const isComparisonFrozen = ref(true); //Candado de comparación - por defecto activado. 
     const selectedClients = reactive(new Map<string, string>());
+    const loadingProjections = reactive<Record<string, boolean>>({});
 
 
 
@@ -144,6 +155,11 @@ export const usePicFilterStore = defineStore('picFilter', () => {
     async function generateReport() {
         isGenerating.value = true;
         try {
+             // 1. Limpiar proyecciones anteriores (CRÍTICO para consistencia)
+            Object.keys(projectionData).forEach(key => {
+                projectionData[key as keyof typeof projectionData] = [];
+            });
+
             // 1. Construir filtros limpios para la API
             const apiFilters: Record<string, any> = {};
             
@@ -193,6 +209,48 @@ export const usePicFilterStore = defineStore('picFilter', () => {
             return false;
         } finally {
             isGenerating.value = false;
+        }
+    }
+
+    // --- NUEVA ACCIÓN: CARGA BAJO DEMANDA ---
+    async function fetchSingleProjection(dimensionKey: string) {
+        // Marcamos esta tabla específica como cargando
+        loadingProjections[dimensionKey] = true;
+        
+        try {
+            // 1. Reconstruir filtros (Podríamos refactorizar esto a un getter para no repetir código, pero por ahora copiamos la lógica)
+            const apiFilters: Record<string, any> = {};
+            const mappings: Record<string, string> = {
+                'Transaccion': 'TRANSACCION', 'FormatoCliente': 'formatocte',
+                'grupo': 'grupo', 'Categorias': 'Categorias', 'SKU': 'SKU_NOMBRE'
+            };
+            for (const key in selected) {
+                const val = selected[key as keyof typeof selected];
+                if (Array.isArray(val) && val.length > 0) {
+                    const dbKey = mappings[key] || key;
+                    if(key !== 'MesInicial' && key !== 'MesFinal') apiFilters[dbKey] = val;
+                }
+            }
+            apiFilters['MesInicial'] = selected.MesInicial;
+            apiFilters['MesFinal'] = selected.MesFinal;
+            if (selectedClients.size > 0) apiFilters['IDCLIENTE'] = Array.from(selectedClients.keys());
+
+            // 2. Años objetivo
+            let yearsTarget = selected.Anio.length > 0 
+                ? [...selected.Anio].sort() 
+                : (options.anios.length > 0 ? options.anios.slice(-3).sort() : ['2023', '2024', '2025']);
+
+            // 3. Llamada API
+            const data = await picApi.getProjection(dimensionKey, apiFilters, yearsTarget);
+            
+            // 4. Guardar en el slot correspondiente
+            // @ts-ignore (Tipado dinámico rápido)
+            projectionData[dimensionKey] = data;
+
+        } catch (e) {
+            console.error(`Error cargando proyección ${dimensionKey}`, e);
+        } finally {
+            loadingProjections[dimensionKey] = false;
         }
     }
     
@@ -280,7 +338,12 @@ export const usePicFilterStore = defineStore('picFilter', () => {
 
         isComparisonFrozen, 
         toggleComparisonLock,
+        
         reportData,
+        projectionData,     // Datos de tablas
+        loadingProjections, // Estado de carga individual
+        fetchSingleProjection, // Acción nueva
+        
         isGenerating,
         generateReport,
         

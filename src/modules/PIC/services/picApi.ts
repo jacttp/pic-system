@@ -60,6 +60,16 @@ export const picApi = {
         return data;
     },
 
+    async getProjection(dimension: string, filters: Record<string, any>, years: string[]) {
+        // Nota: El backend espera 'dimension', 'filters', 'years' en el body
+        const { data } = await picClient.post('/projections', {
+            dimension,
+            filters,
+            years
+        });
+        return data;
+    },
+
     async getPriceAverageSummary(): Promise<any[]> {
         const { data } = await picClient.get('/summary/price-average');
         return data;
@@ -117,3 +127,4 @@ export const picApi = {
         return data.insight;
     }
 };
+
