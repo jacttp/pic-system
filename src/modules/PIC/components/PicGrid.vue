@@ -96,11 +96,52 @@ const configPromedioAnual = computed(() => {
     }], 'bar');
 });
 
+// Helper para eliminar widgets
+const removeWidget = (id: string) => {
+    store.removeDynamicWidget(id);
+};
 </script>
 
 <template>
     <div class="space-y-8 pb-20">
         
+        <div v-if="store.dynamicWidgets.length > 0" class="bg-brand-50/50 rounded-2xl p-6 border border-brand-100 shadow-inner animate-fade-in mb-8">
+            <div class="flex items-center justify-between border-b border-brand-200 pb-3 mb-4">
+                <h3 class="text-sm font-bold text-brand-700 flex items-center gap-2">
+                    <div class="p-1.5 bg-white rounded-md shadow-sm text-brand-600">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    </div>
+                    Insights Generados por IA
+                </h3>
+                <button @click="store.clearDynamicWidgets()" class="text-xs font-medium text-slate-500 hover:text-red-500 transition-colors flex items-center gap-1">
+                    <i class="fa-regular fa-trash-can"></i> Limpiar zona
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div 
+                    v-for="widget in store.dynamicWidgets" 
+                    :key="widget.id" 
+                    class="relative group bg-white rounded-xl shadow-sm border border-slate-200 p-1"
+                >
+                    <div class="h-80 w-full"> 
+                        <BaseChart 
+                            :config="widget.config" 
+                            :title="widget.title" 
+                            :enable-switch="true" 
+                        />
+                    </div>
+
+                    <button 
+                        @click="removeWidget(widget.id)"
+                        class="absolute top-3 right-3 bg-white text-slate-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg shadow-md border border-slate-100 transition-all opacity-0 group-hover:opacity-100 z-10 scale-90 hover:scale-100"
+                        title="Eliminar este gráfico"
+                    >
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="lg:col-span-2">
                 <BaseChart 
@@ -148,7 +189,6 @@ const configPromedioAnual = computed(() => {
         <PicDataTable title="Detalle Precio Promedio" type="promedio" :processed-data="dataPromedio" :years="selectedYears" />
 
         <div class="pt-8 border-t-2 border-slate-200 border-dashed mt-12">
-            
             <button 
                 @click="showDesglose = !showDesglose"
                 class="w-full flex justify-between items-center mb-6 group focus:outline-none"
@@ -162,50 +202,21 @@ const configPromedioAnual = computed(() => {
                         {{ showDesglose ? 'Visible' : 'Oculto' }}
                     </span>
                 </div>
-
                 <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-brand-50 group-hover:text-brand-600 transition-all">
                     <i class="fa-solid fa-chevron-down transition-transform duration-300" :class="{'rotate-180': !showDesglose}"></i>
                 </div>
             </button>
 
             <div v-show="showDesglose" class="space-y-6 transition-all duration-500 ease-in-out">
-                
-                <PicProjectionTable 
-                    title="Proyección por Marcas" 
-                    dimensionKey="marcas" 
-                />
-                
+                <PicProjectionTable title="Proyección por Marcas" dimensionKey="marcas" />
                 <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
                     <PicProjectionTable title="Proyección por Gerencia" dimensionKey="gerencia" />
-                    <PicProjectionTable 
-                        title="Proyección por Zona" 
-                        dimensionKey="zona"
-                        drill-down-target="articulos" 
-                    />
+                    <PicProjectionTable title="Proyección por Zona" dimensionKey="zona" drill-down-target="articulos" />
                 </div>
-
-                <PicProjectionTable 
-                    title="Proyección por Canal" 
-                    dimensionKey="canal" 
-                    drill-down-target="articulos"
-                />
-                <PicProjectionTable 
-                    title="Proyección por Familias" 
-                    dimensionKey="familias" 
-                    drill-down-target="articulos"
-                />
-                
-                <PicProjectionTable 
-                    title="Proyección por Clientes (Top)" 
-                    dimensionKey="clientes" 
-                    drill-down-target="articulos"
-                    :initial-collapsed="true"
-                />
-                <PicProjectionTable 
-                    title="Proyección por Artículos" 
-                    dimensionKey="articulos" 
-                    :initial-collapsed="true"
-                />
+                <PicProjectionTable title="Proyección por Canal" dimensionKey="canal" drill-down-target="articulos"/>
+                <PicProjectionTable title="Proyección por Familias" dimensionKey="familias" drill-down-target="articulos"/>
+                <PicProjectionTable title="Proyección por Clientes (Top)" dimensionKey="clientes" drill-down-target="articulos" :initial-collapsed="true"/>
+                <PicProjectionTable title="Proyección por Artículos" dimensionKey="articulos" :initial-collapsed="true"/>
             </div>
         </div>
 

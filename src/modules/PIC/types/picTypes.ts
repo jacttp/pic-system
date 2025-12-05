@@ -53,3 +53,20 @@ export interface PicActiveFilters {
     Anio: Set<string>;
     // Genéricos (Gerencia, Marca, etc...)
 }
+
+// Estructura para un Gráfico Dinámico generado por IA
+export interface DynamicWidget {
+    id: string;
+    title: string;
+    type: 'bar' | 'line' | 'pie';
+    config: any; // Configuración de Chart.js
+    rawQuery: AiQueryConfig; // Guardamos la query original por si queremos re-consultar
+    timestamp: number;
+}
+
+// Estructura para las Chips de Sugerencia (Propuesta A)
+export interface AiSuggestionChip {
+    label: string;
+    prompt: string; // Lo que se enviará al chat al hacer clic
+    icon?: string;
+}

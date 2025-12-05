@@ -76,43 +76,106 @@ export const picApi = {
     },
 
     // --- INTELIGENCIA ARTIFICIAL ---
+   //  async sendChatPrompt(userPrompt: string): Promise<AiChatResponse> {
+   //      console.log("📡 [Front] Enviando prompt:", userPrompt);
+        
+   //      const { data } = await picClient.post('/gemini-proxy', { userPrompt });
+   //      const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+   //      if (!textResponse) throw new Error("IA no devolvió respuesta válida.");
+
+   //      try {
+   //          const cleanedJson = textResponse.replace(/```json\n?|```/g, '').trim();
+   //          const parsed = JSON.parse(cleanedJson);
+            
+   //          console.log("✅ [Front] JSON Original:", parsed);
+
+   //          if (parsed.explanation) return parsed;
+
+   //          if (parsed.metric || parsed.filters || parsed.dimensions) {
+   //              console.warn("⚠️ [Front] Formato plano detectado. Normalizando...");
+   //              return {
+   //                  explanation: "Entendido. Aquí tienes la configuración de datos solicitada:",
+   //                  queryConfig: parsed
+   //              };
+   //          }
+
+   //          return {
+   //              explanation: JSON.stringify(parsed),
+   //              queryConfig: null
+   //          };
+
+   //      } catch (e) {
+   //          console.error("❌ [Front] Error parseando JSON:", textResponse);
+   //          return {
+   //              explanation: textResponse,
+   //              queryConfig: null
+   //          };
+   //      }
+   //  },
     async sendChatPrompt(userPrompt: string): Promise<AiChatResponse> {
         console.log("📡 [Front] Enviando prompt:", userPrompt);
         
+        // 1. Llamada al Proxy de IA
         const { data } = await picClient.post('/gemini-proxy', { userPrompt });
         const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
         
         if (!textResponse) throw new Error("IA no devolvió respuesta válida.");
 
         try {
-            const cleanedJson = textResponse.replace(/```json\n?|```/g, '').trim();
-            const parsed = JSON.parse(cleanedJson);
+            // 2. Limpieza del string JSON (quita markdowns ```json ... ```)
+            const cleanedJson = textResponse.replace(/\`\`\`json\n?|\`\`\`/g, '').trim();
+            let parsed = JSON.parse(cleanedJson);
             
-            console.log("✅ [Front] JSON Original:", parsed);
-
-            if (parsed.explanation) return parsed;
-
+            // --- BLOQUE DE NORMALIZACIÓN AVANZADA ---
+            
+            // A. Detectar si vino plano (sin estructura explanation/queryConfig) y envolverlo
             if (parsed.metric || parsed.filters || parsed.dimensions) {
                 console.warn("⚠️ [Front] Formato plano detectado. Normalizando...");
-                return {
-                    explanation: "Entendido. Aquí tienes la configuración de datos solicitada:",
+                parsed = {
+                    explanation: "Configuración de datos generada:",
                     queryConfig: parsed
                 };
             }
 
+            // B. Sanitización de Filtros (El "Fix" para 'corona' vs 'CORONA')
+            if (parsed.queryConfig && parsed.queryConfig.filters) {
+                const f = parsed.queryConfig.filters;
+                
+                // Regla 1: Las MARCAS siempre van en mayúsculas en nuestra BD
+                if (f.Marca) {
+                    if (Array.isArray(f.Marca)) {
+                        f.Marca = f.Marca.map((m: string) => String(m).toUpperCase());
+                    } else if (typeof f.Marca === 'string') {
+                        f.Marca = f.Marca.toUpperCase();
+                    }
+                }
+                
+                // Regla 2: Si la IA alucina y pone "Anio" en vez de "Año" en filtros
+                if (f.Anio) {
+                    f['Año'] = f.Anio;
+                    delete f.Anio;
+                }
+
+                console.log("🧹 [Front] Filtros sanitizados:", f);
+            }
+            // ----------------------------------------
+
             return {
-                explanation: JSON.stringify(parsed),
-                queryConfig: null
+                explanation: parsed.explanation || JSON.stringify(parsed),
+                queryConfig: parsed.queryConfig || null
             };
 
         } catch (e) {
             console.error("❌ [Front] Error parseando JSON:", textResponse);
+            // Si falla el parseo, devolvemos el texto crudo como explicación
             return {
                 explanation: textResponse,
                 queryConfig: null
             };
         }
     },
+
 
     async executeAiQuery(queryConfig: AiQueryConfig): Promise<any[]> {
         const { data } = await picClient.post('/ia-query', queryConfig);

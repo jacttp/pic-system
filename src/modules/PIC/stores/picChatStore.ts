@@ -1,7 +1,10 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import {picApi} from '../services/picApi';
-import type { AiQueryConfig } from '../types/picTypes';
+import { picApi } from '../services/picApi';
+import type { AiQueryConfig, DynamicWidget } from '../types/picTypes';
+import { usePicFilterStore } from './picFilterStore'; // <--- Importamos el otro store
+import { getChartConfig } from '../utils/picUtils'; // Reutilizamos tu util de gráficos..
+import axios from 'axios';
 
 export interface ChatMessage {
     id: string;
@@ -15,6 +18,9 @@ export interface ChatMessage {
 export const usePicChatStore = defineStore('picChat', () => {
     const messages = ref<ChatMessage[]>([]);
     const isLoading = ref(false);
+
+     // Accedemos al store de filtros/grid
+    const filterStore = usePicFilterStore(); 
 
     // Estado para controlar si hay un reporte activo (esto servirá para la Fase 3)
     const isReportActive = ref(false);
@@ -73,12 +79,157 @@ export const usePicChatStore = defineStore('picChat', () => {
         initChat();
     }
 
+   //  async function visualizeData(messageId: string) {
+   //      const message = messages.value.find(m => m.id === messageId);
+   //      if (!message || !message.chartConfig) return;
+
+   //      isLoading.value = true;
+   //      try {
+   //          // 1. Ejecutar la query que la IA diseñó
+   //          const data = await picApi.executeAiQuery(message.chartConfig);
+            
+   //          if (!data || data.length === 0) {
+   //              addMessage('system', 'La consulta no devolvió datos para graficar.');
+   //              return;
+   //          }
+
+   //          // 2. Procesar datos para Chart.js (Adaptador rápido)
+   //          // Asumimos que la API devuelve [{ Dimension: '...', TotalMetric: 100 }]
+   //          const labels = data.map((d: any) => {
+   //              // Combinamos dimensiones si hay múltiples (ej: "Norte - 2024")
+   //              return message.chartConfig!.dimensions.map(dim => d[dim]).join(' - ');
+   //          });
+            
+   //          const values = data.map((d: any) => d.TotalMetric || 0);
+   //          const metricLabel = message.chartConfig!.metric === 'VENTA_$$' ? 'Venta ($)' : 'Venta (KG)';
+
+   //          // 3. Generar Configuración Visual
+   //          const chartJsConfig = getChartConfig(
+   //              labels, 
+   //              [{
+   //                  label: metricLabel,
+   //                  data: values,
+   //                  backgroundColor: '#0ea5e9', // Brand Blue
+   //                  borderRadius: 4
+   //              }], 
+   //              'bar' // Por defecto barras
+   //          );
+
+   //          // 4. Crear el Widget y mandarlo al Dashboard
+   //          const newWidget: DynamicWidget = {
+   //              id: Date.now().toString(),
+   //              title: `Análisis: ${metricLabel} por ${message.chartConfig!.dimensions.join(', ')}`,
+   //              type: 'bar',
+   //              config: chartJsConfig,
+   //              rawQuery: message.chartConfig!,
+   //              timestamp: Date.now()
+   //          };
+
+   //          filterStore.addDynamicWidget(newWidget);
+
+   //          // 5. Feedback al usuario
+   //          // Opcional: Podríamos hacer scroll automático al grid
+
+   //      } catch (error) {
+   //          console.error(error);
+   //          addMessage('system', 'Error al generar el gráfico. Intenta de nuevo.');
+   //      } finally {
+   //          isLoading.value = false;
+   //      }
+   //  }
+   
+   // NUEVA ACCIÓN: Convertir la intención de la IA en un gráfico real con manejo de errores robusto
+    
+   async function visualizeData(messageId: string) {
+        const message = messages.value.find(m => m.id === messageId);
+        if (!message || !message.chartConfig) return;
+
+        isLoading.value = true;
+        
+        try {
+            // 1. Ejecutar la query que la IA diseñó
+            const data = await picApi.executeAiQuery(message.chartConfig);
+            
+            // Caso: Query exitosa (200 OK) pero sin resultados (0 filas)
+            if (!data || data.length === 0) {
+                addMessage('system', 'La consulta se ejecutó correctamente pero no encontró datos para esos criterios.');
+                return;
+            }
+
+            // 2. Procesar datos para Chart.js (Adaptador rápido)
+            const labels = data.map((d: any) => {
+                // Combinamos dimensiones si hay múltiples (ej: "Norte - 2024")
+                return message.chartConfig!.dimensions.map(dim => d[dim]).join(' - ');
+            });
+            
+            const values = data.map((d: any) => d.TotalMetric || 0);
+            const metricLabel = message.chartConfig!.metric === 'VENTA_$$' ? 'Venta ($)' : 'Venta (KG)';
+
+            // 3. Generar Configuración Visual
+            const chartJsConfig = getChartConfig(
+                labels, 
+                [{
+                    label: metricLabel,
+                    data: values,
+                    backgroundColor: '#0ea5e9', // Brand Blue
+                    borderRadius: 4
+                }], 
+                'bar' // Por defecto barras
+            );
+
+            // 4. Crear el Widget y mandarlo al Dashboard
+            const newWidget: DynamicWidget = {
+                id: Date.now().toString(),
+                title: `Análisis: ${metricLabel} por ${message.chartConfig!.dimensions.join(', ')}`,
+                type: 'bar',
+                config: chartJsConfig,
+                rawQuery: message.chartConfig!,
+                timestamp: Date.now()
+            };
+
+            filterStore.addDynamicWidget(newWidget);
+
+            // Feedback visual opcional (Scroll o mensaje toast)
+            console.log("✅ Gráfico generado exitosamente");
+
+        } catch (error: any) {
+            console.error("❌ Error visualizando datos:", error);
+            
+            let userFeedback = 'Ocurrió un error técnico al generar el gráfico.';
+
+            // MANEJO DE ERROR 400 (Bad Request - Culpa de los filtros/IA)
+            if (axios.isAxiosError(error) && error.response) {
+                const status = error.response.status;
+                const backendMsg = error.response.data?.message || '';
+
+                if (status === 400) {
+                    // Intentamos interpretar el error para el usuario
+                    if (backendMsg.includes('filtro') || backendMsg.includes('column') || backendMsg.includes('Invalid column name')) {
+                        userFeedback = `No pude interpretar correctamente algunos filtros. Detalle técnico: ${backendMsg}. Intenta ser más específico (ej: "Marca CORONA" en mayúsculas).`;
+                    } else {
+                        userFeedback = `La estructura de la consulta no es válida para el sistema. Detalle: ${backendMsg}`;
+                    }
+                } else if (status === 500) {
+                    userFeedback = 'Error interno del servidor de base de datos. Por favor reporta esto a sistemas.';
+                }
+            }
+
+            addMessage('system', userFeedback);
+            
+        } finally {
+            isLoading.value = false;
+        }
+    }
+
+
     return {
         messages,
         isLoading,
         isReportActive,
         initChat,
         sendMessage,
-        clearChat
+        clearChat,
+
+        visualizeData
     };
 });

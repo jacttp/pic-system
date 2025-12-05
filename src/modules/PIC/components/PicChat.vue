@@ -1,14 +1,28 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick, watch } from 'vue';
+import { ref, onMounted, nextTick, watch, computed } from 'vue';
 import { usePicChatStore } from '../stores/picChatStore';
+import { usePicFilterStore } from '../stores/picFilterStore'; // Importamos el store de filtros
 import ChatMessage from './ChatMessage.vue';
 
 const store = usePicChatStore();
+const filterStore = usePicFilterStore(); // Instanciamos el store
+
 const userInput = ref('');
 const messagesContainer = ref<HTMLElement | null>(null);
-
-// Estado local para colapsar/expandir
 const isCollapsed = ref(false);
+
+// COMPUTED: ¿El chat está habilitado?
+const isChatEnabled = computed(() => {
+    // Está habilitado SOLO si hay datos en el reporte Y no está cargando la IA
+    return filterStore.reportData.length > 0 && !store.isLoading;
+});
+
+// COMPUTED: Placeholder dinámico
+const inputPlaceholder = computed(() => {
+    if (store.isLoading) return 'Pensando...';
+    if (filterStore.reportData.length === 0) return 'Genera el reporte para activar el chat 🔒';
+    return 'Pregunta sobre los datos (ej: Ventas de Corona)...';
+});
 
 onMounted(() => {
     store.initChat();
@@ -27,7 +41,8 @@ const scrollToBottom = () => {
 };
 
 const handleSend = async () => {
-    if (!userInput.value.trim() || store.isLoading) return;
+    // Bloqueo lógico: Si no hay texto O el chat está deshabilitado, no envía nada
+    if (!userInput.value.trim() || !isChatEnabled.value) return;
     
     const text = userInput.value;
     userInput.value = ''; 
@@ -46,11 +61,8 @@ const handleSend = async () => {
             @click="isCollapsed = !isCollapsed"
             class="absolute top-1/2 -translate-y-1/2 flex items-center justify-center transition-all duration-300 z-50 focus:outline-none shadow-lg border-y border-l"
             :class="[
-                // ESTADO 1: Colapsado (Llamativo, Azul, Icono IA)
                 isCollapsed 
                     ? '-left-12 w-12 h-16 bg-brand-600 border-brand-700 text-white rounded-l-2xl hover:bg-brand-700 shadow-brand-500/30' 
-                    
-                // ESTADO 2: Expandido (Sutil, Blanco, Flecha)
                     : '-left-5 w-5 h-12 bg-white border-slate-200 text-slate-300 rounded-l-lg hover:text-brand-600 hover:bg-slate-50'
             ]"
             :title="isCollapsed ? 'Abrir Asistente IA' : 'Ocultar Chat'"
@@ -92,18 +104,24 @@ const handleSend = async () => {
             </div>
 
             <div class="p-4 bg-white border-t border-slate-200 flex-shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                
+                <div v-if="filterStore.reportData.length === 0" class="mb-2 px-3 py-2 bg-yellow-50 border border-yellow-100 rounded-lg text-[10px] text-yellow-700 flex items-center gap-2">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span>Primero genera el reporte con los filtros.</span>
+                </div>
+
                 <div class="relative">
                     <input 
                         v-model="userInput" 
                         @keydown.enter.prevent="handleSend"
                         type="text" 
-                        placeholder="Pregunta sobre ventas..." 
-                        class="w-full pl-4 pr-12 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all placeholder:text-slate-400"
-                        :disabled="store.isLoading"
+                        :placeholder="inputPlaceholder"
+                        class="w-full pl-4 pr-12 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        :disabled="!isChatEnabled"
                     >
                     <button 
                         @click="handleSend"
-                        :disabled="!userInput.trim() || store.isLoading"
+                        :disabled="!userInput.trim() || !isChatEnabled"
                         class="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
                     >
                         <i class="fa-solid fa-paper-plane text-xs"></i>
@@ -116,7 +134,6 @@ const handleSend = async () => {
 </template>
 
 <style scoped>
-/* Animación suave para el ícono de magia */
 .animate-pulse-slow {
     animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }

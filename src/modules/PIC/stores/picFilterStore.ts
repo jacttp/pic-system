@@ -59,6 +59,8 @@ export const usePicFilterStore = defineStore('picFilter', () => {
     const selectedClients = reactive(new Map<string, string>());
     const loadingProjections = reactive<Record<string, boolean>>({});
 
+    const dynamicWidgets = ref<DynamicWidget[]>([]);
+
 
 
     // 3. ACCIONES
@@ -335,6 +337,24 @@ export const usePicFilterStore = defineStore('picFilter', () => {
         depOptions.skus = [];
     }
 
+    function addDynamicWidget(widget: DynamicWidget) {
+    // Agregamos al inicio para que se vea luego luego
+    dynamicWidgets.value.unshift(widget);
+    
+    // Opcional: Limitar a máximo 5 gráficos dinámicos para no saturar memoria
+    if (dynamicWidgets.value.length > 5) {
+        dynamicWidgets.value.pop();
+    }
+   }
+
+   function removeDynamicWidget(id: string) {
+      dynamicWidgets.value = dynamicWidgets.value.filter(w => w.id !== id);
+   }
+
+   function clearDynamicWidgets() {
+      dynamicWidgets.value = [];
+   }
+
     return {
 
         selectedClients,
@@ -363,6 +383,11 @@ export const usePicFilterStore = defineStore('picFilter', () => {
         handleGerenciaChange,
         handleJefaturaChange,
         handleMarcaChange,
-        handleGrupoChange
+        handleGrupoChange,
+
+        dynamicWidgets,
+        addDynamicWidget,
+        removeDynamicWidget,
+        clearDynamicWidgets
     };
 });
