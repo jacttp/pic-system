@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue'; // <--- AGREGAR ref
 import { usePicFilterStore } from '../stores/picFilterStore';
 import { processChartData, processAnnualData, getChartConfig, CHART_COLORS, CHART_COLORS_GREEN, MONTH_NAMES } from '../utils/picUtils';
 import BaseChart from './charts/BaseChart.vue';
@@ -8,6 +8,9 @@ import PicProjectionTable from './tables/PicProjectionTable.vue';
 
 const store = usePicFilterStore();
 const selectedYears = computed(() => store.selected.Anio.sort());
+
+// <--- NUEVO: Estado para colapsar toda la sección de desglose
+const showDesglose = ref(true);
 
 // --- 1. CONFIGURACIÓN PESOS ($) ---
 const dataPesos = computed(() => processChartData(store.reportData, selectedYears.value, 'pesos'));
@@ -85,8 +88,6 @@ const configPromedioMensual = computed(() => {
 
 const dataPromedioAnual = computed(() => processAnnualData(store.reportData, selectedYears.value, 'promedio'));
 const configPromedioAnual = computed(() => {
-    // Calculamos el promedio de promedios para la línea anual (visualización simple)
-    // OJO: Para gráfico de barras de promedio anual usamos colores verdes
     return getChartConfig(selectedYears.value, [{
         label: 'Promedio Anual ($/KG)',
         data: dataPromedioAnual.value,
@@ -147,12 +148,28 @@ const configPromedioAnual = computed(() => {
         <PicDataTable title="Detalle Precio Promedio" type="promedio" :processed-data="dataPromedio" :years="selectedYears" />
 
         <div class="pt-8 border-t-2 border-slate-200 border-dashed mt-12">
-            <h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2 px-1">
-                <i class="fa-solid fa-layer-group text-brand-500"></i>
-                Desglose Operativo
-            </h2>
+            
+            <button 
+                @click="showDesglose = !showDesglose"
+                class="w-full flex justify-between items-center mb-6 group focus:outline-none"
+            >
+                <div class="flex items-center gap-2">
+                    <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2 px-1 group-hover:text-brand-600 transition-colors">
+                        <i class="fa-solid fa-layer-group text-brand-500"></i>
+                        Desglose Operativo
+                    </h2>
+                    <span class="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                        {{ showDesglose ? 'Visible' : 'Oculto' }}
+                    </span>
+                </div>
 
-            <div class="space-y-6">
+                <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-brand-50 group-hover:text-brand-600 transition-all">
+                    <i class="fa-solid fa-chevron-down transition-transform duration-300" :class="{'rotate-180': !showDesglose}"></i>
+                </div>
+            </button>
+
+            <div v-show="showDesglose" class="space-y-6 transition-all duration-500 ease-in-out">
+                
                 <PicProjectionTable 
                     title="Proyección por Marcas" 
                     dimensionKey="marcas" 
@@ -160,15 +177,28 @@ const configPromedioAnual = computed(() => {
                 
                 <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
                     <PicProjectionTable title="Proyección por Gerencia" dimensionKey="gerencia" />
-                    <PicProjectionTable title="Proyección por Zona" dimensionKey="zona" />
+                    <PicProjectionTable 
+                        title="Proyección por Zona" 
+                        dimensionKey="zona"
+                        drill-down-target="articulos" 
+                    />
                 </div>
 
-                <PicProjectionTable title="Proyección por Canal" dimensionKey="canal" />
-                <PicProjectionTable title="Proyección por Familias" dimensionKey="familias" />
+                <PicProjectionTable 
+                    title="Proyección por Canal" 
+                    dimensionKey="canal" 
+                    drill-down-target="articulos"
+                />
+                <PicProjectionTable 
+                    title="Proyección por Familias" 
+                    dimensionKey="familias" 
+                    drill-down-target="articulos"
+                />
                 
                 <PicProjectionTable 
-                    title="Proyección por Clientes" 
+                    title="Proyección por Clientes (Top)" 
                     dimensionKey="clientes" 
+                    drill-down-target="articulos"
                     :initial-collapsed="true"
                 />
                 <PicProjectionTable 

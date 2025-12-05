@@ -59,13 +59,13 @@ export const picApi = {
         });
         return data;
     },
-
-    async getProjection(dimension: string, filters: Record<string, any>, years: string[]) {
-        // Nota: El backend espera 'dimension', 'filters', 'years' en el body
+    
+    async getProjection(dimension: string, filters: Record<string, any>, years: string[], limit?: number) {
         const { data } = await picClient.post('/projections', {
             dimension,
             filters,
-            years
+            years,
+            limit // Enviamos el límite al backend
         });
         return data;
     },

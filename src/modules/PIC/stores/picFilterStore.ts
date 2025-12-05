@@ -240,14 +240,22 @@ export const usePicFilterStore = defineStore('picFilter', () => {
                 ? [...selected.Anio].sort() 
                 : (options.anios.length > 0 ? options.anios.slice(-3).sort() : ['2023', '2024', '2025']);
 
+             // --- CAMBIO AQUÍ: Definir límite según la dimensión ---
+            let limit: number | undefined = undefined;
+            
+            // Regla: Clientes y Artículos limitados a Top 50 para rendimiento
+            if (dimensionKey === 'clientes' || dimensionKey === 'articulos') {
+                limit = 50;
+            }
+
             // 3. Llamada API
-            const data = await picApi.getProjection(dimensionKey, apiFilters, yearsTarget);
+            const data = await picApi.getProjection(dimensionKey, apiFilters, yearsTarget, limit);
             
             // 4. Guardar en el slot correspondiente
             // @ts-ignore (Tipado dinámico rápido)
             projectionData[dimensionKey] = data;
 
-        } catch (e) {
+        } catch (e) {         
             console.error(`Error cargando proyección ${dimensionKey}`, e);
         } finally {
             loadingProjections[dimensionKey] = false;

@@ -1,61 +1,131 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { usePicFilterStore } from '../../stores/picFilterStore';
+import { picApi } from '../../services/picApi'; // <--- NUEVO: Necesario para pedir el detalle
 import { formatNumber } from '../../utils/formatters';
 
 const props = defineProps<{
     title: string;
-    dimensionKey: string; // 'marcas', 'zona', etc. (Clave exacta del store)
+    dimensionKey: string; // La dimensión de ESTA tabla (ej: 'familias')
     initialCollapsed?: boolean;
+    // <--- NUEVO: Define qué dimensión pedir al hacer clic (ej: 'articulos')
+    // Si no se pasa esta prop, la tabla no será interactiva (caso Marcas/Gerencia)
+    drillDownTarget?: string; 
 }>();
 
 const store = usePicFilterStore();
 const isCollapsed = ref(props.initialCollapsed || false);
 
-// Acceder dinámicamente a los datos en el store usando la prop
+// --- ESTADO LOCAL PARA EL DRILL-DOWN ---
+// Guardamos los datos de las filas hijas aquí: { "NombreFilaPadre": [datosHijos...] }
+const expandedRows = ref<Record<string, any[]>>({});
+const loadingRows = ref<Record<string, boolean>>({});
+
+// Acceso al store para datos principales
 const tableData = computed(() => store.projectionData[props.dimensionKey as keyof typeof store.projectionData] || []);
 const isLoading = computed(() => store.loadingProjections[props.dimensionKey] || false);
 
-// Años a comparar (Leemos del store directamente para estar sincronizados)
-const years = computed(() => {
-    return store.selected.Anio.length > 0 
-        ? [...store.selected.Anio].sort() 
-        : ['2023', '2024', '2025'];
-});
-
-// Años clave
+// Años (Sincronizados con el store)
+const years = computed(() => store.selected.Anio.length > 0 ? [...store.selected.Anio].sort() : ['2023', '2024', '2025']);
 const currentYear = computed(() => years.value[years.value.length - 1]);
 const prevYear = computed(() => years.value.length > 1 ? years.value[years.value.length - 2] : null);
 
-// --- LÓGICA DE CARGA ---
+// --- LÓGICA DE CARGA PRINCIPAL ---
 const handleLoad = () => {
-    isCollapsed.value = false; // Asegurar que se vea al cargar
+    isCollapsed.value = false;
     store.fetchSingleProjection(props.dimensionKey);
 };
 
-// --- LÓGICA MATEMÁTICA (Igual que antes) ---
-const processedRows = computed(() => {
-    if (tableData.value.length === 0) return [];
-    
+// --- LÓGICA MATEMÁTICA (Factorizada para reusar en Padre e Hijos) ---
+// Esta función calcula crecimientos y diferencias para cualquier array de datos
+const processData = (data: any[], totalMarketSize: number) => {
+    if (!data || data.length === 0) return [];
     const yCurr = currentYear.value;
     const yPrev = prevYear.value;
-    const totalMarketSize = tableData.value.reduce((sum, row) => sum + (row[`Venta_${yCurr}`] || 0), 0);
 
-    return tableData.value.map(row => {
+    return data.map(row => {
         const valCurr = row[`Venta_${yCurr}`] || 0;
         const valPrev = yPrev ? (row[`Venta_${yPrev}`] || 0) : 0;
         const meta = row[`Meta_${yCurr}`] || 0;
         const difAnual = valCurr - valPrev;
         const difMeta = valCurr - meta;
+        
         const crec = valPrev !== 0 ? (difAnual / valPrev) * 100 : 0;
         const varMeta = meta !== 0 ? (valCurr / meta) * 100 : 0;
+        
+        // La participación siempre es relativa al total que le pasemos
         const share = totalMarketSize !== 0 ? (valCurr / totalMarketSize) * 100 : 0;
 
         return { ...row, valCurr, valPrev, meta, difAnual, difMeta, crec, varMeta, share };
     });
+};
+
+// Procesar filas PADRE (La tabla principal)
+const processedRows = computed(() => {
+    const yCurr = currentYear.value;
+    // El 100% es la suma de toda la tabla actual
+    const total = tableData.value.reduce((s, r) => s + (r[`Venta_${yCurr}`] || 0), 0);
+    return processData(tableData.value, total);
 });
 
-// Footer (Igual que antes)
+// --- NUEVO: LÓGICA DE CLIC EN FILA (DRILL-DOWN) ---
+const toggleRow = async (row: any) => {
+    // Si no se configuró un objetivo de drilldown, no hacemos nada (ej: Marcas)
+    if (!props.drillDownTarget) return;
+
+    const rowId = row.Dimension; // Ej: "ZF-Jamon Pierna"
+
+    // 1. Si ya está abierto, lo cerramos (borramos del estado local)
+    if (expandedRows.value[rowId]) {
+        delete expandedRows.value[rowId];
+        return;
+    }
+
+    // 2. Si no, cargamos los datos
+    loadingRows.value[rowId] = true;
+    try {
+        // Obtenemos los filtros globales actuales
+        const activeFilters = JSON.parse(JSON.stringify(store.getFiltersForClientSearch())); 
+        
+        // Mapeamos: Si estoy en la tabla 'familias', el filtro de BD es 'grupo'
+        const dimensionToFilterMap: Record<string, string> = {
+            'familias': 'grupo',
+            'zona': 'Zona',
+            'canal': 'canal',
+            'clientes': 'NOM_CLIENTE',
+            'gerencia': 'Gerencia'
+        };
+        
+        const filterKey = dimensionToFilterMap[props.dimensionKey] || props.dimensionKey;
+        
+        // AGREGAMOS EL FILTRO: "Traeme los artículos DONDE grupo = 'ZF-Jamon Pierna'"
+        activeFilters[filterKey] = [row.Dimension]; 
+
+        // Llamamos a la API directamente (sin pasar por el store global para no sobrescribir nada)
+        const childData = await picApi.getProjection(props.drillDownTarget, activeFilters, years.value);
+        
+        expandedRows.value[rowId] = childData;
+
+    } catch (e) {
+        console.error("Error cargando detalle:", e);
+    } finally {
+        loadingRows.value[rowId] = false;
+    }
+};
+
+// Helper para procesar las filas HIJAS (cuando se renderizan)
+const getChildRows = (parentId: string) => {
+    const data = expandedRows.value[parentId];
+    if (!data) return [];
+    
+    // Para las hijas, el 100% de participación es con respecto a SU PADRE
+    const parentRow = processedRows.value.find(p => p.Dimension === parentId);
+    const parentTotal = parentRow ? parentRow.valCurr : 1; 
+
+    return processData(data, parentTotal);
+};
+
+// Footer (Cálculo de totales generales)
 const footer = computed(() => {
     if (processedRows.value.length === 0) return null;
     const sums: any = { Dimension: 'TOTAL' };
@@ -116,7 +186,7 @@ const colorClass = (val: number, isPercent = false) => {
             <table class="w-full text-xs text-left border-collapse whitespace-nowrap">
                 <thead class="bg-slate-800 text-white font-semibold uppercase sticky top-0 z-10">
                     <tr>
-                        <th class="px-3 py-2 text-left bg-slate-900 border-r border-slate-700 min-w-[150px] sticky left-0 z-20">
+                        <th class="px-3 py-2 text-left bg-slate-900 border-r border-slate-700 min-w-[180px] sticky left-0 z-20">
                             Concepto
                         </th>
                         <th v-for="y in years" :key="y" class="px-3 py-2 text-right">Venta {{ y }}</th>
@@ -129,18 +199,67 @@ const colorClass = (val: number, isPercent = false) => {
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
-                    <tr v-for="(row, idx) in processedRows" :key="idx" class="hover:bg-yellow-50 transition-colors group">
-                        <td class="px-3 py-2 font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-yellow-50 border-r border-slate-100 truncate max-w-[200px]" :title="row.Dimension">
-                            {{ row.Dimension }}
-                        </td>
-                        <td v-for="y in years" :key="y" class="px-3 py-2 text-right text-slate-600 font-mono">{{ formatNumber(row[`Venta_${y}`]) }}</td>
-                        <td class="px-3 py-2 text-right text-emerald-700 font-mono bg-emerald-50/30">{{ formatNumber(row.meta) }}</td>
-                        <td class="px-3 py-2 text-right font-mono" :class="colorClass(row.difAnual)">{{ formatNumber(row.difAnual) }}</td>
-                        <td class="px-3 py-2 text-right font-mono" :class="colorClass(row.difMeta)">{{ formatNumber(row.difMeta) }}</td>
-                        <td class="px-3 py-2 text-right font-bold" :class="colorClass(row.crec)">{{ row.crec.toFixed(1) }}%</td>
-                        <td class="px-3 py-2 text-right font-bold" :class="colorClass(row.varMeta, true)">{{ row.varMeta.toFixed(1) }}%</td>
-                        <td class="px-3 py-2 text-right text-slate-800 font-bold bg-slate-50">{{ row.share.toFixed(1) }}%</td>
-                    </tr>
+                    <template v-for="(row, idx) in processedRows" :key="row.Dimension">
+                        
+                        <tr 
+                            class="transition-colors group border-l-4 border-transparent"
+                            :class="[
+                                drillDownTarget ? 'cursor-pointer hover:bg-yellow-50' : 'hover:bg-slate-50',
+                                expandedRows[row.Dimension] ? 'bg-slate-50 border-l-brand-500' : ''
+                            ]"
+                            @click="toggleRow(row)"
+                        >
+                            <td class="px-3 py-2 font-bold text-slate-700 sticky left-0 bg-inherit border-r border-slate-100 truncate max-w-[200px]" :title="row.Dimension">
+                                <div class="flex items-center gap-2">
+                                    <i v-if="drillDownTarget" 
+                                       class="fa-solid text-[10px] text-slate-400 transition-transform duration-200"
+                                       :class="expandedRows[row.Dimension] || loadingRows[row.Dimension] ? 'fa-chevron-down' : 'fa-chevron-right'">
+                                    </i>
+                                    {{ row.Dimension }}
+                                </div>
+                            </td>
+                            <td v-for="y in years" :key="y" class="px-3 py-2 text-right text-slate-600 font-mono">{{ formatNumber(row[`Venta_${y}`]) }}</td>
+                            <td class="px-3 py-2 text-right text-emerald-700 font-mono bg-emerald-50/30">{{ formatNumber(row.meta) }}</td>
+                            <td class="px-3 py-2 text-right font-mono" :class="colorClass(row.difAnual)">{{ formatNumber(row.difAnual) }}</td>
+                            <td class="px-3 py-2 text-right font-mono" :class="colorClass(row.difMeta)">{{ formatNumber(row.difMeta) }}</td>
+                            <td class="px-3 py-2 text-right font-bold" :class="colorClass(row.crec)">{{ row.crec.toFixed(1) }}%</td>
+                            <td class="px-3 py-2 text-right font-bold" :class="colorClass(row.varMeta, true)">{{ row.varMeta.toFixed(1) }}%</td>
+                            <td class="px-3 py-2 text-right text-slate-800 font-bold bg-slate-50">{{ row.share.toFixed(1) }}%</td>
+                        </tr>
+
+                        <tr v-if="loadingRows[row.Dimension]">
+                            <td :colspan="8 + years.length" class="bg-slate-50 p-2 text-center text-slate-400 text-[10px]">
+                                <i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Cargando detalle...
+                            </td>
+                        </tr>
+
+                        <tr v-if="expandedRows[row.Dimension]" class="bg-slate-50 shadow-inner">
+                            <td :colspan="8 + years.length" class="p-0">
+                                <div class="pl-8 py-2 pr-2 border-l-4 border-brand-500/20">
+                                    <table class="w-full text-[11px] text-slate-600">
+                                        <tr v-for="child in getChildRows(row.Dimension)" :key="child.Dimension" class="border-b border-slate-200/50 last:border-0 hover:bg-white transition-colors">
+                                            <td class="py-1.5 px-2 font-medium truncate w-[180px] text-slate-500 pl-4">{{ child.Dimension }}</td>
+                                            
+                                            <td v-for="y in years" :key="y" class="py-1.5 px-2 text-right font-mono w-[80px]">
+                                                {{ formatNumber(child[`Venta_${y}`]) }}
+                                            </td>
+                                            <td class="py-1.5 px-2 text-right text-emerald-700/70 w-[80px]">{{ formatNumber(child.meta) }}</td>
+                                            
+                                            <td class="py-1.5 px-2 text-right w-[80px]" :class="colorClass(child.difAnual)">{{ formatNumber(child.difAnual) }}</td>
+                                            <td class="py-1.5 px-2 text-right w-[80px]" :class="colorClass(child.difMeta)">{{ formatNumber(child.difMeta) }}</td>
+                                            <td class="py-1.5 px-2 text-right w-[60px]" :class="colorClass(child.crec)">{{ child.crec.toFixed(1) }}%</td>
+                                            <td class="py-1.5 px-2 text-right w-[60px]" :class="colorClass(child.varMeta, true)">{{ child.varMeta.toFixed(1) }}%</td>
+                                            
+                                            <td class="py-1.5 px-2 text-right font-bold text-brand-700 bg-brand-50/20 w-[60px]">
+                                                {{ child.share.toFixed(1) }}%
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </td>
+                        </tr>
+
+                    </template>
                 </tbody>
                 <tfoot v-if="footer" class="bg-slate-100 font-bold text-slate-800 border-t-2 border-slate-300">
                     <tr>
