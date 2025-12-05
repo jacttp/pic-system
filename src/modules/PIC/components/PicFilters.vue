@@ -6,7 +6,7 @@ import FilterDropdown from './FilterDropdown.vue';
 import PicClientModal from './modals/PicClientModal.vue'; 
 
 const store = usePicFilterStore();
-const isCollapsed = ref(false); 
+const isCollapsed = ref(true); 
 const overflowVisible = ref(true); 
 
 // 2. ESTADO DEL MODAL
