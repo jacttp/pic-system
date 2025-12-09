@@ -54,7 +54,8 @@ const handleLogout = () => {
         <!-- CONTENIDO PRINCIPAL -->
         <main class="flex-1 p-8 lg:p-12 overflow-y-auto">
             <header class="mb-10 fade-in">
-                <h1 class="text-3xl font-bold text-slate-800 mb-2">Bienvenido al Portal Central</h1>
+                <h1 class="text-3xl font-bold text-slate-800 mb-2">Bienvenido a PIC System
+</h1>
                 <p class="text-slate-500">Selecciona un módulo para comenzar a trabajar.</p>
             </header>
 

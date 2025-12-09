@@ -1,235 +1,210 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { picApi } from '../services/picApi';
-import type { AiQueryConfig, DynamicWidget } from '../types/picTypes';
-import { usePicFilterStore } from './picFilterStore'; // <--- Importamos el otro store
-import { getChartConfig } from '../utils/picUtils'; // Reutilizamos tu util de gráficos..
 import axios from 'axios';
+import { picApi } from '../services/picApi';
+import type { AiQueryConfig, DynamicWidget, ChatMessage } from '../types/picTypes';
+import { usePicFilterStore } from './picFilterStore';
+import { getChartConfig } from '../utils/picUtils';
 
-export interface ChatMessage {
+interface ChatContext {
     id: string;
-    role: 'user' | 'assistant' | 'system';
-    text: string;
-    timestamp: Date;
-    // Si el mensaje trae datos para graficar, los guardamos aquí
-    chartConfig?: AiQueryConfig | null; 
+    title: string;
+    data: any;
+    type: 'chart' | 'table';
 }
 
 export const usePicChatStore = defineStore('picChat', () => {
+    // --- ESTADO ---
     const messages = ref<ChatMessage[]>([]);
     const isLoading = ref(false);
-
-     // Accedemos al store de filtros/grid
-    const filterStore = usePicFilterStore(); 
-
-    // Estado para controlar si hay un reporte activo (esto servirá para la Fase 3)
+    const activeContext = ref<ChatContext | null>(null);
     const isReportActive = ref(false);
 
-    // Mensaje de bienvenida inicial
+    const filterStore = usePicFilterStore();
+
+    // --- ACCIONES BÁSICAS ---
     function initChat() {
         if (messages.value.length === 0) {
-            addMessage('assistant', 'Hola, soy tu analista virtual de PIC. Puedes pedirme datos específicos (ej: "Ventas de Corona en 2024") o generar el reporte completo.');
+            addMessage('assistant', 'Hola, soy tu analista virtual de PIC. Puedes pedirme datos específicos o generar reportes.');
         }
     }
 
     function addMessage(role: 'user' | 'assistant' | 'system', text: string, chartConfig: AiQueryConfig | null = null) {
+        const id = Date.now().toString() + Math.random().toString();
         messages.value.push({
-            id: Date.now().toString() + Math.random().toString(),
+            id,
             role,
             text,
             timestamp: new Date(),
             chartConfig
         });
+        return id; // Retornamos ID para uso posterior
+    }
+
+    function setContext(title: string, data: any, type: 'chart' | 'table') {
+        activeContext.value = {
+            id: Date.now().toString(),
+            title,
+            data,
+            type
+        };
+        console.log("Contexto establecido:", title);
+    }
+
+    function clearContext() {
+        activeContext.value = null;
+    }
+
+    function clearChat() {
+        messages.value = [];
+        clearContext();
+        initChat();
     }
 
     async function sendMessage(userText: string) {
         if (!userText.trim()) return;
 
-        // 1. Agregar mensaje del usuario
+        // 1. Agregar mensaje del usuario a la UI inmediatamente
         addMessage('user', userText);
         isLoading.value = true;
 
         try {
-            // 2. Consultar a la API (Backend v1)
-            const response = await picApi.sendChatPrompt(userText);
+            // --- A. PREPARAR MEMORIA (HISTORIAL) ---
+            // Tomamos los últimos 10 mensajes previos para dar contexto
+            // Excluimos el mensaje actual (que acabamos de agregar) y los mensajes de error (system)
+            const history = messages.value
+                .slice(0, -1) // Ignoramos el mensaje actual
+                .slice(-10)   // Limitamos a 10 turnos para ahorrar tokens
+                .filter(m => m.role !== 'system') 
+                .map(m => ({
+                    role: m.role === 'user' ? 'user' : 'model', // Gemini usa 'model', no 'assistant'
+                    parts: [{ text: m.text }]
+                }));
 
-            // 3. Procesar respuesta híbrida
-            // 'explanation' siempre se muestra como texto
+            // --- B. INYECTAR CONTEXTO VISUAL (Si el usuario seleccionó un gráfico) ---
+            let promptToSend = userText;
+            
+            if (activeContext.value) {
+                const contextDataStr = JSON.stringify(activeContext.value.data).slice(0, 5000);
+                promptToSend = `
+                [CONTEXTO VISUAL ACTIVO]
+                Elemento: "${activeContext.value.title}" (${activeContext.value.type}).
+                Datos: ${contextDataStr}.
+                
+                [PREGUNTA USUARIO]
+                "${userText}"
+                `;
+            }
+
+            // --- C. LLAMADA A LA API ---
+            // Enviamos el prompt actual + el historial de la conversación
+            const response = await picApi.sendChatPrompt(promptToSend, history);
+
+            // --- D. PROCESAR RESPUESTA ---
             if (response.explanation) {
-                addMessage('assistant', response.explanation, response.queryConfig);
+                const msgId = addMessage('assistant', response.explanation, response.queryConfig);
+
+                // Si la IA decidió generar un gráfico, lo renderizamos automáticamente
+                if (response.queryConfig) {
+                    await visualizeData(msgId);
+                }
             }
 
-            // 4. Si viene configuración de query, significa que hay datos para mostrar
-            if (response.queryConfig) {
-                // Aquí activaremos el dashboard en el futuro.
-                // Por ahora, el mensaje del asistente ya lleva el 'chartConfig' adjunto.
-                console.log("Datos listos para graficar:", response.queryConfig);
-            }
+            // Limpiamos el contexto visual después de usarlo
+            clearContext();
 
         } catch (error: any) {
-            addMessage('system', 'Lo siento, hubo un error al procesar tu solicitud. Intenta de nuevo.');
-            console.error(error);
+            const errorMsg = error.response?.data?.message || 'Hubo un error técnico al procesar tu solicitud.';
+            addMessage('system', errorMsg);
+            console.error("Chat Error:", error);
         } finally {
             isLoading.value = false;
         }
     }
 
-    function clearChat() {
-        messages.value = [];
-        initChat();
-    }
-
-   //  async function visualizeData(messageId: string) {
-   //      const message = messages.value.find(m => m.id === messageId);
-   //      if (!message || !message.chartConfig) return;
-
-   //      isLoading.value = true;
-   //      try {
-   //          // 1. Ejecutar la query que la IA diseñó
-   //          const data = await picApi.executeAiQuery(message.chartConfig);
-            
-   //          if (!data || data.length === 0) {
-   //              addMessage('system', 'La consulta no devolvió datos para graficar.');
-   //              return;
-   //          }
-
-   //          // 2. Procesar datos para Chart.js (Adaptador rápido)
-   //          // Asumimos que la API devuelve [{ Dimension: '...', TotalMetric: 100 }]
-   //          const labels = data.map((d: any) => {
-   //              // Combinamos dimensiones si hay múltiples (ej: "Norte - 2024")
-   //              return message.chartConfig!.dimensions.map(dim => d[dim]).join(' - ');
-   //          });
-            
-   //          const values = data.map((d: any) => d.TotalMetric || 0);
-   //          const metricLabel = message.chartConfig!.metric === 'VENTA_$$' ? 'Venta ($)' : 'Venta (KG)';
-
-   //          // 3. Generar Configuración Visual
-   //          const chartJsConfig = getChartConfig(
-   //              labels, 
-   //              [{
-   //                  label: metricLabel,
-   //                  data: values,
-   //                  backgroundColor: '#0ea5e9', // Brand Blue
-   //                  borderRadius: 4
-   //              }], 
-   //              'bar' // Por defecto barras
-   //          );
-
-   //          // 4. Crear el Widget y mandarlo al Dashboard
-   //          const newWidget: DynamicWidget = {
-   //              id: Date.now().toString(),
-   //              title: `Análisis: ${metricLabel} por ${message.chartConfig!.dimensions.join(', ')}`,
-   //              type: 'bar',
-   //              config: chartJsConfig,
-   //              rawQuery: message.chartConfig!,
-   //              timestamp: Date.now()
-   //          };
-
-   //          filterStore.addDynamicWidget(newWidget);
-
-   //          // 5. Feedback al usuario
-   //          // Opcional: Podríamos hacer scroll automático al grid
-
-   //      } catch (error) {
-   //          console.error(error);
-   //          addMessage('system', 'Error al generar el gráfico. Intenta de nuevo.');
-   //      } finally {
-   //          isLoading.value = false;
-   //      }
-   //  }
-   
-   // NUEVA ACCIÓN: Convertir la intención de la IA en un gráfico real con manejo de errores robusto
-    
-   async function visualizeData(messageId: string) {
+    // --- GENERACIÓN DE WIDGETS ---
+    async function visualizeData(messageId: string) {
         const message = messages.value.find(m => m.id === messageId);
         if (!message || !message.chartConfig) return;
 
-        isLoading.value = true;
-        
+        // Nota: isLoading global ya suele estar true si viene de sendMessage, 
+        // pero lo forzamos por si se llama manual desde un botón "Reintentar"
+        const localLoading = !isLoading.value; 
+        if (localLoading) isLoading.value = true;
+
         try {
-            // 1. Ejecutar la query que la IA diseñó
+            // 1. Ejecutar Query SQL generada por IA
             const data = await picApi.executeAiQuery(message.chartConfig);
-            
-            // Caso: Query exitosa (200 OK) pero sin resultados (0 filas)
+
             if (!data || data.length === 0) {
-                addMessage('system', 'La consulta se ejecutó correctamente pero no encontró datos para esos criterios.');
+                addMessage('system', 'La consulta es válida pero no devolvió resultados (0 registros).');
                 return;
             }
 
-            // 2. Procesar datos para Chart.js (Adaptador rápido)
-            const labels = data.map((d: any) => {
-                // Combinamos dimensiones si hay múltiples (ej: "Norte - 2024")
-                return message.chartConfig!.dimensions.map(dim => d[dim]).join(' - ');
-            });
-            
+            // 2. Procesar Datos para Chart.js
+            const config = message.chartConfig;
+            const labels = data.map((d: any) => config.dimensions.map(dim => d[dim]).join(' - '));
             const values = data.map((d: any) => d.TotalMetric || 0);
-            const metricLabel = message.chartConfig!.metric === 'VENTA_$$' ? 'Venta ($)' : 'Venta (KG)';
+            
+            const metricLabelMap: Record<string, string> = {
+                'VENTA_KG': 'Venta (KG)',
+                'VENTA_$$': 'Venta ($)',
+                'METAS_KG': 'Meta (KG)'
+            };
+            const labelMetric = metricLabelMap[config.metric] || config.metric;
 
-            // 3. Generar Configuración Visual
             const chartJsConfig = getChartConfig(
-                labels, 
+                labels,
                 [{
-                    label: metricLabel,
+                    label: labelMetric,
                     data: values,
-                    backgroundColor: '#0ea5e9', // Brand Blue
+                    backgroundColor: '#0ea5e9',
                     borderRadius: 4
-                }], 
-                'bar' // Por defecto barras
+                }],
+                'bar'
             );
 
-            // 4. Crear el Widget y mandarlo al Dashboard
+            // 3. Crear Widget en el Dashboard
             const newWidget: DynamicWidget = {
                 id: Date.now().toString(),
-                title: `Análisis: ${metricLabel} por ${message.chartConfig!.dimensions.join(', ')}`,
+                title: `IA: ${labelMetric} por ${config.dimensions.join(', ')}`,
                 type: 'bar',
                 config: chartJsConfig,
-                rawQuery: message.chartConfig!,
+                rawQuery: config,
                 timestamp: Date.now()
             };
 
             filterStore.addDynamicWidget(newWidget);
-
-            // Feedback visual opcional (Scroll o mensaje toast)
-            console.log("✅ Gráfico generado exitosamente");
+            isReportActive.value = true; // Forzar vista de dashboard
 
         } catch (error: any) {
             console.error("❌ Error visualizando datos:", error);
-            
-            let userFeedback = 'Ocurrió un error técnico al generar el gráfico.';
+            let userFeedback = 'Error técnico al generar el gráfico.';
 
-            // MANEJO DE ERROR 400 (Bad Request - Culpa de los filtros/IA)
             if (axios.isAxiosError(error) && error.response) {
                 const status = error.response.status;
-                const backendMsg = error.response.data?.message || '';
-
+                const msg = error.response.data?.message || '';
+                
                 if (status === 400) {
-                    // Intentamos interpretar el error para el usuario
-                    if (backendMsg.includes('filtro') || backendMsg.includes('column') || backendMsg.includes('Invalid column name')) {
-                        userFeedback = `No pude interpretar correctamente algunos filtros. Detalle técnico: ${backendMsg}. Intenta ser más específico (ej: "Marca CORONA" en mayúsculas).`;
-                    } else {
-                        userFeedback = `La estructura de la consulta no es válida para el sistema. Detalle: ${backendMsg}`;
-                    }
-                } else if (status === 500) {
-                    userFeedback = 'Error interno del servidor de base de datos. Por favor reporta esto a sistemas.';
+                    userFeedback = `La consulta generada no es válida para la BD. Detalle: ${msg}`;
                 }
             }
-
             addMessage('system', userFeedback);
-            
         } finally {
-            isLoading.value = false;
+            if (localLoading) isLoading.value = false;
         }
     }
-
 
     return {
         messages,
         isLoading,
+        activeContext,
         isReportActive,
         initChat,
         sendMessage,
         clearChat,
-
-        visualizeData
+        visualizeData,
+        setContext,
+        clearContext
     };
 });

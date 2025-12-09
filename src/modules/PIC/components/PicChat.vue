@@ -1,26 +1,25 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, watch, computed } from 'vue';
 import { usePicChatStore } from '../stores/picChatStore';
-import { usePicFilterStore } from '../stores/picFilterStore'; // Importamos el store de filtros
+import { usePicFilterStore } from '../stores/picFilterStore';
 import ChatMessage from './ChatMessage.vue';
 
 const store = usePicChatStore();
-const filterStore = usePicFilterStore(); // Instanciamos el store
+const filterStore = usePicFilterStore();
 
 const userInput = ref('');
 const messagesContainer = ref<HTMLElement | null>(null);
 const isCollapsed = ref(false);
 
-// COMPUTED: ¿El chat está habilitado?
 const isChatEnabled = computed(() => {
-    // Está habilitado SOLO si hay datos en el reporte Y no está cargando la IA
     return filterStore.reportData.length > 0 && !store.isLoading;
 });
 
-// COMPUTED: Placeholder dinámico
 const inputPlaceholder = computed(() => {
     if (store.isLoading) return 'Pensando...';
     if (filterStore.reportData.length === 0) return 'Genera el reporte para activar el chat 🔒';
+    // Cambiamos el placeholder si hay contexto
+    if (store.activeContext) return `Pregunta sobre "${store.activeContext.title}"...`;
     return 'Pregunta sobre los datos (ej: Ventas de Corona)...';
 });
 
@@ -29,7 +28,6 @@ onMounted(() => {
     scrollToBottom();
 });
 
-// Auto-scroll cuando llegan mensajes nuevos
 watch(() => store.messages.length, () => {
     nextTick(() => scrollToBottom());
 });
@@ -41,12 +39,9 @@ const scrollToBottom = () => {
 };
 
 const handleSend = async () => {
-    // Bloqueo lógico: Si no hay texto O el chat está deshabilitado, no envía nada
     if (!userInput.value.trim() || !isChatEnabled.value) return;
-    
     const text = userInput.value;
     userInput.value = ''; 
-    
     await store.sendMessage(text);
 };
 </script>
@@ -56,7 +51,6 @@ const handleSend = async () => {
         class="relative z-30 flex-shrink-0 transition-all duration-300 ease-in-out h-full border-l border-slate-200 shadow-xl bg-slate-50"
         :class="isCollapsed ? 'w-0' : 'w-full md:w-96'"
     >
-        
         <button
             @click="isCollapsed = !isCollapsed"
             class="absolute top-1/2 -translate-y-1/2 flex items-center justify-center transition-all duration-300 z-50 focus:outline-none shadow-lg border-y border-l"
@@ -105,6 +99,21 @@ const handleSend = async () => {
 
             <div class="p-4 bg-white border-t border-slate-200 flex-shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                 
+                <div v-if="store.activeContext" class="mb-2 flex items-center justify-between px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg animate-in slide-in-from-bottom-2 fade-in duration-300">
+                    <div class="flex items-center gap-2 overflow-hidden">
+                        <i class="fa-solid fa-eye text-indigo-500 text-xs"></i>
+                        <div class="flex flex-col">
+                            <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Analizando</span>
+                            <span class="text-xs font-medium text-indigo-700 truncate max-w-[200px]" :title="store.activeContext.title">
+                                {{ store.activeContext.title }}
+                            </span>
+                        </div>
+                    </div>
+                    <button @click="store.clearContext" class="text-indigo-400 hover:text-indigo-600 p-1 rounded-md hover:bg-indigo-100 transition-colors">
+                        <i class="fa-solid fa-xmark text-xs"></i>
+                    </button>
+                </div>
+
                 <div v-if="filterStore.reportData.length === 0" class="mb-2 px-3 py-2 bg-yellow-50 border border-yellow-100 rounded-lg text-[10px] text-yellow-700 flex items-center gap-2">
                     <i class="fa-solid fa-circle-info"></i>
                     <span>Primero genera el reporte con los filtros.</span>

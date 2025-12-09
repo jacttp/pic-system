@@ -42,6 +42,7 @@ export interface AiQueryConfig {
 export interface AiChatResponse {
     explanation: string;
     queryConfig: AiQueryConfig | null;
+    // type?: 'text' | 'data_query'; esto si lo usas en el UI
 }
 
 // Tipo para el estado de los filtros seleccionados en la UI

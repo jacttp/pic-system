@@ -4,16 +4,14 @@ import { usePicFilterStore } from '../stores/picFilterStore';
 import PicChat from '../components/PicChat.vue';
 import PicFilters from '../components/PicFilters.vue';
 import PicGrid from '../components/PicGrid.vue'; 
+import ExecutiveSummaryCard from '../components/ExecutiveSummaryCard.vue'; // <--- IMPORTAR
 
 const store = usePicFilterStore();
-// Controla si mostramos el dashboard o el hero inicial
 const isReportActive = ref(false);
 
 const handleGenerate = async () => {
-    // 1. Llamar a la acción del store que consulta la API
     const success = await store.generateReport();
     if (success) {
-        // 2. Si la API responde OK, cambiamos la vista al dashboard
         isReportActive.value = true;
     }
 };
@@ -56,6 +54,8 @@ const handleGenerate = async () => {
                 </div>
 
                 <div v-else class="pb-20">
+                    <ExecutiveSummaryCard />
+                    
                     <PicGrid />
                 </div>
 

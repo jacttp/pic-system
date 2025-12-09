@@ -1,18 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { usePicFilterStore } from '../../stores/picFilterStore';
+import { usePicChatStore } from '../../stores/picChatStore'; // <--- Importar Chat Store
 import { calculateTableData, formatCurrency, formatNumber } from '../../utils/picUtils';
 
 const props = defineProps<{
     title: string;
     type: 'pesos' | 'kilos' | 'promedio';
-    processedData: any[]; // Datos ya procesados por processChartData
+    processedData: any[]; 
     years: string[];
 }>();
 
 const store = usePicFilterStore();
+const chatStore = usePicChatStore(); // <--- Instanciar
 
-// Calculamos toda la data de la tabla usando la utilidad
 const tableData = computed(() => {
     return calculateTableData(
         props.processedData, 
@@ -22,28 +23,51 @@ const tableData = computed(() => {
     );
 });
 
-// Helpers de estilo
 const getDiffClass = (val: number) => val < 0 ? 'text-red-500' : 'text-emerald-600';
 const fmt = (val: number) => props.type === 'kilos' ? formatNumber(val) : formatCurrency(val);
+
+// ACCIÓN: Enviar datos de la tabla al chat
+const handleAnalyze = () => {
+    // Enviamos 'tableData.rows' y 'footer' que ya contienen los cálculos (diff, growth, etc.)
+    // Esto es mucho más rico para la IA que los datos crudos.
+    const contextData = {
+        rows: tableData.value.rows,
+        totals: tableData.value.footer,
+        years: tableData.value.sortedYears
+    };
+    
+    chatStore.setContext(props.title, contextData, 'table');
+};
 </script>
 
 <template>
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col group transition-shadow hover:shadow-md">
+        
         <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
             <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2">
                 <i class="fa-solid fa-table text-slate-400"></i> {{ title }}
             </h3>
             
-            <button 
-                v-if="tableData.prevYear"
-                @click="store.toggleComparisonLock()"
-                class="text-xs px-2 py-1 rounded border transition-colors flex items-center gap-1"
-                :class="store.isComparisonFrozen ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-orange-50 text-orange-600 border-orange-200'"
-                title="Bloquear/Desbloquear comparación del mes actual"
-            >
-                <i class="fa-solid" :class="store.isComparisonFrozen ? 'fa-lock' : 'fa-lock-open'"></i>
-                {{ store.isComparisonFrozen ? 'Mes Actual Bloqueado' : 'Comparar Mes Actual' }}
-            </button>
+            <div class="flex items-center gap-3">
+                <button 
+                    @click="handleAnalyze"
+                    class="text-slate-400 hover:text-brand-600 flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded hover:bg-brand-50 transition-colors"
+                    title="Analizar esta tabla con IA"
+                >
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Analizar
+                </button>
+
+                <button 
+                    v-if="tableData.prevYear"
+                    @click="store.toggleComparisonLock()"
+                    class="text-xs px-2 py-1 rounded border transition-colors flex items-center gap-1"
+                    :class="store.isComparisonFrozen ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-orange-50 text-orange-600 border-orange-200'"
+                    title="Bloquear/Desbloquear comparación del mes actual"
+                >
+                    <i class="fa-solid" :class="store.isComparisonFrozen ? 'fa-lock' : 'fa-lock-open'"></i>
+                    <span class="hidden sm:inline">{{ store.isComparisonFrozen ? 'Mes Actual Bloqueado' : 'Comparar Mes Actual' }}</span>
+                </button>
+            </div>
         </div>
 
         <div class="overflow-x-auto">
