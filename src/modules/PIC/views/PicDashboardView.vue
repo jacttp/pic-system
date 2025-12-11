@@ -47,7 +47,7 @@ const handleGenerate = async () => {
                         >
                             <i v-if="store.isGenerating" class="fa-solid fa-circle-notch fa-spin"></i>
                             <span v-else>
-                                <i class="fa-solid fa-bolt"></i> Generar Reporte
+                                <i class="fa-solid fa-bolt"></i> Generar Reporte 
                             </span>
                         </button>
                     </div>

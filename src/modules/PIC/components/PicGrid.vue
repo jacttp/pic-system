@@ -103,7 +103,7 @@ const removeWidget = (id: string) => {
 </script>
 
 <template>
-    <div class="space-y-8 pb-20">
+    <div class="space-y-8 pb-20 @container">
         
         <div v-if="store.dynamicWidgets.length > 0" class="bg-brand-50/50 rounded-2xl p-6 border border-brand-100 shadow-inner animate-fade-in mb-8">
             <div class="flex items-center justify-between border-b border-brand-200 pb-3 mb-4">
@@ -118,7 +118,7 @@ const removeWidget = (id: string) => {
                 </button>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 @split:grid-cols-2 gap-6">
                 <div 
                     v-for="widget in store.dynamicWidgets" 
                     :key="widget.id" 
@@ -142,14 +142,15 @@ const removeWidget = (id: string) => {
                 </div>
             </div>
         </div>
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div class="lg:col-span-2">
+
+       <div class="grid grid-cols-1 @split:grid-cols-3 gap-6">
+            <div class="@split:col-span-2">
                 <BaseChart 
                 :config="configPesosMensual" 
                 title="Facturación Mensual ($)" 
                 :enable-switch="true"/>
             </div>
-            <div class="lg:col-span-1">
+            <div class="@split:col-span-1">
                 <BaseChart :config="configPesosAnual" title="Facturación Anual ($)" />
             </div>
         </div>
@@ -157,15 +158,15 @@ const removeWidget = (id: string) => {
 
         <div class="border-t border-slate-200 my-8"></div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div class="lg:col-span-2">
+        <div class="grid grid-cols-1 @split:grid-cols-3 gap-6">
+            <div class="@split:col-span-2">
                 <BaseChart 
                 :config="configKilosMensual" 
                 title="Venta vs Metas (KG)" 
                 :enable-switch="true"
                 />
             </div>
-            <div class="lg:col-span-1">
+            <div class="@split:col-span-1">
                 <BaseChart :config="configKilosAnual" title="Facturación Anual (KG)" />
             </div>
         </div>
@@ -175,14 +176,14 @@ const removeWidget = (id: string) => {
 
         <div class="border-t border-slate-200 my-8"></div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div class="lg:col-span-2">
+        <div class="grid grid-cols-1 @4xl:grid-cols-3 gap-6">
+            <div class="@split:col-span-2">
                 <BaseChart 
                 :config="configPromedioMensual" 
                 title="Precio Promedio Mensual ($/KG)"
                 :enable-switch="true" />
             </div>
-            <div class="lg:col-span-1">
+            <div class="@split:col-span-1">
                 <BaseChart :config="configPromedioAnual" title="Precio Promedio Anual ($/KG)" />
             </div>
         </div>
@@ -209,7 +210,7 @@ const removeWidget = (id: string) => {
 
             <div v-show="showDesglose" class="space-y-6 transition-all duration-500 ease-in-out">
                 <PicProjectionTable title="Proyección por Marcas" dimensionKey="marcas" />
-                <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 @split:grid-cols-2 gap-6">
                     <PicProjectionTable title="Proyección por Gerencia" dimensionKey="gerencia" />
                     <PicProjectionTable title="Proyección por Zona" dimensionKey="zona" drill-down-target="articulos" />
                 </div>

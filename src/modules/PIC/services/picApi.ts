@@ -52,7 +52,6 @@ export const picApi = {
         return data;
     },
 
-    // --- DATOS DEL REPORTE ---
     async getDashboardData(filters: Record<string, any>, dimensions: string[] = ['Año', 'Mes']): Promise<PicDataPoint[]> {
         const { data } = await picClient.post<PicDataPoint[]>('/query', {
             dimensions,

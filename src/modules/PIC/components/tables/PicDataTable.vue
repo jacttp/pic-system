@@ -70,85 +70,86 @@ const handleAnalyze = () => {
             </div>
         </div>
 
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm text-left">
-                <thead class="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+        <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-sm text-left border-collapse">
+                <thead class="text-xs text-white uppercase bg-slate-800 font-semibold sticky top-0 z-10 shadow-sm">
                     <tr>
-                        <th class="px-4 py-3">Mes</th>
-                        <th v-for="y in tableData.sortedYears" :key="y" class="px-4 py-3 text-right">
+                        <th class="px-4 py-3 border-r border-slate-700 bg-slate-900/50">Mes</th>
+                        <th v-for="y in tableData.sortedYears" :key="y" class="px-4 py-3 text-right font-medium">
                             {{ type === 'kilos' ? 'Venta KG' : (type === 'pesos' ? 'Venta $' : 'Promedio') }} {{ y }}
                         </th>
                         
-                        <th v-if="type === 'kilos'" class="px-4 py-3 text-right text-purple-600">
+                        <th v-if="type === 'kilos'" class="px-4 py-3 text-right text-purple-300 bg-slate-700/50">
                             Meta {{ tableData.currentYear }}
                         </th>
 
                         <template v-if="tableData.prevYear">
-                            <th class="px-4 py-3 text-right">DIF vs {{ tableData.prevYear }}</th>
-                            <th class="px-4 py-3 text-right">Crec %</th>
+                            <th class="px-4 py-3 text-right text-slate-300 font-medium">DIF vs {{ tableData.prevYear }}</th>
+                            <th class="px-4 py-3 text-right text-slate-300 font-medium">Crec %</th>
                             
                             <template v-if="type === 'kilos'">
-                                <th class="px-4 py-3 text-right">DIF vs Meta</th>
-                                <th class="px-4 py-3 text-right">Var % Meta</th>
+                                <th class="px-4 py-3 text-right text-slate-300 font-medium">DIF vs Meta</th>
+                                <th class="px-4 py-3 text-right text-slate-300 font-medium">Var % Meta</th>
                             </template>
                         </template>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
+               <tbody class="divide-y divide-slate-100">
                     <tr v-for="row in tableData.rows" :key="row.mesIndex" class="hover:bg-slate-50/50 transition-colors">
                         <td class="px-4 py-3 font-medium text-slate-700">{{ row.nombre }}</td>
                         
-                        <td v-for="y in tableData.sortedYears" :key="y" class="px-4 py-3 text-right tabular-nums text-slate-600">
+                        <td v-for="y in tableData.sortedYears" :key="y" class="px-4 py-3 text-right tabular-nums text-slate-600 font-mono">
                             {{ fmt(row[y]) }}
                         </td>
 
-                        <td v-if="type === 'kilos'" class="px-4 py-3 text-right tabular-nums text-purple-600 font-medium">
+                        <td v-if="type === 'kilos'" class="px-4 py-3 text-right tabular-nums text-purple-600 font-medium font-mono">
                             {{ fmt(row[`meta_${tableData.currentYear}`]) }}
                         </td>
 
                         <template v-if="tableData.prevYear">
-                            <td class="px-4 py-3 text-right tabular-nums font-medium" :class="row.diff !== null ? getDiffClass(row.diff) : 'text-slate-300'">
+                            <td class="px-4 py-3 text-right tabular-nums font-medium font-mono" :class="row.diff !== null ? getDiffClass(row.diff) : 'text-slate-300'">
                                 {{ row.diff !== null ? fmt(row.diff) : '—' }}
                             </td>
-                            <td class="px-4 py-3 text-right tabular-nums font-bold" :class="row.growth !== null ? getDiffClass(row.growth) : 'text-slate-300'">
+                            <td class="px-4 py-3 text-right tabular-nums font-bold font-mono" :class="row.growth !== null ? getDiffClass(row.growth) : 'text-slate-300'">
                                 {{ row.growth !== null ? row.growth.toFixed(1) + '%' : '—' }}
                             </td>
 
                             <template v-if="type === 'kilos'">
-                                <td class="px-4 py-3 text-right tabular-nums" :class="row.diffMeta !== null ? getDiffClass(row.diffMeta) : 'text-slate-300'">
+                                <td class="px-4 py-3 text-right tabular-nums font-mono" :class="row.diffMeta !== null ? getDiffClass(row.diffMeta) : 'text-slate-300'">
                                     {{ row.diffMeta !== null ? fmt(row.diffMeta) : '—' }}
                                 </td>
-                                <td class="px-4 py-3 text-right tabular-nums font-bold" :class="row.varMeta !== null ? (row.varMeta >= 100 ? 'text-emerald-600' : 'text-red-500') : 'text-slate-300'">
+                                <td class="px-4 py-3 text-right tabular-nums font-bold font-mono" :class="row.varMeta !== null ? (row.varMeta >= 100 ? 'text-emerald-600' : 'text-red-500') : 'text-slate-300'">
                                     {{ row.varMeta !== null ? row.varMeta.toFixed(1) + '%' : '—' }}
                                 </td>
                             </template>
                         </template>
                     </tr>
                 </tbody>
-                <tfoot class="bg-slate-50 font-bold text-slate-800 border-t border-slate-200">
+               <tfoot class="bg-slate-50 font-bold text-slate-800 border-t border-slate-200">
                     <tr>
                         <td class="px-4 py-3">TOTAL</td>
-                        <td v-for="y in tableData.sortedYears" :key="y" class="px-4 py-3 text-right tabular-nums">
+                        
+                        <td v-for="y in tableData.sortedYears" :key="y" class="px-4 py-3 text-right tabular-nums font-mono">
                             {{ fmt(tableData.footer[y]) }}
                         </td>
                         
-                        <td v-if="type === 'kilos'" class="px-4 py-3 text-right tabular-nums text-purple-700">
+                        <td v-if="type === 'kilos'" class="px-4 py-3 text-right tabular-nums text-purple-700 font-mono">
                             {{ fmt(tableData.footer[`meta_${tableData.currentYear}`]) }}
                         </td>
 
                         <template v-if="tableData.prevYear">
-                            <td class="px-4 py-3 text-right tabular-nums" :class="getDiffClass(tableData.footer.diff)">
+                            <td class="px-4 py-3 text-right tabular-nums font-mono" :class="getDiffClass(tableData.footer.diff)">
                                 {{ fmt(tableData.footer.diff) }}
                             </td>
-                            <td class="px-4 py-3 text-right tabular-nums" :class="getDiffClass(tableData.footer.growth)">
+                            <td class="px-4 py-3 text-right tabular-nums font-mono" :class="getDiffClass(tableData.footer.growth)">
                                 {{ tableData.footer.growth.toFixed(1) }}%
                             </td>
 
                             <template v-if="type === 'kilos'">
-                                <td class="px-4 py-3 text-right tabular-nums" :class="getDiffClass(tableData.footer.diffMeta)">
+                                <td class="px-4 py-3 text-right tabular-nums font-mono" :class="getDiffClass(tableData.footer.diffMeta)">
                                     {{ fmt(tableData.footer.diffMeta) }}
                                 </td>
-                                <td class="px-4 py-3 text-right tabular-nums" :class="tableData.footer.varMeta >= 100 ? 'text-emerald-600' : 'text-red-500'">
+                                <td class="px-4 py-3 text-right tabular-nums font-mono" :class="tableData.footer.varMeta >= 100 ? 'text-emerald-600' : 'text-red-500'">
                                     {{ tableData.footer.varMeta.toFixed(1) }}%
                                 </td>
                             </template>
@@ -159,3 +160,9 @@ const handleAnalyze = () => {
         </div>
     </div>
 </template>
+<style scoped>
+/* Scrollbar fino para coincidir con el estilo del sistema */
+.custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+</style>

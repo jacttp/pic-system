@@ -218,13 +218,15 @@ const colorClass = (val: number, isPercent = false) => {
                                     {{ row.Dimension }}
                                 </div>
                             </td>
+
                             <td v-for="y in years" :key="y" class="px-3 py-2 text-right text-slate-600 font-mono">{{ formatNumber(row[`Venta_${y}`]) }}</td>
                             <td class="px-3 py-2 text-right text-emerald-700 font-mono bg-emerald-50/30">{{ formatNumber(row.meta) }}</td>
                             <td class="px-3 py-2 text-right font-mono" :class="colorClass(row.difAnual)">{{ formatNumber(row.difAnual) }}</td>
                             <td class="px-3 py-2 text-right font-mono" :class="colorClass(row.difMeta)">{{ formatNumber(row.difMeta) }}</td>
-                            <td class="px-3 py-2 text-right font-bold" :class="colorClass(row.crec)">{{ row.crec.toFixed(1) }}%</td>
-                            <td class="px-3 py-2 text-right font-bold" :class="colorClass(row.varMeta, true)">{{ row.varMeta.toFixed(1) }}%</td>
-                            <td class="px-3 py-2 text-right text-slate-800 font-bold bg-slate-50">{{ row.share.toFixed(1) }}%</td>
+                            
+                            <td class="px-3 py-2 text-right font-bold font-mono" :class="colorClass(row.crec)">{{ row.crec.toFixed(1) }}%</td>
+                            <td class="px-3 py-2 text-right font-bold font-mono" :class="colorClass(row.varMeta, true)">{{ row.varMeta.toFixed(1) }}%</td>
+                            <td class="px-3 py-2 text-right text-slate-800 font-bold bg-slate-50 font-mono">{{ row.share.toFixed(1) }}%</td>
                         </tr>
 
                         <tr v-if="loadingRows[row.Dimension]">
@@ -243,14 +245,14 @@ const colorClass = (val: number, isPercent = false) => {
                                             <td v-for="y in years" :key="y" class="py-1.5 px-2 text-right font-mono w-[80px]">
                                                 {{ formatNumber(child[`Venta_${y}`]) }}
                                             </td>
-                                            <td class="py-1.5 px-2 text-right text-emerald-700/70 w-[80px]">{{ formatNumber(child.meta) }}</td>
+                                            <td class="py-1.5 px-2 text-right text-emerald-700/70 font-mono w-[80px]">{{ formatNumber(child.meta) }}</td>
                                             
-                                            <td class="py-1.5 px-2 text-right w-[80px]" :class="colorClass(child.difAnual)">{{ formatNumber(child.difAnual) }}</td>
-                                            <td class="py-1.5 px-2 text-right w-[80px]" :class="colorClass(child.difMeta)">{{ formatNumber(child.difMeta) }}</td>
-                                            <td class="py-1.5 px-2 text-right w-[60px]" :class="colorClass(child.crec)">{{ child.crec.toFixed(1) }}%</td>
-                                            <td class="py-1.5 px-2 text-right w-[60px]" :class="colorClass(child.varMeta, true)">{{ child.varMeta.toFixed(1) }}%</td>
+                                            <td class="py-1.5 px-2 text-right font-mono w-[80px]" :class="colorClass(child.difAnual)">{{ formatNumber(child.difAnual) }}</td>
+                                            <td class="py-1.5 px-2 text-right font-mono w-[80px]" :class="colorClass(child.difMeta)">{{ formatNumber(child.difMeta) }}</td>
+                                            <td class="py-1.5 px-2 text-right font-mono w-[60px]" :class="colorClass(child.crec)">{{ child.crec.toFixed(1) }}%</td>
+                                            <td class="py-1.5 px-2 text-right font-mono w-[60px]" :class="colorClass(child.varMeta, true)">{{ child.varMeta.toFixed(1) }}%</td>
                                             
-                                            <td class="py-1.5 px-2 text-right font-bold text-brand-700 bg-brand-50/20 w-[60px]">
+                                            <td class="py-1.5 px-2 text-right font-bold text-brand-700 bg-brand-50/20 font-mono w-[60px]">
                                                 {{ child.share.toFixed(1) }}%
                                             </td>
                                         </tr>
@@ -268,9 +270,9 @@ const colorClass = (val: number, isPercent = false) => {
                         <td class="px-3 py-2 text-right font-mono text-emerald-800">{{ formatNumber(footer.meta) }}</td>
                         <td class="px-3 py-2 text-right font-mono" :class="colorClass(footer.difAnual)">{{ formatNumber(footer.difAnual) }}</td>
                         <td class="px-3 py-2 text-right font-mono" :class="colorClass(footer.difMeta)">{{ formatNumber(footer.difMeta) }}</td>
-                        <td class="px-3 py-2 text-right" :class="colorClass(footer.crec)">{{ footer.crec.toFixed(1) }}%</td>
-                        <td class="px-3 py-2 text-right" :class="colorClass(footer.varMeta, true)">{{ footer.varMeta.toFixed(1) }}%</td>
-                        <td class="px-3 py-2 text-right bg-slate-200">100%</td>
+                        <td class="px-3 py-2 text-right font-mono"  :class="colorClass(footer.crec)">{{ footer.crec.toFixed(1) }}%</td>
+                        <td class="px-3 py-2 text-right font-mono" :class="colorClass(footer.varMeta, true)">{{ footer.varMeta.toFixed(1) }}%</td>
+                        <td class="px-3 py-2 text-right bg-slate-200 font-mono">100%</td>
                     </tr>
                 </tfoot>
             </table>

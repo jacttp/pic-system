@@ -23,8 +23,15 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
-      }
+      }, 
+      containers: {
+        '2xs': '16rem',
+        '3xl': '48rem', // 768px (El default)
+        'split': '850px', // <--- TU VALOR PERSONALIZADO
+      },
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/container-queries'),
+  ],
 }
