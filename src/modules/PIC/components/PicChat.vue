@@ -3,6 +3,7 @@ import { ref, onMounted, nextTick, watch, computed } from 'vue';
 import { usePicChatStore } from '../stores/picChatStore';
 import { usePicFilterStore } from '../stores/picFilterStore';
 import ChatMessage from './ChatMessage.vue';
+import AiModelSelector from './AiModelSelector.vue';
 
 const store = usePicChatStore();
 const filterStore = usePicFilterStore();
@@ -79,9 +80,16 @@ const handleSend = async () => {
                     </div>
                     Asistente IA
                 </h3>
-                <button @click="store.clearChat" class="text-xs text-slate-400 hover:text-red-500 transition-colors p-2 hover:bg-slate-100 rounded-lg" title="Limpiar historial">
-                    <i class="fa-solid fa-trash"></i>
-                </button>
+
+                <!-- GRUPO DE CONTROLES: SELECTOR + BASURA -->
+                <div class="flex items-center gap-2">
+                   
+
+                    <!-- 2. BOTÓN LIMPIAR (Existente) -->
+                    <button @click="store.clearChat" class="text-xs text-slate-400 hover:text-red-500 transition-colors p-2 hover:bg-slate-100 rounded-lg" title="Limpiar historial">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
             </div>
 
             <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 flex flex-col space-y-3 bg-slate-50/50">
@@ -119,19 +127,29 @@ const handleSend = async () => {
                     <span>Primero genera el reporte con los filtros.</span>
                 </div>
 
-                <div class="relative">
+                  <!-- BARRA UNIFICADA: SELECTOR + INPUT + BOTÓN -->
+                <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-1 focus-within:ring-2 focus-within:ring-brand-500/20 focus-within:border-brand-500 transition-all">
+                    
+                    <!-- 1. El Selector de Modelos (Izquierda) -->
+                    <AiModelSelector />
+
+                    <div class="h-6 w-px bg-slate-200 mx-1"></div>
+
+                    <!-- 2. El Input de Texto (Centro) -->
                     <input 
                         v-model="userInput" 
                         @keydown.enter.prevent="handleSend"
                         type="text" 
                         :placeholder="inputPlaceholder"
-                        class="w-full pl-4 pr-12 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        class="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-slate-400 py-2.5 min-w-0"
                         :disabled="!isChatEnabled"
                     >
+
+                    <!-- 3. El Botón Enviar (Derecha) -->
                     <button 
                         @click="handleSend"
                         :disabled="!userInput.trim() || !isChatEnabled"
-                        class="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
+                        class="p-2 mr-1 bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50 disabled:bg-slate-300 disabled:cursor-not-allowed transition-all shadow-sm flex-shrink-0"
                     >
                         <i class="fa-solid fa-paper-plane text-xs"></i>
                     </button>

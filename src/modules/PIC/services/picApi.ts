@@ -76,79 +76,17 @@ export const picApi = {
         return data;
     },
 
-    // --- INTELIGENCIA ARTIFICIAL ---
-   // async sendChatPrompt(userPrompt: string): Promise<AiChatResponse> {
-   //      console.log("📡 [Front] Enviando prompt:", userPrompt);
-        
-   //      // 1. Llamada al Proxy de IA
-   //      const { data } = await picClient.post('/gemini-proxy', { userPrompt });
-
-   //      const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        
-   //      if (!textResponse) throw new Error("IA no devolvió respuesta válida.");
-
-   //      try {
-   //          // 2. Limpieza del string JSON (quita markdowns ```json ... ```)
-   //          const cleanedJson = textResponse.replace(/\`\`\`json\n?|\`\`\`/g, '').trim();
-   //          let parsed = JSON.parse(cleanedJson);
-            
-   //          // --- BLOQUE DE NORMALIZACIÓN AVANZADA ---
-            
-   //          // A. Detectar si vino plano (sin estructura explanation/queryConfig) y envolverlo
-   //          if (parsed.metric || parsed.filters || parsed.dimensions) {
-   //              console.warn("⚠️ [Front] Formato plano detectado. Normalizando...");
-   //              parsed = {
-   //                  explanation: "Configuración de datos generada:",
-   //                  queryConfig: parsed
-   //              };
-   //          }
-
-   //          // B. Sanitización de Filtros (El "Fix" para 'corona' vs 'CORONA')
-   //          if (parsed.queryConfig && parsed.queryConfig.filters) {
-   //              const f = parsed.queryConfig.filters;
-                
-   //              // Regla 1: Las MARCAS siempre van en mayúsculas en nuestra BD
-   //              if (f.Marca) {
-   //                  if (Array.isArray(f.Marca)) {
-   //                      f.Marca = f.Marca.map((m: string) => String(m).toUpperCase());
-   //                  } else if (typeof f.Marca === 'string') {
-   //                      f.Marca = f.Marca.toUpperCase();
-   //                  }
-   //              }
-                
-   //              // Regla 2: Si la IA alucina y pone "Anio" en vez de "Año" en filtros
-   //              if (f.Anio) {
-   //                  f['Año'] = f.Anio;
-   //                  delete f.Anio;
-   //              }
-
-   //              console.log("🧹 [Front] Filtros sanitizados:", f);
-   //          }
-   //          // ----------------------------------------
-   //          return {
-   //              explanation: parsed.explanation || JSON.stringify(parsed),
-   //              queryConfig: parsed.queryConfig || null
-   //          };
-
-   //      } catch (e) {
-   //          console.error("❌ [Front] Error parseando JSON:", textResponse);
-   //          // Si falla el parseo, devolvemos el texto crudo como explicación
-   //          return {
-   //              explanation: textResponse,
-   //              queryConfig: null
-   //          };
-   //      }
-   //  },
    
    // --- INTELIGENCIA ARTIFICIAL (ACTUALIZADO FASE 4) ---
-   async sendChatPrompt(userPrompt: string, history: any[] = []): Promise<AiChatResponse> {
+   async sendChatPrompt(userPrompt: string, history: any[] = [], model: string = 'gemini'): Promise<AiChatResponse> {
         console.log("📡 [Front] Enviando prompt a Smart Agent:", userPrompt);
         
         // 1. Llamada al nuevo endpoint 'Inteligente'
         // El backend ahora devuelve: { type: 'text'|'data_query', explanation: string, queryConfig?: object }
         const { data } = await picClient.post('/ai/chat', { 
          userPrompt,
-         history 
+         history, 
+         modelProvider: model
       });
         
         // 2. Ya no necesitamos parsear texto crudo ni limpiar ```json
@@ -165,12 +103,20 @@ export const picApi = {
         return data;
    },
 
-   async getDataInsights(chartData: any[], promptContext: string): Promise<string> {
-        const { data } = await picClient.post('/gemini-insight', {
-            userPrompt: promptContext,
-            chartData
-        });
-        return data.insight;
+    // Actualiza esta función:
+    async getDataInsights(chartData: any[], promptContext: string, model: string = 'gemini'): Promise<string> {
+        try {
+            // CAMBIO: Apuntamos a /ai/insight y enviamos modelProvider
+            const { data } = await picClient.post('/ai/insight', {
+                userPrompt: promptContext,
+                chartData,
+                modelProvider: model 
+            });
+            return data.insight;
+        } catch (error) {
+            console.error("❌ Error getting insight:", error);
+            return "No se pudo generar el análisis automático.";
+        }
     },
 
    async getExecutiveSummary(reportData: any[]): Promise<string> {

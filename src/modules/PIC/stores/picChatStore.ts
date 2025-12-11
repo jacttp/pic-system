@@ -19,14 +19,17 @@ export const usePicChatStore = defineStore('picChat', () => {
     const isLoading = ref(false);
     const activeContext = ref<ChatContext | null>(null);
     const isReportActive = ref(false);
-
     const filterStore = usePicFilterStore();
-
+    const selectedModel = ref<string>('gemini'); // Default
+    
     // --- ACCIONES BÁSICAS ---
     function initChat() {
         if (messages.value.length === 0) {
             addMessage('assistant', 'Hola, soy tu analista virtual de PIC. Puedes pedirme datos específicos o generar reportes.');
         }
+    }
+    function setModel(modelId: string) {
+        selectedModel.value = modelId;
     }
 
     function addMessage(role: 'user' | 'assistant' | 'system', text: string, chartConfig: AiQueryConfig | null = null) {
@@ -98,7 +101,7 @@ export const usePicChatStore = defineStore('picChat', () => {
 
             // --- C. LLAMADA A LA API ---
             // Enviamos el prompt actual + el historial de la conversación
-            const response = await picApi.sendChatPrompt(promptToSend, history);
+            const response = await picApi.sendChatPrompt(promptToSend, history, selectedModel.value);
 
             // --- D. PROCESAR RESPUESTA ---
             if (response.explanation) {
@@ -122,49 +125,48 @@ export const usePicChatStore = defineStore('picChat', () => {
         }
     }
 
-    // --- GENERACIÓN DE WIDGETS ---
+    
     async function visualizeData(messageId: string) {
         const message = messages.value.find(m => m.id === messageId);
         if (!message || !message.chartConfig) return;
 
-        // Nota: isLoading global ya suele estar true si viene de sendMessage, 
-        // pero lo forzamos por si se llama manual desde un botón "Reintentar"
-        const localLoading = !isLoading.value; 
+        // Indicador visual de que "sigue pensando" (generando insight)
+        const localLoading = !isLoading.value;
         if (localLoading) isLoading.value = true;
-
+        
         try {
-            // 1. Ejecutar Query SQL generada por IA
+            // 1. Ejecutar Query (Traer números)
             const data = await picApi.executeAiQuery(message.chartConfig);
-
+            
             if (!data || data.length === 0) {
-                addMessage('system', 'La consulta es válida pero no devolvió resultados (0 registros).');
+                // Actualizamos el mensaje original para decir que no hubo datos
+                message.text += "\n\n(Nota: La consulta no arrojó resultados numéricos).";
                 return;
             }
 
-            // 2. Procesar Datos para Chart.js
+            // 2. Procesar y Graficar (Código visual existente...)
             const config = message.chartConfig;
             const labels = data.map((d: any) => config.dimensions.map(dim => d[dim]).join(' - '));
             const values = data.map((d: any) => d.TotalMetric || 0);
             
-            const metricLabelMap: Record<string, string> = {
-                'VENTA_KG': 'Venta (KG)',
-                'VENTA_$$': 'Venta ($)',
-                'METAS_KG': 'Meta (KG)'
+            const metricMap: Record<string, string> = { 
+                'VENTA_KG': 'Venta (KG)', 
+                'VENTA_$$': 'Venta ($)', 
+                'METAS_KG': 'Meta (KG)' 
             };
-            const labelMetric = metricLabelMap[config.metric] || config.metric;
+            const labelMetric = metricMap[config.metric] || config.metric;
 
             const chartJsConfig = getChartConfig(
-                labels,
+                labels, 
                 [{
                     label: labelMetric,
                     data: values,
                     backgroundColor: '#0ea5e9',
                     borderRadius: 4
-                }],
+                }], 
                 'bar'
             );
 
-            // 3. Crear Widget en el Dashboard
             const newWidget: DynamicWidget = {
                 id: Date.now().toString(),
                 title: `IA: ${labelMetric} por ${config.dimensions.join(', ')}`,
@@ -175,21 +177,29 @@ export const usePicChatStore = defineStore('picChat', () => {
             };
 
             filterStore.addDynamicWidget(newWidget);
-            isReportActive.value = true; // Forzar vista de dashboard
+            isReportActive.value = true;
+
+            // --- 3. NUEVO: GENERACIÓN DE INSIGHT AUTOMÁTICO ---
+            // Tomamos los datos reales y pedimos un micro-resumen
+            // Limitamos a los top 10 registros para no saturar tokens
+            const dataSample = data.slice(0, 15); 
+            
+            const promptInsight = `
+                Dame UN párrafo muy breve (máx 30 palabras) describiendo la tendencia principal o el 
+                valor más destacado.
+                Empieza directo, ej: "Se observa que..." o "Destaca que..."
+            `;
+
+            // Llamamos a la API de insight (que ya tienes configurada en picApi)
+            const insightText = await picApi.getDataInsights(dataSample, promptInsight);
+            
+            // 4. Actualizamos el mensaje del chat con el insight
+            // Efecto: "Aquí tienes el gráfico... [Se escribe solo:] Se observa que la Zona Norte domina..."
+            message.text = `${message.text}\n\n💡 ${insightText}`;
 
         } catch (error: any) {
-            console.error("❌ Error visualizando datos:", error);
-            let userFeedback = 'Error técnico al generar el gráfico.';
-
-            if (axios.isAxiosError(error) && error.response) {
-                const status = error.response.status;
-                const msg = error.response.data?.message || '';
-                
-                if (status === 400) {
-                    userFeedback = `La consulta generada no es válida para la BD. Detalle: ${msg}`;
-                }
-            }
-            addMessage('system', userFeedback);
+            console.error("❌ Error visualizando/analizando:", error);
+            // No mostramos error al usuario si falla el insight, solo el gráfico se queda igual
         } finally {
             if (localLoading) isLoading.value = false;
         }
@@ -205,6 +215,9 @@ export const usePicChatStore = defineStore('picChat', () => {
         clearChat,
         visualizeData,
         setContext,
-        clearContext
+        clearContext,
+
+        selectedModel, 
+        setModel
     };
 });
