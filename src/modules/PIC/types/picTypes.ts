@@ -37,7 +37,8 @@ export interface AiQueryConfig {
     metric: 'VENTA_KG' | 'VENTA_$$' | 'METAS_KG';
     dimensions: string[];
     filters: Record<string, string | string[]>;
-}
+    visualization: 'bar' | 'line' | 'pie' | 'doughnut' | 'table' | 'kpi'; 
+   }
 
 export interface AiChatResponse {
     explanation: string;
@@ -59,9 +60,10 @@ export interface PicActiveFilters {
 export interface DynamicWidget {
     id: string;
     title: string;
-    type: 'bar' | 'line' | 'pie';
-    config: any; // Configuración de Chart.js
-    rawQuery: AiQueryConfig; // Guardamos la query original por si queremos re-consultar
+    // CAMBIO: Ampliamos los tipos visuales del widget local
+    type: 'bar' | 'line' | 'pie' | 'doughnut' | 'table' | 'kpi';
+    config: any; // Para Chart.js o datos crudos (en caso de table/kpi)
+    rawQuery: AiQueryConfig;
     timestamp: number;
 }
 

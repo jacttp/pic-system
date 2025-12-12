@@ -4,7 +4,7 @@ import axios from 'axios';
 import { picApi } from '../services/picApi';
 import type { AiQueryConfig, DynamicWidget, ChatMessage } from '../types/picTypes';
 import { usePicFilterStore } from './picFilterStore';
-import { getChartConfig } from '../utils/picUtils';
+import { getChartConfig, getPieConfig } from '../utils/picUtils';
 
 interface ChatContext {
     id: string;
@@ -126,29 +126,111 @@ export const usePicChatStore = defineStore('picChat', () => {
     }
 
     
-    async function visualizeData(messageId: string) {
+   //  async function visualizeData(messageId: string) {
+   //      const message = messages.value.find(m => m.id === messageId);
+   //      if (!message || !message.chartConfig) return;
+
+   //      // Indicador visual de que "sigue pensando" (generando insight)
+   //      const localLoading = !isLoading.value;
+   //      if (localLoading) isLoading.value = true;
+        
+   //      try {
+   //          // 1. Ejecutar Query (Traer números)
+   //          const data = await picApi.executeAiQuery(message.chartConfig);
+            
+   //          if (!data || data.length === 0) {
+   //              // Actualizamos el mensaje original para decir que no hubo datos
+   //              message.text += "\n\n(Nota: La consulta no arrojó resultados numéricos).";
+   //              return;
+   //          }
+
+   //          // 2. Procesar y Graficar (Código visual existente...)
+   //          const config = message.chartConfig;
+   //          const labels = data.map((d: any) => config.dimensions.map(dim => d[dim]).join(' - '));
+   //          const values = data.map((d: any) => d.TotalMetric || 0);
+            
+   //          const metricMap: Record<string, string> = { 
+   //              'VENTA_KG': 'Venta (KG)', 
+   //              'VENTA_$$': 'Venta ($)', 
+   //              'METAS_KG': 'Meta (KG)' 
+   //          };
+   //          const labelMetric = metricMap[config.metric] || config.metric;
+
+   //          const chartJsConfig = getChartConfig(
+   //              labels, 
+   //              [{
+   //                  label: labelMetric,
+   //                  data: values,
+   //                  backgroundColor: '#0ea5e9',
+   //                  borderRadius: 4
+   //              }], 
+   //              'bar'
+   //          );
+
+   //          const newWidget: DynamicWidget = {
+   //              id: Date.now().toString(),
+   //              title: `IA: ${labelMetric} por ${config.dimensions.join(', ')}`,
+   //              type: 'bar',
+   //              config: chartJsConfig,
+   //              rawQuery: config,
+   //              timestamp: Date.now()
+   //          };
+
+   //          filterStore.addDynamicWidget(newWidget);
+   //          isReportActive.value = true;
+
+   //          // --- 3. NUEVO: GENERACIÓN DE INSIGHT AUTOMÁTICO ---
+   //          // Tomamos los datos reales y pedimos un micro-resumen
+   //          // Limitamos a los top 10 registros para no saturar tokens
+   //          const dataSample = data.slice(0, 15); 
+            
+   //          const promptInsight = `
+   //              Dame UN párrafo muy breve (máx 30 palabras) describiendo la tendencia principal o el 
+   //              valor más destacado.
+   //              Empieza directo, ej: "Se observa que..." o "Destaca que..."
+   //          `;
+
+   //          // Llamamos a la API de insight (que ya tienes configurada en picApi)
+   //          const insightText = await picApi.getDataInsights(dataSample, promptInsight);
+            
+   //          // 4. Actualizamos el mensaje del chat con el insight
+   //          // Efecto: "Aquí tienes el gráfico... [Se escribe solo:] Se observa que la Zona Norte domina..."
+   //          message.text = `${message.text}\n\n💡 ${insightText}`;
+
+   //      } catch (error: any) {
+   //          console.error("❌ Error visualizando/analizando:", error);
+   //          // No mostramos error al usuario si falla el insight, solo el gráfico se queda igual
+   //      } finally {
+   //          if (localLoading) isLoading.value = false;
+   //      }
+   //  }
+
+   async function visualizeData(messageId: string) {
         const message = messages.value.find(m => m.id === messageId);
         if (!message || !message.chartConfig) return;
 
-        // Indicador visual de que "sigue pensando" (generando insight)
-        const localLoading = !isLoading.value;
-        if (localLoading) isLoading.value = true;
+        // Evitar doble loading si el usuario hace clic varias veces rápido
+        if (isLoading.value) return;
+        isLoading.value = true;
         
         try {
-            // 1. Ejecutar Query (Traer números)
+            // 1. Ejecutar Query a la API (Obtener los datos crudos)
             const data = await picApi.executeAiQuery(message.chartConfig);
             
             if (!data || data.length === 0) {
-                // Actualizamos el mensaje original para decir que no hubo datos
-                message.text += "\n\n(Nota: La consulta no arrojó resultados numéricos).";
+                message.text += "\n\n(La consulta no devolvió datos para visualizar).";
                 return;
             }
 
-            // 2. Procesar y Graficar (Código visual existente...)
             const config = message.chartConfig;
+            const vizType = config.visualization || 'bar'; // Fallback por seguridad
+
+            // Preparar etiquetas y valores comunes
+            // (Para tablas y KPIs se procesan distinto abajo)
             const labels = data.map((d: any) => config.dimensions.map(dim => d[dim]).join(' - '));
             const values = data.map((d: any) => d.TotalMetric || 0);
             
+            // Mapas de etiquetas amigables
             const metricMap: Record<string, string> = { 
                 'VENTA_KG': 'Venta (KG)', 
                 'VENTA_$$': 'Venta ($)', 
@@ -156,22 +238,75 @@ export const usePicChatStore = defineStore('picChat', () => {
             };
             const labelMetric = metricMap[config.metric] || config.metric;
 
-            const chartJsConfig = getChartConfig(
-                labels, 
-                [{
-                    label: labelMetric,
-                    data: values,
-                    backgroundColor: '#0ea5e9',
-                    borderRadius: 4
-                }], 
-                'bar'
-            );
+            let widgetConfig: any = null;
+            let widgetType = vizType;
 
+            // --- FÁBRICA DE VISUALIZACIONES ---
+            switch (vizType) {
+                case 'kpi':
+                    // Para KPI sumamos todo el resultado (ej: Venta total de la consulta)
+                    const totalValue = values.reduce((a: number, b: number) => a + b, 0);
+                    widgetConfig = {
+                        value: totalValue,
+                        label: labelMetric,
+                        subtext: `Basado en ${data.length} registros filtrados`
+                    };
+                    break;
+
+                case 'table':
+                    // Para tabla pasamos los datos crudos y las columnas
+                    widgetConfig = {
+                        columns: [...config.dimensions, 'TotalMetric'], // Columnas dinámicas
+                        data: data,
+                        metricLabel: labelMetric
+                    };
+                    break;
+
+                case 'pie':
+                case 'doughnut':
+                    // Usamos el nuevo helper de Utils
+                    // Importante: Pie charts necesitan colores variados
+                    const bgColors = [
+                        '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', 
+                        '#ec4899', '#06b6d4', '#84cc16', '#6366f1', '#14b8a6'
+                    ];
+                    widgetConfig = getPieConfig(
+                        labels,
+                        [{
+                            data: values,
+                            backgroundColor: bgColors,
+                            borderWidth: 1
+                        }],
+                        vizType
+                    );
+                    break;
+
+                case 'line':
+                case 'bar':
+                default:
+                    // Usamos el helper existente
+                    widgetConfig = getChartConfig(
+                        labels, 
+                        [{
+                            label: labelMetric,
+                            data: values,
+                            backgroundColor: vizType === 'line' ? 'rgba(59, 130, 246, 0.2)' : '#0ea5e9',
+                            borderColor: '#0ea5e9',
+                            fill: vizType === 'line', // Relleno solo si es línea
+                            borderRadius: 4,
+                            tension: 0.3 // Curva suave para líneas
+                        }], 
+                        vizType as 'bar' | 'line'
+                    );
+                    break;
+            }
+
+            // 2. Crear el Widget Dinámico
             const newWidget: DynamicWidget = {
                 id: Date.now().toString(),
                 title: `IA: ${labelMetric} por ${config.dimensions.join(', ')}`,
-                type: 'bar',
-                config: chartJsConfig,
+                type: widgetType, // 'bar', 'kpi', 'table', etc.
+                config: widgetConfig,
                 rawQuery: config,
                 timestamp: Date.now()
             };
@@ -179,29 +314,20 @@ export const usePicChatStore = defineStore('picChat', () => {
             filterStore.addDynamicWidget(newWidget);
             isReportActive.value = true;
 
-            // --- 3. NUEVO: GENERACIÓN DE INSIGHT AUTOMÁTICO ---
-            // Tomamos los datos reales y pedimos un micro-resumen
-            // Limitamos a los top 10 registros para no saturar tokens
-            const dataSample = data.slice(0, 15); 
-            
-            const promptInsight = `
-                Dame UN párrafo muy breve (máx 30 palabras) describiendo la tendencia principal o el 
-                valor más destacado.
-                Empieza directo, ej: "Se observa que..." o "Destaca que..."
-            `;
-
-            // Llamamos a la API de insight (que ya tienes configurada en picApi)
-            const insightText = await picApi.getDataInsights(dataSample, promptInsight);
-            
-            // 4. Actualizamos el mensaje del chat con el insight
-            // Efecto: "Aquí tienes el gráfico... [Se escribe solo:] Se observa que la Zona Norte domina..."
-            message.text = `${message.text}\n\n💡 ${insightText}`;
+            // 3. Generar Insight (Micro-resumen)
+            // Solo para gráficos y tablas, los KPIs suelen explicarse solos
+            if (vizType !== 'kpi') {
+                const dataSample = data.slice(0, 15); 
+                const promptInsight = `Describe brevemente la tendencia, valor más alto o distribución. Máx 20 palabras.`;
+                const insightText = await picApi.getDataInsights(dataSample, promptInsight);
+                message.text = `${message.text}\n\n💡 ${insightText}`;
+            }
 
         } catch (error: any) {
             console.error("❌ Error visualizando/analizando:", error);
-            // No mostramos error al usuario si falla el insight, solo el gráfico se queda igual
+            message.text += "\n\n(Error al generar la visualización).";
         } finally {
-            if (localLoading) isLoading.value = false;
+            isLoading.value = false;
         }
     }
 

@@ -5,6 +5,8 @@ import { processChartData, processAnnualData, getChartConfig, CHART_COLORS, CHAR
 import BaseChart from './charts/BaseChart.vue';
 import PicDataTable from './tables/PicDataTable.vue';
 import PicProjectionTable from './tables/PicProjectionTable.vue';
+import KpiCardWidget from './widgets/KpiCardWidget.vue';       
+import SimpleTableWidget from './widgets/SimpleTableWidget.vue'; 
 
 const store = usePicFilterStore();
 const selectedYears = computed(() => store.selected.Anio.sort());
@@ -118,24 +120,36 @@ const removeWidget = (id: string) => {
                 </button>
             </div>
 
-            <div class="grid grid-cols-1 @split:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 @3xl:grid-cols-2 gap-6">
                 <div 
                     v-for="widget in store.dynamicWidgets" 
                     :key="widget.id" 
-                    class="relative group bg-white rounded-xl shadow-sm border border-slate-200 p-1"
+                    class="relative group bg-white rounded-xl shadow-sm border border-slate-200 p-1 transition-all hover:shadow-md"
                 >
-                    <div class="h-80 w-full"> 
+                    <div class="h-80 w-full overflow-hidden rounded-lg"> 
+                        
+                        <KpiCardWidget 
+                            v-if="widget.type === 'kpi'" 
+                            :config="widget.config" 
+                        />
+
+                        <SimpleTableWidget 
+                            v-else-if="widget.type === 'table'" 
+                            :config="widget.config" 
+                        />
+
                         <BaseChart 
+                            v-else 
                             :config="widget.config" 
                             :title="widget.title" 
-                            :enable-switch="true" 
+                            :enable-switch="widget.type !== 'pie' && widget.type !== 'doughnut'" 
                         />
                     </div>
 
                     <button 
                         @click="removeWidget(widget.id)"
-                        class="absolute top-3 right-3 bg-white text-slate-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg shadow-md border border-slate-100 transition-all opacity-0 group-hover:opacity-100 z-10 scale-90 hover:scale-100"
-                        title="Eliminar este gráfico"
+                        class="absolute top-3 right-3 bg-white text-slate-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg shadow-md border border-slate-100 transition-all opacity-0 group-hover:opacity-100 z-20 scale-90 hover:scale-100"
+                        title="Eliminar este elemento"
                     >
                         <i class="fa-solid fa-xmark"></i>
                     </button>

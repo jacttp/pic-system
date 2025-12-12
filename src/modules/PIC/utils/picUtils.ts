@@ -262,3 +262,40 @@ export function processAnnualData(rawData: any[], years: string[], metricType: '
         return totals[year];
     });
 }
+
+/**
+ * Genera configuración específica para gráficos circulares (Pie/Doughnut).
+ * No tienen ejes cartesianos (X/Y).
+ */
+export function getPieConfig(labels: string[], datasets: any[], type: 'pie' | 'doughnut' = 'doughnut') {
+    return {
+        type,
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { 
+                    position: 'right' as const,
+                    labels: { boxWidth: 12, font: { size: 11 } }
+                },
+                tooltip: { 
+                    callbacks: {
+                        label: function(context: any) {
+                            let label = context.label || '';
+                            if (label) label += ': ';
+                            if (context.parsed !== null) {
+                                // Detectar si es dinero o número por el dataset label o contexto
+                                // Por defecto formateamos bonito
+                                const val = context.parsed;
+                                label += val >= 1000 ? new Intl.NumberFormat('es-MX').format(val) : val;
+                            }
+                            return label;
+                        }
+                    }
+                }
+            },
+            // Sin escalas X/Y
+        }
+    };
+}
