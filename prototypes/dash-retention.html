@@ -1,0 +1,1885 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis de Clientes 2024-2025</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+        
+        :root {
+            --primary: #2c3e50;
+            --secondary: #f8f9fa;
+            --accent: #3498db;
+            --accent-hover: #2980b9;
+            --success: #27ae60;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --info: #3498db;
+            --text: #2c3e50;
+            --text-muted: #95a5a6;
+            --border: #e1e8ed;
+            --card-bg: #ffffff;
+            --bg: #f8f9fa;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* HEADER */
+        header {
+            margin-bottom: 2rem;
+            padding-bottom: 2rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 2rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        h1 i {
+            color: var(--accent);
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            font-weight: 400;
+            margin-top: 0.25rem;
+        }
+
+        .upload-zone {
+            background: var(--card-bg);
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 1.5rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 280px;
+        }
+
+        .upload-zone:hover {
+            border-color: var(--accent);
+            background: var(--secondary);
+        }
+
+        .upload-icon {
+            font-size: 2rem;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+
+        .upload-text {
+            font-weight: 500;
+            color: var(--primary);
+        }
+
+        .upload-hint {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        /* GRÁFICA PRINCIPAL */
+        .main-chart {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .chart-title {
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .chart-title i {
+            color: var(--accent);
+            font-size: 1.1rem;
+        }
+
+        .chart-controls {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.5rem;
+            background: var(--secondary);
+            padding: 0.25rem;
+            border-radius: 6px;
+        }
+
+        .btn-group button {
+            padding: 0.5rem 1rem;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-family: 'Roboto', sans-serif;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .btn-group button:hover {
+            background: var(--card-bg);
+        }
+
+        .btn-group button.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        select {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--card-bg);
+            color: var(--text);
+            font-family: 'Roboto', sans-serif;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        select:hover, select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .type-toggles {
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            padding: 1rem 0;
+            border-top: 1px solid var(--border);
+            margin-top: 1rem;
+        }
+
+        .type-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .type-toggle input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: var(--accent);
+        }
+
+        .type-toggle-label {
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .type-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        /* FILTROS */
+        .filters-section {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .filters-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .filters-header i {
+            color: var(--accent);
+        }
+
+        .filters-header h3 {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: var(--primary);
+        }
+
+        .filters-note {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .filter-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--primary);
+        }
+
+        input[type="number"],
+        input[type="text"] {
+            padding: 0.6rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--card-bg);
+            color: var(--text);
+            font-family: 'Roboto', sans-serif;
+            font-size: 0.875rem;
+            transition: border-color 0.2s;
+        }
+
+        input:hover,
+        input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .btn {
+            padding: 0.6rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            font-family: 'Roboto', sans-serif;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-secondary {
+            background: var(--secondary);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
+        }
+
+        /* MÉTRICAS */
+        .metrics-grid {
+            display: grid;
+            /* Forzamos 4 columnas de igual tamaño */
+            grid-template-columns: repeat(4, 1fr); 
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+         }
+
+        .metric-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .metric-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .metric-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .metric-icon.success { background: rgba(39, 174, 96, 0.1); color: var(--success); }
+        .metric-icon.danger { background: rgba(231, 76, 60, 0.1); color: var(--danger); }
+        .metric-icon.warning { background: rgba(243, 156, 18, 0.1); color: var(--warning); }
+        .metric-icon.info { background: rgba(52, 152, 219, 0.1); color: var(--info); }
+
+        .metric-label {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .metric-change {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-top: 0.5rem;
+        }
+
+        .metric-change.positive {
+            background: rgba(39, 174, 96, 0.1);
+            color: var(--success);
+        }
+
+        .metric-change.negative {
+            background: rgba(231, 76, 60, 0.1);
+            color: var(--danger);
+        }
+
+        /* GRÁFICAS */
+ .charts-grid {
+    display: grid;
+    /* Creamos una retícula base de 4 columnas */
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+/* Gráfico 1: Tendencia (ocupa la mitad izquierda) */
+.charts-grid .chart-container:nth-child(1) {
+    grid-column: span 2;
+}
+
+/* Gráfico 2: Distribución (ocupa la mitad derecha) */
+.charts-grid .chart-container:nth-child(2) {
+    grid-column: span 2;
+}
+
+/* Gráfico 3: Top 10 Clientes (ocupa todo el ancho abajo) */
+.charts-grid .chart-container:nth-child(3) {
+    grid-column: span 4;
+}
+
+        .chart-container {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 350px;
+            width: 100%;
+        }
+
+        /* TABLA */
+        .table-container {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .table-header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .table-title {
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .table-title i {
+            color: var(--accent);
+        }
+
+        .search-box {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            max-width: 300px;
+            flex: 1;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            max-height: 600px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            position: sticky;
+            top: 0;
+            background: var(--secondary);
+            z-index: 10;
+        }
+
+        th {
+            text-align: left;
+            padding: 1rem 1.5rem;
+            font-weight: 500;
+            font-size: 0.875rem;
+            color: var(--text);
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+        }
+
+        th:hover {
+            background: var(--border);
+        }
+
+        th.sortable::after {
+            content: '\f0dc';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            margin-left: 0.5rem;
+            opacity: 0.3;
+            font-size: 0.75rem;
+        }
+
+        th.sort-asc::after {
+            content: '\f0de';
+            opacity: 1;
+            color: var(--accent);
+        }
+
+        th.sort-desc::after {
+            content: '\f0dd';
+            opacity: 1;
+            color: var(--accent);
+        }
+
+        td {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+
+        tbody tr {
+            transition: background 0.2s;
+        }
+
+        tbody tr:hover {
+            background: var(--secondary);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-nuevo {
+            background: rgba(39, 174, 96, 0.1);
+            color: var(--success);
+        }
+
+        .status-baja {
+            background: rgba(231, 76, 60, 0.1);
+            color: var(--danger);
+        }
+
+        .status-activo {
+            background: rgba(52, 152, 219, 0.1);
+            color: var(--info);
+        }
+
+        .status-nuevo-abandono {
+            background: rgba(243, 156, 18, 0.1);
+            color: var(--warning);
+        }
+
+        /* PAGINACIÓN */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .pagination button {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border);
+            background: var(--card-bg);
+            color: var(--text);
+            font-family: 'Roboto', sans-serif;
+            font-size: 0.875rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 36px;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: var(--secondary);
+            border-color: var(--accent);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .pagination button.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .pagination-info {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin: 0 1rem;
+        }
+
+        /* LOADING & NO DATA */
+        .loading, .no-data {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-muted);
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .no-data-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.3;
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 1200px) {
+    /* En pantallas medianas, bajamos los KPIs a 2 columnas (4 filas) */
+    .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 992px) {
+    /* En tablets, hacemos que los gráficos se apilen uno debajo del otro */
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .charts-grid .chart-container:nth-child(1),
+    .charts-grid .chart-container:nth-child(2),
+    .charts-grid .chart-container:nth-child(3) {
+        grid-column: span 1; /* Reseteamos para que ocupen todo el ancho disponible */
+    }
+}
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .metrics-grid,
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .filters-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .chart-controls {
+                width: 100%;
+            }
+
+            .btn-group {
+                width: 100%;
+            }
+
+            .btn-group button {
+                flex: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div>
+                    <h1><i class="fas fa-chart-line"></i>Análisis de Clientes</h1>
+                    <p class="subtitle">Gestión de Clientes Corona - 2024-2025</p>
+                </div>
+                <div class="upload-zone" id="uploadZone">
+                    <div class="upload-icon"><i class="fas fa-file-excel"></i></div>
+                    <div class="upload-text">Cargar Archivo Excel</div>
+                    <div class="upload-hint">.xlsx, .xls</div>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls">
+                </div>
+            </div>
+        </header>
+
+        <div id="mainContent" style="display: none;">
+            <!-- GRÁFICA PRINCIPAL -->
+            <div class="main-chart">
+                <div class="chart-header">
+                    <h3 class="chart-title">
+                        <i class="fas fa-chart-area"></i>
+                        Análisis por Tipo de Cliente
+                    </h3>
+                    <div class="chart-controls">
+                        <div class="btn-group">
+                            <button class="active" onclick="changeStatusMetric('cantidad')">
+                                <i class="fas fa-users"></i> Cantidad
+                            </button>
+                            <button onclick="changeStatusMetric('kg')">
+                                <i class="fas fa-weight"></i> KG
+                            </button>
+                        </div>
+                        <div class="btn-group">
+                            <button onclick="changeStatusScale('linear')">Lineal</button>
+                            <button onclick="changeStatusScale('logarithmic')">Log</button>
+                        </div>
+                        <select onchange="changeStatusYearRange(this.value)">
+                            <option value="all">2024 - 2025</option>
+                            <option value="2024">Solo 2024</option>
+                            <option value="2025">Solo 2025</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="type-toggles">
+                    <label class="type-toggle">
+                        <input type="checkbox" id="toggle-nuevo" checked onchange="toggleStatusType('NUEVO')">
+                        <span class="type-toggle-label">
+                            <span class="type-indicator" style="background: #27ae60;"></span>
+                            NUEVO
+                        </span>
+                    </label>
+                    <label class="type-toggle">
+                        <input type="checkbox" id="toggle-baja" checked onchange="toggleStatusType('BAJA')">
+                        <span class="type-toggle-label">
+                            <span class="type-indicator" style="background: #e74c3c;"></span>
+                            BAJA
+                        </span>
+                    </label>
+                    <label class="type-toggle">
+                        <input type="checkbox" id="toggle-activo" checked onchange="toggleStatusType('ACTIVO')">
+                        <span class="type-toggle-label">
+                            <span class="type-indicator" style="background: #3498db;"></span>
+                            ACTIVO
+                        </span>
+                    </label>
+                    <label class="type-toggle">
+                        <input type="checkbox" id="toggle-nuevo-abandono" checked onchange="toggleStatusType('NUEVO ABANDONO')">
+                        <span class="type-toggle-label">
+                            <span class="type-indicator" style="background: #f39c12;"></span>
+                            NUEVO ABANDONO
+                        </span>
+                    </label>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="statusByMonthChart"></canvas>
+                </div>
+            </div>
+
+            <!-- FILTROS -->
+            <div class="filters-section">
+                <div class="filters-header">
+                    <i class="fas fa-filter"></i>
+                    <h3>Filtros</h3>
+                </div>
+                <p class="filters-note">
+                    <i class="fas fa-info-circle"></i>
+                    Estos filtros afectan métricas, gráficas secundarias y tabla. No afectan el análisis principal.
+                </p>
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label class="filter-label">Status</label>
+                        <select id="filterStatus">
+                            <option value="">Todos</option>
+                            <option value="NUEVO">Nuevo</option>
+                            <option value="BAJA">Baja</option>
+                            <option value="ACTIVO">Activo</option>
+                            <option value="NUEVO ABANDONO">Nuevo Abandono</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Meses sin Compra</label>
+                        <select id="filterMesesSinCompra">
+                            <option value="">Todos</option>
+                            <option value="0">0 meses (Activos)</option>
+                            <option value="1-3">1-3 meses</option>
+                            <option value="4-6">4-6 meses</option>
+                            <option value="7+">7+ meses</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Año Primera Compra</label>
+                        <select id="filterPrimeraVez">
+                            <option value="">Todos</option>
+                            <option value="2025">2025</option>
+                            <option value="2024">2024</option>
+                            <option value="2023">2023</option>
+                            <option value="otros">Otros</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">KG Mínimo 2025</label>
+                        <input type="number" id="filterKgMin" placeholder="0">
+                    </div>
+                    <div class="filter-group" style="align-self: flex-end;">
+                        <button class="btn btn-primary" onclick="applyFilters()">
+                            <i class="fas fa-check"></i> Aplicar
+                        </button>
+                    </div>
+                    <div class="filter-group" style="align-self: flex-end;">
+                        <button class="btn btn-secondary" onclick="resetFilters()">
+                            <i class="fas fa-times"></i> Limpiar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MÉTRICAS -->
+            <div class="metrics-grid" id="metricsGrid"></div>
+
+            <!-- TABLA -->
+            <div class="table-container">
+                <div class="table-header">
+                    <h3 class="table-title">
+                        <i class="fas fa-table"></i>
+                        Detalle de Clientes
+                    </h3>
+                    <div class="search-box">
+                        <i class="fas fa-search" style="color: var(--text-muted);"></i>
+                        <input type="text" id="searchInput" placeholder="Buscar cliente..." class="search-input">
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table id="dataTable">
+                        <thead>
+                            <tr>
+                                <th class="sortable" onclick="sortTable('Matriz')">Matriz</th>
+                                <th class="sortable" onclick="sortTable('NombreCliente')">Cliente</th>
+                                <th class="sortable" onclick="sortTable('Status_Cliente')">Status</th>
+                                <th class="sortable" onclick="sortTable('KG_2024')">KG 2024</th>
+                                <th class="sortable" onclick="sortTable('KG_2025')">KG 2025</th>
+                                <th class="sortable" onclick="sortTable('Diferencia_KG')">Diferencia</th>
+                                <th class="sortable" onclick="sortTable('Meses_Sin_Compra')">Meses s/C</th>
+                                <th class="sortable" onclick="sortTable('Primera_Vez_Absoluta')">Primera Vez</th>
+                                <th class="sortable" onclick="sortTable('Ultima_Vez_Absoluta')">Última Vez</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="pagination"></div>
+            </div>
+            <br>
+            <!-- GRÁFICAS SECUNDARIAS -->
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3 class="chart-title">
+                            <i class="fas fa-chart-line"></i>
+                            Tendencia Mensual
+                        </h3>
+                        <div class="btn-group">
+                            <button class="active" onclick="changeChartView('combined')">Todo</button>
+                            <button onclick="changeChartView('2024')">2024</button>
+                            <button onclick="changeChartView('2025')">2025</button>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="lineChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3 class="chart-title">
+                            <i class="fas fa-chart-pie"></i>
+                            Distribución por Status
+                        </h3>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3 class="chart-title">
+                            <i class="fas fa-trophy"></i>
+                            Top 10 Clientes por KG 2025
+                        </h3>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="topClientsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            
+        </div>
+
+        <div id="noDataMessage" class="no-data">
+            <div class="no-data-icon"><i class="fas fa-folder-open"></i></div>
+            <h3>No hay datos cargados</h3>
+            <p>Carga un archivo Excel para comenzar el análisis</p>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        let allData = [];
+        let filteredData = [];
+        let currentSortColumn = null;
+        let currentSortDirection = 'asc';
+        let charts = {};
+        let currentChartView = 'combined';
+        let currentPage = 1;
+        let rowsPerPage = 100;
+        let statusChartMetric = 'cantidad';
+        let statusChartScale = 'linear';
+        let statusChartYearRange = 'all';
+        let statusChartVisibleTypes = {
+            'NUEVO': true,
+            'BAJA': true,
+            'ACTIVO': true,
+            'NUEVO ABANDONO': true
+        };
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            const uploadZone = document.getElementById('uploadZone');
+            const fileInput = document.getElementById('fileInput');
+            const searchInput = document.getElementById('searchInput');
+
+            uploadZone.addEventListener('click', () => fileInput.click());
+            
+            uploadZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadZone.style.borderColor = 'var(--accent)';
+            });
+
+            uploadZone.addEventListener('dragleave', () => {
+                uploadZone.style.borderColor = 'var(--border)';
+            });
+
+            uploadZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadZone.style.borderColor = 'var(--border)';
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFileUpload(files[0]);
+                }
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFileUpload(e.target.files[0]);
+                }
+            });
+
+            searchInput.addEventListener('input', (e) => {
+                filterBySearch(e.target.value);
+            });
+        }
+
+        function handleFileUpload(file) {
+            if (!file.name.match(/\.(xlsx|xls)$/)) {
+                alert('Por favor, carga un archivo Excel válido (.xlsx o .xls)');
+                return;
+            }
+
+            document.getElementById('noDataMessage').innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p style="margin-top: 1rem;">Procesando ${file.name}...</p>
+                    <p style="margin-top: 0.5rem; color: var(--text-muted); font-size: 0.9rem;">Esto puede tomar unos segundos</p>
+                </div>
+            `;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                    
+                    setTimeout(() => {
+                        processData(jsonData);
+                    }, 100);
+                } catch (error) {
+                    console.error('Error al procesar el archivo:', error);
+                    alert('Error al procesar el archivo. Por favor verifica el formato.');
+                    document.getElementById('noDataMessage').innerHTML = `
+                        <div class="no-data">
+                            <div class="no-data-icon"><i class="fas fa-folder-open"></i></div>
+                            <h3>No hay datos cargados</h3>
+                            <p>Carga un archivo Excel para comenzar el análisis</p>
+                        </div>
+                    `;
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function processData(data) {
+            allData = data.map(row => ({
+                ...row,
+                KG_2024: parseFloat(row.KG_2024) || 0,
+                KG_2025: parseFloat(row.KG_2025) || 0,
+                Diferencia_KG: parseFloat(row.Diferencia_KG) || 0,
+                Meses_Sin_Compra: parseInt(row.Meses_Sin_Compra) || 0
+            }));
+            
+            filteredData = [...allData];
+            
+            document.getElementById('noDataMessage').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'block';
+            
+            renderMetrics();
+            renderCharts();
+            renderTable();
+        }
+
+        function renderMetrics() {
+            const metrics = calculateMetrics();
+            const metricsGrid = document.getElementById('metricsGrid');
+            
+            metricsGrid.innerHTML = `
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-icon success">
+                            <i class="fas fa-user-plus"></i>
+                        </div>
+                        <div style="flex: 1;">
+                            <div class="metric-label">Clientes Nuevos 2025</div>
+                        </div>
+                    </div>
+                    <div class="metric-value">${metrics.nuevos}</div>
+                    <div class="metric-subtitle">Total de nuevos clientes</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-icon danger">
+                            <i class="fas fa-user-minus"></i>
+                        </div>
+                        <div style="flex: 1;">
+                            <div class="metric-label">Clientes Baja 2025</div>
+                        </div>
+                    </div>
+                    <div class="metric-value">${metrics.bajas}</div>
+                    <div class="metric-subtitle">Clientes perdidos</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-icon warning">
+                            <i class="fas fa-user-clock"></i>
+                        </div>
+                        <div style="flex: 1;">
+                            <div class="metric-label">Nuevo Abandono</div>
+                        </div>
+                    </div>
+                    <div class="metric-value">${metrics.nuevoAbandono}</div>
+                    <div class="metric-subtitle">Clientes no fidelizados</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-icon success">
+                            <i class="fas fa-arrow-trend-up"></i>
+                        </div>
+                        <div style="flex: 1;">
+                            <div class="metric-label">KG Ganados 2025</div>
+                        </div>
+                    </div>
+                    <div class="metric-value">${formatNumber(metrics.kgGanados)}</div>
+                    <div class="metric-subtitle">Por clientes nuevos</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-icon danger">
+                            <i class="fas fa-arrow-trend-down"></i>
+                        </div>
+                        <div style="flex: 1;">
+                            <div class="metric-label">KG Perdidos 2025</div>
+                        </div>
+                    </div>
+                    <div class="metric-value">${formatNumber(Math.abs(metrics.kgPerdidos))}</div>
+                    <div class="metric-subtitle">Por clientes de baja</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-icon ${metrics.balanceNeto >= 0 ? 'success' : 'danger'}">
+                            <i class="fas fa-balance-scale"></i>
+                        </div>
+                        <div style="flex: 1;">
+                            <div class="metric-label">Balance Neto KG</div>
+                        </div>
+                    </div>
+                    <div class="metric-value" style="color: ${metrics.balanceNeto >= 0 ? 'var(--success)' : 'var(--danger)'};">
+                        ${metrics.balanceNeto >= 0 ? '+' : ''}${formatNumber(metrics.balanceNeto)}
+                    </div>
+                    <div class="metric-change ${metrics.balanceNeto >= 0 ? 'positive' : 'negative'}">
+                        <i class="fas fa-arrow-${metrics.balanceNeto >= 0 ? 'up' : 'down'}"></i>
+                        ${metrics.balanceNeto >= 0 ? 'Ganancia' : 'Pérdida'}
+                    </div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-icon info">
+                            <i class="fas fa-calendar-day"></i>
+                        </div>
+                        <div style="flex: 1;">
+                            <div class="metric-label">Total KG 2024</div>
+                        </div>
+                    </div>
+                    <div class="metric-value">${formatNumber(metrics.totalKg2024)}</div>
+                    <div class="metric-subtitle">Ventas año anterior</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-icon info">
+                            <i class="fas fa-calendar-check"></i>
+                        </div>
+                        <div style="flex: 1;">
+                            <div class="metric-label">Total KG 2025</div>
+                        </div>
+                    </div>
+                    <div class="metric-value">${formatNumber(metrics.totalKg2025)}</div>
+                    <div class="metric-subtitle">Ventas año actual</div>
+                </div>
+            `;
+        }
+
+        function calculateMetrics() {
+            const nuevos = filteredData.filter(d => d.Status_Cliente === 'NUEVO').length;
+            const bajas = filteredData.filter(d => d.Status_Cliente === 'BAJA').length;
+            const nuevoAbandono = filteredData.filter(d => d.Status_Cliente === 'NUEVO ABANDONO').length;
+            
+            const kgGanados = filteredData
+                .filter(d => d.Status_Cliente === 'NUEVO')
+                .reduce((sum, d) => sum + d.KG_2025, 0);
+            
+            const kgPerdidos = filteredData
+                .filter(d => d.Status_Cliente === 'BAJA')
+                .reduce((sum, d) => sum + d.Diferencia_KG, 0);
+            
+            const totalKg2024 = filteredData.reduce((sum, d) => sum + d.KG_2024, 0);
+            const totalKg2025 = filteredData.reduce((sum, d) => sum + d.KG_2025, 0);
+            
+            return {
+                nuevos,
+                bajas,
+                nuevoAbandono,
+                kgGanados,
+                kgPerdidos,
+                balanceNeto: kgGanados + kgPerdidos,
+                totalKg2024,
+                totalKg2025
+            };
+        }
+
+        function renderCharts() {
+            renderStatusByMonthChart();
+            renderLineChart();
+            renderStatusChart();
+            renderTopClientsChart();
+        }
+
+        function renderStatusByMonthChart() {
+            const ctx = document.getElementById('statusByMonthChart').getContext('2d');
+            
+            if (charts.statusByMonthChart) {
+                charts.statusByMonthChart.destroy();
+            }
+
+            let labels = [];
+            let monthColumns = [];
+            
+            if (statusChartYearRange === 'all') {
+                const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+                labels = [...meses.map(m => m + ' 24'), ...meses.map(m => m + ' 25')];
+                monthColumns = [
+                    ...meses.map((_, i) => ({ year: '24', index: i + 1 })),
+                    ...meses.map((_, i) => ({ year: '25', index: i + 1 }))
+                ];
+            } else if (statusChartYearRange === '2024') {
+                const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+                labels = meses.map(m => m + ' 24');
+                monthColumns = meses.map((_, i) => ({ year: '24', index: i + 1 }));
+            } else {
+                const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+                labels = meses.map(m => m + ' 25');
+                monthColumns = meses.map((_, i) => ({ year: '25', index: i + 1 }));
+            }
+
+            const statusTypes = ['NUEVO', 'BAJA', 'ACTIVO', 'NUEVO ABANDONO'];
+            const colors = {
+                'NUEVO': '#27ae60',
+                'BAJA': '#e74c3c',
+                'ACTIVO': '#3498db',
+                'NUEVO ABANDONO': '#f39c12'
+            };
+
+            const datasets = statusTypes
+                .filter(status => statusChartVisibleTypes[status])
+                .map(status => {
+                    const data = monthColumns.map(({ year, index }) => {
+                        const col = `v${year}_${String(index).padStart(2, '0')}`;
+                        const clientsInMonth = allData.filter(row => {
+                            const hasVenta = (parseFloat(row[col]) || 0) > 0;
+                            return hasVenta && row.Status_Cliente === status;
+                        });
+
+                        if (statusChartMetric === 'cantidad') {
+                            return clientsInMonth.length;
+                        } else {
+                            return clientsInMonth.reduce((sum, row) => sum + (parseFloat(row[col]) || 0), 0);
+                        }
+                    });
+
+                    return {
+                        label: status,
+                        data: data,
+                        borderColor: colors[status],
+                        backgroundColor: colors[status],
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: false,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        pointBackgroundColor: colors[status],
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2
+                    };
+                });
+
+            const yAxisConfig = {
+                type: statusChartScale,
+                beginAtZero: true,
+                grid: {
+                    color: 'rgba(0,0,0,0.05)'
+                },
+                ticks: {
+                    color: '#95a5a6',
+                    font: {
+                        family: 'Roboto',
+                        size: 11
+                    },
+                    callback: function(value) {
+                        if (statusChartMetric === 'cantidad') {
+                            return value;
+                        } else {
+                            return formatNumber(value);
+                        }
+                    }
+                },
+                title: {
+                    display: true,
+                    text: statusChartMetric === 'cantidad' ? 'Cantidad de Clientes' : 'Volumen en KG',
+                    color: '#7f8c8d',
+                    font: {
+                        family: 'Roboto',
+                        weight: '500',
+                        size: 12
+                    }
+                }
+            };
+
+            if (statusChartScale === 'logarithmic') {
+                yAxisConfig.min = statusChartMetric === 'cantidad' ? 0.1 : 1;
+                yAxisConfig.ticks.callback = function(value) {
+                    if (value === 0.1 || value === 1 || value === 10 || value === 100 || 
+                        value === 1000 || value === 10000 || value === 100000 || value === 1000000) {
+                        if (statusChartMetric === 'cantidad') {
+                            return value;
+                        } else {
+                            return formatNumber(value);
+                        }
+                    }
+                    return '';
+                };
+            }
+
+            charts.statusByMonthChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                color: '#7f8c8d',
+                                padding: 15,
+                                font: {
+                                    size: 12,
+                                    family: 'Roboto',
+                                    weight: '500'
+                                },
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            titleColor: '#2c3e50',
+                            bodyColor: '#2c3e50',
+                            borderColor: '#e1e8ed',
+                            borderWidth: 1,
+                            padding: 12,
+                            displayColors: true,
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.dataset.label || '';
+                                    const value = context.parsed.y;
+                                    if (statusChartMetric === 'cantidad') {
+                                        return `${label}: ${value} cliente${value !== 1 ? 's' : ''}`;
+                                    } else {
+                                        return `${label}: ${formatNumber(value)} KG`;
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: yAxisConfig,
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                color: '#95a5a6',
+                                font: {
+                                    family: 'Roboto',
+                                    size: 10
+                                },
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderLineChart() {
+            const ctx = document.getElementById('lineChart').getContext('2d');
+            
+            if (charts.lineChart) {
+                charts.lineChart.destroy();
+            }
+
+            const meses2024 = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+            const meses2025 = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+            
+            const data2024 = meses2024.map((_, i) => {
+                const col = `v24_${String(i + 1).padStart(2, '0')}`;
+                return filteredData.reduce((sum, row) => sum + (parseFloat(row[col]) || 0), 0);
+            });
+            
+            const data2025 = meses2025.map((_, i) => {
+                const col = `v25_${String(i + 1).padStart(2, '0')}`;
+                return filteredData.reduce((sum, row) => sum + (parseFloat(row[col]) || 0), 0);
+            });
+
+            let datasets = [];
+            let labels = [];
+
+            if (currentChartView === 'combined') {
+                labels = [...meses2024.map(m => m + ' 24'), ...meses2025.map(m => m + ' 25')];
+                datasets = [{
+                    label: 'Ventas KG',
+                    data: [...data2024, ...data2025],
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: true
+                }];
+            } else if (currentChartView === '2024') {
+                labels = meses2024;
+                datasets = [{
+                    label: '2024',
+                    data: data2024,
+                    borderColor: '#e74c3c',
+                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: true
+                }];
+            } else {
+                labels = meses2025;
+                datasets = [{
+                    label: '2025',
+                    data: data2025,
+                    borderColor: '#27ae60',
+                    backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: true
+                }];
+            }
+
+            charts.lineChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            titleColor: '#2c3e50',
+                            bodyColor: '#2c3e50',
+                            borderColor: '#e1e8ed',
+                            borderWidth: 1,
+                            padding: 12,
+                            displayColors: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return formatNumber(context.parsed.y) + ' KG';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0,0,0,0.05)'
+                            },
+                            ticks: {
+                                color: '#95a5a6',
+                                callback: function(value) {
+                                    return formatNumber(value);
+                                }
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                color: '#95a5a6'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderStatusChart() {
+            const ctx = document.getElementById('statusChart').getContext('2d');
+            
+            if (charts.statusChart) {
+                charts.statusChart.destroy();
+            }
+
+            const statusCounts = {};
+            filteredData.forEach(d => {
+                statusCounts[d.Status_Cliente] = (statusCounts[d.Status_Cliente] || 0) + 1;
+            });
+
+            const colors = {
+                'NUEVO': '#27ae60',
+                'BAJA': '#e74c3c',
+                'ACTIVO': '#3498db',
+                'NUEVO ABANDONO': '#f39c12'
+            };
+
+            charts.statusChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(statusCounts),
+                    datasets: [{
+                        data: Object.values(statusCounts),
+                        backgroundColor: Object.keys(statusCounts).map(k => colors[k] || '#95a5a6'),
+                        borderColor: '#ffffff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: '#7f8c8d',
+                                padding: 15,
+                                font: {
+                                    size: 12,
+                                    family: 'Roboto',
+                                    weight: '500'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            titleColor: '#2c3e50',
+                            bodyColor: '#2c3e50',
+                            borderColor: '#e1e8ed',
+                            borderWidth: 1,
+                            padding: 12
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderTopClientsChart() {
+            const ctx = document.getElementById('topClientsChart').getContext('2d');
+            
+            if (charts.topClientsChart) {
+                charts.topClientsChart.destroy();
+            }
+
+            const topClients = [...filteredData]
+                .sort((a, b) => b.KG_2025 - a.KG_2025)
+                .slice(0, 10);
+
+            charts.topClientsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: topClients.map(c => c.NombreCliente?.substring(0, 30) || 'Sin nombre'),
+                    datasets: [{
+                        label: 'KG 2025',
+                        data: topClients.map(c => c.KG_2025),
+                        backgroundColor: '#3498db',
+                        borderColor: '#3498db',
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            titleColor: '#2c3e50',
+                            bodyColor: '#2c3e50',
+                            borderColor: '#e1e8ed',
+                            borderWidth: 1,
+                            padding: 12,
+                            callbacks: {
+                                label: function(context) {
+                                    return formatNumber(context.parsed.x) + ' KG';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(0,0,0,0.05)'
+                            },
+                            ticks: {
+                                color: '#95a5a6',
+                                callback: function(value) {
+                                    return formatNumber(value);
+                                }
+                            }
+                        },
+                        y: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                color: '#7f8c8d',
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            const startIndex = (currentPage - 1) * rowsPerPage;
+            const endIndex = Math.min(startIndex + rowsPerPage, filteredData.length);
+            const pageData = filteredData.slice(startIndex, endIndex);
+
+            pageData.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row.Matriz || '-'}</td>
+                    <td>${row.NombreCliente || '-'}</td>
+                    <td><span class="status-badge status-${row.Status_Cliente?.toLowerCase().replace(' ', '-')}">${row.Status_Cliente || '-'}</span></td>
+                    <td>${formatNumber(row.KG_2024)}</td>
+                    <td>${formatNumber(row.KG_2025)}</td>
+                    <td style="color: ${row.Diferencia_KG >= 0 ? 'var(--success)' : 'var(--danger)'}">${row.Diferencia_KG >= 0 ? '+' : ''}${formatNumber(row.Diferencia_KG)}</td>
+                    <td>${row.Meses_Sin_Compra}</td>
+                    <td>${row.Primera_Vez_Absoluta || '-'}</td>
+                    <td>${row.Ultima_Vez_Absoluta || '-'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            renderPagination();
+        }
+
+        function renderPagination() {
+            const pagination = document.getElementById('pagination');
+            const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+            
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+
+            let html = `
+                <button onclick="changePage(1)" ${currentPage === 1 ? 'disabled' : ''}><i class="fas fa-angles-left"></i></button>
+                <button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>
+            `;
+
+            const maxButtons = 7;
+            let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+            let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+            if (endPage - startPage < maxButtons - 1) {
+                startPage = Math.max(1, endPage - maxButtons + 1);
+            }
+
+            if (startPage > 1) {
+                html += `<button onclick="changePage(1)">1</button>`;
+                if (startPage > 2) html += `<span style="padding: 0.5rem; color: var(--text-muted);">...</span>`;
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<button onclick="changePage(${i})" ${i === currentPage ? 'class="active"' : ''}>${i}</button>`;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) html += `<span style="padding: 0.5rem; color: var(--text-muted);">...</span>`;
+                html += `<button onclick="changePage(${totalPages})">${totalPages}</button>`;
+            }
+
+            html += `
+                <button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>
+                <button onclick="changePage(${totalPages})" ${currentPage === totalPages ? 'disabled' : ''}><i class="fas fa-angles-right"></i></button>
+                <span class="pagination-info">${((currentPage - 1) * rowsPerPage) + 1}-${Math.min(currentPage * rowsPerPage, filteredData.length)} de ${filteredData.length}</span>
+            `;
+
+            pagination.innerHTML = html;
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            renderTable();
+            document.getElementById('dataTable').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function applyFilters() {
+            const status = document.getElementById('filterStatus').value;
+            const mesesSinCompra = document.getElementById('filterMesesSinCompra').value;
+            const primeraVez = document.getElementById('filterPrimeraVez').value;
+            const kgMin = parseFloat(document.getElementById('filterKgMin').value) || 0;
+
+            filteredData = allData.filter(row => {
+                let matches = true;
+
+                if (status && row.Status_Cliente !== status) matches = false;
+
+                if (mesesSinCompra) {
+                    const meses = row.Meses_Sin_Compra;
+                    if (mesesSinCompra === '0' && meses !== 0) matches = false;
+                    if (mesesSinCompra === '1-3' && (meses < 1 || meses > 3)) matches = false;
+                    if (mesesSinCompra === '4-6' && (meses < 4 || meses > 6)) matches = false;
+                    if (mesesSinCompra === '7+' && meses < 7) matches = false;
+                }
+
+                if (primeraVez) {
+                    const year = row.Primera_Vez_Absoluta?.substring(0, 4);
+                    if (primeraVez === 'otros' && ['2023', '2024', '2025'].includes(year)) matches = false;
+                    if (primeraVez !== 'otros' && year !== primeraVez) matches = false;
+                }
+
+                if (row.KG_2025 < kgMin) matches = false;
+
+                return matches;
+            });
+
+            currentPage = 1;
+            renderMetrics();
+            renderLineChart();
+            renderStatusChart();
+            renderTopClientsChart();
+            renderTable();
+        }
+
+        function resetFilters() {
+            document.getElementById('filterStatus').value = '';
+            document.getElementById('filterMesesSinCompra').value = '';
+            document.getElementById('filterPrimeraVez').value = '';
+            document.getElementById('filterKgMin').value = '';
+            document.getElementById('searchInput').value = '';
+            
+            filteredData = [...allData];
+            currentPage = 1;
+            renderMetrics();
+            renderLineChart();
+            renderStatusChart();
+            renderTopClientsChart();
+            renderTable();
+        }
+
+        function filterBySearch(searchTerm) {
+            const term = searchTerm.toLowerCase();
+            filteredData = allData.filter(row => 
+                (row.Matriz && row.Matriz.toString().toLowerCase().includes(term)) ||
+                (row.NombreCliente && row.NombreCliente.toLowerCase().includes(term))
+            );
+            currentPage = 1;
+            renderTable();
+        }
+
+        function sortTable(column) {
+            const th = event.target;
+            const allTh = document.querySelectorAll('th');
+            
+            if (currentSortColumn === column) {
+                currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSortColumn = column;
+                currentSortDirection = 'asc';
+                allTh.forEach(t => {
+                    t.classList.remove('sort-asc', 'sort-desc');
+                });
+            }
+
+            allTh.forEach(t => t.classList.remove('sort-asc', 'sort-desc'));
+            th.classList.add(currentSortDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+
+            filteredData.sort((a, b) => {
+                let valA = a[column];
+                let valB = b[column];
+
+                if (typeof valA === 'string') {
+                    valA = valA.toLowerCase();
+                    valB = valB.toLowerCase();
+                }
+
+                if (valA < valB) return currentSortDirection === 'asc' ? -1 : 1;
+                if (valA > valB) return currentSortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            currentPage = 1;
+            renderTable();
+        }
+
+        function changeChartView(view) {
+            currentChartView = view;
+            
+            const tabs = event.target.parentElement.querySelectorAll('button');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            renderLineChart();
+        }
+
+        function changeStatusMetric(metric) {
+            statusChartMetric = metric;
+            
+            const tabs = event.target.parentElement.querySelectorAll('button');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            renderStatusByMonthChart();
+        }
+
+        function changeStatusScale(scale) {
+            statusChartScale = scale;
+            
+            const tabs = event.target.parentElement.querySelectorAll('button');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            renderStatusByMonthChart();
+        }
+
+        function changeStatusYearRange(range) {
+            statusChartYearRange = range;
+            renderStatusByMonthChart();
+        }
+
+        function toggleStatusType(type) {
+            statusChartVisibleTypes[type] = !statusChartVisibleTypes[type];
+            renderStatusByMonthChart();
+        }
+
+        function formatNumber(num) {
+            if (num === null || num === undefined || isNaN(num)) return '0';
+            return new Intl.NumberFormat('es-MX', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2
+            }).format(num);
+        }
+    </script>
+</body>
+</html>

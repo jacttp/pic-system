@@ -19,7 +19,7 @@ export const usePicChatStore = defineStore('picChat', () => {
     const isLoading = ref(false);
     const activeContext = ref<ChatContext | null>(null);
     const isReportActive = ref(false);
-    const filterStore = usePicFilterStore();
+    const filterStore = usePicFilterStore();         
     const selectedModel = ref<string>('gemini'); // Default
     
     // --- ACCIONES BÁSICAS ---
@@ -221,6 +221,12 @@ export const usePicChatStore = defineStore('picChat', () => {
                 message.text += "\n\n(La consulta no devolvió datos para visualizar).";
                 return;
             }
+
+            setContext(
+                `Resultado: ${message.chartConfig.metric} por ${message.chartConfig.dimensions.join(', ')}`, // Título
+                data.slice(0, 50), // Datos (Limitamos a 50 filas para no saturar tokens)
+                'chart' // Tipo
+            );
 
             const config = message.chartConfig;
             const vizType = config.visualization || 'bar'; // Fallback por seguridad

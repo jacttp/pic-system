@@ -3,7 +3,7 @@ import axios from 'axios';
 import { setupAuthInterceptors } from './interceptorSetup';
 
 const api = axios.create({
-    baseURL: 'http://localhost:3000/api/v2',
+    baseURL:import.meta.env.VITE_API_BASE_URL+'/v2' ,
     headers: {
         'Content-Type': 'application/json'
     }

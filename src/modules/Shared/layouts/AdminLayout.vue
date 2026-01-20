@@ -88,6 +88,32 @@ const toggleSidebar = () => {
                     <div v-if="isCollapsed" class="tooltip">Reporte PIC</div>
                 </router-link>
 
+                <router-link 
+                    to="/admin/pic" 
+                    class="flex items-center gap-3 py-2.5 rounded-lg transition-all font-medium group relative"
+                    :class="[
+                        isActive('/admin/pic-logistics') ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-brand-600',
+                        isCollapsed ? 'justify-center px-0' : 'px-4'
+                    ]"
+                >
+                    <i class="fa-solid fa-route w-5 text-center text-lg"></i>
+                    <span v-show="!isCollapsed" class="whitespace-nowrap">Logística</span>
+                    <div v-if="isCollapsed" class="tooltip">Logística</div>
+                </router-link>
+
+                <router-link 
+                    to="/admin/pic" 
+                    class="flex items-center gap-3 py-2.5 rounded-lg transition-all font-medium group relative"
+                    :class="[
+                        isActive('/admin/pic-forecast') ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-brand-600',
+                        isCollapsed ? 'justify-center px-0' : 'px-4'
+                    ]"
+                >
+                    <i class="fa-solid fa-arrow-tr w-5 text-center text-lg"></i>
+                    <span v-show="!isCollapsed" class="whitespace-nowrap">Forecast</span>
+                    <div v-if="isCollapsed" class="tooltip">Forecast</div>
+                </router-link>
+
                 <p v-if="!isCollapsed" class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 mt-6 fade-in">
                     Gestión
                 </p>
@@ -132,6 +158,19 @@ const toggleSidebar = () => {
                     <div v-if="isCollapsed" class="tooltip">Clientes</div>
                 </router-link>
 
+                <router-link 
+                    to="/admin/clients" 
+                    class="flex items-center gap-3 py-2.5 rounded-lg transition-all font-medium group relative"
+                    :class="[
+                        isActive('/admin/clients-validation') ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-brand-600',
+                        isCollapsed ? 'justify-center px-0' : 'px-4'
+                    ]"
+                >
+                    <i class="fa-solid fa-user-check w-5 text-center text-lg"></i>
+                    <span v-show="!isCollapsed" class="whitespace-nowrap">Validación Clientes</span>
+                    <div v-if="isCollapsed" class="tooltip">Validación Clientes</div>
+                </router-link>
+
                 <p v-if="!isCollapsed" class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 mt-6 fade-in">
                     Sistema
                 </p>
@@ -148,6 +187,19 @@ const toggleSidebar = () => {
                     <i class="fa-solid fa-shield-cat w-5 text-center text-lg"></i>
                     <span v-show="!isCollapsed" class="whitespace-nowrap">Auditoría</span>
                     <div v-if="isCollapsed" class="tooltip">Auditoría</div>
+                </router-link>
+
+                <router-link 
+                    to="/admin/audit" 
+                    class="flex items-center gap-3 py-2.5 rounded-lg transition-all font-medium group relative"
+                    :class="[
+                        isActive('/admin/setup') ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-brand-600',
+                        isCollapsed ? 'justify-center px-0' : 'px-4'
+                    ]"
+                >
+                    <i class="fa-solid fa-gear w-5 text-center text-lg"></i>
+                    <span v-show="!isCollapsed" class="whitespace-nowrap">Setup</span>
+                    <div v-if="isCollapsed" class="tooltip">Setup</div>
                 </router-link>
 
             </nav>

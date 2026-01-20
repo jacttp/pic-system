@@ -73,6 +73,28 @@ const handleLogout = () => {
                     bg-class="bg-brand-50"
                 />
 
+                <!-- 1. REPORTE PIC (LEGACY) -->
+                <!-- IMPORTANTE: Cambia el href por la URL real de tu dashboard viejo --> 
+                <ModuleCard 
+                    title="Logística"
+                    description="Gestion, Edición, Alta y Publicación de Rutas e Itinerarios."
+                    icon="fa-solid fa-route"
+                    to="/admin/pic"
+                    color-class="text-lime-600"
+                    bg-class="bg-lime-50"
+                />
+
+                <!-- 1. REPORTE PIC (LEGACY) -->
+                <!-- IMPORTANTE: Cambia el href por la URL real de tu dashboard viejo -->
+                <ModuleCard 
+                    title="Forecast"
+                    description="Dashboard analítico de Forecast, análisis y edición de metas y proyecciones."
+                    icon="fa-solid fa-arrow-trend-up"
+                    to="/admin/pic"
+                    color-class="text-rose-600"
+                    bg-class="bg-rose-50"
+                />
+
                 <!-- 2. GESTIÓN DE USUARIOS (VUE) -->
                 <ModuleCard 
                     title="Gestión de Usuarios"
@@ -95,14 +117,22 @@ const handleLogout = () => {
 
                 <!-- 4. CLIENTES (Placeholder - Próximamente) -->
                 <ModuleCard 
-                    title="Cartera de Clientes"
+                    title="Catálogo Clientes"
                     description="Directorio comercial, segmentación y datos de contacto."
                     icon="fa-solid fa-store"
                     to="/admin/clients"
                     color-class="text-emerald-500"
                     bg-class="bg-emerald-50"
                 />
-
+                <!-- 4. CLIENTES (Placeholder - Próximamente) -->
+                <ModuleCard 
+                    title="Validación de Clientes"
+                    description="Directorio comercial, segmentación y datos de contacto."
+                    icon="fa-solid fa-user-check"
+                    to="/admin/clients"
+                    color-class="text-pink-500"
+                    bg-class="bg-pink-50"
+                />
                 <!-- 5. AUDITORÍA (Placeholder) -->
                 <ModuleCard 
                     title="Auditoría y Logs"
@@ -112,6 +142,16 @@ const handleLogout = () => {
                     color-class="text-slate-500"
                     bg-class="bg-slate-100"
                 />
+                <!-- 5. AUDITORÍA (Placeholder) -->
+                <ModuleCard 
+                    title="Setup"
+                    description="Configuración de Roles y Opciones de sistema.."
+                    icon="fa-solid fa-gear"
+                    to="/admin/audit"
+                    color-class="text-sky-500"
+                    bg-class="bg-sky-100"
+                />
+
 
             </div>
         </main>

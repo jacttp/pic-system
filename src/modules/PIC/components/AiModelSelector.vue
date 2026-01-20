@@ -10,7 +10,8 @@ const dropdownRef = ref<HTMLElement | null>(null);
 const models = [
   { id: 'gemini', name: 'Gemini 2.5', icon: 'fa-brands fa-chrome', color: 'text-blue-500', desc: 'Rápido y preciso' },
   { id: 'openai', name: 'GPT-4o', icon: 'fa-brands fa-openai', color: 'text-green-500', desc: 'Mayor razonamiento' },
-  { id: 'deepseek', name: 'DeepSeek', icon: 'fa-solid fa-robot', color: 'text-purple-500', desc: 'Open Source potente' }
+  { id: 'deepseek', name: 'DeepSeek', icon: 'fa-solid fa-robot', color: 'text-purple-500', desc: 'Open Source potente' },
+  { id: 'groq', name: 'Llama 3.1 (Groq)', icon: 'fa-solid fa-bolt', color: 'text-orange-500', desc: 'Velocidad Instantánea'}
 ];
 
 const currentModel = computed(() => models.find(m => m.id === store.selectedModel) || models[0]);

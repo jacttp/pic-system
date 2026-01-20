@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PIC System - AI Chat Prototype</title>
+    
+    <!-- 1. STACK VISUAL (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js para visualización de datos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50: '#f0f9ff', 100: '#e0f2fe', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1' }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.3s ease-out forwards',
+                        'pulse-slow': 'pulse 3s infinite'
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Scrollbar estilo sistema */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        body { font-family: 'Inter', system-ui, sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-100 h-screen flex overflow-hidden font-sans">
+
+    <!-- LOGIN OVERLAY (Se muestra si no hay token) -->
+    <div id="login-overlay" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] hidden flex items-center justify-center">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200">
+            <div class="text-center mb-6">
+                <div class="w-12 h-12 bg-brand-600 rounded-xl flex items-center justify-center text-white text-xl mx-auto mb-3 shadow-lg">
+                    <i class="fa-solid fa-layer-group"></i>
+                </div>
+                <h2 class="text-xl font-bold text-slate-800">Iniciar Sesión</h2>
+                <p class="text-xs text-slate-500">Ingresa credenciales para obtener token</p>
+            </div>
+            
+            <form onsubmit="event.preventDefault(); chatApp.login();" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Usuario</label>
+                    <input type="text" id="username" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none" placeholder="Ej: SuperAdmin">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Contraseña</label>
+                    <input type="password" id="password" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none" placeholder="••••••••">
+                </div>
+                <div id="login-error" class="text-red-500 text-xs hidden">Credenciales incorrectas</div>
+                <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2.5 rounded-lg transition-colors shadow-sm text-sm">
+                    Acceder
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- DASHBOARD MOCK (Fondo) -->
+    <main class="flex-1 flex flex-col relative overflow-hidden bg-white m-4 rounded-2xl shadow-sm border border-slate-200">
+        <header class="h-16 border-b border-slate-100 flex items-center px-8 justify-between bg-slate-50/50">
+            <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <i class="fa-solid fa-layer-group text-brand-600"></i> PIC Dashboard <span class="text-xs font-normal text-slate-400 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">Vanilla Prototype</span>
+            </h1>
+            <div id="user-badge" class="hidden flex items-center gap-2">
+                <span id="user-name" class="text-sm font-bold text-slate-700">Usuario</span>
+                <button onclick="chatApp.logout()" class="text-xs text-red-500 hover:underline">Salir</button>
+            </div>
+        </header>
+        
+        <div id="dashboard-container" class="flex-1 p-8 overflow-y-auto bg-slate-50 relative">
+            <!-- AQUÍ SE INYECTARÁN LOS WIDGETS DINÁMICOS -->
+            <div id="widgets-area" class="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-20">
+                <!-- Placeholder inicial -->
+                <div id="empty-state" class="col-span-full h-96 flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
+                    <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                        <i class="fa-solid fa-chart-pie text-2xl text-slate-300"></i>
+                    </div>
+                    <p>Usa el chat para generar gráficos aquí.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- CHAT INTERFACE (Panel Lateral) -->
+    <aside class="w-96 bg-white border-l border-slate-200 flex flex-col shadow-xl z-50 h-full">
+        
+        <!-- Header Chat -->
+        <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-white shadow-sm z-10">
+            <h3 class="font-bold text-slate-700 flex items-center gap-2 text-sm">
+                <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center text-brand-600">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </div>
+                Analista Virtual
+            </h3>
+            <div class="flex gap-2">
+                <select id="model-selector" class="text-xs border-none bg-slate-50 text-slate-600 rounded px-2 py-1 focus:ring-0 cursor-pointer">
+                    <option value="gemini">Gemini 2.5</option>
+                    <option value="openai">GPT-4o</option>
+                </select>
+                <button onclick="chatApp.clearChat()" class="text-slate-400 hover:text-red-500 p-2 hover:bg-red-50 rounded-lg transition-colors" title="Limpiar">
+                    <i class="fa-solid fa-trash text-xs"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Área de Mensajes -->
+        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50 scroll-smooth">
+            <!-- Mensaje de bienvenida -->
+            <div class="flex flex-col items-start max-w-[85%] animate-fade-in">
+                <span class="text-[10px] text-slate-400 mb-1 px-1">PIC Assistant</span>
+                <div class="px-4 py-3 rounded-2xl rounded-bl-none shadow-sm text-sm bg-white border border-slate-200 text-slate-700">
+                    Hola. Soy tu asistente de datos. Pídeme reportes como "Ventas por zona 2024" o "Comparativo de marcas".
+                </div>
+                <span class="text-[9px] text-slate-300 mt-1 px-1">Justo ahora</span>
+            </div>
+        </div>
+
+        <!-- Indicador de Carga -->
+        <div id="loading-indicator" class="hidden px-4 py-2">
+            <div class="flex items-center gap-2 text-slate-400 text-xs p-3 bg-white rounded-xl border border-slate-100 shadow-sm w-fit">
+                <i class="fa-solid fa-circle-notch fa-spin text-brand-500"></i>
+                <span class="font-medium">Analizando datos...</span>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="p-4 bg-white border-t border-slate-200">
+            <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-1 focus-within:ring-2 focus-within:ring-brand-500/20 focus-within:border-brand-500 transition-all">
+                <input 
+                    type="text" 
+                    id="user-input"
+                    placeholder="Escribe tu consulta aquí..." 
+                    class="flex-1 bg-transparent border-none outline-none text-xs placeholder:text-slate-400 py-3 px-3 min-w-0 text-slate-700"
+                    onkeydown="if(event.key === 'Enter') chatApp.sendMessage()"
+                >
+                <button 
+                    onclick="chatApp.sendMessage()"
+                    class="p-2.5 mr-1 bg-brand-600 text-white rounded-lg hover:bg-brand-700 shadow-sm transition-all active:scale-95"
+                >
+                    <i class="fa-solid fa-paper-plane text-xs"></i>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- LÓGICA DE APLICACIÓN (VANILLA JS) -->
+    <script>
+        /**
+         * CLASE PRINCIPAL: ChatApplication
+         * Encapsula toda la lógica de estado, API y renderizado.
+         */
+        class ChatApplication {
+            constructor() {
+                // Configuración
+                this.apiBase = 'http://localhost:3000/api'; 
+                this.token = localStorage.getItem('pic_auth_token') || ''; 
+                
+                // Estado
+                this.messages = [];
+                this.isLoading = false;
+                
+                // DOM Elements
+                this.dom = {
+                    messages: document.getElementById('chat-messages'),
+                    input: document.getElementById('user-input'),
+                    loading: document.getElementById('loading-indicator'),
+                    widgetsArea: document.getElementById('widgets-area'),
+                    emptyState: document.getElementById('empty-state'),
+                    modelSelect: document.getElementById('model-selector'),
+                    loginOverlay: document.getElementById('login-overlay'),
+                    usernameInput: document.getElementById('username'),
+                    passwordInput: document.getElementById('password'),
+                    loginError: document.getElementById('login-error'),
+                    userBadge: document.getElementById('user-badge'),
+                    userName: document.getElementById('user-name')
+                };
+
+                this.checkAuth();
+            }
+
+            // --- AUTENTICACIÓN ---
+
+            checkAuth() {
+                if (!this.token) {
+                    this.dom.loginOverlay.classList.remove('hidden');
+                } else {
+                    this.dom.userBadge.classList.remove('hidden');
+                    const userData = JSON.parse(localStorage.getItem('pic_user_data') || '{}');
+                    this.dom.userName.textContent = userData.username || 'Usuario';
+                }
+            }
+
+            async login() {
+                const username = this.dom.usernameInput.value;
+                const password = this.dom.passwordInput.value;
+                
+                try {
+                    // Endpoint estándar de Login del Backend
+                    const response = await fetch(`${this.apiBase}/v2/auth/login`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+
+                    const res = await response.json();
+
+                    if (res.success) {
+                        this.token = res.data.token;
+                        localStorage.setItem('pic_auth_token', this.token);
+                        localStorage.setItem('pic_user_data', JSON.stringify(res.data.user));
+                        
+                        // UI Update
+                        this.dom.loginOverlay.classList.add('hidden');
+                        this.dom.userBadge.classList.remove('hidden');
+                        this.dom.userName.textContent = res.data.user.username;
+                        this.appendMessage('assistant', `Bienvenido ${res.data.user.username}, ¿qué analizamos hoy?`);
+                    } else {
+                        this.dom.loginError.textContent = res.message || 'Error de login';
+                        this.dom.loginError.classList.remove('hidden');
+                    }
+                } catch (e) {
+                    this.dom.loginError.textContent = 'Error de conexión con el servidor.';
+                    this.dom.loginError.classList.remove('hidden');
+                }
+            }
+
+            logout() {
+                this.token = '';
+                localStorage.removeItem('pic_auth_token');
+                localStorage.removeItem('pic_user_data');
+                location.reload();
+            }
+
+            // --- UI HELPERS ---
+
+            scrollToBottom() {
+                this.dom.messages.scrollTop = this.dom.messages.scrollHeight;
+            }
+
+            setLoading(loading) {
+                this.isLoading = loading;
+                this.dom.loading.classList.toggle('hidden', !loading);
+                this.dom.input.disabled = loading;
+                if(loading) this.scrollToBottom();
+            }
+
+            // --- RENDERIZADO DE MENSAJES ---
+
+            appendMessage(role, text, timestamp = new Date()) {
+                const isUser = role === 'user';
+                const timeStr = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                
+                const msgHTML = `
+                    <div class="flex flex-col mb-4 max-w-[90%] animate-fade-in ${isUser ? 'items-end self-end ml-auto' : 'items-start self-start'}">
+                        <span class="text-[10px] text-slate-400 mb-1 px-1">${isUser ? 'Tú' : 'PIC AI'}</span>
+                        <div class="px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm whitespace-pre-wrap ${
+                            isUser 
+                            ? 'bg-brand-600 text-white rounded-br-none' 
+                            : 'bg-white border border-slate-200 text-slate-700 rounded-bl-none'
+                        }">
+                            ${text}
+                        </div>
+                        <span class="text-[9px] text-slate-300 mt-1 px-1 font-mono">${timeStr}</span>
+                    </div>
+                `;
+                
+                this.dom.messages.insertAdjacentHTML('beforeend', msgHTML);
+                this.scrollToBottom();
+                
+                this.messages.push({ role, text });
+            }
+
+            appendSystemError(text) {
+                const html = `
+                    <div class="w-full text-center my-2 animate-fade-in">
+                        <span class="bg-red-50 text-red-600 text-xs px-3 py-1 rounded-full border border-red-100">
+                            <i class="fa-solid fa-circle-exclamation mr-1"></i> ${text}
+                        </span>
+                    </div>
+                `;
+                this.dom.messages.insertAdjacentHTML('beforeend', html);
+                this.scrollToBottom();
+            }
+
+            // --- LÓGICA DE API Y CEREBRO ---
+
+            async sendMessage() {
+                const text = this.dom.input.value.trim();
+                if (!text || this.isLoading) return;
+
+                // 1. UI Update
+                this.dom.input.value = '';
+                this.appendMessage('user', text);
+                this.setLoading(true);
+
+                try {
+                    // 2. Preparar Payload (Historial + Prompt)
+                    const historyPayload = this.messages
+                        .slice(-10) // Últimos 10 mensajes
+                        .map(m => ({
+                            role: m.role === 'user' ? 'user' : 'model',
+                            parts: [{ text: m.text }] // Formato Gemini
+                        }));
+
+                    const model = this.dom.modelSelect.value;
+
+                    // 3. Llamada al Backend (Chat Intent)
+                    const response = await fetch(`${this.apiBase}/ai/chat`, {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${this.token}` // Token enviado aquí
+                        },
+                        body: JSON.stringify({ 
+                            userPrompt: text, 
+                            history: historyPayload,
+                            modelProvider: model
+                        })
+                    });
+
+                    if (response.status === 401 || response.status === 403) {
+                        this.logout(); // Token expirado
+                        throw new Error('Sesión expirada. Por favor ingresa nuevamente.');
+                    }
+
+                    if (!response.ok) throw new Error('Error conectando con el servidor AI');
+                    
+                    const data = await response.json();
+
+                    // 4. Procesar Respuesta
+                    if (data.explanation) {
+                        this.appendMessage('assistant', data.explanation);
+                    }
+
+                    // 5. Si hay intención de datos (Gráfico), ejecutar Query
+                    if (data.type === 'data_query' && data.queryConfig) {
+                        await this.executeAndVisualize(data.queryConfig);
+                    }
+
+                } catch (error) {
+                    console.error(error);
+                    this.appendSystemError(error.message || 'Error desconocido');
+                } finally {
+                    this.setLoading(false);
+                    this.dom.input.focus();
+                }
+            }
+
+            async executeAndVisualize(queryConfig) {
+                this.appendSystemError("Ejecutando consulta SQL..."); // Feedback visual
+                
+                try {
+                    const response = await fetch(`${this.apiBase}/ia-query`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                        body: JSON.stringify(queryConfig)
+                    });
+
+                    const data = await response.json();
+
+                    if (!data || data.length === 0) {
+                        this.appendSystemError("La consulta no arrojó resultados.");
+                        return;
+                    }
+
+                    // Renderizar Widget
+                    this.createWidget(data, queryConfig);
+
+                } catch (e) {
+                    this.appendSystemError("Fallo al obtener datos SQL.");
+                }
+            }
+
+            // --- VISUALIZACIÓN (CHART.JS) ---
+
+            createWidget(data, config) {
+                // Ocultar empty state
+                if (this.dom.emptyState) this.dom.emptyState.style.display = 'none';
+
+                const vizType = config.visualization || 'bar';
+                const canvasId = `chart-${Date.now()}`;
+                const title = `${config.metric} por ${config.dimensions.join(' y ')}`;
+
+                // HTML del contenedor del widget
+                const widgetHTML = `
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 animate-fade-in relative group">
+                        <div class="flex justify-between items-center mb-4">
+                            <h4 class="font-bold text-slate-700 text-sm uppercase flex items-center gap-2">
+                                <i class="fa-solid fa-chart-simple text-brand-500"></i> ${title}
+                            </h4>
+                            <button onclick="this.closest('.bg-white').remove()" class="text-slate-300 hover:text-red-500 text-xs">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                        <div class="h-64 relative">
+                            ${vizType === 'kpi' 
+                                ? `<div class="flex items-center justify-center h-full text-4xl font-black text-brand-600">
+                                     ${this.formatNumber(data.reduce((a,b) => a + (b.TotalMetric||0), 0))}
+                                   </div>` 
+                                : `<canvas id="${canvasId}"></canvas>`
+                            }
+                        </div>
+                    </div>
+                `;
+
+                this.dom.widgetsArea.insertAdjacentHTML('afterbegin', widgetHTML);
+
+                // Si no es KPI, inicializar Chart.js
+                if (vizType !== 'kpi') {
+                    const ctx = document.getElementById(canvasId).getContext('2d');
+                    
+                    // Procesar datos para Chart.js
+                    const labels = data.map(d => config.dimensions.map(dim => d[dim]).join(' - '));
+                    const values = data.map(d => d.TotalMetric);
+
+                    new Chart(ctx, {
+                        type: vizType === 'table' ? 'bar' : vizType, // Fallback table -> bar
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: config.metric,
+                                data: values,
+                                backgroundColor: vizType === 'line' ? 'rgba(14, 165, 233, 0.2)' : '#0ea5e9',
+                                borderColor: '#0ea5e9',
+                                borderWidth: 1,
+                                borderRadius: 4,
+                                fill: vizType === 'line'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } }
+                        }
+                    });
+                }
+            }
+
+            clearChat() {
+                this.dom.messages.innerHTML = '';
+                this.messages = [];
+                this.appendMessage('assistant', 'Chat reiniciado. ¿En qué puedo ayudarte?');
+            }
+
+            formatNumber(num) {
+                return new Intl.NumberFormat('es-MX').format(num);
+            }
+        }
+
+        // Inicialización
+        const chatApp = new ChatApplication();
+    </script>
+</body>
+</html>
