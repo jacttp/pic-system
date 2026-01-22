@@ -1,14 +1,46 @@
 <!-- src/modules/Hub/views/HubView.vue -->
 <script setup lang="ts">
-// import { useAuthStore } from '@/modules/Auth/stores/authStore';
+import { onMounted } from 'vue';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
+import { useSetupStore } from '@/modules/Setup/stores/setupStores';
 import ModuleCard from '../components/ModuleCard.vue';
 
 const auth = useAuthStore();
+const setupStore = useSetupStore();
+
+onMounted(async () => {
+   if (setupStore.modules.length === 0) {
+       await setupStore.fetchModules();
+   }
+});
 
 const handleLogout = () => {
     auth.logout();
 };
+
+// Mapeo de estilos visuales por Key del módulo
+// Si se agregan nuevos módulos en BD, usarán el estilo 'DEFAULT' si no se configuran aquí.
+const MODULE_STYLES: Record<string, { color: string, bg: string, desc?: string }> = {
+    'HUB': { color: 'text-brand-600', bg: 'bg-brand-50', desc: 'Panel central de bienvenida y accesos rápidos.' },
+    'PIC_RPT': { color: 'text-brand-600', bg: 'bg-brand-50', desc: 'Dashboard analítico de ventas, cumplimiento de metas y análisis por zona.' },
+    'LOGISTICS': { color: 'text-lime-600', bg: 'bg-lime-50', desc: 'Gestion, Edición, Alta y Publicación de Rutas e Itinerarios.' },
+    'FORECAST': { color: 'text-rose-600', bg: 'bg-rose-50', desc: 'Dashboard analítico de Forecast, análisis y edición de metas y proyecciones.' },
+    
+    'USERS': { color: 'text-purple-500', bg: 'bg-purple-50', desc: 'Control de accesos, roles y administración de personal del sistema.' },
+    'PRODUCTS': { color: 'text-orange-500', bg: 'bg-orange-50', desc: 'Alta, baja y modificación de artículos y listas de precios.' },
+    'CLIENTS': { color: 'text-emerald-500', bg: 'bg-emerald-50', desc: 'Directorio comercial, segmentación y datos de contacto.' },
+    'VAL_CLI': { color: 'text-pink-500', bg: 'bg-pink-50', desc: 'Validación y aprobación de nuevos clientes.' },
+    
+    'AUDIT': { color: 'text-slate-500', bg: 'bg-slate-100', desc: 'Historial de movimientos y seguridad del sistema.' },
+    'SETUP': { color: 'text-sky-500', bg: 'bg-sky-100', desc: 'Configuración de Roles y Opciones de sistema.' },
+
+    'DEFAULT': { color: 'text-slate-500', bg: 'bg-slate-50', desc: 'Módulo del sistema.' }
+};
+
+const getStyle = (key: string) => {
+    return MODULE_STYLES[key] || MODULE_STYLES['DEFAULT']!;
+};
+
 </script>
 
 <template>
@@ -54,104 +86,38 @@ const handleLogout = () => {
         <!-- CONTENIDO PRINCIPAL -->
         <main class="flex-1 p-8 lg:p-12 overflow-y-auto">
             <header class="mb-10 fade-in">
-                <h1 class="text-3xl font-bold text-slate-800 mb-2">Bienvenido a PIC System
-</h1>
+                <h1 class="text-3xl font-bold text-slate-800 mb-2">Bienvenido a PIC System</h1>
                 <p class="text-slate-500">Selecciona un módulo para comenzar a trabajar.</p>
             </header>
 
+            <!-- Skeleton Loading -->
+            <div v-if="setupStore.isLoading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div v-for="i in 4" :key="i" class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 h-64 animate-pulse">
+                    <div class="w-14 h-14 bg-slate-100 rounded-2xl mb-6"></div>
+                    <div class="h-6 bg-slate-100 rounded w-3/4 mb-4"></div>
+                    <div class="h-4 bg-slate-100 rounded w-full mb-2"></div>
+                    <div class="h-4 bg-slate-100 rounded w-5/6"></div>
+                </div>
+            </div>
+
             <!-- GRID DE MÓDULOS -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 fade-in" style="animation-delay: 0.1s;">
+            <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 fade-in" style="animation-delay: 0.1s;">
                 
-                <!-- 1. REPORTE PIC (LEGACY) -->
-                <!-- IMPORTANTE: Cambia el href por la URL real de tu dashboard viejo -->
                 <ModuleCard 
-                    title="Reporte PIC"
-                    description="Dashboard analítico de ventas, cumplimiento de metas y análisis por zona."
-                    icon="fa-solid fa-chart-pie"
-                    to="/admin/pic"
-                    color-class="text-brand-600"
-                    bg-class="bg-brand-50"
+                    v-for="mod in setupStore.userMenu"
+                    :key="mod.ModuleId"
+                    :title="mod.Label"
+                    :description="getStyle(mod.ModuleKey).desc || 'Descripción no disponible.'"
+                    :icon="mod.Icon"
+                    :to="mod.Route"
+                    :color-class="getStyle(mod.ModuleKey).color"
+                    :bg-class="getStyle(mod.ModuleKey).bg"
                 />
 
-                <!-- 1. REPORTE PIC (LEGACY) -->
-                <!-- IMPORTANTE: Cambia el href por la URL real de tu dashboard viejo --> 
-                <ModuleCard 
-                    title="Logística"
-                    description="Gestion, Edición, Alta y Publicación de Rutas e Itinerarios."
-                    icon="fa-solid fa-route"
-                    to="/admin/pic"
-                    color-class="text-lime-600"
-                    bg-class="bg-lime-50"
-                />
-
-                <!-- 1. REPORTE PIC (LEGACY) -->
-                <!-- IMPORTANTE: Cambia el href por la URL real de tu dashboard viejo -->
-                <ModuleCard 
-                    title="Forecast"
-                    description="Dashboard analítico de Forecast, análisis y edición de metas y proyecciones."
-                    icon="fa-solid fa-arrow-trend-up"
-                    to="/admin/pic"
-                    color-class="text-rose-600"
-                    bg-class="bg-rose-50"
-                />
-
-                <!-- 2. GESTIÓN DE USUARIOS (VUE) -->
-                <ModuleCard 
-                    title="Gestión de Usuarios"
-                    description="Control de accesos, roles y administración de personal del sistema."
-                    icon="fa-solid fa-users"
-                    to="/admin/users"
-                    color-class="text-purple-500"
-                    bg-class="bg-purple-50"
-                />
-
-                <!-- 3. PRODUCTOS (VUE) -->
-                <ModuleCard 
-                    title="Catálogo Productos"
-                    description="Alta, baja y modificación de artículos y listas de precios."
-                    icon="fa-solid fa-boxes-stacked"
-                    to="/admin/products"
-                    color-class="text-orange-500"
-                    bg-class="bg-orange-50"
-                />
-
-                <!-- 4. CLIENTES (Placeholder - Próximamente) -->
-                <ModuleCard 
-                    title="Catálogo Clientes"
-                    description="Directorio comercial, segmentación y datos de contacto."
-                    icon="fa-solid fa-store"
-                    to="/admin/clients"
-                    color-class="text-emerald-500"
-                    bg-class="bg-emerald-50"
-                />
-                <!-- 4. CLIENTES (Placeholder - Próximamente) -->
-                <ModuleCard 
-                    title="Validación de Clientes"
-                    description="Directorio comercial, segmentación y datos de contacto."
-                    icon="fa-solid fa-user-check"
-                    to="/admin/clients"
-                    color-class="text-pink-500"
-                    bg-class="bg-pink-50"
-                />
-                <!-- 5. AUDITORÍA (Placeholder) -->
-                <ModuleCard 
-                    title="Auditoría y Logs"
-                    description="Historial de movimientos y seguridad del sistema."
-                    icon="fa-solid fa-shield-cat"
-                    to="/admin/audit"
-                    color-class="text-slate-500"
-                    bg-class="bg-slate-100"
-                />
-                <!-- 5. AUDITORÍA (Placeholder) -->
-                <ModuleCard 
-                    title="Setup"
-                    description="Configuración de Roles y Opciones de sistema.."
-                    icon="fa-solid fa-gear"
-                    to="/admin/audit"
-                    color-class="text-sky-500"
-                    bg-class="bg-sky-100"
-                />
-
+                <div v-if="setupStore.userMenu.length === 0" class="col-span-full text-center py-10 text-slate-400">
+                    <i class="fa-solid fa-folder-open text-4xl mb-4"></i>
+                    <p>No tienes módulos asignados. Contacta al administrador.</p>
+                </div>
 
             </div>
         </main>

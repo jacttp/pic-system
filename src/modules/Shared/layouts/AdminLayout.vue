@@ -1,13 +1,19 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
+import { useSetupStore } from '@/modules/Setup/stores/setupStores';
 import { useRouter, useRoute } from 'vue-router';
 
 const auth = useAuthStore();
+const setupStore = useSetupStore();
 const router = useRouter();
 const route = useRoute(); 
 
 const isCollapsed = ref(false); // Inicia expandido
+
+onMounted(async () => {
+   await setupStore.fetchModules();
+});
 
 const handleLogout = () => {
     auth.logout();
@@ -57,150 +63,41 @@ const toggleSidebar = () => {
 
             <nav class="flex-1 p-3 space-y-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
                 
-                <p v-if="!isCollapsed" class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 mt-2 fade-in">
-                    Analítica
-                </p>
-                <div v-else class="h-px bg-slate-100 my-4 mx-2"></div>
-                
-                <router-link 
-                    to="/" 
-                    class="flex items-center gap-3 py-2.5 rounded-lg transition-all font-medium group relative"
-                    :class="[
-                        isActive('/') && route.path === '/' ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-brand-600',
-                        isCollapsed ? 'justify-center px-0' : 'px-4'
-                    ]"
-                >
-                    <i class="fa-solid fa-chart-simple w-5 text-center text-lg"></i>
-                    <span v-show="!isCollapsed" class="whitespace-nowrap">Hub Central</span>
-                    <div v-if="isCollapsed" class="tooltip">Hub Central</div>
-                </router-link>
+                <!-- Skeleton Loading -->
+                <div v-if="setupStore.isLoading" class="space-y-4 p-2">
+                   <div v-for="i in 3" :key="i" class="animate-pulse">
+                      <div class="h-3 bg-slate-100 rounded w-20 mb-2"></div>
+                      <div class="h-10 bg-slate-100 rounded-lg"></div>
+                      <div class="h-10 bg-slate-100 rounded-lg mt-1"></div>
+                   </div>
+                </div>
 
-                <router-link 
-                    to="/admin/pic" 
-                    class="flex items-center gap-3 py-2.5 rounded-lg transition-all font-medium group relative"
-                    :class="[
-                        isActive('/admin/pic') ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-brand-600',
-                        isCollapsed ? 'justify-center px-0' : 'px-4'
-                    ]"
-                >
-                    <i class="fa-solid fa-chart-pie w-5 text-center text-lg"></i>
-                    <span v-show="!isCollapsed" class="whitespace-nowrap">Reporte PIC</span>
-                    <div v-if="isCollapsed" class="tooltip">Reporte PIC</div>
-                </router-link>
+                <!-- Dynamic Menu -->
+                <template v-else v-for="(modules, category) in setupStore.groupedMenu" :key="category">
+                    
+                   <!-- Category Header -->
+                   <p v-if="!isCollapsed" class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 mt-6 fade-in first:mt-2">
+                       {{ category }}
+                   </p>
+                   <div v-else class="h-px bg-slate-100 my-4 mx-2"></div>
 
-                <router-link 
-                    to="/admin/pic" 
-                    class="flex items-center gap-3 py-2.5 rounded-lg transition-all font-medium group relative"
-                    :class="[
-                        isActive('/admin/pic-logistics') ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-brand-600',
-                        isCollapsed ? 'justify-center px-0' : 'px-4'
-                    ]"
-                >
-                    <i class="fa-solid fa-route w-5 text-center text-lg"></i>
-                    <span v-show="!isCollapsed" class="whitespace-nowrap">Logística</span>
-                    <div v-if="isCollapsed" class="tooltip">Logística</div>
-                </router-link>
-
-                <router-link 
-                    to="/admin/pic" 
-                    class="flex items-center gap-3 py-2.5 rounded-lg transition-all font-medium group relative"
-                    :class="[
-                        isActive('/admin/pic-forecast') ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-brand-600',
-                        isCollapsed ? 'justify-center px-0' : 'px-4'
-                    ]"
-                >
-                    <i class="fa-solid fa-arrow-tr w-5 text-center text-lg"></i>
-                    <span v-show="!isCollapsed" class="whitespace-nowrap">Forecast</span>
-                    <div v-if="isCollapsed" class="tooltip">Forecast</div>
-                </router-link>
-
-                <p v-if="!isCollapsed" class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 mt-6 fade-in">
-                    Gestión
-                </p>
-                <div v-else class="h-px bg-slate-100 my-4 mx-2"></div>
-                
-                <router-link 
-                    to="/admin/users" 
-                    class="flex items-center gap-3 py-2.5 rounded-lg transition-all font-medium group relative"
-                    :class="[
-                        isActive('/admin/users') ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-brand-600',
-                        isCollapsed ? 'justify-center px-0' : 'px-4'
-                    ]"
-                >
-                    <i class="fa-solid fa-users w-5 text-center text-lg"></i>
-                    <span v-show="!isCollapsed" class="whitespace-nowrap">Usuarios</span>
-                    <div v-if="isCollapsed" class="tooltip">Usuarios</div>
-                </router-link>
-
-                <router-link 
-                    to="/admin/products" 
-                    class="flex items-center gap-3 py-2.5 rounded-lg transition-all font-medium group relative"
-                    :class="[
-                        isActive('/admin/products') ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-brand-600',
-                        isCollapsed ? 'justify-center px-0' : 'px-4'
-                    ]"
-                >
-                    <i class="fa-solid fa-boxes-stacked w-5 text-center text-lg"></i>
-                    <span v-show="!isCollapsed" class="whitespace-nowrap">Productos</span>
-                    <div v-if="isCollapsed" class="tooltip">Productos</div>
-                </router-link>
-
-                <router-link 
-                    to="/admin/clients" 
-                    class="flex items-center gap-3 py-2.5 rounded-lg transition-all font-medium group relative"
-                    :class="[
-                        isActive('/admin/clients') ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-brand-600',
-                        isCollapsed ? 'justify-center px-0' : 'px-4'
-                    ]"
-                >
-                    <i class="fa-solid fa-store w-5 text-center text-lg"></i>
-                    <span v-show="!isCollapsed" class="whitespace-nowrap">Clientes</span>
-                    <div v-if="isCollapsed" class="tooltip">Clientes</div>
-                </router-link>
-
-                <router-link 
-                    to="/admin/clients" 
-                    class="flex items-center gap-3 py-2.5 rounded-lg transition-all font-medium group relative"
-                    :class="[
-                        isActive('/admin/clients-validation') ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-brand-600',
-                        isCollapsed ? 'justify-center px-0' : 'px-4'
-                    ]"
-                >
-                    <i class="fa-solid fa-user-check w-5 text-center text-lg"></i>
-                    <span v-show="!isCollapsed" class="whitespace-nowrap">Validación Clientes</span>
-                    <div v-if="isCollapsed" class="tooltip">Validación Clientes</div>
-                </router-link>
-
-                <p v-if="!isCollapsed" class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 mt-6 fade-in">
-                    Sistema
-                </p>
-                <div v-else class="h-px bg-slate-100 my-4 mx-2"></div>
-
-                <router-link 
-                    to="/admin/audit" 
-                    class="flex items-center gap-3 py-2.5 rounded-lg transition-all font-medium group relative"
-                    :class="[
-                        isActive('/admin/audit') ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-brand-600',
-                        isCollapsed ? 'justify-center px-0' : 'px-4'
-                    ]"
-                >
-                    <i class="fa-solid fa-shield-cat w-5 text-center text-lg"></i>
-                    <span v-show="!isCollapsed" class="whitespace-nowrap">Auditoría</span>
-                    <div v-if="isCollapsed" class="tooltip">Auditoría</div>
-                </router-link>
-
-                <router-link 
-                    to="/admin/audit" 
-                    class="flex items-center gap-3 py-2.5 rounded-lg transition-all font-medium group relative"
-                    :class="[
-                        isActive('/admin/setup') ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-brand-600',
-                        isCollapsed ? 'justify-center px-0' : 'px-4'
-                    ]"
-                >
-                    <i class="fa-solid fa-gear w-5 text-center text-lg"></i>
-                    <span v-show="!isCollapsed" class="whitespace-nowrap">Setup</span>
-                    <div v-if="isCollapsed" class="tooltip">Setup</div>
-                </router-link>
+                   <!-- Modules Loop -->
+                   <router-link 
+                       v-for="mod in modules" 
+                       :key="mod.ModuleId"
+                       :to="mod.Route" 
+                       class="flex items-center gap-3 py-2.5 rounded-lg transition-all font-medium group relative"
+                       :class="[
+                           isActive(mod.Route) ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-brand-600',
+                           isCollapsed ? 'justify-center px-0' : 'px-4'
+                       ]"
+                   >
+                       <i :class="[mod.Icon, 'w-5 text-center text-lg']"></i>
+                       <span v-show="!isCollapsed" class="whitespace-nowrap">{{ mod.Label }}</span>
+                       <div v-if="isCollapsed" class="tooltip">{{ mod.Label }}</div>
+                   </router-link>
+                   
+                </template>
 
             </nav>
 
