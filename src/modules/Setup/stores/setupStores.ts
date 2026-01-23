@@ -107,12 +107,38 @@ export const useSetupStore = defineStore('setup', () => {
       }
    }
 
+   // 5. Acción Admin: Actualizar Módulo Completo
+   async function updateModule(moduleId: number, changes: Partial<SystemModule>) {
+      const index = modules.value.findIndex(m => m.ModuleId === moduleId);
+      if (index === -1) return false;
+
+      const targetModule = modules.value[index];
+      if (!targetModule) return false;
+
+      // Hacemos una copia 'segura' tipada
+      const original: SystemModule = { ...targetModule };
+
+      try {
+         // UI Optimista
+         Object.assign(targetModule, changes);
+
+         await setupApi.updateModule(moduleId, changes);
+         return true;
+      } catch (e) {
+         console.error("Error actualizando módulo", e);
+         // Revertir
+         modules.value[index] = original;
+         return false;
+      }
+   }
+
    return {
       modules,
       isLoading,
       userMenu,
       groupedMenu,
       fetchModules,
-      toggleModuleStatus
+      toggleModuleStatus,
+      updateModule
    };
 });

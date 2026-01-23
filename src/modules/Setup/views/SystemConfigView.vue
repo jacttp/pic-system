@@ -42,10 +42,23 @@ const getStatusColor = (status: DevStatus | undefined) => {
         default: return 'bg-slate-100 text-slate-600 border-slate-200';
     }
 };
+
+const isCritical = (mod: SystemModule) => {
+    // Definir módulos críticos que NO se pueden desactivar desde la UI
+    // 'HUB' es el dashboard principal, 'SETUP' es este mismo módulo
+    const CRITICAL_KEYS = ['HUB', 'SETUP'];
+    return CRITICAL_KEYS.includes(mod.ModuleKey);
+};
+
+const handleToggle = (mod: SystemModule) => {
+    if (isCritical(mod)) return;
+    setupStore.toggleModuleStatus(mod.ModuleId, !!mod.IsActive);
+};
 </script>
 
 <template>
-  <div class="p-6 max-w-7xl mx-auto">
+  <div class="h-full overflow-y-auto">
+    <div class="p-6 max-w-7xl mx-auto">
     
     <div class="flex items-center justify-between mb-8">
         <div>
@@ -113,9 +126,14 @@ const getStatusColor = (status: DevStatus | undefined) => {
                             <div class="flex justify-center">
                                 <button 
                                     v-if="isAdmin"
-                                    @click="setupStore.toggleModuleStatus(mod.ModuleId, !!mod.IsActive)"
+                                    @click="handleToggle(mod)"
+                                    :disabled="isCritical(mod)"
                                     class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
-                                    :class="mod.IsActive ? 'bg-brand-600' : 'bg-slate-200'"
+                                    :class="[
+                                        mod.IsActive ? 'bg-brand-600' : 'bg-slate-200',
+                                        isCritical(mod) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                                    ]"
+                                    :title="isCritical(mod) ? 'Módulo Crítico (No se puede desactivar)' : 'Alternar Estado'"
                                 >
                                     <span 
                                         class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
@@ -211,5 +229,6 @@ const getStatusColor = (status: DevStatus | undefined) => {
         </div>
     </div>
 
+    </div>
   </div>
 </template>

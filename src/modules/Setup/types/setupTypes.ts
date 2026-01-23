@@ -10,8 +10,10 @@ export interface SystemModule {
    IsActive: boolean;
    DisplayOrder: number;
    Category: 'Analítica' | 'Gestión' | 'Sistema' | 'Otro';
-
+   DevStatus?: 'Finished' | 'Maintaining' | 'Development';
 }
+
+export type DevStatus = 'Finished' | 'Maintaining' | 'Development';
 
 //Mapeo para traducir tus roles de string a número
 
@@ -21,9 +23,11 @@ export const ROLE_LEVELS: Record<string, number> = {
    'General': 2,
    'Admin': 3,
 
+
    //Alias
    'user': 1,
    'general': 2,
-   'admin': 3
+   'admin': 3,
+
 };
 

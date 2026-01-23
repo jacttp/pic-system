@@ -1,6 +1,6 @@
 <!-- src/modules/Hub/views/HubView.vue -->
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, computed } from 'vue';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import { useSetupStore } from '@/modules/Setup/stores/setupStores';
 import ModuleCard from '../components/ModuleCard.vue';
@@ -12,6 +12,10 @@ onMounted(async () => {
    if (setupStore.modules.length === 0) {
        await setupStore.fetchModules();
    }
+});
+
+const dashboardModules = computed(() => {
+    return setupStore.userMenu.filter(m => m.ModuleKey !== 'HUB');
 });
 
 const handleLogout = () => {
@@ -104,7 +108,7 @@ const getStyle = (key: string) => {
             <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 fade-in" style="animation-delay: 0.1s;">
                 
                 <ModuleCard 
-                    v-for="mod in setupStore.userMenu"
+                    v-for="mod in dashboardModules"
                     :key="mod.ModuleId"
                     :title="mod.Label"
                     :description="getStyle(mod.ModuleKey).desc || 'Descripción no disponible.'"
