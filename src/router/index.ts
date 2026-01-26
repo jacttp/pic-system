@@ -99,7 +99,17 @@ const router = createRouter({
                path: 'pic-forecast',
                name: 'pic-forecast',
                component: () => import('@/modules/PIC/views/PicDashboardView.vue')
-            }
+            },
+            {
+               path: 'cannibalization', // URL: /admin/cannibalization
+               name: 'cannibalization',
+               component: () => import('@/modules/Cannibalization/views/CannibalizationDashboard.vue'),
+               meta: {
+                  requiresAuth: true,
+                  // Opcional: Si tienes roles, agrégalos aquí
+               }
+            },
+
          ]
       },
       // Ruta comodín para redirigir cualquier URL no encontrada al inicio

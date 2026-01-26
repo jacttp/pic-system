@@ -1,28 +1,40 @@
 /* src/utils/chartConfig.ts */
 import {
-  Chart as ChartJS,
-  Title,
-  Tooltip,
-  Legend,
-  BarElement,
-  LineElement,
-  PointElement,
-  CategoryScale,
-  LinearScale,
-  ArcElement
+   Chart as ChartJS,
+   Title,
+   Tooltip,
+   Legend,
+   BarElement,
+   LineElement,
+   PointElement,
+   CategoryScale,
+   LinearScale,
+
+   Filler,
+
+   ArcElement,
+   LineController,
+   BarController,
+   PieController,
+   DoughnutController
 } from 'chart.js';
 
 // Registrar componentes necesarios (Tree Shaking)
 ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  LineElement,
-  PointElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend
+   CategoryScale,
+   LinearScale,
+   BarElement,
+   LineElement,
+   PointElement,
+   ArcElement,
+   Title,
+   Tooltip,
+   Legend,
+   Filler,
+   LineController,
+   BarController,
+   PieController,
+   DoughnutController
 );
 
 // Configuración global de fuentes/colores para que coincida con Tailwind

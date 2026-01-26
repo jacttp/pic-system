@@ -23,7 +23,6 @@ export const ROLE_LEVELS: Record<string, number> = {
    'General': 2,
    'Admin': 3,
 
-
    //Alias
    'user': 1,
    'general': 2,

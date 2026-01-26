@@ -5,6 +5,9 @@ import App from './App.vue'
 import router from './router'
 import './style.css' // Importante: Tailwind
 
+//En revisión
+import './utils/chartConfig';
+
 // FontAwesome (versión CDN o npm)
 import '@fortawesome/fontawesome-free/css/all.min.css'
 
