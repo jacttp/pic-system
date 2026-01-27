@@ -7,24 +7,42 @@ interface AnalysisFilters {
    grupo?: string;
    ruta?: string;
    gerencia?: string;
+   jefatura?: string;
 }
 
 export default {
    /**
-    * Obtiene los datos jerárquicos de ventas (Cliente -> Familia -> SKUs)
-    * para el análisis de canibalización.
+    * Obtiene los datos jerárquicos de ventas
     */
    async fetchAnalysisData(year: string, filters: AnalysisFilters = {}): Promise<ClientNode[]> {
-      // CORRECCIÓN: Sobrescribimos la baseURL para apuntar a '/api' en lugar de '/api/v2'
-      // Esto es necesario porque la ruta está en analyticsRoutes.js
       const { data } = await api.post<ClientNode[]>('/cannibalization', {
          year,
          filters
       }, {
-         // "Rompe" el default de Axios que agrega /v2
          baseURL: import.meta.env.VITE_API_BASE_URL
       });
 
+      return data;
+   },
+
+   /**
+    * Obtiene la lista de familias (grupos) disponibles.
+    */
+   async fetchFamilies(): Promise<string[]> {
+      const { data } = await api.post<string[]>('/grupos', {}, {
+         baseURL: import.meta.env.VITE_API_BASE_URL + '/filters'
+      });
+      return data;
+   },
+
+   /**
+    * NUEVO: Obtiene la lista de años disponibles (Fiscal Years).
+    */
+   async fetchYears(): Promise<string[]> {
+      // Usamos GET porque así está definido en filterRoutes.js
+      const { data } = await api.get<string[]>('/anios', {
+         baseURL: import.meta.env.VITE_API_BASE_URL + '/filters'
+      });
       return data;
    }
 };

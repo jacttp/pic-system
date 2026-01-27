@@ -11,7 +11,11 @@ export const useCannibalizationStore = defineStore('cannibalization', () => {
    const isLoading = ref(false);
    const rawData = ref<ClientNode[]>([]);
    const detectedCases = ref<DetectedCannibalization[]>([]);
-   const lastFetchParams = ref({ year: '', filters: {} });
+
+   // Metadatos Dinámicos
+   const availableFamilies = ref<string[]>([]);
+   const availableYears = ref<string[]>([]); // <--- NUEVO
+
 
    // Configuración Reactiva (Valores por defecto)
    const rules = reactive<DetectionRules>({
@@ -33,32 +37,42 @@ export const useCannibalizationStore = defineStore('cannibalization', () => {
       isLoading.value = true;
       try {
          rawData.value = await cannibalizationApi.fetchAnalysisData(year, filters);
-         lastFetchParams.value = { year, filters };
-         // Al cargar nuevos datos, re-ejecutamos el análisis automáticamente
          analyze();
       } catch (error) {
          console.error('Error fetching cannibalization data:', error);
-
          rawData.value = [];
       } finally {
          isLoading.value = false;
       }
    }
-
    /**
-    * 2. Ejecutar Motor de Análisis (Local)
-    * Esto es instantáneo y reactivo a los sliders de configuración
-    */
-   function analyze() {
-      if (rawData.value.length === 0) return;
+   * NUEVO: Cargar lista de familias al iniciar
+   */
+   async function loadMetadata() {
+      try {
+         // Hacemos las dos peticiones al mismo tiempo para no perder tiempo
+         const [families, years] = await Promise.all([
+            cannibalizationApi.fetchFamilies(),
+            cannibalizationApi.fetchYears()
+         ]);
 
-      console.log('🔄 Ejecutando motor de canibalización con reglas:', rules);
+         availableFamilies.value = families;
+         // Ordenamos los años descendente (2025, 2024...) para que el más reciente salga primero
+         availableYears.value = years.sort().reverse();
+
+      } catch (error) {
+         console.error('Error cargando metadatos:', error);
+      }
+   }
+
+   function analyze() {
+      if (rawData.value.length === 0) {
+         detectedCases.value = [];
+         return;
+      }
       detectedCases.value = engine.runAnalysis(rawData.value, rules);
    }
 
-   /**
-    * 3. Actualizar reglas y re-analizar
-    */
    function updateRules(newRules: Partial<DetectionRules>) {
       Object.assign(rules, newRules);
       analyze();
@@ -70,9 +84,12 @@ export const useCannibalizationStore = defineStore('cannibalization', () => {
       rawData,
       detectedCases,
       rules,
+      availableFamilies,
+      availableYears,
 
       // Actions
       fetchData,
+      loadMetadata,
       analyze,
       updateRules
    };

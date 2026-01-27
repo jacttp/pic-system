@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useCannibalizationStore } from '../stores/cannibalizationStore';
 import AnalysisConfigPanel from '../../Shared/components/config/AnalysisConfigPanel.vue';
 import SuspectsTable from '../../Shared/components/tables/SuspectsTable.vue';
@@ -8,24 +8,29 @@ import type { DetectedCannibalization } from '../types/cannibalizationTypes';
 
 const store = useCannibalizationStore();
 
-// Estado local para el gráfico de detalle
+// --- ESTADO LOCAL ---
 const selectedCase = ref<DetectedCannibalization | null>(null);
 const selectedVictimVector = ref<number[]>([]);
 const selectedCannibalVector = ref<number[]>([]);
 
-// Estado para carga inicial
+// Filtros de API
 const selectedYear = ref('2025');
-const selectedFamily = ref('ZF-Chorizos Corona'); 
+const selectedFamily = ref('');
 
-// Acción al seleccionar una fila de la tabla
+// Estado visual (replicando PIC)
+const isCollapsed = ref(true); 
+const overflowVisible = ref(true);
+
+// Helper para formato visual de porcentaje
+const toPct = (val: number) => `${(val * 100).toFixed(0)}%`;
+
+// --- ACCIONES ---
+
 const onCaseSelected = (item: DetectedCannibalization) => {
     selectedCase.value = item;
     
-    // Buscar los vectores en los datos crudos (RawData)
-    // El ID del item es "Matriz-Familia". Necesitamos buscar por Cliente y Familia.
-    // Nota: item.id no es suficiente para buscar directo si no tenemos un mapa, así que iteramos o buscamos.
-    
-    const client = store.rawData.find(c => c.name === item.clientName); // Ojo: Idealmente usar ID, pero item tiene clientName
+    // Buscar los datos crudos para el gráfico
+    const client = store.rawData.find(c => c.name === item.clientName);
     if (client) {
         const family = client.families.find(f => f.name === item.family);
         if (family) {
@@ -41,102 +46,254 @@ const onCaseSelected = (item: DetectedCannibalization) => {
 };
 
 const loadData = () => {
-    store.fetchData(selectedYear.value, { grupo: selectedFamily.value });
+    selectedCase.value = null;
+    const filters: any = {};
+    
+    if (selectedFamily.value) {
+        filters.grupo = selectedFamily.value;
+    }
+    
+    // Fetch Data trae los datos y ejecuta analyze() internamente
+    store.fetchData(selectedYear.value, filters);
 };
 
-    // onMounted eliminado para carga manual
+// --- WATCHERS (PIC STYLE) ---
+watch(isCollapsed, (newVal) => {
+    if (newVal) {
+        overflowVisible.value = false; 
+    } else {
+        setTimeout(() => {
+            overflowVisible.value = true; 
+        }, 350); 
+    }
+});
 
+// --- CICLO DE VIDA ---
+
+onMounted(async () => {
+    // Solo cargamos los catálogos (Años y Familias)
+    // Asumimos que loadMetadata existe en tu store completo (aunque no aparecía en el snippet provisto)
+    if (store.loadMetadata) {
+        await store.loadMetadata();
+    }
+    
+    // Seleccionar año más reciente por defecto visualmente, pero SIN cargar datos
+    if (store.availableYears && store.availableYears.length > 0) {
+        if (!store.availableYears.includes(selectedYear.value)) {
+            selectedYear.value = store.availableYears[0];
+        }
+    }
+
+    // ELIMINADO: loadData(); 
+    // Ahora el usuario debe hacer clic explícitamente en "ANALIZAR"
+});
 </script>
 
 <template>
     <div class="h-full flex flex-col p-6 gap-6 bg-slate-50 overflow-hidden">
         
-        <!-- Header & Config Zone -->
-        <div class="flex flex-col gap-4">
-             <!-- Filtros Principales -->
-            <div class="flex justify-between items-end bg-white p-4 rounded-lg border border-slate-200">
-                <div class="flex gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Año Fiscal</label>
-                        <select v-model="selectedYear" class="border-slate-300 rounded text-sm px-3 py-1.5">
-                            <option value="2024">2024</option>
-                            <option value="2025">2025</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Familia de Productos</label>
-                        <select v-model="selectedFamily" class="border-slate-300 rounded text-sm px-3 py-1.5 w-64">
-                            <option value="ZF-Chorizos Corona">ZF-Chorizos Corona</option>
-                            <option value="ZF-Salchichas">ZF-Salchichas</option>
-                            </select>
-                    </div>
-                </div>
-                <button 
-                    @click="loadData" 
-                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-bold flex items-center gap-2"
-                    :disabled="store.isLoading"
-                >
-                    <span v-if="store.isLoading" class="animate-spin">↻</span>
-                    {{ store.isLoading ? 'Cargando...' : 'Cargar Datos' }}
-                </button>
-            </div>
-
-            <!-- Panel de Variables de Detección (Horizontal) -->
-            <AnalysisConfigPanel />
-        </div>
-
-        <!-- Main Content Grid -->
-        <div class="flex-1 flex flex-col lg:grid lg:grid-cols-12 lg:grid-rows-1 gap-6 min-h-0 overflow-hidden">
+        <!-- HEADER: PANEL FILTROS (Estilo PIC) -->
+        <div class="relative z-40 bg-white border border-slate-200 shadow-sm rounded-xl transition-all duration-300 ease-in-out mb-2">
             
-            <!-- Tabla de Resultados -->
-            <div class="lg:col-span-7 h-1/3 lg:h-full min-h-0 flex flex-col">
-                <SuspectsTable 
-                    @select="onCaseSelected" 
-                    :selected-id="selectedCase?.id"
-                />
-            </div>
+            <div 
+                class="transition-all duration-300 ease-in-out"
+                :class="[
+                    isCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[800px] opacity-100',
+                    overflowVisible && !isCollapsed ? 'overflow-visible' : 'overflow-hidden'
+                ]"
+            >
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
+                        <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2">
+                            <div class="p-1.5 bg-brand-50 rounded text-brand-600">
+                                <i class="fa-solid fa-sliders"></i>
+                            </div>
+                            Configuración de Análisis
+                        </h2>
+                        <div class="flex gap-3">
+                            <button 
+                                @click="loadData" 
+                                :disabled="store.isLoading"
+                                class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold px-5 py-2 rounded-lg shadow-md shadow-brand-500/20 transition-all flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed hover:-translate-y-0.5"
+                            >
+                                <i v-if="store.isLoading" class="fa-solid fa-circle-notch fa-spin"></i>
+                                <span v-else class="flex items-center gap-2">
+                                    <i class="fa-solid fa-rotate"></i> Actualizar
+                                </span>
+                            </button>
+                        </div>
+                    </div>
 
-            <!-- Gráfico de Detalle -->
-            <div class="lg:col-span-5 h-2/3 lg:h-full flex flex-col min-h-0">
-                <div v-if="selectedCase" class="h-full flex flex-col gap-3">
-                    
-                    <!-- Tarjeta de Información Compacta -->
-                    <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm shrink-0">
-                        <div class="flex justify-between items-start">
-                             <div class="min-w-0 flex-1 mr-4">
-                                <h3 class="font-bold text-slate-800 text-sm truncate" :title="selectedCase.clientName">
-                                    {{ selectedCase.clientName }}
-                                </h3>
-                                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-slate-500 mt-1">
-                                    <span class="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 whitespace-nowrap">{{ selectedCase.matriz }}</span>
-                                    <span class="truncate">{{ selectedCase.route }}</span>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
+                        
+                        <!-- GRUPO 1: ORIGEN DE DATOS -->
+                        <div class="space-y-4">
+                            <h3 class="text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2 mb-3">
+                                <i class="fa-solid fa-database mr-1"></i> Origen de Datos
+                            </h3>
+                            
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Año Fiscal</label>
+                                <div class="relative">
+                                    <select v-model="selectedYear" class="w-full text-xs font-medium border border-slate-200 rounded-lg pl-2 pr-6 h-[38px] bg-white appearance-none focus:border-brand-500 focus:ring-1 focus:ring-brand-100 outline-none cursor-pointer hover:border-slate-300">
+                                        <option v-for="year in store.availableYears" :key="year" :value="year">{{ year }}</option>
+                                    </select>
+                                    <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none"></i>
                                 </div>
                             </div>
                             
-                            <!-- KPI Compactos -->
-                            <div class="flex gap-2 text-right shrink-0">
-                                <div>
-                                    <div class="text-[10px] text-slate-400">Sustitución</div>
-                                    <div class="font-bold text-slate-700">{{ selectedCase.substitutionRate }}%</div>
-                                </div>
-                                <div class="w-px bg-slate-100 my-1"></div>
-                                <div>
-                                    <div class="text-[10px] text-slate-400">Neto</div>
-                                    <div :class="selectedCase.netBalance >= 0 ? 'text-green-600' : 'text-red-600'" class="font-bold">
-                                        {{ selectedCase.netBalance > 0 ? '+' : '' }}{{ selectedCase.netBalance.toFixed(0) }}
-                                    </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Familia</label>
+                                <div class="relative">
+                                    <select v-model="selectedFamily" class="w-full text-xs font-medium border border-slate-200 rounded-lg pl-2 pr-6 h-[38px] bg-white appearance-none focus:border-brand-500 focus:ring-1 focus:ring-brand-100 outline-none cursor-pointer hover:border-slate-300">
+                                        <option value="">-- Todas --</option>
+                                        <option v-for="fam in store.availableFamilies" :key="fam" :value="fam">{{ fam }}</option>
+                                    </select>
+                                    <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none"></i>
                                 </div>
                             </div>
                         </div>
+
+                        <!-- GRUPO 2: PARÁMETROS -->
+                        <div class="space-y-4">
+                            <h3 class="text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2 mb-3">
+                                <i class="fa-solid fa-gears mr-1"></i> Parámetros
+                            </h3>
+                            
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Mes Corte</label>
+                                <div class="relative">
+                                    <select v-model.number="store.rules.splitMonth" @change="store.analyze()" class="w-full text-xs font-medium border border-slate-200 rounded-lg pl-2 pr-6 h-[38px] bg-white appearance-none focus:border-brand-500 focus:ring-1 focus:ring-brand-100 outline-none cursor-pointer hover:border-slate-300">
+                                        <option :value="1">Enero</option>
+                                        <option :value="6">Junio</option>
+                                        <option :value="7">Julio</option>
+                                        <option :value="8">Agosto</option>
+                                        <option :value="9">Septiembre</option>
+                                        <option :value="10">Octubre</option>
+                                    </select>
+                                    <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none"></i>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Vol. Min (Kg)</label>
+                                <input 
+                                    type="number" 
+                                    v-model.number="store.rules.minVolume"
+                                    @input="store.analyze()"
+                                    class="w-full text-xs font-medium border border-slate-200 rounded-lg px-3 h-[38px] bg-white focus:border-brand-500 focus:ring-1 focus:ring-brand-100 outline-none transition-shadow"
+                                />
+                            </div>
+                        </div>
+
+                        <!-- GRUPO 3: SENSIBILIDAD -->
+                        <div class="space-y-4">
+                            <h3 class="text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2 mb-3">
+                                <i class="fa-solid fa-chart-line mr-1"></i> Sensibilidad
+                            </h3>
+                            
+                            <div class="space-y-4 pt-2">
+                                <div>
+                                    <div class="flex justify-between text-[10px] uppercase font-bold text-slate-400 mb-2">
+                                        <span>Umbral Caída</span>
+                                        <span class="text-rose-600 bg-rose-50 px-1.5 rounded">{{ toPct(store.rules.dropThreshold) }}</span>
+                                    </div>
+                                    <input 
+                                        type="range" min="0.1" max="0.9" step="0.05" 
+                                        v-model.number="store.rules.dropThreshold"
+                                        @change="store.analyze()"
+                                        class="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-rose-500 hover:accent-rose-600 transition-colors"
+                                    />
+                                </div>
+                                <div>
+                                     <div class="flex justify-between text-[10px] uppercase font-bold text-slate-400 mb-2">
+                                        <span>Umbral Subida</span>
+                                        <span class="text-emerald-600 bg-emerald-50 px-1.5 rounded">{{ toPct(store.rules.growthThreshold) }}</span>
+                                    </div>
+                                    <input 
+                                        type="range" min="0.1" max="2.0" step="0.1" 
+                                        v-model.number="store.rules.growthThreshold"
+                                        @change="store.analyze()"
+                                        class="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-emerald-500 hover:accent-emerald-600 transition-colors"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- BUTTON TOGGLE (Colgando) -->
+            <div class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full z-50">
+                <button 
+                    @click="isCollapsed = !isCollapsed"
+                    class="flex items-center gap-2 px-6 py-1.5 rounded-b-xl shadow-md border-x border-b border-t-0 transition-all duration-300 group"
+                    :class="[
+                        isCollapsed 
+                            ? 'bg-brand-600 border-brand-700 text-white hover:bg-brand-700 hover:pt-3' 
+                            : 'bg-white border-slate-200 text-slate-300 hover:text-brand-600 hover:bg-slate-50'
+                    ]"
+                    :title="isCollapsed ? 'Mostrar Filtros' : 'Ocultar Filtros'"
+                >
+                    <i 
+                        class="fa-solid transition-transform duration-300"
+                        :class="isCollapsed ? 'fa-filter' : 'fa-chevron-up group-hover:-translate-y-0.5'"
+                    ></i>
+                    <span v-if="isCollapsed" class="text-xs font-bold tracking-wide uppercase">
+                        Filtros
+                    </span>
+                </button>
+            </div>
+
+        </div>
+
+        <!-- MAIN CONTENT: GRID DE 2 COLUMNAS (TABLA Y CHART) -->
+        <div 
+            class="flex-1 flex flex-col lg:grid lg:grid-cols-12 gap-6 min-h-0 overflow-hidden transition-all duration-500 ease-in-out"
+        >
+            
+            <!-- COLUMNA IZQUIERDA: TABLA DE RESULTADOS (5/12) -->
+            <div class="lg:col-span-5 h-1/3 lg:h-full min-h-0 flex flex-col">
+                <SuspectsTable 
+                    @select="onCaseSelected" 
+                />
+            </div>
+
+            <!-- COLUMNA DERECHA: DETALLE VISUAL (7/12) -->
+            <div class="lg:col-span-7 h-2/3 lg:h-full flex flex-col min-h-0">
+                
+                <div v-if="selectedCase" class="h-full flex flex-col gap-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                    
+                    <!-- KPI Header del Caso -->
+                    <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm shrink-0 flex justify-between items-center">
+                        <div class="min-w-0">
+                            <h3 class="font-bold text-slate-800 text-base truncate">{{ selectedCase.clientName }}</h3>
+                            <div class="flex gap-3 text-xs text-slate-500 mt-1">
+                                <span class="bg-slate-100 px-2 py-0.5 rounded border border-slate-200 font-mono">{{ selectedCase.matriz }}</span>
+                                <span>{{ selectedCase.route }}</span>
+                                <span class="text-slate-300">|</span>
+                                <span class="font-semibold text-brand-600">{{ selectedCase.family }}</span>
+                            </div>
+                        </div>
                         
-                        <!-- Segunda fila de detalles -->
-                         <div class="flex gap-4 text-[10px] text-slate-500 mt-2 pt-2 border-t border-slate-50">
-                             <div class="truncate"><span class="font-semibold">Ger:</span> {{ selectedCase.gerencia }}</div>
-                             <div class="truncate"><span class="font-semibold">Jef:</span> {{ selectedCase.jefatura }}</div>
+                        <div class="flex gap-6 text-right">
+                             <div>
+                                <div class="text-[10px] text-slate-400 uppercase font-bold">Sustitución</div>
+                                <div class="text-xl font-bold text-slate-700">{{ selectedCase.substitutionRate }}%</div>
+                            </div>
+                            <div class="w-px bg-slate-100"></div>
+                            <div>
+                                <div class="text-[10px] text-slate-400 uppercase font-bold">Impacto Neto</div>
+                                <div :class="selectedCase.netBalance >= 0 ? 'text-green-600' : 'text-red-600'" class="text-xl font-bold">
+                                    {{ selectedCase.netBalance > 0 ? '+' : '' }}{{ selectedCase.netBalance.toFixed(1) }} <span class="text-sm font-normal text-slate-400">Kg</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="flex-1 min-h-0 relative bg-white rounded-lg border border-slate-200 p-2"> <!-- Container blanca para el gráfico -->
+                    <!-- Gráfico Grande -->
+                    <div class="flex-1 min-h-0 relative bg-white rounded-lg border border-slate-200 p-4 shadow-sm"> 
                         <SubstitutionChart 
                             :victim-name="selectedCase.victimSku"
                             :victim-vector="selectedVictimVector"
@@ -147,8 +304,17 @@ const loadData = () => {
                     </div>
                 </div>
                 
-                <div v-else class="h-full bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400 p-8 text-center text-sm">
-                    Selecciona un caso para ver detalles
+                <!-- Estado Vacío -->
+                <div v-else class="h-full bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 p-8 text-center gap-4">
+                    <div class="bg-white p-4 rounded-full shadow-sm">
+                        <svg class="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-medium text-slate-600">Listo para analizar</h3>
+                        <p class="text-sm text-slate-400 mt-1 max-w-xs mx-auto">Selecciona un caso de la lista de la izquierda para ver el detalle gráfico de la canibalización.</p>
+                    </div>
                 </div>
             </div>
         </div>
