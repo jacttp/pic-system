@@ -11,6 +11,8 @@ export const useCannibalizationStore = defineStore('cannibalization', () => {
    const isLoading = ref(false);
    const rawData = ref<ClientNode[]>([]);
    const detectedCases = ref<DetectedCannibalization[]>([]);
+   const lastFetchParams = ref<any>({});
+
 
    // Metadatos Dinámicos
    const availableFamilies = ref<string[]>([]);
@@ -34,6 +36,7 @@ export const useCannibalizationStore = defineStore('cannibalization', () => {
     * 1. Cargar Datos del Servidor
     */
    async function fetchData(year: string, filters: any = {}) {
+      lastFetchParams.value = { year, filters };
       isLoading.value = true;
       try {
          rawData.value = await cannibalizationApi.fetchAnalysisData(year, filters);
@@ -82,7 +85,9 @@ export const useCannibalizationStore = defineStore('cannibalization', () => {
       // State
       isLoading,
       rawData,
+
       detectedCases,
+      lastFetchParams,
       rules,
       availableFamilies,
       availableYears,
