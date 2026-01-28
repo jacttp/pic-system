@@ -5,6 +5,8 @@ import AnalysisConfigPanel from '../../Shared/components/config/AnalysisConfigPa
 import SuspectsTable from '../../Shared/components/tables/SuspectsTable.vue';
 import SubstitutionChart from '../components/charts/SubstitutionChart.vue';
 import type { DetectedCannibalization } from '../types/cannibalizationTypes';
+import AnalysisSummaryCard from '../components/cards/AnalysisSummaryCard.vue';
+import ExportModal from '../components/modals/ExportModal.vue'; 
 
 const store = useCannibalizationStore();
 
@@ -57,6 +59,11 @@ const loadData = () => {
     store.fetchData(selectedYear.value, filters);
 };
 
+const showExportModal = ref(false);
+
+const handleExport = () => {
+    showExportModal.value = true;
+};
 // --- WATCHERS (PIC STYLE) ---
 watch(isCollapsed, (newVal) => {
     if (newVal) {
@@ -87,6 +94,8 @@ onMounted(async () => {
     // ELIMINADO: loadData(); 
     // Ahora el usuario debe hacer clic explícitamente en "ANALIZAR"
 });
+
+
 </script>
 
 <template>
@@ -248,75 +257,69 @@ onMounted(async () => {
 
         </div>
 
-        <!-- MAIN CONTENT: GRID DE 2 COLUMNAS (TABLA Y CHART) -->
         <div 
             class="flex-1 flex flex-col lg:grid lg:grid-cols-12 gap-6 min-h-0 overflow-hidden transition-all duration-500 ease-in-out"
         >
             
-            <!-- COLUMNA IZQUIERDA: TABLA DE RESULTADOS (5/12) -->
-            <div class="lg:col-span-5 h-1/3 lg:h-full min-h-0 flex flex-col">
+            <div class="lg:col-span-7 h-1/3 lg:h-full min-h-0 flex flex-col">
                 <SuspectsTable 
                     @select="onCaseSelected" 
                 />
             </div>
 
-            <!-- COLUMNA DERECHA: DETALLE VISUAL (7/12) -->
-            <div class="lg:col-span-7 h-2/3 lg:h-full flex flex-col min-h-0">
+            <div class="lg:col-span-5 h-2/3 lg:h-full flex flex-col min-h-0 gap-6">
                 
-                <div v-if="selectedCase" class="h-full flex flex-col gap-4 animate-in fade-in slide-in-from-right-4 duration-300">
-                    
-                    <!-- KPI Header del Caso -->
-                    <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm shrink-0 flex justify-between items-center">
-                        <div class="min-w-0">
-                            <h3 class="font-bold text-slate-800 text-base truncate">{{ selectedCase.clientName }}</h3>
-                            <div class="flex gap-3 text-xs text-slate-500 mt-1">
-                                <span class="bg-slate-100 px-2 py-0.5 rounded border border-slate-200 font-mono">{{ selectedCase.matriz }}</span>
-                                <span>{{ selectedCase.route }}</span>
-                                <span class="text-slate-300">|</span>
-                                <span class="font-semibold text-brand-600">{{ selectedCase.family }}</span>
-                            </div>
-                        </div>
+                <div class="flex-[3] min-h-0">
+                    <div v-if="selectedCase" class="h-full flex flex-col gap-4 animate-in fade-in slide-in-from-right-4 duration-300">
                         
-                        <div class="flex gap-6 text-right">
-                             <div>
-                                <div class="text-[10px] text-slate-400 uppercase font-bold">Sustitución</div>
-                                <div class="text-xl font-bold text-slate-700">{{ selectedCase.substitutionRate }}%</div>
+                         <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm shrink-0 flex justify-between items-center">
+                            <div class="min-w-0">
+                                <h3 class="font-bold text-slate-800 text-base truncate">{{ selectedCase.clientName }}</h3>
+                                <div class="flex gap-3 text-xs text-slate-500 mt-1">
+                                    <span class="bg-slate-100 px-2 py-0.5 rounded border border-slate-200 font-mono">{{ selectedCase.matriz }}</span>
+                                    <span>{{ selectedCase.route }}</span>
+                                    <span class="font-semibold text-brand-600">| {{ selectedCase.family }}</span>
+                                </div>
                             </div>
-                            <div class="w-px bg-slate-100"></div>
-                            <div>
-                                <div class="text-[10px] text-slate-400 uppercase font-bold">Impacto Neto</div>
-                                <div :class="selectedCase.netBalance >= 0 ? 'text-green-600' : 'text-red-600'" class="text-xl font-bold">
-                                    {{ selectedCase.netBalance > 0 ? '+' : '' }}{{ selectedCase.netBalance.toFixed(1) }} <span class="text-sm font-normal text-slate-400">Kg</span>
+                             <div class="flex gap-4 text-right">
+                                <div>
+                                    <div class="text-[10px] text-slate-400 uppercase font-bold">Neto</div>
+                                    <div :class="selectedCase.netBalance >= 0 ? 'text-green-600' : 'text-red-600'" class="text-lg font-bold">
+                                        {{ selectedCase.netBalance > 0 ? '+' : '' }}{{ selectedCase.netBalance.toFixed(0) }}
+                                    </div>
                                 </div>
                             </div>
                         </div>
+
+                        <div class="flex-1 min-h-0 relative bg-white rounded-lg border border-slate-200 p-4 shadow-sm"> 
+                            <SubstitutionChart 
+                                :victim-name="selectedCase.victimSku"
+                                :victim-vector="selectedVictimVector"
+                                :cannibal-name="selectedCase.cannibalSku"
+                                :cannibal-vector="selectedCannibalVector"
+                                :split-month="store.rules.splitMonth"
+                            />
+                        </div>
                     </div>
 
-                    <!-- Gráfico Grande -->
-                    <div class="flex-1 min-h-0 relative bg-white rounded-lg border border-slate-200 p-4 shadow-sm"> 
-                        <SubstitutionChart 
-                            :victim-name="selectedCase.victimSku"
-                            :victim-vector="selectedVictimVector"
-                            :cannibal-name="selectedCase.cannibalSku"
-                            :cannibal-vector="selectedCannibalVector"
-                            :split-month="store.rules.splitMonth"
-                        />
+                    <div v-else class="h-full bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 p-8 text-center gap-4">
+                         <div class="bg-white p-4 rounded-full shadow-sm">
+                            <i class="fa-solid fa-chart-line text-2xl text-slate-300"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-medium text-slate-600">Detalle Gráfico</h3>
+                            <p class="text-xs text-slate-400 mt-1">Selecciona un caso para ver la curva de sustitución.</p>
+                        </div>
                     </div>
                 </div>
-                
-                <!-- Estado Vacío -->
-                <div v-else class="h-full bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 p-8 text-center gap-4">
-                    <div class="bg-white p-4 rounded-full shadow-sm">
-                        <svg class="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="font-medium text-slate-600">Listo para analizar</h3>
-                        <p class="text-sm text-slate-400 mt-1 max-w-xs mx-auto">Selecciona un caso de la lista de la izquierda para ver el detalle gráfico de la canibalización.</p>
-                    </div>
+
+                <div class="flex-[2] min-h-0">
+                    <AnalysisSummaryCard @export="handleExport" />
                 </div>
+
             </div>
         </div>
+    
+        <ExportModal v-model="showExportModal" />
     </div>
 </template>
