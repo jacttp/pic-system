@@ -24,7 +24,7 @@ export const useCannibalizationStore = defineStore('cannibalization', () => {
       dropThreshold: 0.5,    // 50% caída para ser víctima
       growthThreshold: 0.2,  // 20% subida para ser caníbal
       minVolume: 10,         // Mínimo 10kg promedio para considerar
-      splitMonth: 8          // Agosto (según el caso de uso del usuario)
+      splitMonth: 7          // Agosto (según el caso de uso del usuario)
    });
 
    // --- COMPOSABLES ---

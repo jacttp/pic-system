@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import { useCannibalizationStore } from '../stores/cannibalizationStore';
 import AnalysisConfigPanel from '../../Shared/components/config/AnalysisConfigPanel.vue';
 import SuspectsTable from '../../Shared/components/tables/SuspectsTable.vue';
 import SubstitutionChart from '../components/charts/SubstitutionChart.vue';
+import GeneralEvolutionChart from '../components/charts/GeneralEvolutionChart.vue';
 import type { DetectedCannibalization } from '../types/cannibalizationTypes';
 import AnalysisSummaryCard from '../components/cards/AnalysisSummaryCard.vue';
 import ExportModal from '../components/modals/ExportModal.vue'; 
+// import GeneralEvolutionChart from '../components/charts/GeneralEvolutionChart.vue';
+import CoverageStatsCard from '../components/cards/CoverageStatsCard.vue';
 
 const store = useCannibalizationStore();
 
@@ -58,6 +61,56 @@ const loadData = () => {
     // Fetch Data trae los datos y ejecuta analyze() internamente
     store.fetchData(selectedYear.value, filters);
 };
+
+// --- AGREGACIÓN PARA GRÁFICO GENERAL ---
+const generalEvolutionData = computed(() => {
+    // 12 meses
+    const totalVictim = new Array(12).fill(0);
+    const totalCannibal = new Array(12).fill(0);
+    const clientSets = Array.from({ length: 12 }, () => new Set<string>());
+
+    if (store.detectedCases.length === 0) {
+        return { victim: totalVictim, cannibal: totalCannibal, clients: new Array(12).fill(0) };
+    }
+
+    // Iteramos sobre los casos detectados para sumar sus vectores
+    store.detectedCases.forEach(item => {
+        // Buscar vectores en rawData
+        const client = store.rawData.find(c => c.name === item.clientName);
+        if (!client) return;
+        
+        const family = client.families.find(f => f.name === item.family);
+        if (!family) return;
+
+        const victim = family.skus.find(s => s.name === item.victimSku);
+        const cannibal = family.skus.find(s => s.name === item.cannibalSku);
+
+        if (victim && cannibal) {
+            for (let i = 0; i < 12; i++) {
+                const vVol = (victim.salesVector[i] || 0);
+                const cVol = (cannibal.salesVector[i] || 0);
+                
+                // Sumar a los acumuladores respectivos
+                totalVictim[i] += vVol;
+                totalCannibal[i] += cVol;
+
+                // Si hubo venta (actividad) en este mes para este caso, contamos al cliente
+                // Usamos el ID del cliente (Matriz) para contar únicos
+                if ((vVol + cVol) > 0) {
+                    clientSets[i].add(client.matriz);
+                }
+            }
+        }
+    });
+
+    const totalClients = clientSets.map(s => s.size);
+
+    return {
+        victim: totalVictim,
+        cannibal: totalCannibal,
+        clients: totalClients
+    };
+});
 
 const showExportModal = ref(false);
 
@@ -257,41 +310,36 @@ onMounted(async () => {
 
         </div>
 
-        <div 
-            class="flex-1 flex flex-col lg:grid lg:grid-cols-12 gap-6 min-h-0 overflow-hidden transition-all duration-500 ease-in-out"
-        >
+        <div class="flex-1 flex flex-col lg:grid lg:grid-cols-12 gap-6 min-h-0 overflow-hidden transition-all duration-500 ease-in-out">
             
             <div class="lg:col-span-7 h-1/3 lg:h-full min-h-0 flex flex-col">
-                <SuspectsTable 
-                    @select="onCaseSelected" 
-                />
+                <SuspectsTable @select="onCaseSelected"/>
             </div>
-
-            <div class="lg:col-span-5 h-2/3 lg:h-full flex flex-col min-h-0 gap-6">
+            <div class="lg:col-span-5 h-2/3 lg:h-full flex flex-col overflow-y-auto gap-4 pr-1">
                 
-                <div class="flex-[3] min-h-0">
-                    <div v-if="selectedCase" class="h-full flex flex-col gap-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                <div class="shrink-0">
+                    <div v-if="selectedCase" class="flex flex-col gap-3 animate-in fade-in slide-in-from-right-4 duration-300">
                         
-                         <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm shrink-0 flex justify-between items-center">
+                         <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm shrink-0 flex justify-between items-center">
                             <div class="min-w-0">
-                                <h3 class="font-bold text-slate-800 text-base truncate">{{ selectedCase.clientName }}</h3>
-                                <div class="flex gap-3 text-xs text-slate-500 mt-1">
-                                    <span class="bg-slate-100 px-2 py-0.5 rounded border border-slate-200 font-mono">{{ selectedCase.matriz }}</span>
+                                <h3 class="font-bold text-slate-800 text-sm truncate">{{ selectedCase.clientName }}</h3>
+                                <div class="flex gap-2 text-[10px] text-slate-500 mt-0.5">
+                                    <span class="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 font-mono">{{ selectedCase.matriz }}</span>
                                     <span>{{ selectedCase.route }}</span>
                                     <span class="font-semibold text-brand-600">| {{ selectedCase.family }}</span>
                                 </div>
                             </div>
                              <div class="flex gap-4 text-right">
                                 <div>
-                                    <div class="text-[10px] text-slate-400 uppercase font-bold">Neto</div>
-                                    <div :class="selectedCase.netBalance >= 0 ? 'text-green-600' : 'text-red-600'" class="text-lg font-bold">
+                                    <div class="text-[9px] text-slate-400 uppercase font-bold">Neto</div>
+                                    <div :class="selectedCase.netBalance >= 0 ? 'text-green-600' : 'text-red-600'" class="text-base font-bold">
                                         {{ selectedCase.netBalance > 0 ? '+' : '' }}{{ selectedCase.netBalance.toFixed(0) }}
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="flex-1 min-h-0 relative bg-white rounded-lg border border-slate-200 p-4 shadow-sm"> 
+                        <div class="h-[350px] relative bg-white rounded-lg border border-slate-200 p-3 shadow-sm"> 
                             <SubstitutionChart 
                                 :victim-name="selectedCase.victimSku"
                                 :victim-vector="selectedVictimVector"
@@ -302,24 +350,36 @@ onMounted(async () => {
                         </div>
                     </div>
 
-                    <div v-else class="h-full bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 p-8 text-center gap-4">
+                    <div v-else class="h-[430px] bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 p-8 text-center gap-4">
                          <div class="bg-white p-4 rounded-full shadow-sm">
                             <i class="fa-solid fa-chart-line text-2xl text-slate-300"></i>
                         </div>
                         <div>
-                            <h3 class="font-medium text-slate-600">Detalle Gráfico</h3>
-                            <p class="text-xs text-slate-400 mt-1">Selecciona un caso para ver la curva de sustitución.</p>
+                            <h3 class="font-medium text-slate-600">Detalle Individual</h3>
+                            <p class="text-xs text-slate-400 mt-1">Selecciona un caso de la tabla izquierda.</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="flex-[2] min-h-0">
+                <div class="shrink-0">
                     <AnalysisSummaryCard @export="handleExport" />
                 </div>
 
-            </div>
-        </div>
-    
+                <div class="shrink-0 min-h-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div class="h-[400px]"> 
+                        <GeneralEvolutionChart 
+                            :victim-vector="generalEvolutionData.victim"
+                            :cannibal-vector="generalEvolutionData.cannibal"
+                            :client-count-vector="generalEvolutionData.clients"
+                        />
+                    </div>
+                </div>
+
+                <div class="shrink-0 pb-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
+                    <CoverageStatsCard />
+                </div>
+            </div>            
+        </div>    
         <ExportModal v-model="showExportModal" />
     </div>
 </template>

@@ -35,6 +35,8 @@ const chartData = computed<ChartData>(() => ({
 }));
 
 const chartOptions = computed(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
     plugins: {
         annotation: { // Nota: Requiere plugin chartjs-plugin-annotation (Si no lo tienes, simplemente no se dibujará la línea, no rompe nada)
             annotations: {
@@ -54,9 +56,9 @@ const chartOptions = computed(() => ({
 </script>
 
 <template>
-    <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200 h-full">
-        <h3 class="text-sm font-bold text-slate-700 mb-4">Dinámica de Sustitución Mensual</h3>
-        <div class="h-[300px]">
+    <div class="h-full w-full flex flex-col min-h-0">
+        <h3 class="text-sm font-bold text-slate-700 mb-2 shrink-0">Dinámica de Sustitución Mensual</h3>
+        <div class="flex-1 min-h-0 relative w-full">
             <BaseChart type="line" :data="chartData" :options="chartOptions" />
         </div>
     </div>
