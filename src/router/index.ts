@@ -72,7 +72,7 @@ const router = createRouter({
             {
                path: 'clients-validation',
                name: 'clients-validation',
-               component: () => import('@/modules/Clients/views/ClientList.vue') // Reusando vista temporalmente
+               component: () => import('@/modules/ClientValidation/views/ClientValidationView.vue') // Reusando vista temporalmente
             },
             {
                path: 'audit',
@@ -109,6 +109,7 @@ const router = createRouter({
                   // Opcional: Si tienes roles, agrégalos aquí
                }
             },
+
 
          ]
       },

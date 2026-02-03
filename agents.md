@@ -1,113 +1,140 @@
-# CONTEXTO DEL MÓDULO: DETECCIÓN DE CANIBALIZACIÓN (PIC)
+# Contexto de Proyecto & Handover Frontend
+**Proyecto:** PIC System (Módulo de Validación de Clientes)
+**Rol Actual:** Arquitecto de Software Lead
+**Estado:** Backend Finalizado (API v2) | Frontend Pendiente de Implementación
 
-## 1. Objetivo del Módulo
-Este módulo tiene como propósito identificar, cuantificar y visualizar casos de **"Canibalización Inducida"** en las ventas.
-En el contexto de negocio (Embutidos Corona), esto ocurre cuando estrategias de incentivos ("Vivecos") provocan que la venta de un producto consolidado (**Víctima**) sea desplazada por un producto nuevo o promocionado (**Caníbal**), resultando en una pérdida de eficiencia logística (Drop Size) o nula ganancia neta.
+## 1. OBJETIVO DEL SPRINT
+Desarrollar el módulo **"ClientValidation"** en el Frontend.
+El objetivo de negocio es una herramienta para detectar, validar y homologar clientes duplicados basándose en su ubicación geográfica (`Geopos`).
 
-## 2. Arquitectura Técnica
-El módulo sigue una arquitectura **DDD (Domain-Driven Design)** implementada como un "Silo Modular" dentro de la aplicación Vue 3.
-* **Ruta Base:** `src/modules/Cannibalization/`
-* **Aislamiento:** El módulo es autocontenido. Posee sus propios tipos, servicios, stores y vistas.
-* **Dependencias Externas:**
-    * `src/api/axios.ts`: Para comunicación HTTP segura.
-    * `src/Shared/components/charts/BaseChart.vue`: Para renderizado de gráficos (Chart.js).
+El flujo de trabajo es:
+1.  **Bandeja de Entrada:** Ver clientes con status `TipoCli = 'Revisar'`.
+2.  **Análisis:** Al seleccionar uno, buscar automáticamente clientes cercanos (radio 1km).
+3.  **Decisión:** (Futuro) Fusionar o validar.
 
-## 3. Interacción Backend-Frontend
 
-### 3.1. Responsabilidad del Backend (`Node.js`)
-El backend actúa como un **Agregador y Pivoteador de Datos**. No realiza el análisis matemático de detección; su función es entregar vectores de venta limpios y estructurados jerárquicamente.
+## 2. ARQUITECTURA FRONTEND OBLIGATORIA
+Estamos usando **Domain-Driven Design (DDD)** con "Silos Modulares".
+**NO** agregues archivos en carpetas genéricas. Todo debe vivir dentro de `src/modules/ClientValidation/`.
 
-* **Endpoint:** `POST /api/cannibalization`
-* **Controlador:** `getCannibalizationData` (en `picController.js`)
-* **Query SQL:** Extrae ventas agrupadas por `Matriz` (Cliente), `Grupo` (Familia), `SKU` y `Mes`.
-* **Transformación:** Convierte filas planas de base de datos en una estructura JSON anidada.
+**Estructura de Directorios Definida:**
+```text
+src/modules/ClientValidation/
+├── components/
+│   ├── ClientReviewTable.vue      # (Pendiente)
+│   ├── HomologationWorkspace.vue  # (Pendiente - Panel derecho)
+│   └── GeoMapWidget.vue           # (Fase 3 - Futuro)
+├── services/
+│   └── validationApi.ts           # (Definido abajo)
+├── stores/
+│   └── validationStore.ts         # (Lógica de estado Pinia)
+├── types/
+│   └── clientValidationTypes.ts   # (Interfaces estrictas)
+└── views/
+    └── ClientValidationView.vue   # (Layout Principal: Master-Detail)
 
-### 3.2. Contrato de Datos (Input del Frontend)
-El frontend recibe una lista de nodos de cliente (`ClientNode[]`).
+```
 
-```typescript
-// Estructura Jerárquica recibida del API
-interface ClientNode {
-    id: string;        // Identificador del Cliente (Matriz)
-    name: string;      // Nombre del Cliente
-    route: string;     // Ruta de venta
-    families: {
-        name: string;  // Familia de productos (ej: "ZF-Chorizos Corona")
-        skus: {
-            name: string;        // Nombre del SKU
-            salesVector: number[]; // Array[12] con venta en KG (Ene-Dic)
-            metaVector: number[];  // Array[12] con metas asignadas
-        }[];
-    }[];
+**Tech Stack:**
+
+- Vue 3 (Composition API + <script setup lang="ts">)
+- TypeScript Estricto (Prohibido any).
+- TailwindCSS.
+- Pinia (Store Setup Syntax).
+
+## 3. CONTRATO DE BACKEND (API v2 - YA IMPLEMENTADO)
+Los endpoints ya existen y responden correctamente. Base URL: /api/v2/homologation Auth: Header Authorization: Bearer <TOKEN>
+
+**A. Obtener Pendientes (GET /pending)** 
+Query Params: page, limit
+
+```JSON
+
+{
+    "success": true,
+    "total": 150,
+    "data": [
+        {
+            "clienteid": "CTE-001",
+            "Nombre": "Abarrotes Don Pepe",
+            "Geopos": "19.4326,-99.1332", // IMPORTANTE: String "lat,long"
+            "TipoCli": "Revisar",
+            "Calle_Numero": "Av. Siempre Viva 123"
+        }
+    ]
+}
+```
+
+**B. Buscar Vecinos (GET /nearby)**
+
+- Lógica: El backend parsea la string Geopos y aplica fórmula Haversine.
+- Query Params:
+   - lat: float (Ej: 19.4326)
+   - lng: float (Ej: -99.1332)
+   - radiusMetros: int (Default 1000)
+   - excludeId: string (ID del cliente actual para no auto-encontrarse)
+
+- Respuesta JSON:
+
+```JSON
+
+{
+    "success": true,
+    "count": 2,
+    "data": [
+        {
+            "clienteid": "CTE-999",
+            "Nombre": "Tienda Pepe (Duplicado)",
+            "DistanciaKm": 0.05 // Distancia calculada
+            // ... resto de datos
+        }
+    ]
 }
 
 ```
 
-## 4. Motor Lógico (Frontend)
-El análisis de detección ocurre en el lado del cliente (Client-Side) para permitir interactividad en tiempo real sin saturar el servidor.
 
-### 4.1. Ubicación
+## 4. INSTRUCCIONES DE IMPLEMENTACIÓN (PASO A PASO)
 
--Composable: src/modules/Cannibalization/composables/useCannibalizationEngine.ts
+### Paso 1: Tipado (types/clientValidationTypes.ts)
+Define interfaces para ClientReview (incluyendo Geopos string y DistanciaKm number opcional) y NearbyResponse.
 
--Store: src/modules/Cannibalization/stores/cannibalizationStore.ts
+### Paso 2: Servicio (services/validationApi.ts)
+Implementa las funciones getPendingClients y getNearbyClients usando la instancia de axios existente (@/api/axios o picApi).
 
-### 4.2. Algoritmo de Detección
+### Paso 3: Store (stores/validationStore.ts)
+Necesitamos un store de Pinia que maneje:
 
-El motor itera sobre cada familia de cada cliente y aplica la siguiente heurística comparativa basada en un Mes de Corte (splitMonth):
+- pendingClients: Array de pendientes.
+- selectedClient: El cliente que el usuario está revisando actualmente.
+- nearbyCandidates: Array de vecinos encontrados por el endpoint /nearby.
+- Acción Crítica: selectClientForReview(client) -> Debe parsear la string client.Geopos ("lat,long"), validar que no sea null, y llamar automáticamente a la API /nearby.
 
-1. Cálculo de Promedios: Se calcula el volumen promedio Pre-Corte y Post-Corte para cada SKU.
+### Paso 4: Vista (views/ClientValidationView.vue)
 
-2. Identificación de Víctima:
+- mplementar un layout de Pantalla Dividida (Split View).
+- Izquierda (1/3): Lista scrolleable de pendientes.
+- Derecha (2/3): Panel de detalles.
+   - Header con datos del selectedClient.
+   - Sección "Análisis Geoespacial": Mostrar una tabla simple con los nearbyCandidates y su distancia. (El mapa gráfico se hará en el siguiente sprint).
 
-- Condición: (PromedioPre - PromedioPost) / PromedioPre >= dropThreshold
-
-- Significado: El producto cayó drásticamente tras el cambio de estrategia.
-
-3. Identificación de Caníbal:
-
-- Condición: (PromedioPost - PromedioPre) / PromedioPre >= growthThreshold (o es un producto nuevo).
-
-- Significado: El producto creció significativamente en el mismo periodo.
-
-4. Emparejamiento (Matchmaking):
-
-- Si en una misma familia existen Víctimas y Caníbales, se asume correlación.
-
-- Se calcula el netBalance (Ganancia - Pérdida).
-
-### 4.3. Variables Configurables (Rules)
-El análisis es dinámico y depende de los siguientes parámetros ajustables por el usuario:
-
-- dropThreshold: Sensibilidad a la caída (ej. 0.4 = 40%).
-
-- growthThreshold: Sensibilidad al crecimiento (ej. 0.2 = 20%).
-
-- minVolume: Filtro de ruido para ignorar ventas insignificantes.
-
-- splitMonth: Mes donde inicia la supuesta canibalización (Punto de inflexión).
-
-## 5. Componentes Clave de UI
-
-- AnalysisConfigPanel.vue: Interfaz de control. Modifica el estado reactivo rules en el Store, disparando automáticamente el re-análisis del motor (engine.runAnalysis).
-
-- SuspectsTable.vue: Muestra la lista de casos detectados (DetectedCannibalization[]), ordenados por impactScore (Severidad económica).
-
-SubstitutionChart.vue: Visualización detallada. Recibe dos vectores (Víctima vs Caníbal) y los grafica en una línea de tiempo para evidenciar el cruce de tendencias.
-
-## 6. Flujo de Información Resumido
-1. User Action: Selecciona Año 2025 y Familia "Chorizos".
-
-2. API Call: fetchAnalysisData solicita datos crudos.
-
-3. Store: Almacena rawData (Jerarquía de Clientes).
-
-4. Engine: Ejecuta runAnalysis(rawData, rules).
-
-5. Output: Genera detectedCases.
-
-6. UI: Renderiza tabla de sospechosos.
-
-7. Interaction: Usuario mueve slider de "Umbral Caída" -> Engine Recalcula -> UI se actualiza instantáneamente.
+### Paso 5: Router (src/routes/index.ts)
+Asegúrate de que la ruta existente:
 
 
+``` ts
+
+{
+    path: 'clients-validation',
+    name: 'ClientValidation',
+    component: () => import('@/modules/ClientValidation/views/ClientValidationView.vue')
+}
+```
+
+Apunte correctamente al nuevo archivo.
+
+
+## 5. REGLAS DE ORO (Estrictas)
+1. Cero any: Si no sabes el tipo, crea una interfaz.
+2. Manejo de Errores: La UI debe mostrar estados de isLoading y manejar errores de conexión (ej: si Geopos es inválida, no romper la app, solo avisar).
+3. Código Limpio: Usa Composition API con <script setup>. No uses Options API.
