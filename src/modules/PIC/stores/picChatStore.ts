@@ -7,89 +7,89 @@ import { usePicFilterStore } from './picFilterStore';
 import { getChartConfig, getPieConfig } from '../utils/picUtils';
 
 interface ChatContext {
-    id: string;
-    title: string;
-    data: any;
-    type: 'chart' | 'table';
+   id: string;
+   title: string;
+   data: any;
+   type: 'chart' | 'table';
 }
 
 export const usePicChatStore = defineStore('picChat', () => {
-    // --- ESTADO ---
-    const messages = ref<ChatMessage[]>([]);
-    const isLoading = ref(false);
-    const activeContext = ref<ChatContext | null>(null);
-    const isReportActive = ref(false);
-    const filterStore = usePicFilterStore();         
-    const selectedModel = ref<string>('gemini'); // Default
-    
-    // --- ACCIONES BÁSICAS ---
-    function initChat() {
-        if (messages.value.length === 0) {
-            addMessage('assistant', 'Hola, soy tu analista virtual de PIC. Puedes pedirme datos específicos o generar reportes.');
-        }
-    }
-    function setModel(modelId: string) {
-        selectedModel.value = modelId;
-    }
+   // --- ESTADO ---
+   const messages = ref<ChatMessage[]>([]);
+   const isLoading = ref(false);
+   const activeContext = ref<ChatContext | null>(null);
+   const isReportActive = ref(false);
+   const filterStore = usePicFilterStore();
+   const selectedModel = ref<string>('gemini'); // Default
 
-    function addMessage(role: 'user' | 'assistant' | 'system', text: string, chartConfig: AiQueryConfig | null = null) {
-        const id = Date.now().toString() + Math.random().toString();
-        messages.value.push({
-            id,
-            role,
-            text,
-            timestamp: new Date(),
-            chartConfig
-        });
-        return id; // Retornamos ID para uso posterior
-    }
+   // --- ACCIONES BÁSICAS ---
+   function initChat() {
+      if (messages.value.length === 0) {
+         addMessage('assistant', 'Hola, soy tu analista virtual de PIC. Puedes pedirme datos específicos o generar reportes.');
+      }
+   }
+   function setModel(modelId: string) {
+      selectedModel.value = modelId;
+   }
 
-    function setContext(title: string, data: any, type: 'chart' | 'table') {
-        activeContext.value = {
-            id: Date.now().toString(),
-            title,
-            data,
-            type
-        };
-        console.log("Contexto establecido:", title);
-    }
+   function addMessage(role: 'user' | 'assistant' | 'system', text: string, chartConfig: AiQueryConfig | null = null) {
+      const id = Date.now().toString() + Math.random().toString();
+      messages.value.push({
+         id,
+         role,
+         text,
+         timestamp: new Date(),
+         chartConfig
+      });
+      return id; // Retornamos ID para uso posterior
+   }
 
-    function clearContext() {
-        activeContext.value = null;
-    }
+   function setContext(title: string, data: any, type: 'chart' | 'table') {
+      activeContext.value = {
+         id: Date.now().toString(),
+         title,
+         data,
+         type
+      };
+      console.log("Contexto establecido:", title);
+   }
 
-    function clearChat() {
-        messages.value = [];
-        clearContext();
-        initChat();
-    }
+   function clearContext() {
+      activeContext.value = null;
+   }
 
-    async function sendMessage(userText: string) {
-        if (!userText.trim()) return;
+   function clearChat() {
+      messages.value = [];
+      clearContext();
+      initChat();
+   }
 
-        // 1. Agregar mensaje del usuario a la UI inmediatamente
-        addMessage('user', userText);
-        isLoading.value = true;
+   async function sendMessage(userText: string) {
+      if (!userText.trim()) return;
 
-        try {
-            // --- A. PREPARAR MEMORIA (HISTORIAL) ---
-            // Tomamos los últimos 10 mensajes previos para dar contexto
-            // Excluimos el mensaje actual (que acabamos de agregar) y los mensajes de error (system)
-            const history = messages.value
-                .slice(0, -1) // Ignoramos el mensaje actual
-                .slice(-10)   // Limitamos a 10 turnos para ahorrar tokens
-                .filter(m => m.role !== 'system') 
-                .map(m => ({
-                    role: m.role === 'user' ? 'user' : 'model', // Gemini usa 'model', no 'assistant'
-                    parts: [{ text: m.text }]
-                }));
+      // 1. Agregar mensaje del usuario a la UI inmediatamente
+      addMessage('user', userText);
+      isLoading.value = true;
 
-            // --- B. INYECTAR CONTEXTO VISUAL (Si el usuario seleccionó un gráfico) ---
-            let promptToSend = userText;
-            
-            if (activeContext.value) {
-                const contextDataStr = JSON.stringify(activeContext.value.data).slice(0, 5000);
-                promptToSend = `
+      try {
+         // --- A. PREPARAR MEMORIA (HISTORIAL) ---
+         // Tomamos los últimos 10 mensajes previos para dar contexto
+         // Excluimos el mensaje actual (que acabamos de agregar) y los mensajes de error (system)
+         const history = messages.value
+            .slice(0, -1) // Ignoramos el mensaje actual
+            .slice(-10)   // Limitamos a 10 turnos para ahorrar tokens
+            .filter(m => m.role !== 'system')
+            .map(m => ({
+               role: m.role === 'user' ? 'user' : 'model', // Gemini usa 'model', no 'assistant'
+               parts: [{ text: m.text }]
+            }));
+
+         // --- B. INYECTAR CONTEXTO VISUAL (Si el usuario seleccionó un gráfico) ---
+         let promptToSend = userText;
+
+         if (activeContext.value) {
+            const contextDataStr = JSON.stringify(activeContext.value.data).slice(0, 5000);
+            promptToSend = `
                 [CONTEXTO VISUAL ACTIVO]
                 Elemento: "${activeContext.value.title}" (${activeContext.value.type}).
                 Datos: ${contextDataStr}.
@@ -97,259 +97,179 @@ export const usePicChatStore = defineStore('picChat', () => {
                 [PREGUNTA USUARIO]
                 "${userText}"
                 `;
+         }
+
+         // --- C. LLAMADA A LA API ---
+         // Enviamos el prompt actual + el historial de la conversación
+         const response = await picApi.sendChatPrompt(promptToSend, history, selectedModel.value);
+
+         // --- D. PROCESAR RESPUESTA ---
+         if (response.explanation) {
+            const msgId = addMessage('assistant', response.explanation, response.queryConfig);
+
+            // Si la IA decidió generar un gráfico, lo renderizamos automáticamente
+            if (response.queryConfig) {
+               await visualizeData(msgId);
             }
+         }
 
-            // --- C. LLAMADA A LA API ---
-            // Enviamos el prompt actual + el historial de la conversación
-            const response = await picApi.sendChatPrompt(promptToSend, history, selectedModel.value);
+         // Limpiamos el contexto visual después de usarlo
+         clearContext();
 
-            // --- D. PROCESAR RESPUESTA ---
-            if (response.explanation) {
-                const msgId = addMessage('assistant', response.explanation, response.queryConfig);
-
-                // Si la IA decidió generar un gráfico, lo renderizamos automáticamente
-                if (response.queryConfig) {
-                    await visualizeData(msgId);
-                }
-            }
-
-            // Limpiamos el contexto visual después de usarlo
-            clearContext();
-
-        } catch (error: any) {
-            const errorMsg = error.response?.data?.message || 'Hubo un error técnico al procesar tu solicitud.';
-            addMessage('system', errorMsg);
-            console.error("Chat Error:", error);
-        } finally {
-            isLoading.value = false;
-        }
-    }
-
-    
-   //  async function visualizeData(messageId: string) {
-   //      const message = messages.value.find(m => m.id === messageId);
-   //      if (!message || !message.chartConfig) return;
-
-   //      // Indicador visual de que "sigue pensando" (generando insight)
-   //      const localLoading = !isLoading.value;
-   //      if (localLoading) isLoading.value = true;
-        
-   //      try {
-   //          // 1. Ejecutar Query (Traer números)
-   //          const data = await picApi.executeAiQuery(message.chartConfig);
-            
-   //          if (!data || data.length === 0) {
-   //              // Actualizamos el mensaje original para decir que no hubo datos
-   //              message.text += "\n\n(Nota: La consulta no arrojó resultados numéricos).";
-   //              return;
-   //          }
-
-   //          // 2. Procesar y Graficar (Código visual existente...)
-   //          const config = message.chartConfig;
-   //          const labels = data.map((d: any) => config.dimensions.map(dim => d[dim]).join(' - '));
-   //          const values = data.map((d: any) => d.TotalMetric || 0);
-            
-   //          const metricMap: Record<string, string> = { 
-   //              'VENTA_KG': 'Venta (KG)', 
-   //              'VENTA_$$': 'Venta ($)', 
-   //              'METAS_KG': 'Meta (KG)' 
-   //          };
-   //          const labelMetric = metricMap[config.metric] || config.metric;
-
-   //          const chartJsConfig = getChartConfig(
-   //              labels, 
-   //              [{
-   //                  label: labelMetric,
-   //                  data: values,
-   //                  backgroundColor: '#0ea5e9',
-   //                  borderRadius: 4
-   //              }], 
-   //              'bar'
-   //          );
-
-   //          const newWidget: DynamicWidget = {
-   //              id: Date.now().toString(),
-   //              title: `IA: ${labelMetric} por ${config.dimensions.join(', ')}`,
-   //              type: 'bar',
-   //              config: chartJsConfig,
-   //              rawQuery: config,
-   //              timestamp: Date.now()
-   //          };
-
-   //          filterStore.addDynamicWidget(newWidget);
-   //          isReportActive.value = true;
-
-   //          // --- 3. NUEVO: GENERACIÓN DE INSIGHT AUTOMÁTICO ---
-   //          // Tomamos los datos reales y pedimos un micro-resumen
-   //          // Limitamos a los top 10 registros para no saturar tokens
-   //          const dataSample = data.slice(0, 15); 
-            
-   //          const promptInsight = `
-   //              Dame UN párrafo muy breve (máx 30 palabras) describiendo la tendencia principal o el 
-   //              valor más destacado.
-   //              Empieza directo, ej: "Se observa que..." o "Destaca que..."
-   //          `;
-
-   //          // Llamamos a la API de insight (que ya tienes configurada en picApi)
-   //          const insightText = await picApi.getDataInsights(dataSample, promptInsight);
-            
-   //          // 4. Actualizamos el mensaje del chat con el insight
-   //          // Efecto: "Aquí tienes el gráfico... [Se escribe solo:] Se observa que la Zona Norte domina..."
-   //          message.text = `${message.text}\n\n💡 ${insightText}`;
-
-   //      } catch (error: any) {
-   //          console.error("❌ Error visualizando/analizando:", error);
-   //          // No mostramos error al usuario si falla el insight, solo el gráfico se queda igual
-   //      } finally {
-   //          if (localLoading) isLoading.value = false;
-   //      }
-   //  }
+      } catch (error: any) {
+         const errorMsg = error.response?.data?.message || 'Hubo un error técnico al procesar tu solicitud.';
+         addMessage('system', errorMsg);
+         console.error("Chat Error:", error);
+      } finally {
+         isLoading.value = false;
+      }
+   }
 
    async function visualizeData(messageId: string) {
-        const message = messages.value.find(m => m.id === messageId);
-        if (!message || !message.chartConfig) return;
+      const message = messages.value.find(m => m.id === messageId);
+      if (!message || !message.chartConfig) return;
 
-        // Evitar doble loading si el usuario hace clic varias veces rápido
-        if (isLoading.value) return;
-        isLoading.value = true;
-        
-        try {
-            // 1. Ejecutar Query a la API (Obtener los datos crudos)
-            const data = await picApi.executeAiQuery(message.chartConfig);
-            
-            if (!data || data.length === 0) {
-                message.text += "\n\n(La consulta no devolvió datos para visualizar).";
-                return;
-            }
+      // Evitar doble loading si el usuario hace clic varias veces rápido
+      if (isLoading.value) return;
+      isLoading.value = true;
 
-            setContext(
-                `Resultado: ${message.chartConfig.metric} por ${message.chartConfig.dimensions.join(', ')}`, // Título
-                data.slice(0, 50), // Datos (Limitamos a 50 filas para no saturar tokens)
-                'chart' // Tipo
-            );
+      try {
+         // 1. Ejecutar Query a la API (Obtener los datos crudos)
+         const data = await picApi.executeAiQuery(message.chartConfig);
 
-            const config = message.chartConfig;
-            const vizType = config.visualization || 'bar'; // Fallback por seguridad
+         if (!data || data.length === 0) {
+            message.text += "\n\n(La consulta no devolvió datos para visualizar).";
+            return;
+         }
 
-            // Preparar etiquetas y valores comunes
-            // (Para tablas y KPIs se procesan distinto abajo)
-            const labels = data.map((d: any) => config.dimensions.map(dim => d[dim]).join(' - '));
-            const values = data.map((d: any) => d.TotalMetric || 0);
-            
-            // Mapas de etiquetas amigables
-            const metricMap: Record<string, string> = { 
-                'VENTA_KG': 'Venta (KG)', 
-                'VENTA_$$': 'Venta ($)', 
-                'METAS_KG': 'Meta (KG)' 
-            };
-            const labelMetric = metricMap[config.metric] || config.metric;
+         setContext(
+            `Resultado: ${message.chartConfig.metric} por ${message.chartConfig.dimensions.join(', ')}`, // Título
+            data.slice(0, 50), // Datos (Limitamos a 50 filas para no saturar tokens)
+            'chart' // Tipo
+         );
 
-            let widgetConfig: any = null;
-            let widgetType = vizType;
+         const config = message.chartConfig;
+         const vizType = config.visualization || 'bar'; // Fallback por seguridad
 
-            // --- FÁBRICA DE VISUALIZACIONES ---
-            switch (vizType) {
-                case 'kpi':
-                    // Para KPI sumamos todo el resultado (ej: Venta total de la consulta)
-                    const totalValue = values.reduce((a: number, b: number) => a + b, 0);
-                    widgetConfig = {
-                        value: totalValue,
-                        label: labelMetric,
-                        subtext: `Basado en ${data.length} registros filtrados`
-                    };
-                    break;
+         // Preparar etiquetas y valores comunes
+         // (Para tablas y KPIs se procesan distinto abajo)
+         const labels = data.map((d: any) => config.dimensions.map(dim => d[dim]).join(' - '));
+         const values = data.map((d: any) => d.TotalMetric || 0);
 
-                case 'table':
-                    // Para tabla pasamos los datos crudos y las columnas
-                    widgetConfig = {
-                        columns: [...config.dimensions, 'TotalMetric'], // Columnas dinámicas
-                        data: data,
-                        metricLabel: labelMetric
-                    };
-                    break;
+         // Mapas de etiquetas amigables
+         const metricMap: Record<string, string> = {
+            'VENTA_KG': 'Venta (KG)',
+            'VENTA_$$': 'Venta ($)',
+            'METAS_KG': 'Meta (KG)'
+         };
+         const labelMetric = metricMap[config.metric] || config.metric;
 
-                case 'pie':
-                case 'doughnut':
-                    // Usamos el nuevo helper de Utils
-                    // Importante: Pie charts necesitan colores variados
-                    const bgColors = [
-                        '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', 
-                        '#ec4899', '#06b6d4', '#84cc16', '#6366f1', '#14b8a6'
-                    ];
-                    widgetConfig = getPieConfig(
-                        labels,
-                        [{
-                            data: values,
-                            backgroundColor: bgColors,
-                            borderWidth: 1
-                        }],
-                        vizType
-                    );
-                    break;
+         let widgetConfig: any = null;
+         let widgetType = vizType;
 
-                case 'line':
-                case 'bar':
-                default:
-                    // Usamos el helper existente
-                    widgetConfig = getChartConfig(
-                        labels, 
-                        [{
-                            label: labelMetric,
-                            data: values,
-                            backgroundColor: vizType === 'line' ? 'rgba(59, 130, 246, 0.2)' : '#0ea5e9',
-                            borderColor: '#0ea5e9',
-                            fill: vizType === 'line', // Relleno solo si es línea
-                            borderRadius: 4,
-                            tension: 0.3 // Curva suave para líneas
-                        }], 
-                        vizType as 'bar' | 'line'
-                    );
-                    break;
-            }
+         // --- FÁBRICA DE VISUALIZACIONES ---
+         switch (vizType) {
+            case 'kpi':
+               // Para KPI sumamos todo el resultado (ej: Venta total de la consulta)
+               const totalValue = values.reduce((a: number, b: number) => a + b, 0);
+               widgetConfig = {
+                  value: totalValue,
+                  label: labelMetric,
+                  subtext: `Basado en ${data.length} registros filtrados`
+               };
+               break;
 
-            // 2. Crear el Widget Dinámico
-            const newWidget: DynamicWidget = {
-                id: Date.now().toString(),
-                title: `IA: ${labelMetric} por ${config.dimensions.join(', ')}`,
-                type: widgetType, // 'bar', 'kpi', 'table', etc.
-                config: widgetConfig,
-                rawQuery: config,
-                timestamp: Date.now()
-            };
+            case 'table':
+               // Para tabla pasamos los datos crudos y las columnas
+               widgetConfig = {
+                  columns: [...config.dimensions, 'TotalMetric'], // Columnas dinámicas
+                  data: data,
+                  metricLabel: labelMetric
+               };
+               break;
 
-            filterStore.addDynamicWidget(newWidget);
-            isReportActive.value = true;
+            case 'pie':
+            case 'doughnut':
+               // Usamos el nuevo helper de Utils
+               // Importante: Pie charts necesitan colores variados
+               const bgColors = [
+                  '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
+                  '#ec4899', '#06b6d4', '#84cc16', '#6366f1', '#14b8a6'
+               ];
+               widgetConfig = getPieConfig(
+                  labels,
+                  [{
+                     data: values,
+                     backgroundColor: bgColors,
+                     borderWidth: 1
+                  }],
+                  vizType
+               );
+               break;
 
-            // 3. Generar Insight (Micro-resumen)
-            // Solo para gráficos y tablas, los KPIs suelen explicarse solos
-            if (vizType !== 'kpi') {
-                const dataSample = data.slice(0, 15); 
-                const promptInsight = `Describe brevemente la tendencia, valor más alto o distribución. Máx 20 palabras.`;
-                const insightText = await picApi.getDataInsights(dataSample, promptInsight);
-                message.text = `${message.text}\n\n💡 ${insightText}`;
-            }
+            case 'line':
+            case 'bar':
+            default:
+               // Usamos el helper existente
+               widgetConfig = getChartConfig(
+                  labels,
+                  [{
+                     label: labelMetric,
+                     data: values,
+                     backgroundColor: vizType === 'line' ? 'rgba(59, 130, 246, 0.2)' : '#0ea5e9',
+                     borderColor: '#0ea5e9',
+                     fill: vizType === 'line', // Relleno solo si es línea
+                     borderRadius: 4,
+                     tension: 0.3 // Curva suave para líneas
+                  }],
+                  vizType as 'bar' | 'line'
+               );
+               break;
+         }
 
-        } catch (error: any) {
-            console.error("❌ Error visualizando/analizando:", error);
-            message.text += "\n\n(Error al generar la visualización).";
-        } finally {
-            isLoading.value = false;
-        }
-    }
+         // 2. Crear el Widget Dinámico
+         const newWidget: DynamicWidget = {
+            id: Date.now().toString(),
+            title: `IA: ${labelMetric} por ${config.dimensions.join(', ')}`,
+            type: widgetType, // 'bar', 'kpi', 'table', etc.
+            config: widgetConfig,
+            rawQuery: config,
+            timestamp: Date.now()
+         };
 
-    return {
-        messages,
-        isLoading,
-        activeContext,
-        isReportActive,
-        initChat,
-        sendMessage,
-        clearChat,
-        visualizeData,
-        setContext,
-        clearContext,
+         filterStore.addDynamicWidget(newWidget);
+         isReportActive.value = true;
 
-        selectedModel, 
-        setModel
-    };
+         // 3. Generar Insight (Micro-resumen)
+         // Solo para gráficos y tablas, los KPIs suelen explicarse solos
+         if (vizType !== 'kpi') {
+            const dataSample = data.slice(0, 15);
+            const promptInsight = `Describe brevemente la tendencia, valor más alto o distribución. Máx 20 palabras.`;
+            const insightText = await picApi.getDataInsights(dataSample, promptInsight);
+            message.text = `${message.text}\n\n💡 ${insightText}`;
+         }
+
+      } catch (error: any) {
+         console.error("❌ Error visualizando/analizando:", error);
+         message.text += "\n\n(Error al generar la visualización).";
+      } finally {
+         isLoading.value = false;
+      }
+   }
+
+   return {
+      messages,
+      isLoading,
+      activeContext,
+      isReportActive,
+      initChat,
+      sendMessage,
+      clearChat,
+      visualizeData,
+      setContext,
+      clearContext,
+
+      selectedModel,
+      setModel
+   };
 });

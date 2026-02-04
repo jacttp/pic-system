@@ -93,7 +93,6 @@ Query Params: page, limit
 
 ```
 
-
 ## 4. INSTRUCCIONES DE IMPLEMENTACIÓN (PASO A PASO)
 
 ### Paso 1: Tipado (types/clientValidationTypes.ts)
@@ -121,7 +120,6 @@ Necesitamos un store de Pinia que maneje:
 ### Paso 5: Router (src/routes/index.ts)
 Asegúrate de que la ruta existente:
 
-
 ``` ts
 
 {
@@ -130,11 +128,5 @@ Asegúrate de que la ruta existente:
     component: () => import('@/modules/ClientValidation/views/ClientValidationView.vue')
 }
 ```
-
 Apunte correctamente al nuevo archivo.
 
-
-## 5. REGLAS DE ORO (Estrictas)
-1. Cero any: Si no sabes el tipo, crea una interfaz.
-2. Manejo de Errores: La UI debe mostrar estados de isLoading y manejar errores de conexión (ej: si Geopos es inválida, no romper la app, solo avisar).
-3. Código Limpio: Usa Composition API con <script setup>. No uses Options API.

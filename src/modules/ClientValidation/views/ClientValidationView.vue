@@ -79,6 +79,12 @@ const handleApplyMatch = () => {
 const handleApplyNew = () => {
   store.applyNewClientLogic();
 };
+
+const handleSkip = async () => {
+   if (confirm('¿Marcar como "Sin Análisis" (SA) y omitir?')) {
+      await store.applySkipLogic();
+   }
+};
 </script>
 
 <template>
@@ -141,11 +147,14 @@ const handleApplyNew = () => {
       <div v-else class="flex-1 p-6 overflow-y-auto pb-20">
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div class="flex justify-between items-start mb-2">
-            <h1 class="text-2xl font-bold text-gray-800">{{ selectedClient.Nombre }}</h1>
+            <div>
+              <h1 class="text-2xl font-bold text-gray-800">{{ selectedClient.Nombre }}</h1>
+              <span class="text-sm font-mono text-gray-400">ID: {{ selectedClient.clienteid }}</span>
+            </div>
             <button 
               @click="handleNext"
               class="text-gray-400 hover:text-blue-600 transition-colors p-2 rounded-full hover:bg-gray-100"
-              title="Siguiente Caso (Alt + ->)"
+              title="Siguiente Caso"
             >
               <i class="fas fa-arrow-right text-xl"></i>
             </button>
@@ -163,15 +172,25 @@ const handleApplyNew = () => {
           </div>
           
           <div class="relative rounded-lg overflow-hidden border border-gray-200">
-             <div v-if="mainClientGeo.lat !== 0">
+             <!-- Escenario B: FANTASMA (Sin Geopos) -->
+             <div v-if="!selectedClient.Geopos" class="h-24 bg-red-50 flex items-center justify-center text-red-500 border-b border-red-100">
+               <span class="font-medium flex items-center">
+                  <i class="fas fa-exclamation-triangle mr-2"></i> 
+                  ⚠️ Cliente sin geolocalización detectada.
+               </span>
+             </div>
+
+             <!-- Escenario A: Isvalid Geo -->
+             <div v-else-if="mainClientGeo.lat !== 0">
                  <GeoMapWidget 
                    :main-client="mainClientGeo"
                    :candidates="candidateGeos"
                    @select-candidate="onCandidateSelected"
                  />
              </div>
+             
              <div v-else class="h-64 bg-slate-100 flex items-center justify-center text-slate-400">
-               <span class="italic"><i class="fas fa-map-marked-alt mr-2"></i> Sin coordenadas válidas</span>
+               <span class="italic"><i class="fas fa-map-marked-alt mr-2"></i> Cargando mapa...</span>
              </div>
 
              <div v-if="isLoading" class="absolute inset-0 bg-white/60 flex items-center justify-center z-[2000] backdrop-blur-[1px]">
@@ -183,18 +202,23 @@ const handleApplyNew = () => {
           </div>
         </div>
 
-        <!-- Seccion comparador -->
+        <!-- Seccion comparador: Siempre Visible ahora (incluso si no hay candidato seleccionado, se ve la "Isla") -->
         <transition 
           enter-active-class="transition duration-300 ease-out" 
           enter-from-class="transform translate-y-4 opacity-0" 
           enter-to-class="transform translate-y-0 opacity-100"
         >
-          <div v-if="candidateToCompare" class="mt-4">
-            <div class="flex items-center mb-2">
-               <h3 class="text-lg font-bold text-gray-700">Candidato Seleccionado:</h3>
-               <span class="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-md border border-blue-200">
-                  {{ candidateToCompare.Nombre }} ({{ candidateToCompare.clienteid }})
-               </span>
+          <div class="mt-4">
+            <div class="flex items-center mb-2 justify-between">
+               <div class="flex items-center">
+                  <h3 class="text-lg font-bold text-gray-700">Candidato Seleccionado:</h3>
+                  <span v-if="candidateToCompare" class="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-md border border-blue-200">
+                      {{ candidateToCompare.Nombre }} ({{ candidateToCompare.clienteid }})
+                  </span>
+                  <span v-else class="ml-2 px-2 py-1 bg-gray-100 text-gray-500 text-xs font-semibold rounded-md border border-gray-200 italic">
+                      -- Ninguno --
+                  </span>
+               </div>
             </div>
             
             <DataComparator 
@@ -212,7 +236,9 @@ const handleApplyNew = () => {
       <div v-if="selectedClient" class="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-50">
          <div class="bg-white rounded-full shadow-lg border border-gray-200 px-6 py-2 flex items-center space-x-4">
             
+            <!-- Boton Duplicado (Solo si hay candidato) -->
             <button 
+               v-if="candidateToCompare"
                @click="handleApplyMatch"
                class="px-4 py-2 bg-blue-50 text-blue-700 font-medium rounded-full hover:bg-blue-100 transition-colors text-sm flex items-center"
             >
@@ -224,6 +250,16 @@ const handleApplyNew = () => {
                class="px-4 py-2 bg-green-50 text-green-700 font-medium rounded-full hover:bg-green-100 transition-colors text-sm flex items-center"
             >
                <i class="fas fa-plus-circle mr-2"></i> Es Nuevo
+            </button>
+
+            <!-- Boton OMITIR (Solo si no hay geopos o explicito) -->
+            <button 
+               v-if="!selectedClient.Geopos"
+               @click="handleSkip"
+               class="px-4 py-2 bg-red-50 text-red-600 font-medium rounded-full hover:bg-red-100 transition-colors text-sm flex items-center"
+               title="Marcar como Sin Análisis (SA)"
+            >
+               <i class="fas fa-ban mr-2"></i> OMITIR (SA)
             </button>
 
             <div class="h-6 w-px bg-gray-300"></div>

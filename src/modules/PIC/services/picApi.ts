@@ -125,25 +125,29 @@ export const picApi = {
          const key = `${row.Año}-${row.Mes}`;
          if (!acc[key]) acc[key] = { k: 0, p: 0, m: 0 };
          acc[key].k += row.TotalVentaKG || 0;
-         acc[key].p += row.TotalVentaPesos || 0;
+         // acc[key].p += row.TotalVentaPesos || 0;
          acc[key].m += row.TotalMetasKG || 0;
          return acc;
       }, {});
 
       const context = `
             Actúa como un Director Financiero (CFO) experto.
-            Analiza los siguientes datos agregados (Año-Mes: {k: Kilos, p: Pesos, m: Meta}).
+            Analiza los siguientes datos agregados (Año-Mes: {k: Kilos, m: Meta}).
             
             DATOS: ${JSON.stringify(summaryData)}
             
-            INSTRUCCIÓN:
-            Genera un "Resumen Ejecutivo" en formato HTML simple (usa <p>, <ul>, <li>, <strong>).
-            Debe contener:
-            1. 📊 **Veredicto General:** Una frase contundente sobre el desempeño.
-            2. 📈 **Tendencias:** Qué subió o bajó significativamente.
-            3. 🎯 **Cumplimiento:** Mención sobre si se lograron las metas de Kilos.
-            4. 💡 **Observación Clave:** Un insight que destaque (ej: precio promedio o mes récord).
-            
+            INSTRUCCIONES DE NEGOCIO (STRICT MODE):
+            - 🚫 PROHIBIDO mencionar dinero/pesos. Todo análisis es en VOLUMEN (Kg o Toneladas).
+            - KPI Principal: Cumplimiento de Volumen = (k / m) * 100.
+            - Si k > m, destaca el sobrecumplimiento. Si k < m, alerta la brecha.
+
+            INSTRUCCIÓN: GENERAR REPORTE HTML (Estructura):
+            <p><strong>📊 Veredicto General:</strong> [Frase contundente sobre el movimiento de carga]</p>
+            <ol>
+               <li><strong>📈 Tendencia:</strong> [Análisis de si estamos moviendo más o menos Kg]</li>
+               <li><strong>🎯 Cumplimiento vs Meta:</strong> [¿Llegamos al objetivo de tonelaje?]</li>
+               <li><strong>💡 Hallazgo Operativo:</strong> [Un insight clave sobre el volumen (ej: kg promedio o mes récord)]</li>
+            </ol>
             Tono: Profesional, directo, orientado a resultados. No saludes.
         `;
 

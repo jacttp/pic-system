@@ -4,13 +4,13 @@ import type { ClientPending, ClientGeoMatch } from '../types/clientValidationTyp
 
 const props = defineProps<{
   master: ClientPending;
-  candidate: ClientGeoMatch | ClientPending;
+  candidate: ClientGeoMatch | ClientPending | null;
 }>();
 
 const emit = defineEmits<{
   (e: 'mergeToMaster', payload: { field: string; value: any }): void;
   (e: 'mergeToCandidate', payload: { field: string; value: any }): void;
-  (e: 'update:master', payload: any): void; // Para v-model del input si quisiéramos ser estrictos, pero mutamos master por ref
+  (e: 'update:master', payload: any): void; 
 }>();
 
 // Campos a comparar (Orden Estricto)
@@ -28,8 +28,8 @@ const COMPARE_FIELDS = [
   'Jefatura',
   'Zona',
   'Ruta',
-  'Cadena', // Requested explicitly
-  'Umaf'    // Requested explicitly
+  'Cadena', 
+  'umaf'
 ] as const;
 
 // Helper de normalización
@@ -40,18 +40,22 @@ const normalize = (val: any): string => {
 const comparisonRows = computed(() => {
   return COMPARE_FIELDS.map(field => {
     const valMaster = (props.master as any)[field];
-    const valCandidate = (props.candidate as any)[field];
+    const valCandidate = props.candidate ? (props.candidate as any)[field] : null;
     
     // Normalizar para comparación
     const normMaster = normalize(valMaster);
     const normCandidate = normalize(valCandidate);
     
     // Reglas de Visualización
-    const isMatch = normMaster === normCandidate && normMaster !== '';
-    const isMismatch = !isMatch && normMaster !== '' && normCandidate !== '';
+    // Si no hay candidato, no hay match
+    const isMatch = props.candidate ? (normMaster === normCandidate && normMaster !== '') : false;
+    const isMismatch = props.candidate ? (!isMatch && normMaster !== '' && normCandidate !== '') : false;
 
     // 1. Regla Especial: Geopos match exacto
     const isGeoposMatch = field === 'Geopos' && isMatch;
+    
+    // Check if Geopos is empty/invalid on Master (for explicit styling)
+    const isGeoposEmptyMaster = field === 'Geopos' && !valMaster;
 
     // 2. Regla Crítica: Ruta diferente
     const isRutaMismatch = field === 'Ruta' && isMismatch;
@@ -59,9 +63,10 @@ const comparisonRows = computed(() => {
     return {
       field,
       masterValue: valMaster || '',
-      candidateValue: valCandidate || '-',
+      candidateValue: valCandidate || (props.candidate ? '-' : null), // null indicates invalid candidate
       isMatch,
       isGeoposMatch,
+      isGeoposEmptyMaster,
       isRutaMismatch
     };
   });
@@ -80,9 +85,12 @@ const handleMergeToCandidate = (field: string, value: any) => {
   <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden text-sm">
     <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
       <h3 class="font-bold text-gray-700">Edición y Homologación</h3>
-      <div class="text-xs space-x-3">
+      <div v-if="candidate" class="text-xs space-x-3">
          <span class="inline-flex items-center"><span class="w-2 h-2 rounded-full bg-yellow-200 mr-1"></span> Coincidencia</span>
          <span class="inline-flex items-center"><span class="w-2 h-2 rounded-full bg-red-600 mr-1"></span> Alerta Ruta/Geopos</span>
+      </div>
+      <div v-else class="text-xs text-gray-500 italic">
+        Sin coincidencias cercanas ("Isla")
       </div>
     </div>
 
@@ -116,7 +124,8 @@ const handleMergeToCandidate = (field: string, value: any) => {
                   class="w-full px-2 py-1.5 bg-transparent border border-transparent hover:border-gray-200 focus:border-blue-500 focus:bg-white rounded transition-all outline-none text-gray-700"
                   :class="{ 
                      'text-red-700 font-bold': row.isGeoposMatch,
-                     'text-red-600': row.isRutaMismatch
+                     'text-red-600': row.isRutaMismatch,
+                     'bg-red-50 border-red-300 ring-1 ring-red-200': row.isGeoposEmptyMaster
                   }"
                   placeholder="-"
                />
@@ -124,7 +133,7 @@ const handleMergeToCandidate = (field: string, value: any) => {
 
             <!-- Merge Buttons (Bidireccional) -->
             <td class="p-2 text-center align-middle border-x border-gray-100">
-               <div class="flex justify-center space-x-1">
+               <div v-if="candidate" class="flex justify-center space-x-1">
                  <!-- Hacia Master -->
                  <button 
                   @click="handleMergeToMaster(row.field, row.candidateValue)"
@@ -145,13 +154,19 @@ const handleMergeToCandidate = (field: string, value: any) => {
                    <i class="fas fa-arrow-right"></i>
                  </button>
                </div>
+               <div v-else class="text-xs text-gray-300 text-center">-</div>
             </td>
 
             <!-- Candidate Value -->
             <td class="p-3 text-blue-800 break-words font-mono text-xs select-text">
-              <span :class="{ 'text-red-600 font-bold': row.isGeoposMatch }">
-                 {{ row.candidateValue }}
-              </span>
+              <template v-if="candidate">
+                <span :class="{ 'text-red-600 font-bold': row.isGeoposMatch }">
+                  {{ row.candidateValue }}
+                </span>
+              </template>
+              <template v-else>
+                 <span class="text-gray-400 italic font-sans text-[10px]">-- Sin datos --</span>
+              </template>
             </td>
           </tr>
         </tbody>
