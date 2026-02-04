@@ -111,38 +111,8 @@ export const useClientValidationStore = defineStore('clientValidation', () => {
       }
    };
 
-   // const applyMatchLogic = () => {
-   //    if (!selectedClient.value || !candidateToCompare.value) return;
-
-   //    const master = selectedClient.value;
-   //    const candidate = candidateToCompare.value;
-
-   //    // 1. Copiar valores del Candidato al Master
-   //    // Campos: 'canal', 'canalm', 'formato', 'gerencia', 'zona', 'jefatura'
-   //    // Mapeamos keys dinámicamente si existen
-   //    (master as any).canal = (candidate as any).canal || (candidate as any).canalm;
-   //    (master as any).canalm = (candidate as any).canalm || (candidate as any).canal;
-   //    (master as any).formato = (candidate as any).formato || (candidate as any).formatocte;
-   //    (master as any).formatocte = (candidate as any).formatocte || (candidate as any).formato;
-
-   //    // Hierarchy
-   //    (master as any).Gerencia = (candidate as any).Gerencia;
-   //    (master as any).Zona = (candidate as any).Zona;
-   //    (master as any).Jefatura = (candidate as any).Jefatura;
-
-   //    // UMAF (si aplica)
-   //    if ((candidate as any).umaf) (master as any).umaf = (candidate as any).umaf;
-
-   //    // 2. Ruta Conflict Check
-   //    if (master.Ruta !== candidate.Ruta) {
-   //       // Podríamos usar un estado global para alertas, por ahora console warning
-   //       console.warn('Conflicto de Ruta detectado:', master.Ruta, 'vs', candidate.Ruta);
-   //       alert(`Conflicto de Ruta: Master [${master.Ruta}] vs Candidato [${candidate.Ruta}]. Verifique.`);
-   //    }
-
-   //    // Update TipoCli
-   //    master.TipoCli = 'Igual';
-   // };
+   const validationAction = ref<'duplicate' | 'new' | null>(null);
+   const manualCheckRequired = ref(false);
 
    const applyMatchLogic = () => {
       if (!selectedClient.value || !candidateToCompare.value) return;
@@ -150,32 +120,62 @@ export const useClientValidationStore = defineStore('clientValidation', () => {
       const master = selectedClient.value;
       const candidate = candidateToCompare.value;
 
+      // Reset states
+      manualCheckRequired.value = false;
+      validationAction.value = null;
 
-      // 1. Copiar valores del Candidato al Master
+      // --- REGLA EXCEPCIÓN "M" ---
+      // Si el candidato es "M" (Muerto/Modificado), NO copiamos Formato ni TipoCli automáticamente
+      const candTipoCli = candidate.TipoCli ? String(candidate.TipoCli).trim().toLowerCase() : '';
+      const isCandidateM = candTipoCli.startsWith('m'); // insensitive check
+
+      if (isCandidateM) {
+         manualCheckRequired.value = true;
+      }
+
+      // --- HERENCIA MASIVA (ADOPCIÓN TOTAL) ---
+      // Lista estricta de campos a copiar:
+      // Matriz, Cadena, Canal, Canalm, Formato(con excepcion), Gerencia, Zona, Jefatura, Umaf
+
+      // 1. Matriz & Cadena
+      if ((candidate as any).Matriz) (master as any).Matriz = (candidate as any).Matriz;
+      if ((candidate as any).Cadena) (master as any).Cadena = (candidate as any).Cadena;
+
+      // 2. Canal & Canalm (Bidireccional fallback si uno falta en candidato, pero priorizando candidato)
       (master as any).canal = (candidate as any).canal || (candidate as any).canalm;
       (master as any).canalm = (candidate as any).canalm || (candidate as any).canal;
-      (master as any).formato = (candidate as any).formato || (candidate as any).formatocte;
-      (master as any).formatocte = (candidate as any).formatocte || (candidate as any).formato;
 
-      // Hierarchy
+      // 3. Jerarquía Comercial
       (master as any).Gerencia = (candidate as any).Gerencia;
       (master as any).Zona = (candidate as any).Zona;
       (master as any).Jefatura = (candidate as any).Jefatura;
 
-      // UMAF (si aplica)
+      // 4. UMAF
       if ((candidate as any).umaf) (master as any).umaf = (candidate as any).umaf;
 
-      // 2. Ruta Conflict Check
+      // 5. Formato & TipoCli (CONDICIONAL)
+      if (!isCandidateM) {
+         // Si NO es "M", copiamos todo confiados
+         (master as any).formato = (candidate as any).formato || (candidate as any).formatocte;
+         (master as any).formatocte = (candidate as any).formatocte || (candidate as any).formato;
+
+         if (candidate.TipoCli) {
+            master.TipoCli = candidate.TipoCli;
+         }
+      } else {
+         // Si ES "M", NO copiamos Formato ni TipoCli.
+         // La UI debe alertar.
+         console.warn('Excepción "M" detectada: No se heredaron Formato ni TipoCli. Revisión manual requerida.');
+      }
+
+      // 6. Ruta Conflict Check
       if (master.Ruta !== candidate.Ruta) {
          console.warn('Conflicto de Ruta detectado:', master.Ruta, 'vs', candidate.Ruta);
          alert(`⚠️ ATENCIÓN: Conflicto de Ruta.\nMaster: ${master.Ruta}\nCandidato: ${candidate.Ruta}\n\nPor favor verifique.`);
       }
 
-      // 3. Update TipoCli (CORREGIDO)
-      // En lugar de poner el texto "Igual", copiamos el estatus real del vecino
-      if (candidate.TipoCli) {
-         master.TipoCli = candidate.TipoCli;
-      }
+      // Marcar acción como 'duplicate' para pintar de AZUL
+      validationAction.value = 'duplicate';
    };
 
    const applyNewClientLogic = () => {
@@ -183,7 +183,24 @@ export const useClientValidationStore = defineStore('clientValidation', () => {
 
       const year = new Date().getFullYear();
       selectedClient.value.TipoCli = `Nuevo${year}`;
+
+      // Reset exception state
+      manualCheckRequired.value = false;
+      // Marcar acción como 'new' para pintar de VERDE
+      validationAction.value = 'new';
    };
+
+   const resetValidationState = () => {
+      validationAction.value = null;
+      manualCheckRequired.value = false;
+   };
+
+   // Hook into selection to reset state
+   const originalSelectClientForReview = selectClientForReview;
+   const selectClientForReviewWithReset = async (client: ClientPending) => {
+      resetValidationState();
+      await originalSelectClientForReview(client);
+   }
 
    const applySkipLogic = async () => {
       if (!selectedClient.value) return;
@@ -201,16 +218,19 @@ export const useClientValidationStore = defineStore('clientValidation', () => {
       isLoading,
       totalPending,
       currentPage,
+      validationAction,
+      manualCheckRequired,
 
       // Actions
       fetchPendingClients,
-      selectClientForReview,
+      selectClientForReview: selectClientForReviewWithReset, // Override with reset wrapper
       setCandidateForComparison,
       selectNextClient,
       saveClientAction,
       applyMatchLogic,
       applyNewClientLogic,
-      applySkipLogic
+      applySkipLogic,
+      resetValidationState
    };
 });
 
