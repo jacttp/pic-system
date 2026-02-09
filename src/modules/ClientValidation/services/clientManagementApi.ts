@@ -1,3 +1,4 @@
+/* src/modules/ClientValidation/services/clientManagementApi.ts */
 import api from '@/api/axios'; // Asumo que este es tu instancia base con interceptores
 import type { AxiosResponse } from 'axios';
 
@@ -34,7 +35,8 @@ export interface NearbyResponse {
 }
 
 // Endpoints
-const BASE_URL = '/homologation';
+const V2 = import.meta.env.VITE_API_V2_PATH;
+const BASE_URL = `${V2}/homologation`;
 
 export default {
    getPendingClients(page = 1, limit = 50): Promise<AxiosResponse<PendingResponse>> {

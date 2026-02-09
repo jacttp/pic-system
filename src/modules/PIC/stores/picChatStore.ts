@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import axios from 'axios';
+
 import { picApi } from '../services/picApi';
 import type { AiQueryConfig, DynamicWidget, ChatMessage } from '../types/picTypes';
 import { usePicFilterStore } from './picFilterStore';

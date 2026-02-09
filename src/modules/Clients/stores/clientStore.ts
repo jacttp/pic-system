@@ -1,219 +1,148 @@
 /* src/modules/Clients/stores/clientStore.ts */
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import api from '@/api/axios';
-import type { Client, ClientResponse } from '@/types/clients';
+import { clientApi } from '../services/clientApi';
+import type { Client, ClientFilterOptions } from '@/types/clients'; // Adjust types as needed
 
 export const useClientStore = defineStore('clients', () => {
+   // State
    const clients = ref<Client[]>([]);
    const totalRecords = ref(0);
    const isLoading = ref(false);
    const error = ref<string | null>(null);
+   const filters = ref<ClientFilterOptions>({
+      canales: [],
+      gerencias: [],
+      jefaturas: []
+   });
 
-   async function fetchClients(page = 1, limit = 10, search = '') {
+   // Getters for filters (Expose them directly if needed)
+   const canales = ref<string[]>([]);
+   const gerencias = ref<string[]>([]);
+   const jefaturas = ref<string[]>([]);
+
+   // Actions
+   async function fetchClients(page = 1, limit = 10, search = '', filterParams: any = {}) {
       isLoading.value = true;
       try {
          const params = new URLSearchParams({
             page: page.toString(),
-            limit: limit.toString()
+            limit: limit.toString(),
+            search,
+            ...filterParams
          });
-         if (search) params.append('search', search);
-
-         const { data } = await api.get<ClientResponse>(`/clients?${params.toString()}`);
-
+         const data = await clientApi.getClients(params);
          if (data.success) {
             clients.value = data.data;
             totalRecords.value = data.total;
          }
       } catch (e: any) {
+         error.value = 'Error fetching clients';
          console.error(e);
-         error.value = 'Error al cargar clientes';
       } finally {
          isLoading.value = false;
       }
    }
 
-   async function createClient(client: Partial<Client>) {
-      isLoading.value = true;
+   // Unified fetch (Optional, kept for backward comp)
+   async function fetchFilters() {
       try {
-         await api.post('/clients', client);
+         const [c, g, j] = await Promise.all([
+            clientApi.getCanales(),
+            clientApi.getGerencias(),
+            clientApi.getJefaturas()
+         ]);
+
+         // Update state
+         canales.value = c;
+         gerencias.value = g;
+         jefaturas.value = j;
+
+         // Update legacy filters object if needed
+         filters.value = { canales: c, gerencias: g, jefaturas: j };
+      } catch (e) {
+         console.error('Error fetching filters', e);
+      }
+   }
+
+   // Individual fetch actions (Required by ClientEditView.vue)
+   async function fetchCanales() {
+      try {
+         canales.value = await clientApi.getCanales();
+         filters.value.canales = canales.value;
+      } catch (e) { console.error(e); }
+   }
+
+   async function fetchGerencias() {
+      try {
+         gerencias.value = await clientApi.getGerencias();
+         filters.value.gerencias = gerencias.value;
+      } catch (e) { console.error(e); }
+   }
+
+   async function fetchJefaturas() {
+      try {
+         jefaturas.value = await clientApi.getJefaturas();
+         filters.value.jefaturas = jefaturas.value;
+      } catch (e) { console.error(e); }
+   }
+
+   async function createClient(client: Partial<Client>) {
+      try {
+         await clientApi.createClient(client);
          return true;
-      } catch (e: any) {
-         throw e.response?.data?.message || 'Error al crear cliente';
-      } finally {
-         isLoading.value = false;
+      } catch (e) {
+         console.error(e);
+         return false;
       }
    }
 
    async function updateClient(id: number, client: Partial<Client>) {
-      isLoading.value = true;
       try {
-         await api.put(`/clients/${id}`, client);
+         await clientApi.updateClient(id, client);
          return true;
-      } catch (e: any) {
-         throw e.response?.data?.message || 'Error al actualizar';
-      } finally {
-         isLoading.value = false;
+      } catch (e) {
+         console.error(e);
+         return false;
       }
    }
 
    async function deleteClient(id: number) {
       try {
-         await api.delete(`/clients/${id}`);
+         await clientApi.deleteClient(id);
          return true;
-      } catch (e: any) {
-         throw e.response?.data?.message || 'Error al eliminar';
-      }
-   }
-
-   const canales = ref<string[]>([]);
-   const gerencias = ref<string[]>([]);
-   const jefaturas = ref<string[]>([]);
-
-   // async function fetchCanales() {
-   //    try {
-   //       // Override baseURL to avoid /v2
-   //       const { data } = await api.get('/filters/canales', {
-   //          baseURL: import.meta.env.VITE_API_BASE_URL
-   //       });
-   //       if (Array.isArray(data)) {
-   //          canales.value = data;
-   //       } else if (data.data && Array.isArray(data.data)) {
-   //          canales.value = data.data;
-   //       }
-   //    } catch (e) {
-   //       console.error('Error al cargar canales', e);
-   //    }
-   // }
-
-
-   // async function fetchGerencias() {
-   //    try {
-   //       const { data } = await api.get('/filters/gerencias', {
-   //          baseURL: import.meta.env.VITE_API_BASE_URL
-   //       });
-   //       if (Array.isArray(data)) {
-   //          gerencias.value = data;
-   //       } else if (data.data && Array.isArray(data.data)) {
-   //          gerencias.value = data.data;
-   //       }
-   //    } catch (e) {
-   //       console.error('Error al cargar gerencias', e);
-   //    }
-   // }
-
-   // async function fetchJefaturas() {
-   //    try {
-   //       // Nota: El usuario indicó router.post('/jefaturas', getJefaturas);
-   //       const { data } = await api.post('/filters/jefaturas', {}, {
-   //          baseURL: import.meta.env.VITE_API_BASE_URL
-   //       });
-   //       if (Array.isArray(data)) {
-   //          jefaturas.value = data;
-   //       } else if (data.data && Array.isArray(data.data)) {
-   //          jefaturas.value = data.data;
-   //       }
-   //    } catch (e) {
-   //       console.error('Error al cargar jefaturas', e);
-   //    }
-   // }
-
-   // async function fetchClientById(id: number): Promise<Client | null> {
-   //    try {
-   //       const { data } = await api.get<{ success: boolean, data: Client }>(`/clients/${id}`);
-   //       if (data.success) {
-   //          return data.data;
-   //       }
-   //       return null;
-   //    } catch (e) {
-   //       console.error('Error fetching client by ID', e);
-   //       throw e;
-   //    }
-   // }
-
-   async function fetchCanales() {
-      try {
-         // Al ser la base .../api, esto llama a: .../api/filters/canales
-         const { data } = await api.get('/filters/canales', {
-            baseURL: import.meta.env.VITE_API_BASE_URL
-         });
-
-         if (Array.isArray(data)) {
-            canales.value = data;
-         } else if (data.data && Array.isArray(data.data)) {
-            canales.value = data.data;
-         }
       } catch (e) {
-         console.error('Error al cargar canales', e);
+         console.error(e);
+         return false;
       }
    }
 
-   async function fetchGerencias() {
+   async function fetchClientById(id: number | string) {
       try {
-         const { data } = await api.get('/filters/gerencias', {
-            baseURL: import.meta.env.VITE_API_BASE_URL
-         });
-
-         if (Array.isArray(data)) {
-            gerencias.value = data;
-         } else if (data.data && Array.isArray(data.data)) {
-            gerencias.value = data.data;
-         }
+         return await clientApi.getClientById(id);
       } catch (e) {
-         console.error('Error al cargar gerencias', e);
-      }
-   }
-
-   async function fetchJefaturas() {
-      try {
-         const { data } = await api.post('/filters/jefaturas', {}, {
-            baseURL: import.meta.env.VITE_API_BASE_URL
-         });
-
-         if (Array.isArray(data)) {
-            jefaturas.value = data;
-         } else if (data.data && Array.isArray(data.data)) {
-            jefaturas.value = data.data;
-         }
-      } catch (e) {
-         console.error('Error al cargar jefaturas', e);
-      }
-   }
-
-   // --- CLIENTE POR ID (CRUD V2) ---
-
-   async function fetchClientById(id: number | string): Promise<Client | null> {
-      try {
-         // Axios base URL is already /api/v2 so we just need /clients/${id}
-         const { data } = await api.get<{ success: boolean, data: Client }>(`/clients/${id}`);
-         if (data.success) {
-            return data.data;
-         }
+         console.error(e);
          return null;
-      } catch (e) {
-         console.error('Error fetching client by ID', e);
-         throw e;
       }
    }
-
-
-
 
    return {
       clients,
       totalRecords,
       isLoading,
       error,
+      filters,
       canales,
       gerencias,
       jefaturas,
       fetchClients,
-      createClient,
-      updateClient,
-      deleteClient,
+      fetchFilters,
       fetchCanales,
       fetchGerencias,
       fetchJefaturas,
+      createClient,
+      updateClient,
+      deleteClient,
       fetchClientById
    };
 });

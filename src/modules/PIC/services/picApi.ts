@@ -1,31 +1,20 @@
 /* src/modules/PIC/services/picApi.ts */
-import axios from 'axios';
-import { setupAuthInterceptors } from '@/api/interceptorSetup';
+import api from '@/api/axios';
 import type { PicFilterOptions, PicDataPoint, AiChatResponse, AiQueryConfig } from '../types/picTypes';
 
-
-// Instancia para API V1
-const picClient = axios.create({
-   baseURL: import.meta.env.VITE_API_BASE_URL,
-   headers: {
-      'Content-Type': 'application/json'
-   }
-});
-
-// Aplicamos la misma configuración de seguridad que en V2
-setupAuthInterceptors(picClient);
+const V2 = import.meta.env.VITE_API_V2_PATH;
 
 export const picApi = {
 
    // --- FILTROS ---
    async getInitialFilters(): Promise<PicFilterOptions> {
       const [canales, gerencias, marcas, anios, transacciones, formatos] = await Promise.all([
-         picClient.get<string[]>('/filters/canales'),
-         picClient.get<string[]>('/filters/gerencias'),
-         picClient.get<string[]>('/filters/marcas'),
-         picClient.get<string[]>('/filters/anios'),
-         picClient.get<string[]>('/filters/transacciones'),
-         picClient.get<string[]>('/filters/formato-cliente')
+         api.get<string[]>('/filters/canales'),
+         api.get<string[]>('/filters/gerencias'),
+         api.get<string[]>('/filters/marcas'),
+         api.get<string[]>('/filters/anios'),
+         api.get<string[]>('/filters/transacciones'),
+         api.get<string[]>('/filters/formato-cliente')
       ]);
 
       return {
@@ -39,12 +28,12 @@ export const picApi = {
    },
 
    async getDependentOptions(endpoint: string, parentFilters: Record<string, string[]>): Promise<string[]> {
-      const { data } = await picClient.post<string[]>(`/filters/${endpoint}`, parentFilters);
+      const { data } = await api.post<string[]>(`/filters/${endpoint}`, parentFilters);
       return data;
    },
 
    async searchClients(searchTerm: string, page: number, filters: Record<string, any>) {
-      const { data } = await picClient.post('/filters/clients', {
+      const { data } = await api.post('/filters/clients', {
          searchTerm,
          page,
          filters
@@ -53,7 +42,7 @@ export const picApi = {
    },
 
    async getDashboardData(filters: Record<string, any>, dimensions: string[] = ['Año', 'Mes']): Promise<PicDataPoint[]> {
-      const { data } = await picClient.post<PicDataPoint[]>('/query', {
+      const { data } = await api.post<PicDataPoint[]>('/query', {
          dimensions,
          filters
       });
@@ -61,7 +50,7 @@ export const picApi = {
    },
 
    async getProjection(dimension: string, filters: Record<string, any>, years: string[], limit?: number) {
-      const { data } = await picClient.post('/projections', {
+      const { data } = await api.post(`/projections`, {
          dimension,
          filters,
          years,
@@ -71,7 +60,7 @@ export const picApi = {
    },
 
    async getPriceAverageSummary(): Promise<any[]> {
-      const { data } = await picClient.get('/summary/price-average');
+      const { data } = await api.get(`/summary/price-average`);
       return data;
    },
 
@@ -82,7 +71,7 @@ export const picApi = {
 
       // 1. Llamada al nuevo endpoint 'Inteligente'
       // El backend ahora devuelve: { type: 'text'|'data_query', explanation: string, queryConfig?: object }
-      const { data } = await picClient.post('/ai/chat', {
+      const { data } = await api.post(`/ai/chat`, {
          userPrompt,
          history,
          modelProvider: model
@@ -98,7 +87,7 @@ export const picApi = {
 
 
    async executeAiQuery(queryConfig: AiQueryConfig): Promise<any[]> {
-      const { data } = await picClient.post('/ia-query', queryConfig);
+      const { data } = await api.post(`/ia-query`, queryConfig);
       return data;
    },
 
@@ -106,7 +95,7 @@ export const picApi = {
    async getDataInsights(chartData: any[], promptContext: string, model: string = 'gemini'): Promise<string> {
       try {
          // CAMBIO: Apuntamos a /ai/insight y enviamos modelProvider
-         const { data } = await picClient.post('/ai/insight', {
+         const { data } = await api.post(`/ai/insight`, {
             userPrompt: promptContext,
             chartData,
             modelProvider: model
@@ -124,11 +113,13 @@ export const picApi = {
       const summaryData = reportData.reduce((acc, row) => {
          const key = `${row.Año}-${row.Mes}`;
          if (!acc[key]) acc[key] = { k: 0, p: 0, m: 0 };
+         // @ts-ignore
          acc[key].k += row.TotalVentaKG || 0;
          // acc[key].p += row.TotalVentaPesos || 0;
+         // @ts-ignore
          acc[key].m += row.TotalMetasKG || 0;
          return acc;
-      }, {});
+      }, {} as any);
 
       const context = `
                Actúa como un Director Financiero (CFO) experto.
@@ -151,7 +142,7 @@ export const picApi = {
                Tono: Profesional, directo, orientado a resultados. No saludes.
          `;
 
-      const { data } = await picClient.post('/gemini-insight', {
+      const { data } = await api.post(`/gemini-insight`, {
          userPrompt: context,
          chartData: summaryData // Enviamos data reducida
       });

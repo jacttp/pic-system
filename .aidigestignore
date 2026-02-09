@@ -12,8 +12,6 @@ depasito.md
 package-lock.json
 README.md
 vite.config.ts
-src/modules/Products 
-src/modules/Users  
 frontvue_v1.11.2.md
 package-lock.json
 package.json
@@ -23,3 +21,11 @@ dist/
 .gitignore
 src/prueba-chat.md
 fix_this.md
+.agent/ 
+
+src/modules/Audit
+src/modules/Cannibalization
+src/modules/ClientValidation
+src/modules/Users
+src/modules/Products 
+

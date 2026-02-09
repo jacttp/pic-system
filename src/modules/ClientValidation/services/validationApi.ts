@@ -1,9 +1,11 @@
+/* src/modules/ClientValidation/services/validationApi.ts */
 import api from '@/api/axios';
 import type { AxiosResponse } from 'axios';
 import type { PendingResponse, NearbyResponse, ClientPending } from '../types/clientValidationTypes';
 
 // Endpoints
-const BASE_URL = '/homologation';
+const V2 = import.meta.env.VITE_API_V2_PATH;
+const BASE_URL = `${V2}/homologation`;
 
 export default {
    getPendingClients(page = 1, limit = 50): Promise<AxiosResponse<PendingResponse>> {
