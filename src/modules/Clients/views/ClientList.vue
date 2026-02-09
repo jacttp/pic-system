@@ -1,14 +1,12 @@
-<!-- src/modules/Clients/views/ClientList.vue -->
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { useClientStore } from '../stores/clientStore';
 import type { Client } from '@/types/clients';
 import BaseTable from '@/modules/Shared/components/BaseTable.vue';
-import ClientForm from '../components/ClientForm.vue';
 
+const router = useRouter();
 const store = useClientStore();
-const showModal = ref(false);
-const clientToEdit = ref<Client | null>(null);
 const searchTerm = ref('');
 const currentPage = ref(1);
 const itemsPerPage = 10;
@@ -39,15 +37,21 @@ const handlePageChange = (page: number) => {
     loadData();
 };
 
-const openCreateModal = () => {
-    clientToEdit.value = null;
-    showModal.value = true;
+const handleCreate = () => {
+    router.push('/admin/clients/new');
 };
 
 const handleEdit = (item: Client) => {
-    clientToEdit.value = item;
-    showModal.value = true;
-};
+      // MODIFICACIÓN: Agregamos (item as any).clienteid porque es la PK real en ClientesIC
+      const clientId = item.Id || (item as any).id || (item as any).IdCliente || (item as any).clienteid;
+      
+      if (clientId) {
+          router.push(`/admin/clients/${clientId}`);
+      } else {
+          console.error('Client ID is missing in handleEdit. Objeto recibido:', item);
+          alert('Error: No se pudo identificar el ID del cliente.');
+      }
+  };
 
 const handleDelete = async (item: Client) => {
     if (confirm(`¿Eliminar cliente "${item.Nombre}"?`)) {
@@ -73,7 +77,7 @@ const handleDelete = async (item: Client) => {
                     <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
                     <input v-model="searchTerm" type="text" placeholder="Buscar cliente..." class="pl-9 pr-4 py-2 w-full rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
                 </div>
-                <button @click="openCreateModal" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm flex items-center gap-2 transition-colors whitespace-nowrap">
+                <button @click="handleCreate" class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm flex items-center gap-2 transition-colors whitespace-nowrap">
                     <i class="fa-solid fa-plus"></i> Nuevo
                 </button>
             </div>
@@ -91,7 +95,5 @@ const handleDelete = async (item: Client) => {
             @edit="handleEdit"
             @delete="handleDelete"
         />
-
-        <ClientForm v-model="showModal" :client-to-edit="clientToEdit" @saved="loadData" />
     </div>
 </template>

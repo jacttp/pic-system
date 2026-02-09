@@ -131,25 +131,25 @@ export const picApi = {
       }, {});
 
       const context = `
-            Actúa como un Director Financiero (CFO) experto.
-            Analiza los siguientes datos agregados (Año-Mes: {k: Kilos, m: Meta}).
-            
-            DATOS: ${JSON.stringify(summaryData)}
-            
-            INSTRUCCIONES DE NEGOCIO (STRICT MODE):
-            - 🚫 PROHIBIDO mencionar dinero/pesos. Todo análisis es en VOLUMEN (Kg o Toneladas).
-            - KPI Principal: Cumplimiento de Volumen = (k / m) * 100.
-            - Si k > m, destaca el sobrecumplimiento. Si k < m, alerta la brecha.
+               Actúa como un Director Financiero (CFO) experto.
+               Analiza los siguientes datos agregados (Año-Mes: {k: Kilos, m: Meta}).
+               
+               DATOS: ${JSON.stringify(summaryData)}
+               
+               INSTRUCCIONES DE NEGOCIO (STRICT MODE):
+               - 🚫 PROHIBIDO mencionar dinero/pesos. Todo análisis es en VOLUMEN (Kg o Toneladas).
+               - KPI Principal: Cumplimiento de Volumen = (k / m) * 100.
+               - Si k > m, destaca el sobrecumplimiento. Si k < m, alerta la brecha.
 
-            INSTRUCCIÓN: GENERAR REPORTE HTML (Estructura):
-            <p><strong>📊 Veredicto General:</strong> [Frase contundente sobre el movimiento de carga]</p>
-            <ol>
-               <li><strong>📈 Tendencia:</strong> [Análisis de si estamos moviendo más o menos Kg]</li>
-               <li><strong>🎯 Cumplimiento vs Meta:</strong> [¿Llegamos al objetivo de tonelaje?]</li>
-               <li><strong>💡 Hallazgo Operativo:</strong> [Un insight clave sobre el volumen (ej: kg promedio o mes récord)]</li>
-            </ol>
-            Tono: Profesional, directo, orientado a resultados. No saludes.
-        `;
+               INSTRUCCIÓN: GENERAR REPORTE HTML (Estructura):
+               <p><strong>📊 Veredicto General:</strong> [Frase contundente sobre el movimiento de carga]</p>
+               <ol>
+                  <li><strong>📈 Tendencia:</strong> [Análisis de si estamos moviendo más o menos Kg]</li>
+                  <li><strong>🎯 Cumplimiento vs Meta:</strong> [¿Llegamos al objetivo de tonelaje?]</li>
+                  <li><strong>💡 Hallazgo Operativo:</strong> [Un insight clave sobre el volumen (ej: kg promedio o mes récord)]</li>
+               </ol>
+               Tono: Profesional, directo, orientado a resultados. No saludes.
+         `;
 
       const { data } = await picClient.post('/gemini-insight', {
          userPrompt: context,

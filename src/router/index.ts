@@ -70,6 +70,16 @@ const router = createRouter({
                component: () => import('@/modules/Clients/views/ClientList.vue')
             },
             {
+               path: 'clients/new',
+               name: 'client-new',
+               component: () => import('@/modules/Clients/views/ClientEditView.vue')
+            },
+            {
+               path: 'clients/:id',
+               name: 'client-edit',
+               component: () => import('@/modules/Clients/views/ClientEditView.vue')
+            },
+            {
                path: 'clients-validation',
                name: 'clients-validation',
                component: () => import('@/modules/ClientValidation/views/ClientValidationView.vue') // Reusando vista temporalmente
