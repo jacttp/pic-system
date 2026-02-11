@@ -111,6 +111,11 @@ const router = createRouter({
                component: () => import('@/modules/PIC/views/PicDashboardView.vue')
             },
             {
+               path: 'segmentation',
+               name: 'segmentation',
+               component: () => import('@/modules/CustomerSegmentation/views/SegmentationView.vue')
+            },
+            {
                path: 'cannibalization', // URL: /admin/cannibalization
                name: 'cannibalization',
                component: () => import('@/modules/Cannibalization/views/CannibalizationDashboard.vue'),

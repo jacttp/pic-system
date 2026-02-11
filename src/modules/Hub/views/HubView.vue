@@ -26,19 +26,23 @@ const handleLogout = () => {
 // Si se agregan nuevos módulos en BD, usarán el estilo 'DEFAULT' si no se configuran aquí.
 const MODULE_STYLES: Record<string, { color: string, bg: string, desc?: string }> = {
     'HUB': { color: 'text-brand-600', bg: 'bg-brand-50', desc: 'Panel central de bienvenida y accesos rápidos.' },
-    'PIC_RPT': { color: 'text-brand-600', bg: 'bg-brand-50', desc: 'Dashboard analítico de ventas, cumplimiento de metas y análisis por zona.' },
-    'LOGISTICS': { color: 'text-lime-600', bg: 'bg-lime-50', desc: 'Gestion, Edición, Alta y Publicación de Rutas e Itinerarios.' },
-    'FORECAST': { color: 'text-rose-600', bg: 'bg-rose-50', desc: 'Dashboard analítico de Forecast, análisis y edición de metas y proyecciones.' },
+    'PIC': { color: 'text-brand-600', bg: 'bg-brand-50', desc: 'Dashboard analítico de ventas y metas.' },
+    'PRODS': { color: 'text-orange-500', bg: 'bg-orange-50', desc: 'Alta, baja y modificación de artículos y listas de precios.' },
+    'CLI': { color: 'text-emerald-500', bg: 'bg-emerald-50', desc: 'Directorio comercial, segmentación y datos de contacto.' },
     
     'USERS': { color: 'text-purple-500', bg: 'bg-purple-50', desc: 'Control de accesos, roles y administración de personal del sistema.' },
-    'PRODUCTS': { color: 'text-orange-500', bg: 'bg-orange-50', desc: 'Alta, baja y modificación de artículos y listas de precios.' },
-    'CLIENTS': { color: 'text-emerald-500', bg: 'bg-emerald-50', desc: 'Directorio comercial, segmentación y datos de contacto.' },
-    'VAL_CLI': { color: 'text-pink-500', bg: 'bg-pink-50', desc: 'Validación y aprobación de nuevos clientes.' },
+    'SETUP': { color: 'text-rose-800', bg: 'bg-fuchsia-50', desc: 'Dashboard analítico de ventas, cumplimiento de metas y análisis por zona.' },
+    'AUDIT': { color: 'text-indigo-500', bg: 'bg-slate-100', desc: 'Historial de movimientos y seguridad del sistema.' },
+    'LOGISTICS': { color: 'text-lime-600', bg: 'bg-lime-50', desc: 'Gestion, Edición, Alta y Publicación de Rutas e Itinerarios.' },
     
-    'AUDIT': { color: 'text-slate-500', bg: 'bg-slate-100', desc: 'Historial de movimientos y seguridad del sistema.' },
-    'SETUP': { color: 'text-sky-500', bg: 'bg-sky-100', desc: 'Configuración de Roles y Opciones de sistema.' },
+    'FORECAST': { color: 'text-violet-500', bg: 'bg-rose-50', desc: 'Dashboard analítico de Forecast, análisis y edición de metas y proyecciones.' },
+    'VAL_CLI': { color: 'text-pink-500', bg: 'bg-pink-50', desc: 'Validación y aprobación de nuevos clientes.' },
+    'CANNIB': {color: 'text-purple-600', bg: 'bg-purple-50', desc: 'Segmentación avanzada de clientes por volumen: cuartiles, quintiles, deciles y percentiles.'},
+    'SEGMENT': {color: 'text-purple-600', bg: 'bg-purple-50', desc: 'Segmentación avanzada de clientes por volumen: cuartiles, quintiles, deciles y percentiles.'},
+    
+    
 
-    'DEFAULT': { color: 'text-slate-500', bg: 'bg-slate-50', desc: 'Módulo del sistema.' }
+    'DEFAULT': { color: 'text-slate-500', bg: 'bg-slate-50', desc: 'Módulo del sistema.' }, 
 };
 
 const getStyle = (key: string) => {

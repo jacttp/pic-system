@@ -6,6 +6,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+.aidigestignore
 
 node_modules
 dist
@@ -37,3 +38,5 @@ prototypes/backend_requirements.md
 prototypes/frontvue_v1.10.0.md
 comportamiento.md
 frontend.md
+backend_prompt.md
+clean_context.md
