@@ -31,7 +31,7 @@ const showExportPanel = ref(false)
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50">
+  <div class="h-full overflow-y-auto bg-slate-50">
 
     <!-- ── HEADER ──────────────────────────────────────────────── -->
     <div class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
