@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useSegmentationStore } from '../../stores/segmentationStore'
 import { useFormatters } from '../../composables/useFormatters'
 import { useSegmentColors } from '../../composables/useSegmentColors'
@@ -41,6 +41,12 @@ watch(() => props.modelValue, async (isOpen) => {
     currentPage.value = 1
     await loadClients()
   }
+  // Bloquear scroll del body cuando el modal está abierto
+  document.body.style.overflow = isOpen ? 'hidden' : ''
+})
+
+onUnmounted(() => {
+  document.body.style.overflow = ''
 })
 
 const loadClients = async () => {
@@ -82,7 +88,9 @@ const pagination = computed(() => store.segmentClientsData?.pagination)
         >
           <div
             v-if="isOpen && segment"
-            class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col"
+            class="bg-white w-full max-w-6xl overflow-hidden flex flex-col
+                   h-screen sm:h-auto sm:max-h-[90vh]
+                   sm:rounded-2xl sm:shadow-2xl"
           >
             <!-- Header -->
             <div

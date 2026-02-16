@@ -17,7 +17,6 @@ const buildOption = () => {
   if (!segments.length) return {}
 
   const colors = getChartColors(store.currentGroupType)
-  const unit = store.metricUnit
 
   // Series de clientes y volumen apiladas al 100%
   const clientSeries = segments.map((s, i) => ({
@@ -43,6 +42,12 @@ const buildOption = () => {
     ],
     itemStyle: { color: colors[i] ?? '#64748b' },
     barMaxWidth: 120,
+    emphasis: {
+      itemStyle: {
+        shadowBlur: 10,
+        shadowColor: 'rgba(0,0,0,0.15)'
+      }
+    },
     label: {
       show: s.clientPercent > 5,
       position: 'inside' as const,
@@ -63,6 +68,12 @@ const buildOption = () => {
     ],
     itemStyle: { color: colors[i] ?? '#64748b' },
     barMaxWidth: 120,
+    emphasis: {
+      itemStyle: {
+        shadowBlur: 10,
+        shadowColor: 'rgba(0,0,0,0.15)'
+      }
+    },
     label: {
       show: s.volumePercent > 5,
       position: 'inside' as const,
@@ -97,6 +108,16 @@ const buildOption = () => {
           ${rows}
         </div>`
       }
+    },
+    toolbox: {
+      show: true,
+      right: 16,
+      top: 4,
+      feature: {
+        saveAsImage: { title: 'Guardar', pixelRatio: 2 }
+      },
+      iconStyle: { borderColor: '#94a3b8' },
+      emphasis: { iconStyle: { borderColor: '#7c3aed' } }
     },
     grid: { ...baseGrid, bottom: 40, left: 90 },
     xAxis: {

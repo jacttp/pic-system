@@ -72,7 +72,35 @@ const buildOption = () => {
           </div>`
       }
     },
-    grid: baseGrid,
+    toolbox: {
+      show: true,
+      right: 16,
+      top: 4,
+      feature: {
+        saveAsImage: { title: 'Guardar', pixelRatio: 2 },
+        restore: { title: 'Restaurar' }
+      },
+      iconStyle: { borderColor: '#94a3b8' },
+      emphasis: { iconStyle: { borderColor: '#7c3aed' } }
+    },
+    grid: { ...baseGrid, right: 50 },
+    dataZoom: [
+      {
+        type: 'slider',
+        yAxisIndex: 0,
+        right: 8,
+        width: 22,
+        borderColor: '#e2e8f0',
+        fillerColor: 'rgba(124,58,237,0.12)',
+        handleStyle: { color: '#7c3aed', borderColor: '#7c3aed' },
+        textStyle: { color: CHART_COLORS.base.text, fontSize: 10 },
+        labelFormatter: (value: number) => formatNumber(value, 0)
+      },
+      {
+        type: 'inside',
+        yAxisIndex: 0
+      }
+    ],
     xAxis: {
       type: 'category',
       data: labels,
@@ -100,6 +128,12 @@ const buildOption = () => {
           borderColor: (params: any) => colors[params.dataIndex] ?? '#64748b',
           borderWidth: 2
         },
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 12,
+            shadowColor: 'rgba(0,0,0,0.2)'
+          }
+        },
         boxWidth: ['30%', '60%']
       },
       {
@@ -108,6 +142,10 @@ const buildOption = () => {
         data: outlierData,
         symbolSize: 8,
         itemStyle: { color: '#fbbf24', borderColor: '#f59e0b', borderWidth: 1 },
+        emphasis: {
+          scale: 1.5,
+          itemStyle: { shadowBlur: 10, shadowColor: 'rgba(251,191,36,0.4)' }
+        },
         tooltip: { show: true }
       }
     ]

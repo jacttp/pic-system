@@ -52,11 +52,11 @@ const buildOption = () => {
 
   // Líneas verticales: media, media ± 1σ, media ± 2σ
   const markLines = [
-    { xAxis: mean, name: 'Media', lineStyle: { color: '#7c3aed', type: 'solid', width: 2 } },
-    { xAxis: mean - stdDev, name: '-1σ', lineStyle: { color: '#94a3b8', type: 'dashed' } },
-    { xAxis: mean + stdDev, name: '+1σ', lineStyle: { color: '#94a3b8', type: 'dashed' } },
-    { xAxis: mean - 2 * stdDev, name: '-2σ', lineStyle: { color: '#cbd5e1', type: 'dashed' } },
-    { xAxis: mean + 2 * stdDev, name: '+2σ', lineStyle: { color: '#cbd5e1', type: 'dashed' } }
+    { xAxis: mean, name: 'Media', lineStyle: { color: '#7c3aed', type: 'solid' as const, width: 2 } },
+    { xAxis: mean - stdDev, name: '-1σ', lineStyle: { color: '#94a3b8', type: 'dashed' as const } },
+    { xAxis: mean + stdDev, name: '+1σ', lineStyle: { color: '#94a3b8', type: 'dashed' as const } },
+    { xAxis: mean - 2 * stdDev, name: '-2σ', lineStyle: { color: '#cbd5e1', type: 'dashed' as const } },
+    { xAxis: mean + 2 * stdDev, name: '+2σ', lineStyle: { color: '#cbd5e1', type: 'dashed' as const } }
   ]
 
   return {
@@ -84,12 +84,41 @@ const buildOption = () => {
         return ''
       }
     },
+    toolbox: {
+      show: true,
+      right: 16,
+      top: 4,
+      feature: {
+        saveAsImage: { title: 'Guardar', pixelRatio: 2 },
+        dataZoom: { title: { zoom: 'Zoom', back: 'Restaurar' } },
+        restore: { title: 'Restaurar' }
+      },
+      iconStyle: { borderColor: '#94a3b8' },
+      emphasis: { iconStyle: { borderColor: '#7c3aed' } }
+    },
     legend: {
-      bottom: 0,
+      bottom: 30,
       data: ['Curva Normal Teórica', 'Distribución Real'],
       textStyle: { color: CHART_COLORS.base.text, fontSize: 11 }
     },
-    grid: { ...baseGrid, bottom: 70 },
+    grid: { ...baseGrid, bottom: 90 },
+    dataZoom: [
+      {
+        type: 'slider',
+        xAxisIndex: 0,
+        bottom: 4,
+        height: 22,
+        borderColor: '#e2e8f0',
+        fillerColor: 'rgba(124,58,237,0.12)',
+        handleStyle: { color: '#7c3aed', borderColor: '#7c3aed' },
+        textStyle: { color: CHART_COLORS.base.text, fontSize: 10 },
+        labelFormatter: (value: number) => formatNumber(value, 0)
+      },
+      {
+        type: 'inside',
+        xAxisIndex: 0
+      }
+    ],
     xAxis: {
       type: 'value',
       name: unit,
@@ -113,16 +142,17 @@ const buildOption = () => {
         data: normalCurve,
         smooth: true,
         symbol: 'none',
-        lineStyle: { color: '#7c3aed', width: 3 },
+        lineStyle: { color: '#7c3aed', width: 2.5, opacity: 0.8 },
         areaStyle: {
           color: {
             type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: 'rgba(124,58,237,0.18)' },
-              { offset: 1, color: 'rgba(124,58,237,0.02)' }
+              { offset: 0, color: 'rgba(124,58,237,0.10)' },
+              { offset: 1, color: 'rgba(124,58,237,0.01)' }
             ]
           }
         },
+        z: 1,
         markLine: {
           silent: false,
           data: markLines.map(m => ({
@@ -137,9 +167,22 @@ const buildOption = () => {
         name: 'Distribución Real',
         type: 'bar',
         data: histData,
-        itemStyle: { color: 'rgba(14,165,233,0.5)', borderColor: '#0ea5e9', borderWidth: 1.5 },
+        itemStyle: {
+          color: 'rgba(14,165,233,0.6)',
+          borderColor: '#0ea5e9',
+          borderWidth: 1.5,
+          borderRadius: [3, 3, 0, 0]
+        },
+        emphasis: {
+          itemStyle: {
+            color: 'rgba(14,165,233,0.85)',
+            shadowBlur: 12,
+            shadowColor: 'rgba(14,165,233,0.3)'
+          }
+        },
         barGap: '0%',
-        barCategoryGap: '0%'
+        barCategoryGap: '0%',
+        z: 2
       }
     ]
   }
@@ -155,5 +198,5 @@ watch([() => store.segments, () => store.statistics], () => {
 </script>
 
 <template>
-  <div ref="containerRef" class="w-full h-96 md:h-[420px]"></div>
+  <div ref="containerRef" class="w-full h-96 md:h-[460px]"></div>
 </template>

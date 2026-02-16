@@ -9,6 +9,19 @@ export type ChartType = 'boxplot' | 'normal' | 'histogram' | 'stacked' | 'master
 export type PeriodType = 'monthly' | 'annual'
 export type MetricType = 'VENTA_KG' | 'VENTA_$$'
 
+/**
+ * Algoritmo de segmentación:
+ *
+ * 'by_volume'  — (default) Cada segmento representa 1/N del volumen total.
+ *                El nº de clientes por segmento es variable.
+ *                Uso: estrategia comercial, KAM, Pareto.
+ *
+ * 'by_clients' — Cada segmento contiene el mismo nº de clientes (cuantiles).
+ *                El peso en volumen por segmento es variable.
+ *                Uso: análisis estadístico y distribuciones.
+ */
+export type SegmentationMode = 'by_volume' | 'by_clients'
+
 // ============================================================
 // FILTROS
 // ============================================================
@@ -43,6 +56,7 @@ export interface SegmentationFilters {
 
 export interface SegmentationRequest {
    groupType: GroupType
+   segmentationMode: SegmentationMode
    filters: SegmentationFilters
    includeClientList?: boolean
 }
@@ -123,8 +137,11 @@ export interface SegmentationResponse {
    pareto: ParetoData
    filters: SegmentationFilters
    groupType: GroupType
+   segmentationMode: SegmentationMode
    totalClients: number
    totalVolume: number
+   /** true cuando algún segmento contiene un solo cliente (datasets muy concentrados en by_volume) */
+   hasConcentratedSegments: boolean
    generatedAt: string
 }
 
@@ -218,4 +235,3 @@ export interface SegmentationUIState {
    isFiltersOpen: boolean
    isComparisonMode: boolean
 }
-

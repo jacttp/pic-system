@@ -29,8 +29,25 @@ const buildOption = () => {
   const volumePercents = segments.map(s => parseFloat(s.volumePercent.toFixed(2)))
   const accumPercents = segments.map(s => parseFloat(s.volumePercentAccum.toFixed(2)))
 
-  // Línea de referencia 80%
-  const pareto80 = pareto?.cutoffValue ?? 80
+  // Encontrar el segmento donde se cruza el 80%
+  const pareto80Index = accumPercents.findIndex(v => v >= 80)
+
+  // Generar markArea que sombreé los segmentos que suman el 80%
+  const markAreaData: any[] = []
+  if (pareto80Index >= 0) {
+    markAreaData.push([
+      {
+        xAxis: labels[0],
+        itemStyle: {
+          color: 'rgba(16,185,129,0.07)',
+          borderColor: 'rgba(16,185,129,0.2)',
+          borderWidth: 1,
+          borderType: 'dashed'
+        }
+      },
+      { xAxis: labels[pareto80Index] }
+    ])
+  }
 
   return {
     backgroundColor: 'transparent',
@@ -58,12 +75,40 @@ const buildOption = () => {
           </div>`
       }
     },
+    toolbox: {
+      show: true,
+      right: 16,
+      top: 4,
+      feature: {
+        saveAsImage: { title: 'Guardar', pixelRatio: 2 },
+        dataZoom: { title: { zoom: 'Zoom', back: 'Restaurar' } },
+        restore: { title: 'Restaurar' }
+      },
+      iconStyle: { borderColor: '#94a3b8' },
+      emphasis: { iconStyle: { borderColor: '#10b981' } }
+    },
     legend: {
-      bottom: 0,
+      bottom: 30,
       data: ['% Volumen', '% Vol. Acumulado'],
       textStyle: { color: CHART_COLORS.base.text, fontSize: 11 }
     },
-    grid: { ...baseGrid, bottom: 70 },
+    grid: { ...baseGrid, bottom: 90 },
+    dataZoom: [
+      {
+        type: 'slider',
+        xAxisIndex: 0,
+        bottom: 4,
+        height: 22,
+        borderColor: '#e2e8f0',
+        fillerColor: 'rgba(16,185,129,0.12)',
+        handleStyle: { color: '#10b981', borderColor: '#10b981' },
+        textStyle: { color: CHART_COLORS.base.text, fontSize: 10 }
+      },
+      {
+        type: 'inside',
+        xAxisIndex: 0
+      }
+    ],
     xAxis: {
       type: 'category',
       data: labels,
@@ -101,6 +146,12 @@ const buildOption = () => {
           }
         })),
         barMaxWidth: 80,
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 12,
+            shadowColor: 'rgba(0,0,0,0.2)'
+          }
+        },
         label: {
           show: true,
           position: 'top' as const,
@@ -120,6 +171,10 @@ const buildOption = () => {
         symbolSize: 8,
         lineStyle: { color: '#10b981', width: 3 },
         itemStyle: { color: '#10b981', borderColor: '#fff', borderWidth: 2 },
+        emphasis: {
+          scale: 1.4,
+          itemStyle: { shadowBlur: 10, shadowColor: 'rgba(16,185,129,0.4)' }
+        },
         label: {
           show: true,
           position: 'top' as const,
@@ -143,7 +198,11 @@ const buildOption = () => {
               }
             }
           ]
-        }
+        },
+        markArea: markAreaData.length > 0 ? {
+          silent: true,
+          data: markAreaData
+        } : undefined
       }
     ]
   }
@@ -165,5 +224,5 @@ watch(() => store.segments, () => {
 </script>
 
 <template>
-  <div ref="containerRef" class="w-full h-96 md:h-[420px]"></div>
+  <div ref="containerRef" class="w-full h-96 md:h-[460px]"></div>
 </template>

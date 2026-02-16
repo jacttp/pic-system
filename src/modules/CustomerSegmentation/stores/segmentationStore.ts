@@ -7,6 +7,7 @@ import type {
    SegmentationResponse,
    SegmentationFilters,
    GroupType,
+   SegmentationMode,
    ChartType,
    ClientSegment,
    SegmentClientsResponse,
@@ -25,6 +26,7 @@ export const useSegmentationStore = defineStore('customerSegmentation', () => {
 
    // Configuración actual
    const currentGroupType = ref<GroupType>('quintiles')
+   const currentSegmentationMode = ref<SegmentationMode>('by_volume')
    const currentFilters = ref<SegmentationFilters>({
       canal: [],
       gerencia: [],
@@ -85,6 +87,10 @@ export const useSegmentationStore = defineStore('customerSegmentation', () => {
       return currentFilters.value.metric === 'VENTA_KG' ? 'KG' : '$$'
    })
 
+   const hasConcentratedSegments = computed(() => data.value?.hasConcentratedSegments ?? false)
+
+   const activeSegmentationMode = computed(() => data.value?.segmentationMode ?? currentSegmentationMode.value)
+
    // ============================================================
    // ACTIONS
    // ============================================================
@@ -92,15 +98,16 @@ export const useSegmentationStore = defineStore('customerSegmentation', () => {
    /**
     * Analizar segmentación con los filtros actuales
     */
-   async function analyze(groupType: GroupType, filters: SegmentationFilters) {
+   async function analyze(groupType: GroupType, segmentationMode: SegmentationMode, filters: SegmentationFilters) {
       isLoading.value = true
       error.value = null
 
       try {
-         const response = await segmentationApi.analyze(groupType, filters)
+         const response = await segmentationApi.analyze(groupType, segmentationMode, filters)
 
          data.value = response
          currentGroupType.value = groupType
+         currentSegmentationMode.value = segmentationMode
          currentFilters.value = filters
          activeSegmentId.value = null // Reset segment selection
 
@@ -277,6 +284,7 @@ export const useSegmentationStore = defineStore('customerSegmentation', () => {
       isLoading,
       error,
       currentGroupType,
+      currentSegmentationMode,
       currentFilters,
       selectedChartType,
       activeSegmentId,
@@ -297,6 +305,8 @@ export const useSegmentationStore = defineStore('customerSegmentation', () => {
       activeSegment,
       metricLabel,
       metricUnit,
+      hasConcentratedSegments,
+      activeSegmentationMode,
 
       // Actions
       analyze,

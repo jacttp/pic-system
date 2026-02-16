@@ -1,20 +1,41 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { useSegmentationStore } from '../../stores/segmentationStore'
 import { useFilterOptions } from '../../composables/useFilterOptions'
 import GroupTypeSelector from './GroupTypeSelector.vue'
 import MetricSelector from './MetricSelector.vue'
 import PeriodSelector from './PeriodSelector.vue'
 import MultiSelectDropdown from './MultiSelectDropDown.vue'
-import type { GroupType, MetricType, SegmentationFilters } from '../../types/segmentation.types'
+import SegmentationModeSelector from './SegmentationModeSelector.vue'
+import type { GroupType, MetricType, SegmentationMode, SegmentationFilters } from '../../types/segmentation.types'
 
 const store = useSegmentationStore()
 const filterOptions = useFilterOptions()
 
-const isCollapsed = ref(false)
+// Colapsado: persistir en sessionStorage  para que sobreviva navegación
+const COLLAPSE_KEY = 'seg_filters_collapsed'
+const isCollapsed = ref(sessionStorage.getItem(COLLAPSE_KEY) === 'true')
+
+const toggleCollapse = () => {
+  isCollapsed.value = !isCollapsed.value
+  sessionStorage.setItem(COLLAPSE_KEY, String(isCollapsed.value))
+}
+
+// Resumen de filtros activos para mostrar cuando está colapsado
+const activeFiltersCount = computed(() => {
+  let count = 0
+  if (localCanal.value.length) count++
+  if (localGerencia.value.length) count++
+  if (localJefatura.value.length) count++
+  if (localRuta.value.length) count++
+  if (localMarca.value.length) count++
+  if (localGrupo.value.length) count++
+  return count
+})
 
 // Estado local de filtros
 const localGroupType = ref<GroupType>('quintiles')
+const localSegmentationMode = ref<SegmentationMode>('by_volume')
 const localMetric = ref<MetricType>('VENTA_KG')
 const localYears = ref<string[]>([])
 const localMonthStart = ref(1)
@@ -74,11 +95,12 @@ const buildFilters = (): SegmentationFilters => {
 
 const applyFilters = async () => {
   const filters = buildFilters()
-  await store.analyze(localGroupType.value, filters)
+  await store.analyze(localGroupType.value, localSegmentationMode.value, filters)
 }
 
 const resetFilters = () => {
   localGroupType.value = 'quintiles'
+  localSegmentationMode.value = 'by_volume'
   localMetric.value = 'VENTA_KG'
   localYears.value = filterOptions.staticOptions.anios.length > 0 
     ? [filterOptions.staticOptions.anios[0]] 
@@ -123,21 +145,42 @@ const hasFiltersApplied = () => {
       
       <button
         type="button"
-        @click="isCollapsed = !isCollapsed"
-        class="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+        @click="toggleCollapse"
+        class="flex items-center gap-2 p-2 hover:bg-slate-100 rounded-lg transition-colors"
+        :aria-expanded="!isCollapsed"
+        aria-controls="filters-content"
       >
+        <!-- Badge filtros activos cuando está colapsado -->
+        <span
+          v-if="isCollapsed && activeFiltersCount > 0"
+          class="inline-flex items-center justify-center w-5 h-5 bg-brand-600 text-white text-[10px] font-bold rounded-full"
+          :aria-label="`${activeFiltersCount} filtros activos`"
+        >
+          {{ activeFiltersCount }}
+        </span>
         <i
-          class="fa-solid fa-chevron-up text-slate-400 transition-transform"
+          class="fa-solid fa-chevron-up text-slate-400 transition-transform duration-200"
           :class="{ 'rotate-180': isCollapsed }"
+          aria-hidden="true"
         ></i>
       </button>
     </div>
-    
-    <!-- Filters Content -->
-    <div v-if="!isCollapsed" class="p-6 space-y-6">
+
+    <!-- Filters Content con transición CSS (max-height) -->
+    <div 
+      id="filters-content"
+      class="transition-all duration-300 ease-in-out"
+      :class="[
+        isCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[2000px] opacity-100 overflow-visible'
+      ]"
+    >
+    <div class="p-6 space-y-6">
       
       <!-- Tipo de Agrupación -->
       <GroupTypeSelector v-model="localGroupType" />
+
+      <!-- Criterio de segmentación -->
+      <SegmentationModeSelector v-model="localSegmentationMode" />
       
       <!-- Métrica -->
       <MetricSelector v-model="localMetric" />
@@ -282,5 +325,10 @@ const hasFiltersApplied = () => {
         </div>
       </div>
     </div>
+    </div>
   </div>
 </template>
+
+<style scoped>
+/* No se necesitan estilos adicionales, las clases de Tailwind manejan la transición */
+</style>

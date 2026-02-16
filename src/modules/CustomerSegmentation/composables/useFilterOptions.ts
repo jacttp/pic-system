@@ -47,7 +47,12 @@ export function useFilterOptions() {
          staticOptions.canales = canales.data
          staticOptions.gerencias = gerencias.data
          staticOptions.marcas = marcas.data
-         staticOptions.anios = anios.data.sort((a: string, b: string) => b.localeCompare(a)) // Descendente
+
+         // Filtrar años futuros (el backend puede devolver años que aún no aplican)
+         const currentYear = new Date().getFullYear()
+         staticOptions.anios = (anios.data as string[])
+            .filter(y => Number(y) <= currentYear)
+            .sort((a, b) => b.localeCompare(a)) // Descendente
 
       } catch (e: any) {
          optionsError.value = 'Error al cargar opciones de filtros'

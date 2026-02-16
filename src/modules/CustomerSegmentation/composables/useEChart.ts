@@ -18,7 +18,8 @@ import {
    MarkLineComponent,
    MarkAreaComponent,
    ToolboxComponent,
-   VisualMapComponent
+   VisualMapComponent,
+   BrushComponent
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 
@@ -38,6 +39,7 @@ echarts.use([
    MarkAreaComponent,
    ToolboxComponent,
    VisualMapComponent,
+   BrushComponent,
    CanvasRenderer
 ])
 
@@ -74,6 +76,8 @@ export function useEChart(containerRef: Ref<HTMLDivElement | null>) {
       instance?.on(event, handler)
    }
 
+   const getInstance = () => instance
+
    onMounted(() => {
       init()
       window.addEventListener('resize', resize)
@@ -84,7 +88,7 @@ export function useEChart(containerRef: Ref<HTMLDivElement | null>) {
       dispose()
    })
 
-   return { isReady, setOption, resize, dispose, on }
+   return { isReady, setOption, resize, dispose, on, getInstance }
 }
 
 // Tema de colores compartido para todos los gráficos

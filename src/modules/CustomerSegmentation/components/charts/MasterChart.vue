@@ -65,6 +65,24 @@ const buildOption = () => {
           </div>`
       }
     },
+    toolbox: {
+      show: true,
+      right: 16,
+      top: 4,
+      feature: {
+        saveAsImage: { title: 'Guardar', pixelRatio: 2 },
+        brush: { title: { rect: 'Selección', clear: 'Limpiar' } },
+        restore: { title: 'Restaurar' }
+      },
+      iconStyle: { borderColor: '#94a3b8' },
+      emphasis: { iconStyle: { borderColor: '#7c3aed' } }
+    },
+    brush: {
+      toolbox: ['rect', 'clear'],
+      xAxisIndex: 0,
+      yAxisIndex: 0,
+      outOfBrush: { colorAlpha: 0.2 }
+    },
     legend: {
       bottom: 0,
       data: ['Igualdad Perfecta', 'Concentración Real'],

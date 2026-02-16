@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch, ref } from 'vue'
 import { useSegmentationStore } from '../../stores/segmentationStore'
 import { useFormatters } from '../../composables/useFormatters'
 import KPICard from './KpiCard.vue'
@@ -7,50 +7,103 @@ import KPICard from './KpiCard.vue'
 const store = useSegmentationStore()
 const { formatCompact, formatPercent, formatGini } = useFormatters()
 
-const totalClientsFormatted = computed(() => {
+// Key para forzar re-mount de las cards al cambiar datos (re-dispara animaciones)
+const animKey = ref(0)
+watch(() => store.data, () => { animKey.value++ })
+
+// ── Valores formateados ───────────────────────────────────────
+const totalClients = computed(() =>
+  store.hasData ? store.totalClients : 0
+)
+
+const totalVolumeLabel = computed(() => {
   if (!store.hasData) return '-'
-  return formatCompact(store.totalClients)
+  return `${formatCompact(store.totalVolume)} ${store.metricUnit}`
 })
 
-const totalVolumeFormatted = computed(() => {
-  if (!store.hasData) return '-'
-  const value = formatCompact(store.totalVolume)
-  return `${value} ${store.metricUnit}`
-})
+const avgTicket = computed(() =>
+  store.hasData && store.totalClients > 0
+    ? Math.round(store.totalVolume / store.totalClients)
+    : 0
+)
 
-const avgTicketFormatted = computed(() => {
-  if (!store.hasData) return '-'
-  const avg = store.totalVolume / store.totalClients
-  return `${formatCompact(avg)} ${store.metricUnit}`
-})
+const avgTicketLabel = computed(() =>
+  store.hasData ? `${formatCompact(avgTicket.value)} ${store.metricUnit}` : '-'
+)
 
-const paretoFormatted = computed(() => {
+const paretoLabel = computed(() => {
   if (!store.hasData || !store.pareto) return '-'
   return `${formatPercent(store.pareto.topClientsPercent, 1)} / ${formatPercent(store.pareto.topVolumePercent, 1)}`
 })
 
-const giniFormatted = computed(() => {
-  if (!store.hasData || !store.pareto) return '-'
-  return formatGini(store.pareto.giniIndex)
+const giniLabel = computed(() =>
+  store.hasData && store.pareto ? formatGini(store.pareto.giniIndex) : '-'
+)
+
+const giniLevel = computed(() => {
+  if (!store.hasData || !store.pareto) return { label: '-', iconColor: 'text-slate-400', iconBg: 'bg-slate-100' }
+  const g = store.pareto.giniIndex
+  if (g < 0.3) return { label: 'Baja concentración', iconColor: 'text-green-600', iconBg: 'bg-green-100' }
+  if (g < 0.5) return { label: 'Concentración moderada', iconColor: 'text-yellow-600', iconBg: 'bg-yellow-100' }
+  if (g < 0.7) return { label: 'Alta concentración', iconColor: 'text-orange-600', iconBg: 'bg-orange-100' }
+  return { label: 'Concentración muy alta', iconColor: 'text-red-600', iconBg: 'bg-red-100' }
 })
 
-const concentrationLevel = computed(() => {
-  if (!store.hasData || !store.pareto) return { label: '-', color: 'text-slate-600' }
-  
-  const gini = store.pareto.giniIndex
-  
-  if (gini < 0.3) return { label: 'Baja desigualdad', color: 'text-green-600' }
-  if (gini < 0.5) return { label: 'Desigualdad moderada', color: 'text-yellow-600' }
-  if (gini < 0.7) return { label: 'Alta desigualdad', color: 'text-orange-600' }
-  return { label: 'Muy alta desigualdad', color: 'text-red-600' }
-})
+// Configuración de las 5 tarjetas con stagger (delay incremental)
+const cards = computed(() => [
+  {
+    title: 'Total Clientes',
+    value: store.hasData ? formatCompact(totalClients.value) : '-',
+    subtitle: 'clientes segmentados',
+    icon: 'fa-users',
+    iconBg: 'bg-blue-100',
+    iconColor: 'text-blue-600',
+    delay: 0
+  },
+  {
+    title: 'Volumen Total',
+    value: totalVolumeLabel.value,
+    subtitle: store.metricLabel,
+    icon: 'fa-weight-hanging',
+    iconBg: 'bg-green-100',
+    iconColor: 'text-green-600',
+    delay: 80
+  },
+  {
+    title: 'Ticket Promedio',
+    value: avgTicketLabel.value,
+    subtitle: 'promedio por cliente',
+    icon: 'fa-calculator',
+    iconBg: 'bg-purple-100',
+    iconColor: 'text-purple-600',
+    delay: 160
+  },
+  {
+    title: 'Índice Pareto',
+    value: paretoLabel.value,
+    subtitle: '% clientes / % volumen',
+    icon: 'fa-chart-pie',
+    iconBg: 'bg-orange-100',
+    iconColor: 'text-orange-600',
+    delay: 240
+  },
+  {
+    title: 'Índice Gini',
+    value: giniLabel.value,
+    subtitle: giniLevel.value.label,
+    icon: 'fa-scale-balanced',
+    iconBg: giniLevel.value.iconBg,
+    iconColor: giniLevel.value.iconColor,
+    delay: 320
+  }
+])
 </script>
 
 <template>
-  <div>
+  <section aria-label="Indicadores de segmentación">
     <!-- Header -->
     <div class="flex items-center gap-3 mb-4">
-      <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+      <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center" aria-hidden="true">
         <i class="fa-solid fa-chart-line text-blue-600"></i>
       </div>
       <div>
@@ -58,97 +111,72 @@ const concentrationLevel = computed(() => {
         <p class="text-xs text-slate-500">Resumen ejecutivo de la segmentación</p>
       </div>
     </div>
-    
-    <!-- KPI Cards Grid -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-      <!-- Total Clientes -->
+
+    <!-- Grid de tarjetas con stagger -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
       <KPICard
-        title="Total Clientes"
-        :value="totalClientsFormatted"
-        subtitle="segmentados"
-        icon="fa-users"
-        icon-color="text-blue-600"
-        :loading="store.isLoading"
-      />
-      
-      <!-- Volumen Total -->
-      <KPICard
-        :title="`Volumen Total`"
-        :value="totalVolumeFormatted"
-        :subtitle="store.metricLabel"
-        icon="fa-chart-bar"
-        icon-color="text-green-600"
-        :loading="store.isLoading"
-      />
-      
-      <!-- Ticket Promedio -->
-      <KPICard
-        title="Ticket Promedio"
-        :value="avgTicketFormatted"
-        subtitle="por cliente"
-        icon="fa-calculator"
-        icon-color="text-purple-600"
-        :loading="store.isLoading"
-      />
-      
-      <!-- Índice Pareto -->
-      <KPICard
-        title="Índice Pareto"
-        :value="paretoFormatted"
-        subtitle="clientes / volumen"
-        icon="fa-chart-pie"
-        icon-color="text-orange-600"
-        :loading="store.isLoading"
-      />
-      
-      <!-- Índice Gini -->
-      <KPICard
-        title="Índice Gini"
-        :value="giniFormatted"
-        :subtitle="concentrationLevel.label"
-        icon="fa-balance-scale"
-        :icon-color="concentrationLevel.color"
+        v-for="(card, i) in cards"
+        :key="`${animKey}-${i}`"
+        v-bind="card"
         :loading="store.isLoading"
       />
     </div>
-    
-    <!-- Explicación de Pareto -->
-    <div 
-      v-if="store.hasData && store.pareto"
-      class="mt-4 p-4 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg"
-    >
-      <div class="flex items-start gap-3">
-        <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
-          <i class="fa-solid fa-lightbulb text-orange-600"></i>
-        </div>
-        <div class="flex-1">
-          <h4 class="font-bold text-orange-900 mb-1">Análisis de Concentración</h4>
-          <p class="text-sm text-orange-800">
-            El <strong>{{ formatPercent(store.pareto.topClientsPercent, 1) }}</strong> 
-            de tus clientes 
-            (<strong>{{ formatCompact(store.pareto.topClientsCount) }}</strong> clientes)
-            generan el <strong>{{ formatPercent(store.pareto.topVolumePercent, 1) }}</strong> 
-            del volumen total.
-            El índice Gini de <strong>{{ giniFormatted }}</strong> indica
-            <span :class="concentrationLevel.color" class="font-semibold lowercase">
-              {{ concentrationLevel.label }}
-            </span>
-            en la distribución de ventas.
-          </p>
+
+    <!-- Análisis de concentración (Pareto insight) -->
+    <Transition name="fade-up">
+      <div
+        v-if="store.hasData && store.pareto"
+        class="mt-4 p-4 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl"
+        role="note"
+        aria-label="Análisis de concentración"
+      >
+        <div class="flex items-start gap-3">
+          <div class="w-9 h-9 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0" aria-hidden="true">
+            <i class="fa-solid fa-lightbulb text-orange-600"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h4 class="font-bold text-orange-900 mb-1 text-sm">Análisis de Concentración</h4>
+            <p class="text-xs md:text-sm text-orange-800 leading-relaxed">
+              El
+              <strong>{{ formatPercent(store.pareto.topClientsPercent, 1) }}</strong>
+              de tus clientes
+              (<strong>{{ formatCompact(store.pareto.topClientsCount) }}</strong>)
+              generan el
+              <strong>{{ formatPercent(store.pareto.topVolumePercent, 1) }}</strong>
+              del volumen total. El índice Gini de
+              <strong>{{ giniLabel }}</strong>
+              indica
+              <span :class="giniLevel.iconColor" class="font-semibold">
+                {{ giniLevel.label.toLowerCase() }}
+              </span>
+              en la distribución de ventas.
+            </p>
+          </div>
         </div>
       </div>
-    </div>
-    
-    <!-- Estado Vacío -->
-    <div 
-      v-if="!store.hasData && !store.isLoading"
-      class="mt-4 p-8 text-center bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl"
-    >
-      <i class="fa-solid fa-chart-simple text-4xl text-slate-300 mb-3"></i>
-      <p class="text-slate-600 font-medium">No hay datos de segmentación</p>
-      <p class="text-sm text-slate-500 mt-1">
-        Aplica filtros y ejecuta el análisis para ver los indicadores
-      </p>
-    </div>
-  </div>
+    </Transition>
+
+    <!-- Estado vacío -->
+    <Transition name="fade">
+      <div
+        v-if="!store.hasData && !store.isLoading"
+        class="mt-4 p-8 text-center bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl"
+        role="status"
+      >
+        <i class="fa-solid fa-chart-simple text-4xl text-slate-300 mb-3 block" aria-hidden="true"></i>
+        <p class="text-slate-600 font-medium">Sin indicadores disponibles</p>
+        <p class="text-sm text-slate-500 mt-1">Aplica filtros y ejecuta el análisis</p>
+      </div>
+    </Transition>
+  </section>
 </template>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-from,
+.fade-leave-to { opacity: 0; }
+
+.fade-up-enter-active { transition: all 0.35s ease; }
+.fade-up-enter-from { opacity: 0; transform: translateY(8px); }
+</style>

@@ -7,25 +7,28 @@ import type {
    SegmentClientsResponse,
    SegmentationComparisonResponse,
    GroupType,
+   SegmentationMode,
    SegmentationFilters
 } from '../types/segmentation.types'
 
 // Base path para endpoints de segmentación
-const BASE = 'segmentation'
+const BASE = '/segmentation'
 
 export const segmentationApi = {
    /**
     * Análisis principal de segmentación
-    * POST segmentation/analyze
+    * POST /api/segmentation/analyze
     */
    async analyze(
       groupType: GroupType,
+      segmentationMode: SegmentationMode,
       filters: SegmentationFilters
    ): Promise<SegmentationResponse> {
       const { data } = await api.post<SegmentationResponse>(
          `${BASE}/analyze`,
          {
             groupType,
+            segmentationMode,
             filters,
             includeClientList: false
          }
@@ -35,7 +38,7 @@ export const segmentationApi = {
 
    /**
     * Obtener clientes de un segmento específico (paginado)
-    * GET segmentation/clients/:segmentId
+    * GET /api/segmentation/clients/:segmentId
     */
    async getSegmentClients(
       segmentId: string,
@@ -65,7 +68,7 @@ export const segmentationApi = {
 
    /**
     * Exportar clientes de múltiples segmentos
-    * POST segmentation/clients/export
+    * POST /api/segmentation/clients/export
     */
    async exportSegmentClients(
       segments: Array<{
@@ -92,7 +95,7 @@ export const segmentationApi = {
 
    /**
     * Comparación temporal entre dos períodos
-    * POST segmentation/comparison
+    * POST /api/segmentation/comparison
     */
    async compareSegmentation(
       groupType: GroupType,
