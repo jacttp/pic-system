@@ -28,6 +28,14 @@ const handleViewSegment = (segmentId: string) => {
 
 // ── Panel de exportación (drawer lateral en desktop) ─────────
 const showExportPanel = ref(false)
+
+// Detectar si el error es por "sin resultados" (no es un error real)
+const noResultsKeywords = ['no se encontraron', 'sin resultados', 'no clients', 'no data', '0 clientes', 'no encontr']
+const isNoResultsError = computed(() => {
+  if (!store.error) return false
+  const msg = store.error.toLowerCase()
+  return noResultsKeywords.some(kw => msg.includes(kw))
+})
 </script>
 
 <template>
@@ -103,10 +111,32 @@ const showExportPanel = ref(false)
           <!-- Filtros -->
           <SegmentationFilters />
 
-          <!-- Error global -->
+          <!-- Notificación: sin resultados o error -->
           <Transition name="fade">
+            <!-- Sin resultados (notificación suave) -->
             <div
-              v-if="store.error"
+              v-if="store.error && isNoResultsError"
+              class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3"
+            >
+              <i class="fa-solid fa-filter-circle-xmark text-amber-500 text-xl mt-0.5 flex-shrink-0"></i>
+              <div class="flex-1">
+                <h3 class="font-semibold text-amber-800 mb-1">Sin resultados</h3>
+                <p class="text-sm text-amber-700">
+                  No se encontraron clientes con los filtros seleccionados. Intenta ampliar los criterios de búsqueda o seleccionar un período diferente.
+                </p>
+              </div>
+              <button
+                type="button"
+                @click="store.error = null"
+                class="p-1 hover:bg-amber-100 rounded transition-colors flex-shrink-0"
+              >
+                <i class="fa-solid fa-xmark text-amber-500"></i>
+              </button>
+            </div>
+
+            <!-- Error real -->
+            <div
+              v-else-if="store.error"
               class="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3"
             >
               <i class="fa-solid fa-exclamation-circle text-red-500 text-xl mt-0.5 flex-shrink-0"></i>

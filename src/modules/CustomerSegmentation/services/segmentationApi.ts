@@ -38,7 +38,7 @@ export const segmentationApi = {
 
    /**
     * Obtener clientes de un segmento específico (paginado)
-    * GET /api/segmentation/clients/:segmentId
+    * POST /api/segmentation/clients/:segmentId
     */
    async getSegmentClients(
       segmentId: string,
@@ -49,18 +49,16 @@ export const segmentationApi = {
       sortBy: 'volume' | 'clientName' | 'activeMonths' = 'volume',
       sortOrder: 'asc' | 'desc' = 'desc'
    ): Promise<SegmentClientsResponse> {
-      const { data } = await api.get<SegmentClientsResponse>(
+      const { data } = await api.post<SegmentClientsResponse>(
          `${BASE}/clients/${segmentId}`,
          {
-            params: {
-               page,
-               pageSize,
-               sortBy,
-               sortOrder,
-               clientIds: JSON.stringify(clientIds),
-               filters: JSON.stringify(filters),
-               metric: filters.metric
-            }
+            page,
+            pageSize,
+            sortBy,
+            sortOrder,
+            clientIds,
+            filters,
+            metric: filters.metric
          }
       )
       return data

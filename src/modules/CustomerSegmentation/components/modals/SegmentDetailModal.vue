@@ -23,6 +23,7 @@ const { getSegmentColor } = useSegmentColors()
 
 const currentPage = ref(1)
 const pageSize = ref(20)
+const selectedTipoCli = ref<string | null>(null)
 
 const isOpen = computed({
   get: () => props.modelValue,
@@ -39,6 +40,7 @@ const segmentColor = computed(() => {
 watch(() => props.modelValue, async (isOpen) => {
   if (isOpen && props.segment) {
     currentPage.value = 1
+    selectedTipoCli.value = null
     await loadClients()
   }
   // Bloquear scroll del body cuando el modal está abierto
@@ -63,8 +65,29 @@ const close = () => {
   isOpen.value = false
 }
 
-const clients = computed(() => store.segmentClientsData?.clients ?? [])
+const allClients = computed(() => store.segmentClientsData?.clients ?? [])
 const pagination = computed(() => store.segmentClientsData?.pagination)
+
+// ── TipoCli helpers ─────────────────────────────────────────
+const availableTipos = computed(() => {
+  const tipos = new Set(allClients.value.map(c => c.tipoCli).filter(Boolean))
+  return [...tipos].sort()
+})
+
+const clients = computed(() => {
+  if (!selectedTipoCli.value) return allClients.value
+  return allClients.value.filter(c => c.tipoCli === selectedTipoCli.value)
+})
+
+const tipoCliBadgeClass = (tipo: string): string => {
+  if (!tipo) return 'bg-slate-100 text-slate-600 border-slate-200'
+  const t = tipo.toUpperCase()
+  if (t.startsWith('M'))  return 'bg-purple-100 text-purple-700 border-purple-200'
+  if (t.startsWith('D'))  return 'bg-blue-100 text-blue-700 border-blue-200'
+  if (t.startsWith('A'))  return 'bg-green-100 text-green-700 border-green-200'
+  if (t.startsWith('S'))  return 'bg-amber-100 text-amber-700 border-amber-200'
+  return 'bg-slate-100 text-slate-600 border-slate-200'
+}
 </script>
 
 <template>
@@ -201,10 +224,45 @@ const pagination = computed(() => store.segmentClientsData?.pagination)
             
             <!-- Lista de Clientes -->
             <div class="flex-1 overflow-auto p-6">
-              <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
                 <h3 class="text-sm font-bold text-slate-700">
                   Lista de Clientes ({{ pagination?.totalClients ?? 0 }})
+                  <span v-if="selectedTipoCli" class="text-xs font-normal text-slate-500 ml-2">
+                    · mostrando {{ clients.length }} de tipo {{ selectedTipoCli }}
+                  </span>
                 </h3>
+              </div>
+
+              <!-- Filtro por Tipo Cliente -->
+              <div
+                v-if="availableTipos.length > 0"
+                class="flex items-center gap-2 mb-4 flex-wrap"
+              >
+                <span class="text-xs font-medium text-slate-500 mr-1">
+                  <i class="fa-solid fa-filter text-slate-400 mr-1"></i> Tipo:
+                </span>
+                <button
+                  type="button"
+                  @click="selectedTipoCli = null"
+                  class="px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors"
+                  :class="selectedTipoCli === null
+                    ? 'bg-slate-800 text-white border-slate-800'
+                    : 'bg-white text-slate-600 border-slate-300 hover:border-slate-400'"
+                >
+                  Todos
+                </button>
+                <button
+                  v-for="tipo in availableTipos"
+                  :key="tipo"
+                  type="button"
+                  @click="selectedTipoCli = selectedTipoCli === tipo ? null : tipo"
+                  class="px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors"
+                  :class="selectedTipoCli === tipo
+                    ? 'bg-slate-800 text-white border-slate-800'
+                    : tipoCliBadgeClass(tipo)"
+                >
+                  {{ tipo }}
+                </button>
               </div>
               
               <!-- Loading -->
@@ -221,9 +279,16 @@ const pagination = computed(() => store.segmentClientsData?.pagination)
                 >
                   <div class="flex items-start justify-between gap-4">
                     <div class="flex-1">
-                      <div class="flex items-center gap-2 mb-1">
+                      <div class="flex items-center gap-2 mb-1 flex-wrap">
                         <span class="font-semibold text-slate-800">{{ client.clientName }}</span>
                         <span class="text-xs text-slate-500 font-mono">{{ client.clientId }}</span>
+                        <span
+                          v-if="client.tipoCli"
+                          class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border leading-none"
+                          :class="tipoCliBadgeClass(client.tipoCli)"
+                        >
+                          {{ client.tipoCli }}
+                        </span>
                       </div>
                       <div class="flex items-center gap-4 text-xs text-slate-600">
                         <span>

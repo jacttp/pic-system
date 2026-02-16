@@ -152,6 +152,7 @@ export interface SegmentationResponse {
 export interface ClientInSegment {
    clientId: string
    clientName: string
+   tipoCli: string
    gerencia: string
    jefatura: string
    ruta: string
