@@ -20,7 +20,7 @@ export const usePicChatStore = defineStore('picChat', () => {
    const activeContext = ref<ChatContext | null>(null);
    const isReportActive = ref(false);
    const filterStore = usePicFilterStore();
-   const selectedModel = ref<string>('gemini'); // Default
+   const selectedModel = ref<string>('openai'); // Default
 
    // --- ACCIONES BÁSICAS ---
    function initChat() {
@@ -84,19 +84,38 @@ export const usePicChatStore = defineStore('picChat', () => {
                parts: [{ text: m.text }]
             }));
 
-         // --- B. INYECTAR CONTEXTO VISUAL (Si el usuario seleccionó un gráfico) ---
+         // --- B. INYECTAR CONTEXTO ---
          let promptToSend = userText;
 
+         // B1. Contexto de Filtros Activos del Dashboard
+         // Diccionario para nombres legibles (reduce tokens vs enviar keys crudos)
+         const filterLabels: Record<string, string> = {
+            canal: 'Canal', Gerencia: 'Gerencia', Jefatura: 'Jefatura',
+            Ruta: 'Ruta', Marca: 'Marca', grupo: 'Grupo/Familia',
+            Categorias: 'Categoría', SKU: 'SKU', Anio: 'Año',
+            Transaccion: 'Transacción', FormatoCliente: 'Formato Cliente',
+            MesInicial: 'Mes Inicial', MesFinal: 'Mes Final'
+         };
+
+         // Construir resumen compacto de filtros seleccionados (solo los no vacíos)
+         const activeFilters: string[] = [];
+         for (const [key, label] of Object.entries(filterLabels)) {
+            const val = filterStore.selected[key as keyof typeof filterStore.selected];
+            if (Array.isArray(val) && val.length > 0) {
+               activeFilters.push(`${label}: ${val.join(', ')}`);
+            } else if (typeof val === 'string' && val) {
+               activeFilters.push(`${label}: ${val}`);
+            }
+         }
+
+         if (activeFilters.length > 0) {
+            promptToSend = `[FILTROS ACTIVOS DEL DASHBOARD]\n${activeFilters.join('\n')}\n\n[PREGUNTA USUARIO]\n"${userText}"`;
+         }
+
+         // B2. Contexto Visual (Si el usuario seleccionó un gráfico/tabla con el botón de contexto)
          if (activeContext.value) {
             const contextDataStr = JSON.stringify(activeContext.value.data).slice(0, 5000);
-            promptToSend = `
-                [CONTEXTO VISUAL ACTIVO]
-                Elemento: "${activeContext.value.title}" (${activeContext.value.type}).
-                Datos: ${contextDataStr}.
-                
-                [PREGUNTA USUARIO]
-                "${userText}"
-                `;
+            promptToSend = `[FILTROS ACTIVOS DEL DASHBOARD]\n${activeFilters.length > 0 ? activeFilters.join('\n') : '(ninguno)'}\n\n[CONTEXTO VISUAL ACTIVO]\nElemento: "${activeContext.value.title}" (${activeContext.value.type}).\nDatos: ${contextDataStr}.\n\n[PREGUNTA USUARIO]\n"${userText}"`;
          }
 
          // --- C. LLAMADA A LA API ---

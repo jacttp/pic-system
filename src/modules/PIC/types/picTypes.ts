@@ -36,7 +36,10 @@ export interface PicFilterOptions {
 export interface AiQueryConfig {
    metric: 'VENTA_KG' | 'VENTA_$$' | 'METAS_KG';
    dimensions: string[];
-   filters: Record<string, string | string[]>;
+   // Filtros normalizados a arrays por el backend.
+   // Incluye: TRANSACCION (crítico), Año, Mes, Gerencia, Zona, Jefatura, Ruta,
+   //          Marca, grupo, Categorias, SKU_NOMBRE, canal, formatocte
+   filters: Record<string, string[]>;
    visualization: 'bar' | 'line' | 'pie' | 'doughnut' | 'table' | 'kpi';
 }
 

@@ -72,9 +72,14 @@ export const usePicFilterStore = defineStore('picFilter', () => {
          const data = await picApi.getInitialFilters();
          Object.assign(options, data);
 
+         // Sanitizar: excluir años futuros que no deberían existir en la BD
+         const currentYear = new Date().getFullYear();
+         if (options.anios.length > 0) {
+            options.anios = options.anios.filter(y => parseInt(y) <= currentYear);
+         }
+
          // Lógica Legacy Mejorada: Seleccionar Año Actual y 2 previos
          if (options.anios.length > 0) {
-            const currentYear = new Date().getFullYear(); // 2026
             const targetYears = [
                (currentYear - 2).toString(), // 2024
                (currentYear - 1).toString(), // 2025
