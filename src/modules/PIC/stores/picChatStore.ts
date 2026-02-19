@@ -4,7 +4,7 @@ import { ref } from 'vue';
 import { picApi } from '../services/picApi';
 import type { AiQueryConfig, DynamicWidget, ChatMessage } from '../types/picTypes';
 import { usePicFilterStore } from './picFilterStore';
-import { getChartConfig, getPieConfig } from '../utils/picUtils';
+import { getChartConfig, getPieConfig, getSeriesColor, getMultiColors } from '../utils/picUtils';
 
 interface ChatContext {
    id: string;
@@ -41,7 +41,30 @@ export const usePicChatStore = defineStore('picChat', () => {
          timestamp: new Date(),
          chartConfig
       });
-      return id; // Retornamos ID para uso posterior
+      return id;
+   }
+
+   // Efecto typewriter: anima el texto carácter por carácter
+   function typewriterMessage(role: 'user' | 'assistant' | 'system', fullText: string, chartConfig: AiQueryConfig | null = null): Promise<string> {
+      const id = Date.now().toString() + Math.random().toString();
+      messages.value.push({ id, role, text: '', timestamp: new Date(), chartConfig, isTyping: true });
+
+      return new Promise((resolve) => {
+         let i = 0;
+         const SPEED_MS = 18; // ms por carácter (~55 chars/seg)
+         const msg = messages.value.find(m => m.id === id)!;
+
+         const tick = () => {
+            if (i < fullText.length) {
+               msg.text = fullText.slice(0, ++i);
+               setTimeout(tick, SPEED_MS);
+            } else {
+               msg.isTyping = false; // ocultar cursor
+               resolve(id);
+            }
+         };
+         setTimeout(tick, SPEED_MS);
+      });
    }
 
    function setContext(title: string, data: any, type: 'chart' | 'table') {
@@ -124,11 +147,13 @@ export const usePicChatStore = defineStore('picChat', () => {
 
          // --- D. PROCESAR RESPUESTA ---
          if (response.explanation) {
-            const msgId = addMessage('assistant', response.explanation, response.queryConfig);
-
-            // Si la IA decidió generar un gráfico, lo renderizamos automáticamente
             if (response.queryConfig) {
+               // Respuesta con gráfico: texto instantáneo + botón de visualizar
+               const msgId = addMessage('assistant', response.explanation, response.queryConfig);
                await visualizeData(msgId);
+            } else {
+               // Respuesta conversacional: efecto typewriter ✨
+               await typewriterMessage('assistant', response.explanation);
             }
          }
 
@@ -209,18 +234,13 @@ export const usePicChatStore = defineStore('picChat', () => {
 
             case 'pie':
             case 'doughnut':
-               // Usamos el nuevo helper de Utils
-               // Importante: Pie charts necesitan colores variados
-               const bgColors = [
-                  '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
-                  '#ec4899', '#06b6d4', '#84cc16', '#6366f1', '#14b8a6'
-               ];
                widgetConfig = getPieConfig(
                   labels,
                   [{
                      data: values,
-                     backgroundColor: bgColors,
-                     borderWidth: 1
+                     backgroundColor: getMultiColors(values.length),
+                     borderWidth: 1,
+                     borderColor: '#ffffff'
                   }],
                   vizType
                );
@@ -228,22 +248,26 @@ export const usePicChatStore = defineStore('picChat', () => {
 
             case 'line':
             case 'bar':
-            default:
-               // Usamos el helper existente
+            default: {
+               // Paleta vibrante: el color rota según cuántos widgets hay ya en el tablero
+               const colorIndex = filterStore.dynamicWidgets?.length ?? 0;
+               const color = getSeriesColor(colorIndex);
+               const colorAlpha = color + '33'; // 20% opacidad para el fill de línea
                widgetConfig = getChartConfig(
                   labels,
                   [{
                      label: labelMetric,
                      data: values,
-                     backgroundColor: vizType === 'line' ? 'rgba(59, 130, 246, 0.2)' : '#0ea5e9',
-                     borderColor: '#0ea5e9',
-                     fill: vizType === 'line', // Relleno solo si es línea
+                     backgroundColor: vizType === 'line' ? colorAlpha : color,
+                     borderColor: color,
+                     fill: vizType === 'line',
                      borderRadius: 4,
-                     tension: 0.3 // Curva suave para líneas
+                     tension: 0.3
                   }],
                   vizType as 'bar' | 'line'
                );
                break;
+            }
          }
 
          // 2. Crear el Widget Dinámico

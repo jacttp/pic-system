@@ -29,9 +29,9 @@ onMounted(() => {
     scrollToBottom();
 });
 
-watch(() => store.messages.length, () => {
+watch(() => store.messages, () => {
     nextTick(() => scrollToBottom());
-});
+}, { deep: true });
 
 const scrollToBottom = () => {
     if (messagesContainer.value) {

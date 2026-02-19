@@ -177,7 +177,7 @@ const handleCancel = () => {
 </script>
 
 <template>
-    <div class="min-h-screen bg-slate-50 pb-20">
+    <div class="min-h-full bg-slate-50 pb-20">
         <!-- Header Sticky -->
         <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
             <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">

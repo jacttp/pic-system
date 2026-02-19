@@ -83,4 +83,5 @@ export interface ChatMessage {
    text: string;
    timestamp: Date;
    chartConfig?: AiQueryConfig | null;
+   isTyping?: boolean; // true mientras el efecto typewriter está activo
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { ChatMessage } from '../stores/picChatStore';
+import type { ChatMessage } from '../types/picTypes';
 import { usePicChatStore } from '../stores/picChatStore';
 
 const props = defineProps<{
@@ -31,7 +31,7 @@ const handleVisualize = () => {
         </span>
 
         <div class="px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap shadow-sm" :class="bubbleClass">
-            {{ message.text }}
+            {{ message.text }}<span v-if="message.isTyping" class="typing-cursor">|</span>
         </div>
 
         <div v-if="message.chartConfig" class="mt-2 flex flex-col gap-2 self-start w-full">
@@ -65,5 +65,17 @@ const handleVisualize = () => {
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(5px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+.typing-cursor {
+    display: inline-block;
+    margin-left: 1px;
+    font-weight: 300;
+    animation: blink 0.7s step-end infinite;
+    opacity: 1;
+}
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
 }
 </style>
