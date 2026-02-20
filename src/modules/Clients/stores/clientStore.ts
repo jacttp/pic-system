@@ -97,7 +97,7 @@ export const useClientStore = defineStore('clients', () => {
       }
    }
 
-   async function updateClient(id: number, client: Partial<Client>) {
+   async function updateClient(id: number | string, client: Partial<Client>) {
       try {
          await clientApi.updateClient(id, client);
          return true;

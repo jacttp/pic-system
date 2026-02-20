@@ -15,8 +15,8 @@ export const clientApi = {
       await api.post(`${V2}/clients`, client);
    },
 
-   async updateClient(id: number, client: Partial<Client>): Promise<void> {
-      await api.put(`${V2}/clients/${id}`, client);
+   async updateClient(id: number | string, client: Partial<Client>): Promise<void> {
+      await api.patch(`${V2}/clients/${id}`, client);
    },
 
    async deleteClient(id: number): Promise<void> {

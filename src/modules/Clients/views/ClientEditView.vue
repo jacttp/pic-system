@@ -24,6 +24,8 @@ let marker: L.Marker | null = null;
 const initialState = {
     // Status
     Tipocli: '',
+    Est2017: '',
+    LP: '',
     
     // Identification
     clienteid: '', // Readonly
@@ -35,18 +37,21 @@ const initialState = {
     Ciudad: '',
     Estado: '',
     Geopos: '',
+    Cedis: '',
 
     // Segmentation
     Matriz: '',
     Cadena: '',
     Canal: '',
     Canalm: '',
+    Canalc: '',
     Formato: '',
     Gerencia: '',
     Zona: '',
     Jefatura: '',
     Ruta: '',
-    Umaf: ''
+    Umaf: '',
+    Segemento: ''
 };
 
 const form = reactive({ ...initialState });
@@ -158,7 +163,8 @@ const handleSave = async () => {
         if (isNew.value) {
             await store.createClient(form);
         } else {
-            await store.updateClient(clientId, form);
+            // Pasamos form.clienteid ya que el backend requiere ese valor de negocio (e.g. CTE-1006)
+            await store.updateClient(form.clienteid, form);
         }
         router.push('/admin/clients');
     } catch (e) {
@@ -235,6 +241,24 @@ const handleCancel = () => {
                                 :class="{'bg-amber-50 border-amber-300': isChanged('Tipocli')}"
                             />
                         </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Estatus 2017 (Est2017)</label>
+                            <input 
+                                v-model="form.Est2017" 
+                                type="text"
+                                class="w-full rounded-md border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all font-medium text-slate-700"
+                                :class="{'bg-amber-50 border-amber-300': isChanged('Est2017')}"
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">LP</label>
+                            <input 
+                                v-model="form.LP" 
+                                type="text"
+                                class="w-full rounded-md border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all font-medium text-slate-700"
+                                :class="{'bg-amber-50 border-amber-300': isChanged('LP')}"
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -296,6 +320,10 @@ const handleCancel = () => {
                             <div>
                                 <label class="block text-xs font-semibold text-slate-500 mb-1">Estado</label>
                                 <input v-model="form.Estado" type="text" class="input-premium" :class="{'input-changed': isChanged('Estado')}" />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 mb-1">CEDIS</label>
+                                <input v-model="form.Cedis" type="text" class="input-premium" :class="{'input-changed': isChanged('Cedis')}" />
                             </div>
                         </div>
                     </div>
@@ -369,6 +397,14 @@ const handleCancel = () => {
                      <div>
                         <label class="block text-xs font-semibold text-slate-500 mb-1">UMAF</label>
                         <input v-model="form.Umaf" type="text" class="input-premium" :class="{'input-changed': isChanged('Umaf')}" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">Canal C</label>
+                        <input v-model="form.Canalc" type="text" class="input-premium" :class="{'input-changed': isChanged('Canalc')}" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">Segmento</label>
+                        <input v-model="form.Segemento" type="text" class="input-premium" :class="{'input-changed': isChanged('Segemento')}" />
                     </div>
 
                 </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue';
+import { onMounted, computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useClientValidationStore } from '../stores/validationStore';
 import GeoMapWidget from '../components/GeoMapWidget.vue';
@@ -8,11 +8,14 @@ import DataComparator from '../components/DataComparator.vue';
 const store = useClientValidationStore();
 const { pendingClients, selectedClient, nearbyCandidates, candidateToCompare, isLoading, totalPending } = storeToRefs(store);
 
+const isManuallyEdited = ref(false);
+
 onMounted(() => {
   store.fetchPendingClients();
 });
 
 const handleSelect = (client: any) => {
+  isManuallyEdited.value = false;
   store.selectClientForReview(client);
 };
 
@@ -59,12 +62,17 @@ const handleMergeToCandidate = ({ field, value }: { field: string, value: any })
   }
 };
 
+const handleManualEdit = () => {
+   isManuallyEdited.value = true;
+};
+
 const handleNext = async () => {
+   isManuallyEdited.value = false;
    await store.selectNextClient();
 };
 
 const handleSave = async () => {
-   if (selectedClient.value?.TipoCli === 'Revisar') {
+   if (selectedClient.value?.TipoCli === 'Revisar' && !isManuallyEdited.value) {
       alert('Debe definir si es Nuevo o Duplicado (TipoCli) antes de guardar.');
       return;
    }
@@ -226,6 +234,7 @@ const handleSkip = async () => {
                :candidate="candidateToCompare"
                @merge-to-master="handleMergeToMaster"
                @merge-to-candidate="handleMergeToCandidate"
+               @manual-edit="handleManualEdit"
             />
           </div>
         </transition>
@@ -266,7 +275,7 @@ const handleSkip = async () => {
 
             <button 
                @click="handleSave"
-               :disabled="isLoading || selectedClient.TipoCli === 'Revisar'"
+               :disabled="isLoading || (selectedClient.TipoCli === 'Revisar' && !isManuallyEdited)"
                class="px-6 py-2 bg-slate-800 text-white font-bold rounded-full hover:bg-black transition-all shadow-md flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
                <i class="fas fa-save"></i>

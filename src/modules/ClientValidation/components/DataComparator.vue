@@ -14,13 +14,14 @@ const emit = defineEmits<{
   (e: 'mergeToMaster', payload: { field: string; value: any }): void;
   (e: 'mergeToCandidate', payload: { field: string; value: any }): void;
   (e: 'update:master', payload: any): void; 
+  (e: 'manualEdit'): void;
 }>();
 
-// Campos a comparar (Orden Estricto)
 // Campos a comparar (Orden Estricto)
 const COMPARE_FIELDS = [
   'TipoCli',  
   'clienteid',
+  'Est2017',
   'Nombre', 
   'Calle_Numero', 
   'Colonia', 
@@ -42,6 +43,7 @@ const COMPARE_FIELDS = [
 
 const FIELD_LABELS: Record<string, string> = {
   clienteid: 'Id Cliente',
+  Est2017: 'Estatus 2017',
   Canalm: 'Canal M',
   formatocte: 'Formato'
 };
@@ -127,10 +129,12 @@ const comparisonRows = computed(() => {
 
 const handleMergeToMaster = (field: string, value: any) => {
   emit('mergeToMaster', { field, value });
+  emit('manualEdit');
 };
 
 const handleMergeToCandidate = (field: string, value: any) => {
   emit('mergeToCandidate', { field, value });
+  emit('manualEdit');
 };
 </script>
 
@@ -190,6 +194,7 @@ const handleMergeToCandidate = (field: string, value: any) => {
                   <input 
                      type="text" 
                      v-model="(props.master as any)[row.field]"
+                     @input="$emit('manualEdit')"
                      class="w-full px-2 py-1.5 bg-transparent border border-transparent hover:border-gray-200 focus:border-blue-500 focus:bg-white rounded transition-all outline-none"
                      :class="{ 
                         'text-red-700 font-bold': row.isGeoposCollision || row.isCriticalMaster,

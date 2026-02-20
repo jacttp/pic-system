@@ -137,9 +137,10 @@ export const useClientValidationStore = defineStore('clientValidation', () => {
       // Lista estricta de campos a copiar:
       // Matriz, Cadena, Canal, Canalm, Formato(con excepcion), Gerencia, Zona, Jefatura, Umaf
 
-      // 1. Matriz & Cadena
+      // 1. Matriz & Cadena & Est2017
       if ((candidate as any).Matriz) (master as any).Matriz = (candidate as any).Matriz;
       if ((candidate as any).Cadena) (master as any).Cadena = (candidate as any).Cadena;
+      if ((candidate as any).Est2017) (master as any).Est2017 = (candidate as any).Est2017;
 
       // 2. Canal & Canalm (Bidireccional fallback si uno falta en candidato, pero priorizando candidato)
       (master as any).canal = (candidate as any).canal || (candidate as any).canalm;
@@ -181,8 +182,12 @@ export const useClientValidationStore = defineStore('clientValidation', () => {
    const applyNewClientLogic = () => {
       if (!selectedClient.value) return;
 
-      const year = new Date().getFullYear();
+      const currentDate = new Date();
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1; // getMonth is 0-indexed
+
       selectedClient.value.TipoCli = `Nuevo${year}`;
+      (selectedClient.value as any).Est2017 = `Act${month}`;
 
       // Reset exception state
       manualCheckRequired.value = false;
