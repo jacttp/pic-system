@@ -349,6 +349,12 @@ const handleCancel = () => {
                          </div>
                     </div>
 
+                    <!-- Zona -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">Zona</label>
+                        <input v-model="form.Zona" type="text" class="input-premium" :class="{'input-changed': isChanged('Zona')}" />
+                    </div>
+
                     <!-- Jefatura (Select) -->
                     <div>
                         <label class="block text-xs font-semibold text-slate-500 mb-1">Jefatura</label>

@@ -124,6 +124,22 @@ const router = createRouter({
                   // Opcional: Si tienes roles, agrégalos aquí
                }
             },
+            // Estructura Comercial
+            {
+               path: 'commercial-structure',
+               name: 'commercial-structure',
+               component: () => import('@/modules/CommercialStructure/views/CommercialStructureList.vue')
+            },
+            {
+               path: 'commercial-structure/new',
+               name: 'commercial-structure-new',
+               component: () => import('@/modules/CommercialStructure/views/CommercialStructureEditView.vue')
+            },
+            {
+               path: 'commercial-structure/:ruta',
+               name: 'commercial-structure-edit',
+               component: () => import('@/modules/CommercialStructure/views/CommercialStructureEditView.vue')
+            },
 
 
          ]

@@ -39,6 +39,7 @@ const MODULE_STYLES: Record<string, { color: string, bg: string, desc?: string }
     'VAL_CLI': { color: 'text-pink-500', bg: 'bg-pink-50', desc: 'Validación y aprobación de nuevos clientes.' },
     'CANNIB': {color: 'text-purple-600', bg: 'bg-purple-50', desc: 'Segmentación avanzada de clientes por volumen: cuartiles, quintiles, deciles y percentiles.'},
     'SEGMENT': {color: 'text-purple-600', bg: 'bg-purple-50', desc: 'Segmentación avanzada de clientes por volumen: cuartiles, quintiles, deciles y percentiles.'},
+    'COM_STRUCT': { color: 'text-teal-600', bg: 'bg-teal-50', desc: 'Gestión de la estructura territorial comercial: Gerencia, Zona, Jefatura y Ruta.' },
     
     
 
