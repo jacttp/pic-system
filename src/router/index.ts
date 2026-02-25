@@ -39,9 +39,7 @@ const router = createRouter({
    routes: [
       {
          path: '/',
-         name: 'hub',
-         component: () => import('@/modules/Hub/views/HubView.vue'),
-         meta: { requiresAuth: true }
+         redirect: '/admin'
       },
       {
          path: '/login',
@@ -55,9 +53,28 @@ const router = createRouter({
          meta: { requiresAuth: true },
          children: [
             {
+               path: '',
+               name: 'hub',
+               component: () => import('@/modules/Hub/views/HubView.vue'),
+               meta: { requiresAuth: true }
+            },
+            {
                path: 'users',
-               name: 'users',
-               component: () => import('@/modules/Users/views/UserList.vue')
+               name: 'user-management',
+               component: () => import('@/modules/Users/views/UserListView.vue'),
+               meta: { requiresAuth: true, minRoleLevel: 2 }
+            },
+            {
+               path: 'users/:id',
+               name: 'user-detail',
+               component: () => import('@/modules/Users/views/UserDetailView.vue'),
+               meta: { requiresAuth: true, minRoleLevel: 2 }
+            },
+            {
+               path: 'profile',
+               name: 'user-profile',
+               component: () => import('@/modules/UserProfile/views/ProfileView.vue'),
+               meta: { requiresAuth: true }
             },
             {
                path: 'products',

@@ -2,17 +2,28 @@
 import { ref, onMounted } from 'vue';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import { useSetupStore } from '@/modules/Setup/stores/setupStores';
+import { useProfileStore } from '@/modules/UserProfile/stores/profileStore';
 import { useRouter, useRoute } from 'vue-router';
+import NotificationCenter from '@/modules/UserProfile/components/NotificationCenter.vue';
 
 const auth = useAuthStore();
 const setupStore = useSetupStore();
+const profileStore = useProfileStore();
 const router = useRouter();
 const route = useRoute(); 
 
-const isCollapsed = ref(false); // Inicia expandido
+const isCollapsed = ref(false);
+const showNotifDropdown = ref(false);
+
+let notifPoll: ReturnType<typeof setInterval> | null = null;
 
 onMounted(async () => {
    await setupStore.fetchModules();
+   // Cargar notificaciones y hacer polling
+   profileStore.fetchNotifications();
+   notifPoll = setInterval(() => {
+      profileStore.fetchNotifications();
+   }, 120_000);
 });
 
 const handleLogout = () => {
@@ -26,6 +37,10 @@ const isActive = (path: string) => {
 
 const toggleSidebar = () => {
     isCollapsed.value = !isCollapsed.value;
+};
+
+const goToProfile = () => {
+    router.push({ name: 'user-profile' });
 };
 </script>
 
@@ -51,15 +66,56 @@ const toggleSidebar = () => {
                     <span>PIC System</span>
                 </router-link>
 
-                <button 
-                    @click="toggleSidebar"
-                    class="text-slate-400 hover:text-brand-600 p-2 rounded-lg hover:bg-slate-50 transition-all focus:outline-none"
-                    :title="isCollapsed ? 'Expandir menú' : 'Colapsar menú'"
-                >
-                    <i class="fa-solid text-lg" :class="isCollapsed ? 'fa-bars' : 'fa-indent'"></i>
-                </button>
+                <div class="flex items-center gap-1">
+                    <!-- Notification bell -->
+                    <div class="relative">
+                        <button 
+                            @click="showNotifDropdown = !showNotifDropdown"
+                            class="text-slate-400 hover:text-brand-600 p-2 rounded-lg hover:bg-slate-50 transition-all focus:outline-none relative"
+                            title="Notificaciones"
+                        >
+                            <i class="fa-solid fa-bell text-lg"></i>
+                            <span 
+                                v-if="profileStore.unreadCount > 0"
+                                class="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-bold min-w-[16px] h-4 flex items-center justify-center rounded-full px-1 shadow-sm"
+                            >
+                                {{ profileStore.unreadCount > 9 ? '9+' : profileStore.unreadCount }}
+                            </span>
+                        </button>
+
+                        <!-- Dropdown -->
+                        <transition name="dropdown-anim">
+                            <div 
+                                v-if="showNotifDropdown"
+                                class="absolute left-full top-0 ml-2 w-80 z-[100] shadow-xl rounded-xl"
+                            >
+                                <NotificationCenter mode="dropdown" :max-items="8" />
+                            </div>
+                        </transition>
+                        <div v-if="showNotifDropdown" @click="showNotifDropdown = false" class="fixed inset-0 z-[90]"></div>
+                    </div>
+
+                    <button 
+                        @click="toggleSidebar"
+                        v-show="!isCollapsed"
+                        class="text-slate-400 hover:text-brand-600 p-2 rounded-lg hover:bg-slate-50 transition-all focus:outline-none"
+                        :title="isCollapsed ? 'Expandir menú' : 'Colapsar menú'"
+                    >
+                        <i class="fa-solid text-lg" :class="isCollapsed ? 'fa-bars' : 'fa-indent'"></i>
+                    </button>
+                </div>
 
             </div>
+
+            <!-- Collapsed: toggle btn at top of nav -->
+            <button 
+                v-if="isCollapsed"
+                @click="toggleSidebar"
+                class="mx-3 mt-3 mb-1 text-slate-400 hover:text-brand-600 p-2 rounded-lg hover:bg-slate-50 transition-all focus:outline-none"
+                title="Expandir menú"
+            >
+                <i class="fa-solid fa-bars text-lg"></i>
+            </button>
 
             <nav class="flex-1 p-3 space-y-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
                 
@@ -101,22 +157,32 @@ const toggleSidebar = () => {
 
             </nav>
 
+            <!-- Footer: User info + Profile link -->
             <div class="p-3 border-t border-slate-100 bg-slate-50/50">
                 <div 
-                    class="flex items-center gap-3 p-2 rounded-lg hover:bg-white transition-all group relative cursor-default"
+                    @click="goToProfile"
+                    class="flex items-center gap-3 p-2 rounded-lg hover:bg-white transition-all group relative cursor-pointer"
                     :class="isCollapsed ? 'justify-center' : ''"
+                    title="Ver mi perfil"
                 >
-                    <div class="w-9 h-9 rounded-full bg-brand-600 text-white flex items-center justify-center font-bold text-sm shadow-md shrink-0">
+                    <div class="w-9 h-9 rounded-full bg-brand-600 text-white flex items-center justify-center font-bold text-sm shadow-md shrink-0 relative">
                         {{ auth.user?.username.substring(0,2).toUpperCase() }}
+                        <!-- Presence dot -->
+                        <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white"
+                              :class="{
+                                 'bg-emerald-500': profileStore.profile?.presenceStatus === 'online',
+                                 'bg-amber-500': profileStore.profile?.presenceStatus === 'busy',
+                                 'bg-slate-400': !profileStore.profile || profileStore.profile?.presenceStatus === 'offline'
+                              }"></span>
                     </div>
                     
-                    <div v-if="!isCollapsed" class="overflow-hidden transition-opacity duration-300">
+                    <div v-if="!isCollapsed" class="overflow-hidden transition-opacity duration-300 flex-1">
                         <p class="text-xs font-bold text-slate-700 truncate w-32">{{ auth.user?.username }}</p>
                         <p class="text-[10px] uppercase font-bold text-slate-400 truncate tracking-wide">{{ auth.user?.role }}</p>
                     </div>
                     
                     <button 
-                        @click="handleLogout" 
+                        @click.stop="handleLogout" 
                         class="text-slate-400 hover:text-red-500 transition-colors p-1.5 hover:bg-red-50 rounded-md" 
                         :class="isCollapsed ? 'absolute left-10 top-0 opacity-0 group-hover:opacity-100 bg-white shadow-lg border border-slate-100 z-50 ml-4' : 'ml-auto'"
                         title="Cerrar Sesión"
@@ -156,9 +222,9 @@ const toggleSidebar = () => {
     top: 50%;
     transform: translateY(-50%);
     margin-left: 10px;
-    background-color: #1e293b; /* Slate-800 */
+    background-color: #1e293b;
     color: white;
-    font-size: 0.75rem; /* text-xs */
+    font-size: 0.75rem;
     padding: 0.25rem 0.5rem;
     border-radius: 0.25rem;
     opacity: 0;
@@ -171,5 +237,16 @@ const toggleSidebar = () => {
 
 .group:hover .tooltip {
     opacity: 1;
+}
+
+/* Notification dropdown animation */
+.dropdown-anim-enter-active,
+.dropdown-anim-leave-active {
+    transition: all 0.15s ease;
+}
+.dropdown-anim-enter-from,
+.dropdown-anim-leave-to {
+    opacity: 0;
+    transform: translateX(-8px);
 }
 </style>

@@ -15,18 +15,25 @@ export interface SystemModule {
 
 export type DevStatus = 'Finished' | 'Maintaining' | 'Development';
 
-//Mapeo para traducir tus roles de string a número
+//Mapeo para traducir roles de string a número (expandido a 4 niveles)
 
 export const ROLE_LEVELS: Record<string, number> = {
 
-   'User': 1,
-   'General': 2,
+   'Gerente': 1,
+   'JefeGerentes': 2,
    'Admin': 3,
+   'SuperAdmin': 4,
 
-   //Alias
-   'user': 1,
-   'general': 2,
+   // Aliases (case insensitive)
+   'gerente': 1,
+   'jefegerentes': 2,
    'admin': 3,
+   'superadmin': 4,
+
+   // Compatibilidad con roles antiguos
+   'User': 1,
+   'user': 1,
+   'General': 2,
+   'general': 2,
 
 };
-
