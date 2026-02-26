@@ -37,7 +37,8 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       Transaccion: ['Venta', 'Metas', 'NC'], // Default legacy
       FormatoCliente: [] as string[],
       MesInicial: '1',
-      MesFinal: '12'
+      MesFinal: String(new Date().getMonth() + 1),
+      usarRangoMeses: false
    });
 
    // Almacén para las tablas

@@ -2,12 +2,41 @@
 import { onMounted, ref, watch, computed } from 'vue';
 import { usePicFilterStore } from '../stores/picFilterStore';
 import FilterDropdown from './FilterDropdown.vue';
-// 1. IMPORTAMOS EL MODAL
 import PicClientModal from './modals/PicClientModal.vue'; 
+import { usePicChatStore } from '../stores/picChatStore'; 
 
 const store = usePicFilterStore();
+const chatStore = usePicChatStore();
+const filterPanel = ref<HTMLElement | null>(null);
 const isCollapsed = ref(true); 
 const overflowVisible = ref(true); 
+
+// Lógica para limitar MesFinal
+const maxMesFinal = computed(() => {
+    const currentYear = new Date().getFullYear();
+    const hasCurrentYear = store.selected.Anio.includes(String(currentYear));
+    return hasCurrentYear ? new Date().getMonth() + 1 : 12;
+});
+
+// Watcher de seguridad: si cambian los años elegidos y el mes final/inicial quedó por encima del máximo permitido, reajustar.
+watch(() => store.selected.Anio, () => {
+    const max = maxMesFinal.value;
+    if (parseInt(store.selected.MesFinal) > max) {
+        store.selected.MesFinal = String(max);
+    }
+    if (parseInt(store.selected.MesInicial) > max) {
+        store.selected.MesInicial = String(max);
+    }
+});
+
+function toggleRangoMeses() {
+    store.selected.usarRangoMeses = !store.selected.usarRangoMeses;
+    if (!store.selected.usarRangoMeses) {
+        // Reset a los valores por defecto al apagar el switch
+        store.selected.MesInicial = '1';
+        store.selected.MesFinal = String(maxMesFinal.value);
+    }
+}
 
 // 2. ESTADO DEL MODAL
 const showClientModal = ref(false); 
@@ -217,27 +246,44 @@ watch(isCollapsed, (newVal) => {
                             </h3>
                             <FilterDropdown label="Año(s)" :options="store.options.anios" v-model="store.selected.Anio" />
                             
-                            <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Mes Ini</label>
-                                    <div class="relative">
-                                        <select v-model="store.selected.MesInicial" class="w-full text-xs font-medium border border-slate-200 rounded-lg pl-2 pr-6 h-[38px] bg-white appearance-none focus:border-brand-500 focus:ring-1 focus:ring-brand-100 outline-none cursor-pointer hover:border-slate-300">
-                                            <option v-for="i in 12" :key="i" :value="String(i)">{{ i }}</option>
-                                        </select>
-                                        <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none"></i>
-                                    </div>
+                            <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                                <div class="flex items-center justify-between mb-3">
+                                    <label class="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Acotar Meses</label>
+                                    <button 
+                                        @click="toggleRangoMeses"
+                                        class="w-8 h-4 rounded-full transition-colors relative"
+                                        :class="store.selected.usarRangoMeses ? 'bg-brand-500' : 'bg-slate-300'"
+                                    >
+                                        <div 
+                                            class="absolute top-0.5 left-0.5 bg-white w-3 h-3 rounded-full transition-transform shadow-sm"
+                                            :class="store.selected.usarRangoMeses ? 'translate-x-4' : 'translate-x-0'"
+                                        ></div>
+                                    </button>
                                 </div>
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Mes Fin</label>
-                                    <div class="relative">
-                                        <select v-model="store.selected.MesFinal" class="w-full text-xs font-medium border border-slate-200 rounded-lg pl-2 pr-6 h-[38px] bg-white appearance-none focus:border-brand-500 focus:ring-1 focus:ring-brand-100 outline-none cursor-pointer hover:border-slate-300">
-                                            <option v-for="i in 12" :key="i" :value="String(i)">{{ i }}</option>
-                                        </select>
-                                        <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none"></i>
+
+                                <div class="grid grid-cols-2 gap-3" :class="{'opacity-50 pointer-events-none': !store.selected.usarRangoMeses}">
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Mes Ini</label>
+                                        <div class="relative">
+                                            <select v-model="store.selected.MesInicial" class="w-full text-xs font-medium border border-slate-200 rounded-lg pl-2 pr-6 h-[38px] bg-white appearance-none focus:border-brand-500 focus:ring-1 focus:ring-brand-100 outline-none cursor-pointer hover:border-slate-300">
+                                                <option v-for="i in maxMesFinal" :key="'ini-'+i" :value="String(i)">{{ i }}</option>
+                                            </select>
+                                            <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none"></i>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Mes Fin</label>
+                                        <div class="relative">
+                                            <select v-model="store.selected.MesFinal" class="w-full text-xs font-medium border border-slate-200 rounded-lg pl-2 pr-6 h-[38px] bg-white appearance-none focus:border-brand-500 focus:ring-1 focus:ring-brand-100 outline-none cursor-pointer hover:border-slate-300">
+                                                <option v-for="i in maxMesFinal" :key="'fin-'+i" :value="String(i)">{{ i }}</option>
+                                            </select>
+                                            <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none"></i>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
+
                     </div>
 
                 </div>

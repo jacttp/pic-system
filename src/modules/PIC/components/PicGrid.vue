@@ -19,19 +19,32 @@ const showDesglose = ref(true);
 const currentRealYear = new Date().getFullYear();
 const currentRealMonth = new Date().getMonth() + 1; // 1-12
 
-const visibleMonthCount = computed(() => {
+const visibleMonthRange = computed(() => {
     const hasCurrentYear = selectedYears.value.includes(String(currentRealYear));
-    return hasCurrentYear ? currentRealMonth : 12;
+    const maxMesFinal = hasCurrentYear ? currentRealMonth : 12;
+
+    if (!store.selected.usarRangoMeses) {
+        return { start: 0, end: maxMesFinal };
+    }
+
+    const start = Math.max(0, parseInt(store.selected.MesInicial) - 1); // 0-indexed
+    let end = parseInt(store.selected.MesFinal);
+
+    // Seguridad extra
+    if (end > maxMesFinal) end = maxMesFinal;
+    if (start >= end) return { start: 0, end: maxMesFinal }; // Fallback
+    
+    return { start, end };
 });
 
 // --- 1. CONFIGURACIÓN PESOS ($) ---
 const dataPesos = computed(() => processChartData(store.reportData, selectedYears.value, 'pesos'));
 const configPesosMensual = computed(() => {
-    const count = visibleMonthCount.value;
-    const labels = MONTH_NAMES.slice(0, count);
+    const { start, end } = visibleMonthRange.value;
+    const labels = MONTH_NAMES.slice(start, end);
     const datasets = selectedYears.value.map((year, i) => ({
         label: year,
-        data: dataPesos.value.slice(0, count).map(d => d[year]),
+        data: dataPesos.value.slice(start, end).map(d => d[year]),
         backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
         borderRadius: 4
     }));
@@ -52,11 +65,11 @@ const configPesosAnual = computed(() => {
 // --- 2. CONFIGURACIÓN KILOS (KG) ---
 const dataKilos = computed(() => processChartData(store.reportData, selectedYears.value, 'kilos'));
 const configKilosMensual = computed(() => {
-    const count = visibleMonthCount.value;
-    const labels = MONTH_NAMES.slice(0, count);
+    const { start, end } = visibleMonthRange.value;
+    const labels = MONTH_NAMES.slice(start, end);
     const datasets = selectedYears.value.map((year, i) => ({
         label: `KG ${year}`,
-        data: dataKilos.value.slice(0, count).map(d => d[year]),
+        data: dataKilos.value.slice(start, end).map(d => d[year]),
         backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
         borderRadius: 4,
         order: 2
@@ -65,7 +78,7 @@ const configKilosMensual = computed(() => {
     if (lastYear) {
         datasets.push({
             label: `Meta ${lastYear}`,
-            data: dataKilos.value.slice(0, count).map(d => d[`meta_${lastYear}`]),
+            data: dataKilos.value.slice(start, end).map(d => d[`meta_${lastYear}`]),
             type: 'line' as any,
             borderColor: '#9333ea', 
             borderWidth: 2,
@@ -91,11 +104,11 @@ const configKilosAnual = computed(() => {
 // --- 3. CONFIGURACIÓN PROMEDIO ($/KG) ---
 const dataPromedio = computed(() => processChartData(store.reportData, selectedYears.value, 'promedio'));
 const configPromedioMensual = computed(() => {
-    const count = visibleMonthCount.value;
-    const labels = MONTH_NAMES.slice(0, count);
+    const { start, end } = visibleMonthRange.value;
+    const labels = MONTH_NAMES.slice(start, end);
     const datasets = selectedYears.value.map((year, i) => ({
         label: `Promedio ${year}`,
-        data: dataPromedio.value.slice(0, count).map(d => d[year]),
+        data: dataPromedio.value.slice(start, end).map(d => d[year]),
         borderColor: CHART_COLORS_GREEN[i % CHART_COLORS_GREEN.length],
         backgroundColor: CHART_COLORS_GREEN[i % CHART_COLORS_GREEN.length],
         borderRadius: 4

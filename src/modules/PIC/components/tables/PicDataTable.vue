@@ -29,8 +29,19 @@ const currentRealMonth = new Date().getMonth() + 1; // 1-12
 
 const visibleRows = computed(() => {
     const hasCurrentYear = props.years.includes(String(currentRealYear));
-    if (!hasCurrentYear) return tableData.value.rows;
-    return tableData.value.rows.filter(row => row.mesIndex <= currentRealMonth);
+    const maxMesFinal = hasCurrentYear ? currentRealMonth : 12;
+
+    if (!store.selected.usarRangoMeses) {
+        return tableData.value.rows.filter(row => row.mesIndex <= maxMesFinal);
+    }
+
+    const start = Math.max(1, parseInt(store.selected.MesInicial));
+    let end = parseInt(store.selected.MesFinal);
+
+    if (end > maxMesFinal) end = maxMesFinal;
+    if (start > end) return tableData.value.rows.filter(row => row.mesIndex <= maxMesFinal);
+
+    return tableData.value.rows.filter(row => row.mesIndex >= start && row.mesIndex <= end);
 });
 
 // --- FOOTER RECALCULADO SOBRE FILAS VISIBLES ---
@@ -52,7 +63,7 @@ const visibleFooter = computed(() => {
     if (props.type === 'promedio') {
         sortedYears.forEach(y => {
             const count = rows.filter(r => (r[y] || 0) > 0).length;
-            totals[y] = count > 0 ? totals[y] / count : 0;
+            totals[y] = count > 0 ? (totals[y] || 0) / count : 0;
         });
     }
 
