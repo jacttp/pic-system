@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { usePicFilterStore } from '../../stores/picFilterStore';
-import { usePicChatStore } from '../../stores/picChatStore'; // <--- Importar Chat Store
+import { usePicChatStore } from '../../stores/picChatStore';
 import { calculateTableData, formatCurrency, formatNumber } from '../../utils/picUtils';
 
 const props = defineProps<{
@@ -12,7 +12,7 @@ const props = defineProps<{
 }>();
 
 const store = usePicFilterStore();
-const chatStore = usePicChatStore(); // <--- Instanciar
+const chatStore = usePicChatStore();
 
 const tableData = computed(() => {
     return calculateTableData(
@@ -23,19 +23,67 @@ const tableData = computed(() => {
     );
 });
 
+// --- FILTRO DE MESES FUTUROS ---
+const currentRealYear = new Date().getFullYear();
+const currentRealMonth = new Date().getMonth() + 1; // 1-12
+
+const visibleRows = computed(() => {
+    const hasCurrentYear = props.years.includes(String(currentRealYear));
+    if (!hasCurrentYear) return tableData.value.rows;
+    return tableData.value.rows.filter(row => row.mesIndex <= currentRealMonth);
+});
+
+// --- FOOTER RECALCULADO SOBRE FILAS VISIBLES ---
+const visibleFooter = computed(() => {
+    const rows = visibleRows.value;
+    const { sortedYears, currentYear, prevYear } = tableData.value;
+
+    // Sumar columnas de años y metas solo sobre filas visibles
+    const totals: Record<string, number> = {};
+    sortedYears.forEach(y => { totals[y] = 0; });
+    if (props.type === 'kilos' && currentYear) totals[`meta_${currentYear}`] = 0;
+
+    rows.forEach(row => {
+        sortedYears.forEach(y => { totals[y] += (row[y] || 0); });
+        if (props.type === 'kilos' && currentYear) totals[`meta_${currentYear}`] += (row[`meta_${currentYear}`] || 0);
+    });
+
+    // Para promedio: promediar en lugar de sumar
+    if (props.type === 'promedio') {
+        sortedYears.forEach(y => {
+            const count = rows.filter(r => (r[y] || 0) > 0).length;
+            totals[y] = count > 0 ? totals[y] / count : 0;
+        });
+    }
+
+    const footer: any = { ...totals };
+
+    if (prevYear && currentYear) {
+        const totalCurr = footer[currentYear] || 0;
+        const totalPrev = footer[prevYear] || 0;
+        footer.diff = totalCurr - totalPrev;
+        footer.growth = totalPrev !== 0 ? (footer.diff / totalPrev) * 100 : 0;
+
+        if (props.type === 'kilos') {
+            const totalMeta = footer[`meta_${currentYear}`] || 0;
+            footer.diffMeta = totalCurr - totalMeta;
+            footer.varMeta = totalMeta !== 0 ? (totalCurr / totalMeta) * 100 : 0;
+        }
+    }
+
+    return footer;
+});
+
 const getDiffClass = (val: number) => val < 0 ? 'text-red-500' : 'text-emerald-600';
 const fmt = (val: number) => props.type === 'kilos' ? formatNumber(val) : formatCurrency(val);
 
 // ACCIÓN: Enviar datos de la tabla al chat
 const handleAnalyze = () => {
-    // Enviamos 'tableData.rows' y 'footer' que ya contienen los cálculos (diff, growth, etc.)
-    // Esto es mucho más rico para la IA que los datos crudos.
     const contextData = {
-        rows: tableData.value.rows,
-        totals: tableData.value.footer,
+        rows: visibleRows.value,
+        totals: visibleFooter.value,
         years: tableData.value.sortedYears
     };
-    
     chatStore.setContext(props.title, contextData, 'table');
 };
 </script>
@@ -95,7 +143,7 @@ const handleAnalyze = () => {
                     </tr>
                 </thead>
                <tbody class="divide-y divide-slate-100">
-                    <tr v-for="row in tableData.rows" :key="row.mesIndex" class="hover:bg-slate-50/50 transition-colors">
+               <tr v-for="row in visibleRows" :key="row.mesIndex" class="hover:bg-slate-50/50 transition-colors">
                         <td class="px-4 py-3 font-medium text-slate-700">{{ row.nombre }}</td>
                         
                         <td v-for="y in tableData.sortedYears" :key="y" class="px-4 py-3 text-right tabular-nums text-slate-600 font-mono">
@@ -125,32 +173,32 @@ const handleAnalyze = () => {
                         </template>
                     </tr>
                 </tbody>
-               <tfoot class="bg-slate-50 font-bold text-slate-800 border-t border-slate-200">
+                <tfoot class="bg-slate-50 font-bold text-slate-800 border-t border-slate-200">
                     <tr>
                         <td class="px-4 py-3">TOTAL</td>
                         
                         <td v-for="y in tableData.sortedYears" :key="y" class="px-4 py-3 text-right tabular-nums font-mono">
-                            {{ fmt(tableData.footer[y]) }}
+                            {{ fmt(visibleFooter[y] || 0) }}
                         </td>
                         
                         <td v-if="type === 'kilos'" class="px-4 py-3 text-right tabular-nums text-purple-700 font-mono">
-                            {{ fmt(tableData.footer[`meta_${tableData.currentYear}`]) }}
+                            {{ fmt(visibleFooter[`meta_${tableData.currentYear}`] || 0) }}
                         </td>
 
                         <template v-if="tableData.prevYear">
-                            <td class="px-4 py-3 text-right tabular-nums font-mono" :class="getDiffClass(tableData.footer.diff)">
-                                {{ fmt(tableData.footer.diff) }}
+                            <td class="px-4 py-3 text-right tabular-nums font-mono" :class="getDiffClass(visibleFooter.diff || 0)">
+                                {{ fmt(visibleFooter.diff || 0) }}
                             </td>
-                            <td class="px-4 py-3 text-right tabular-nums font-mono" :class="getDiffClass(tableData.footer.growth)">
-                                {{ tableData.footer.growth.toFixed(1) }}%
+                            <td class="px-4 py-3 text-right tabular-nums font-mono" :class="getDiffClass(visibleFooter.growth || 0)">
+                                {{ (visibleFooter.growth || 0).toFixed(1) }}%
                             </td>
 
                             <template v-if="type === 'kilos'">
-                                <td class="px-4 py-3 text-right tabular-nums font-mono" :class="getDiffClass(tableData.footer.diffMeta)">
-                                    {{ fmt(tableData.footer.diffMeta) }}
+                                <td class="px-4 py-3 text-right tabular-nums font-mono" :class="getDiffClass(visibleFooter.diffMeta || 0)">
+                                    {{ fmt(visibleFooter.diffMeta || 0) }}
                                 </td>
-                                <td class="px-4 py-3 text-right tabular-nums font-mono" :class="tableData.footer.varMeta >= 100 ? 'text-emerald-600' : 'text-red-500'">
-                                    {{ tableData.footer.varMeta.toFixed(1) }}%
+                                <td class="px-4 py-3 text-right tabular-nums font-mono" :class="(visibleFooter.varMeta || 0) >= 100 ? 'text-emerald-600' : 'text-red-500'">
+                                    {{ (visibleFooter.varMeta || 0).toFixed(1) }}%
                                 </td>
                             </template>
                         </template>

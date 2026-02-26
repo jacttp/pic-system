@@ -14,16 +14,28 @@ const selectedYears = computed(() => store.selected.Anio.sort());
 // <--- NUEVO: Estado para colapsar toda la sección de desglose
 const showDesglose = ref(true);
 
+// --- LÓGICA DE MESES VISIBLES ---
+// Si el año actual está entre los años seleccionados, sólo mostramos hasta el mes en curso.
+const currentRealYear = new Date().getFullYear();
+const currentRealMonth = new Date().getMonth() + 1; // 1-12
+
+const visibleMonthCount = computed(() => {
+    const hasCurrentYear = selectedYears.value.includes(String(currentRealYear));
+    return hasCurrentYear ? currentRealMonth : 12;
+});
+
 // --- 1. CONFIGURACIÓN PESOS ($) ---
 const dataPesos = computed(() => processChartData(store.reportData, selectedYears.value, 'pesos'));
 const configPesosMensual = computed(() => {
+    const count = visibleMonthCount.value;
+    const labels = MONTH_NAMES.slice(0, count);
     const datasets = selectedYears.value.map((year, i) => ({
         label: year,
-        data: dataPesos.value.map(d => d[year]),
+        data: dataPesos.value.slice(0, count).map(d => d[year]),
         backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
         borderRadius: 4
     }));
-    return getChartConfig(MONTH_NAMES, datasets, 'bar');
+    return getChartConfig(labels, datasets, 'bar');
 });
 
 const dataPesosAnual = computed(() => processAnnualData(store.reportData, selectedYears.value, 'pesos'));
@@ -40,9 +52,11 @@ const configPesosAnual = computed(() => {
 // --- 2. CONFIGURACIÓN KILOS (KG) ---
 const dataKilos = computed(() => processChartData(store.reportData, selectedYears.value, 'kilos'));
 const configKilosMensual = computed(() => {
+    const count = visibleMonthCount.value;
+    const labels = MONTH_NAMES.slice(0, count);
     const datasets = selectedYears.value.map((year, i) => ({
         label: `KG ${year}`,
-        data: dataKilos.value.map(d => d[year]),
+        data: dataKilos.value.slice(0, count).map(d => d[year]),
         backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
         borderRadius: 4,
         order: 2
@@ -51,7 +65,7 @@ const configKilosMensual = computed(() => {
     if (lastYear) {
         datasets.push({
             label: `Meta ${lastYear}`,
-            data: dataKilos.value.map(d => d[`meta_${lastYear}`]),
+            data: dataKilos.value.slice(0, count).map(d => d[`meta_${lastYear}`]),
             type: 'line' as any,
             borderColor: '#9333ea', 
             borderWidth: 2,
@@ -60,7 +74,7 @@ const configKilosMensual = computed(() => {
             order: 1
         });
     }
-    return getChartConfig(MONTH_NAMES, datasets, 'bar');
+    return getChartConfig(labels, datasets, 'bar');
 });
 
 const dataKilosAnual = computed(() => processAnnualData(store.reportData, selectedYears.value, 'kilos'));
@@ -77,15 +91,16 @@ const configKilosAnual = computed(() => {
 // --- 3. CONFIGURACIÓN PROMEDIO ($/KG) ---
 const dataPromedio = computed(() => processChartData(store.reportData, selectedYears.value, 'promedio'));
 const configPromedioMensual = computed(() => {
+    const count = visibleMonthCount.value;
+    const labels = MONTH_NAMES.slice(0, count);
     const datasets = selectedYears.value.map((year, i) => ({
         label: `Promedio ${year}`,
-        data: dataPromedio.value.map(d => d[year]),
+        data: dataPromedio.value.slice(0, count).map(d => d[year]),
         borderColor: CHART_COLORS_GREEN[i % CHART_COLORS_GREEN.length],
         backgroundColor: CHART_COLORS_GREEN[i % CHART_COLORS_GREEN.length],
         borderRadius: 4
-       
     }));
-    return getChartConfig(MONTH_NAMES, datasets, 'bar');
+    return getChartConfig(labels, datasets, 'bar');
 });
 
 const dataPromedioAnual = computed(() => processAnnualData(store.reportData, selectedYears.value, 'promedio'));
@@ -224,10 +239,8 @@ const removeWidget = (id: string) => {
 
             <div v-show="showDesglose" class="space-y-6 transition-all duration-500 ease-in-out">
                 <PicProjectionTable title="Proyección por Marcas" dimensionKey="marcas" />
-                <div class="grid grid-cols-1 @split:grid-cols-2 gap-6">
-                    <PicProjectionTable title="Proyección por Gerencia" dimensionKey="gerencia" />
-                    <PicProjectionTable title="Proyección por Zona" dimensionKey="zona" drill-down-target="articulos" />
-                </div>
+                <PicProjectionTable title="Proyección por Gerencia" dimensionKey="gerencia" />
+                <PicProjectionTable title="Proyección por Zona" dimensionKey="zona" drill-down-target="articulos" />
                 <PicProjectionTable title="Proyección por Canal" dimensionKey="canal" drill-down-target="articulos"/>
                 <PicProjectionTable title="Proyección por Familias" dimensionKey="familias" drill-down-target="articulos"/>
                 <PicProjectionTable title="Proyección por Clientes (Top)" dimensionKey="clientes" drill-down-target="articulos" :initial-collapsed="true"/>

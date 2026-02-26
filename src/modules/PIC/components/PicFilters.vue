@@ -17,7 +17,6 @@ const clientButtonText = computed(() => {
     const count = store.selectedClients.size;
     if (count === 0) return 'Buscar Cliente...';
     if (count === 1) {
-        // Obtenemos el nombre del primer valor del Map
         return store.selectedClients.values().next().value; 
     }
     return `${count} Clientes Seleccionados`;
@@ -27,14 +26,31 @@ onMounted(() => {
     store.initFilters();
 });
 
+// --- TOAST NOTIFICATION ---
+type ToastType = 'success' | 'error' | null;
+const toast = ref<{ type: ToastType; message: string; detail?: string } | null>(null);
+let toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+function showToast(type: ToastType, message: string, detail?: string) {
+    if (toastTimer) clearTimeout(toastTimer);
+    toast.value = { type, message, detail };
+    toastTimer = setTimeout(() => {
+        toast.value = null;
+    }, 4500);
+}
+
 const handleUpdate = async () => {
-    await store.generateReport();
+    const success = await store.generateReport();
+    if (success) {
+        isCollapsed.value = true;
+        showToast('success', 'Reporte generado exitosamente', 'Los filtros han sido aplicados y los datos actualizados.');
+    } else {
+        showToast('error', 'Error al generar el reporte', 'Verifica tu conexión o los filtros seleccionados.');
+    }
 };
 
 const handleReset = () => {
     store.resetFilters();
-    // Opcional: Si quieres que se recargue el reporte vacío o con defaults:
-    // await store.generateReport(); 
 };
 
 watch(isCollapsed, (newVal) => {
@@ -54,6 +70,50 @@ watch(isCollapsed, (newVal) => {
     <div class="relative z-40 bg-white border-b border-slate-200 shadow-sm transition-all duration-300 ease-in-out">
         
         <PicClientModal v-model="showClientModal" />
+
+        <!-- TOAST NOTIFICATION -->
+        <Transition
+            enter-active-class="transition-all duration-300 ease-out"
+            enter-from-class="opacity-0 translate-y-2 scale-95"
+            enter-to-class="opacity-100 translate-y-0 scale-100"
+            leave-active-class="transition-all duration-200 ease-in"
+            leave-from-class="opacity-100 translate-y-0 scale-100"
+            leave-to-class="opacity-0 translate-y-2 scale-95"
+        >
+            <div
+                v-if="toast"
+                class="fixed bottom-6 right-6 z-[9999] flex items-start gap-3 px-4 py-3.5 rounded-xl shadow-xl border max-w-sm w-full"
+                :class="toast.type === 'success'
+                    ? 'bg-white border-brand-200 shadow-brand-100'
+                    : 'bg-white border-rose-200 shadow-rose-100'"
+            >
+                <!-- Icon -->
+                <div
+                    class="shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-0.5"
+                    :class="toast.type === 'success' ? 'bg-brand-50' : 'bg-rose-50'"
+                >
+                    <i
+                        class="fa-solid text-sm"
+                        :class="toast.type === 'success' ? 'fa-circle-check text-brand-600' : 'fa-circle-xmark text-rose-500'"
+                    ></i>
+                </div>
+                <!-- Content -->
+                <div class="flex-1 min-w-0">
+                    <p
+                        class="text-sm font-bold"
+                        :class="toast.type === 'success' ? 'text-brand-700' : 'text-rose-700'"
+                    >{{ toast.message }}</p>
+                    <p v-if="toast.detail" class="text-xs text-slate-500 mt-0.5 leading-snug">{{ toast.detail }}</p>
+                </div>
+                <!-- Close -->
+                <button
+                    @click="toast = null"
+                    class="shrink-0 text-slate-300 hover:text-slate-500 transition-colors mt-0.5"
+                >
+                    <i class="fa-solid fa-xmark text-xs"></i>
+                </button>
+            </div>
+        </Transition>
 
         <div 
             class="transition-all duration-300 ease-in-out"

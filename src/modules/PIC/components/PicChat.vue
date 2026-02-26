@@ -10,7 +10,7 @@ const filterStore = usePicFilterStore();
 
 const userInput = ref('');
 const messagesContainer = ref<HTMLElement | null>(null);
-const isCollapsed = ref(false);
+const isCollapsed = ref(true);
 
 const isChatEnabled = computed(() => {
     return filterStore.reportData.length > 0 && !store.isLoading;

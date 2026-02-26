@@ -97,6 +97,17 @@ export const usePicFilterStore = defineStore('picFilter', () => {
                selected.Anio = sortedYears.slice(-3);
             }
          }
+
+         // Marcas por defecto: Corona, Ros, Wali (solo las que existan en la BD)
+         if (options.marcas.length > 0) {
+            const defaultMarcas = ['Corona', 'Ros', 'Wali'];
+            const matchedMarcas = defaultMarcas.filter(m => options.marcas.includes(m));
+            if (matchedMarcas.length > 0) {
+               selected.Marca = matchedMarcas;
+               // Disparar la cascada para cargar grupos y SKUs dependientes
+               await handleMarcaChange();
+            }
+         }
       } catch (error) {
          console.error("Error cargando filtros iniciales", error);
       } finally {
