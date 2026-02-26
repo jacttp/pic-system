@@ -59,44 +59,44 @@ const formatActivity = (dateStr: string | null) => {
 </script>
 
 <template>
-   <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+   <div class="bg-white rounded-2xl border border-slate-200/70 shadow-sm overflow-hidden">
       <!-- Loading state -->
-      <div v-if="loading" class="flex items-center justify-center py-20">
-         <div class="flex flex-col items-center gap-3">
-            <i class="fa-solid fa-circle-notch fa-spin text-2xl text-brand-500"></i>
-            <span class="text-sm text-slate-500">Cargando usuarios...</span>
-         </div>
+      <div v-if="loading" class="flex flex-col items-center justify-center py-16 gap-3">
+         <div class="w-9 h-9 rounded-full border-[3px] border-purple-200 border-t-purple-600 animate-spin"></div>
+         <span class="text-sm text-slate-400 font-medium">Cargando usuarios…</span>
       </div>
 
       <!-- Empty state -->
-      <div v-else-if="users.length === 0" class="flex flex-col items-center justify-center py-20 text-slate-400">
-         <i class="fa-solid fa-users text-4xl mb-3"></i>
-         <p class="text-sm">No se encontraron usuarios</p>
+      <div v-else-if="users.length === 0" class="flex flex-col items-center justify-center py-16 gap-3">
+         <div class="w-14 h-14 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-center text-slate-300">
+            <i class="fa-solid fa-users text-2xl"></i>
+         </div>
+         <p class="text-sm font-semibold text-slate-500">No se encontraron usuarios</p>
       </div>
 
       <!-- Table -->
       <table v-else class="w-full">
          <thead>
-            <tr class="bg-slate-50/80 border-b border-slate-200">
-               <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Usuario</th>
-               <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Rol</th>
-               <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Zona</th>
-               <th class="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Estado</th>
-               <th class="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actividad</th>
-               <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
+            <tr class="bg-slate-800">
+               <th class="text-left px-4 py-3 text-xs font-semibold text-slate-300 uppercase tracking-wider">Usuario</th>
+               <th class="text-left px-4 py-3 text-xs font-semibold text-slate-300 uppercase tracking-wider">Rol</th>
+               <th class="text-left px-4 py-3 text-xs font-semibold text-slate-300 uppercase tracking-wider">Zona</th>
+               <th class="text-center px-4 py-3 text-xs font-semibold text-slate-300 uppercase tracking-wider">Estado</th>
+               <th class="text-center px-4 py-3 text-xs font-semibold text-slate-300 uppercase tracking-wider">Actividad</th>
+               <th class="text-right px-4 py-3 text-xs font-semibold text-slate-300 uppercase tracking-wider">Acciones</th>
             </tr>
          </thead>
          <tbody class="divide-y divide-slate-100">
             <tr 
                v-for="user in users" 
                :key="user.IdUser"
-               class="hover:bg-slate-50/50 transition-colors group cursor-pointer"
+               class="group border-b border-slate-100 last:border-0 hover:bg-purple-50/30 transition-colors duration-100 cursor-pointer"
                @click="emit('view', user)"
             >
                <!-- Usuario -->
                <td class="px-4 py-3.5">
                   <div class="flex items-center gap-3">
-                     <div class="w-9 h-9 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                     <div class="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 text-white flex items-center justify-center font-bold text-xs shadow-sm flex-shrink-0">
                         {{ user.Usuario.substring(0, 2).toUpperCase() }}
                      </div>
                      <div>

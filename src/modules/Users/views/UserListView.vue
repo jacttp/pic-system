@@ -123,69 +123,71 @@ const handleUserSaved = () => {
 </script>
 
 <template>
-   <div class="p-6 lg:p-8 max-w-[1400px] mx-auto">
+   <div class="w-full px-4 sm:px-6 lg:px-10 py-6 lg:py-8">
       
       <!-- Header -->
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-         <div>
-            <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
-               <i class="fa-solid fa-users-gear text-purple-500"></i>
-               Gestión de Usuarios
-            </h1>
-            <p class="text-slate-500 text-sm mt-1">Administra usuarios, permisos y monitorea actividad.</p>
+         <div class="flex items-center gap-4">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-purple-200">
+               <i class="fa-solid fa-users-gear text-white text-base"></i>
+            </div>
+            <div>
+               <h1 class="text-xl font-bold text-slate-900 tracking-tight leading-tight">Gestión de Usuarios</h1>
+               <p class="text-xs text-slate-500 mt-0.5 font-medium">Administra usuarios, permisos y monitorea actividad.</p>
+            </div>
          </div>
          <div v-if="canManageUsers" class="flex items-center gap-2">
             <button 
                @click="handleBroadcast"
-               class="px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2"
+               class="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors flex items-center gap-2"
             >
-               <i class="fa-solid fa-paper-plane text-emerald-500"></i> Broadcast
+               <i class="fa-solid fa-paper-plane text-emerald-500 text-xs"></i> Broadcast
             </button>
             <button 
                @click="handleCreate" 
-               class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium shadow-sm flex items-center gap-2 transition-colors"
+               class="bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm shadow-purple-200 flex items-center gap-2 transition-all"
             >
-               <i class="fa-solid fa-user-plus"></i> Nuevo Usuario
+               <i class="fa-solid fa-user-plus text-xs"></i> Nuevo Usuario
             </button>
          </div>
       </div>
 
       <!-- Estadísticas rápidas -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-         <div class="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center">
+         <div class="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center flex-shrink-0">
                <i class="fa-solid fa-users text-purple-500"></i>
             </div>
             <div>
-               <p class="text-xl font-bold text-slate-800">{{ stats.total }}</p>
-               <p class="text-xs text-slate-400">Total</p>
+               <p class="text-xl font-bold text-slate-800 tabular-nums">{{ stats.total }}</p>
+               <p class="text-xs font-medium text-slate-400">Total</p>
             </div>
          </div>
-         <div class="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+         <div class="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
                <i class="fa-solid fa-circle-check text-emerald-500"></i>
             </div>
             <div>
-               <p class="text-xl font-bold text-slate-800">{{ stats.active }}</p>
-               <p class="text-xs text-slate-400">Activos</p>
+               <p class="text-xl font-bold text-slate-800 tabular-nums">{{ stats.active }}</p>
+               <p class="text-xs font-medium text-slate-400">Activos</p>
             </div>
          </div>
-         <div class="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center">
+         <div class="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
                <i class="fa-solid fa-ban text-red-500"></i>
             </div>
             <div>
-               <p class="text-xl font-bold text-slate-800">{{ stats.blocked }}</p>
-               <p class="text-xs text-slate-400">Bloqueados</p>
+               <p class="text-xl font-bold text-slate-800 tabular-nums">{{ stats.blocked }}</p>
+               <p class="text-xs font-medium text-slate-400">Bloqueados</p>
             </div>
          </div>
-         <div class="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center">
+         <div class="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
                <i class="fa-solid fa-shield-halved text-amber-500"></i>
             </div>
             <div>
-               <p class="text-xl font-bold text-slate-800">{{ stats.admins }}</p>
-               <p class="text-xs text-slate-400">Admins</p>
+               <p class="text-xl font-bold text-slate-800 tabular-nums">{{ stats.admins }}</p>
+               <p class="text-xs font-medium text-slate-400">Admins</p>
             </div>
          </div>
       </div>
@@ -197,21 +199,21 @@ const handleUserSaved = () => {
          <div class="lg:col-span-3 space-y-4">
             
             <!-- Barra de filtros -->
-            <div class="flex flex-col sm:flex-row gap-3">
+            <div class="flex flex-col sm:flex-row gap-2.5">
                <!-- Búsqueda -->
                <div class="relative flex-1">
                   <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
                   <input
                      v-model="searchQuery"
                      type="text"
-                     placeholder="Buscar por nombre, zona, rol..."
-                     class="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white"
+                     placeholder="Buscar por nombre, zona, rol…"
+                     class="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 focus:outline-none transition"
                   />
                </div>
                <!-- Filtro de estado -->
                <select 
                   v-model="statusFilter"
-                  class="px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white"
+                  class="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 focus:outline-none transition cursor-pointer"
                >
                   <option value="all">Todos los estados</option>
                   <option value="active">Activos</option>
@@ -232,8 +234,8 @@ const handleUserSaved = () => {
             />
 
             <!-- Info de conteo -->
-            <div class="text-xs text-slate-400 text-right">
-               Mostrando {{ filteredUsers.length }} de {{ userStore.users.length }} usuarios
+            <div class="text-xs text-slate-500 font-medium text-right">
+               Mostrando <span class="font-semibold text-slate-700">{{ filteredUsers.length }}</span> de <span class="font-semibold text-slate-700">{{ userStore.users.length }}</span> usuarios
             </div>
          </div>
 
