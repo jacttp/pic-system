@@ -77,6 +77,12 @@ const router = createRouter({
                meta: { requiresAuth: true }
             },
             {
+               path: 'approvals',
+               name: 'approvals',
+               component: () => import('@/modules/Approvals/views/ApprovalsView.vue'),
+               meta: { requiresAuth: true }
+            },
+            {
                path: 'products',
                name: 'products',
                component: () => import('@/modules/Products/views/ProductList.vue')
@@ -188,6 +194,18 @@ router.beforeEach(async (to, from, next) => {
          return next('/login');
       }
 
+      // --- ROUTE-LEVEL ROLE CHECK ---
+      // Si la ruta define minRoleLevel en meta, verificar antes del módulo
+      if (to.meta.minRoleLevel) {
+         const userRoleStr = authStore.user?.role || 'User';
+         const userLevel = ROLE_LEVELS[userRoleStr] || 1;
+
+         if (userLevel < (to.meta.minRoleLevel as number)) {
+            console.warn(`⛔ Acceso denegado por ruta: Nivel ${userLevel} vs Requerido ${to.meta.minRoleLevel}`);
+            return next('/');
+         }
+      }
+
       // --- SETUP SECURITY & DYNAMIC MODULE CHECK ---
       // Verificar si la ruta destino está protegida por configuración de módulos
 
@@ -197,18 +215,16 @@ router.beforeEach(async (to, from, next) => {
       }
 
       // Buscar si la ruta actual coincide con algún módulo definido
-      // Normalizamos rutas quitando query params y hashes para comparar
       const targetPath = to.path;
 
       // Encontrar módulo que coincida con la ruta destino
       const moduleConfig = setupStore.modules.find(m => targetPath.startsWith(m.Route) && m.Route !== '/');
-      // Nota: m.Route !== '/' evita que el módulo "HOME" bloquee todo si tiene ruta raíz
 
       if (moduleConfig) {
          // 1. Verificar si está activo globalmente
          if (!moduleConfig.IsActive) {
             console.warn(`⛔ Acceso denegado: El módulo ${moduleConfig.Label} está desactivado.`);
-            return next('/'); // O una página 404/Mantenimiento
+            return next('/');
          }
 
          // 2. Verificar Rol (MinRoleLevel)
@@ -217,7 +233,6 @@ router.beforeEach(async (to, from, next) => {
 
          if (userLevel < moduleConfig.MinRoleLevel) {
             console.warn(`⛔ Acceso Prohibido: Nivel ${userLevel} vs Requerido ${moduleConfig.MinRoleLevel}`);
-            // Redirigir a Home o 403
             return next('/');
          }
       }

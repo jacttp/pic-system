@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import { useSetupStore } from '@/modules/Setup/stores/setupStores';
 import { useProfileStore } from '@/modules/UserProfile/stores/profileStore';
@@ -19,11 +19,16 @@ let notifPoll: ReturnType<typeof setInterval> | null = null;
 
 onMounted(async () => {
    await setupStore.fetchModules();
-   // Cargar notificaciones y hacer polling
+   // Cargar perfil (presencia) y notificaciones
+   profileStore.fetchProfile();
    profileStore.fetchNotifications();
    notifPoll = setInterval(() => {
       profileStore.fetchNotifications();
    }, 120_000);
+});
+
+onUnmounted(() => {
+   if (notifPoll) clearInterval(notifPoll);
 });
 
 const handleLogout = () => {
