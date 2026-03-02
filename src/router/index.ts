@@ -113,6 +113,11 @@ const router = createRouter({
                component: () => import('@/modules/Audit/views/AuditLog.vue')
             },
             {
+               path: 'pvr',
+               name: 'pvr',
+               component: () => import('@/modules/PVR/views/PvrView.vue'),
+            },
+            {
                path: 'setup',
                name: 'setup',
                component: () => import('@/modules/Setup/views/SystemConfigView.vue')

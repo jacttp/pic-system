@@ -8,7 +8,7 @@ const setupStore = useSetupStore();
 const authStore = useAuthStore();
 
 // Permissions
-const isAdmin = computed(() => (authStore.user?.role === 'Admin'));
+const isAdmin = computed(() => authStore.isAdmin);
 
 // Edit Modal State
 const showModal = ref(false);
