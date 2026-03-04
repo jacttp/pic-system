@@ -9,7 +9,6 @@ import type {
    PvrCanal,
 } from '../types/pvrTypes';
 
-// Meses fijos 1-12 — no requieren query al backend
 const ALL_MESES = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
 
 export const usePvrStore = defineStore('pvr', () => {
@@ -20,14 +19,13 @@ export const usePvrStore = defineStore('pvr', () => {
 
    const reportData = ref<Record<PvrCanal, PvrCanalData> | null>(null);
    const availableCanales = ref<PvrCanal[]>([]);
-   const activeCanal = ref<PvrCanal>('Total');
 
    const filterOptions = ref<PvrFilterOptions>({
       años: [],
-      meses: ALL_MESES,   // siempre disponibles
+      canales: [],
       gerencias: [],
       cadenas: [],
-      canales: [],
+      meses: ALL_MESES,
    });
 
    const activeFilters = ref<PvrActiveFilters>({
@@ -46,11 +44,6 @@ export const usePvrStore = defineStore('pvr', () => {
    // GETTERS
    // ─────────────────────────────────────────
 
-   const currentCanalData = computed<PvrCanalData | null>(() => {
-      if (!reportData.value) return null;
-      return reportData.value[activeCanal.value] ?? null;
-   });
-
    const hasActiveFilters = computed(() =>
       activeFilters.value.años.length > 0 ||
       activeFilters.value.meses.length > 0 ||
@@ -64,29 +57,27 @@ export const usePvrStore = defineStore('pvr', () => {
    // ─────────────────────────────────────────
 
    /**
-    * Carga las opciones de filtros desde 3 fuentes:
-    *  - /filters/anios      → años (filterRoutes, cacheado)
-    *  - /filters/gerencias  → gerencias (filterRoutes, cacheado)
-    *  - /api/pvr/filters    → cadenas + canales (exclusivo de InformePVR)
-    *
-    * Las tres llamadas van en paralelo con Promise.allSettled para que
-    * el fallo de una no bloquee las demás.
+    * Carga las opciones de filtros en paralelo desde 3 fuentes:
+    *  - /api/pvr/filters   → canales + años (exclusivos de InformePVR, cacheado 12h)
+    *  - /api/filters/gerencias → gerencias (catálogo, cacheado)
+    *  - /api/filters/cadenas   → cadenas  (catálogo, cacheado)
     */
    async function fetchFilters(): Promise<void> {
       isLoadingFilters.value = true;
       error.value = null;
 
       try {
-         const [añosResult, gerenciasResult, pvrResult] = await Promise.allSettled([
-            pvrApi.getAnios(),
+         const [pvrResult, gerenciasResult, cadenasResult] = await Promise.allSettled([
+            pvrApi.getPvrFilters(),
             pvrApi.getGerencias(),
-            pvrApi.getPvrExclusiveFilters(),
+            pvrApi.getCadenas(),
          ]);
 
-         if (añosResult.status === 'fulfilled') {
-            filterOptions.value.años = añosResult.value;
+         if (pvrResult.status === 'fulfilled') {
+            filterOptions.value.canales = pvrResult.value.canales;
+            filterOptions.value.años = pvrResult.value.años;
          } else {
-            console.error('[pvrStore] Error cargando años:', añosResult.reason);
+            console.error('[pvrStore] Error cargando filtros PVR:', pvrResult.reason);
          }
 
          if (gerenciasResult.status === 'fulfilled') {
@@ -95,14 +86,13 @@ export const usePvrStore = defineStore('pvr', () => {
             console.error('[pvrStore] Error cargando gerencias:', gerenciasResult.reason);
          }
 
-         if (pvrResult.status === 'fulfilled') {
-            filterOptions.value.cadenas = pvrResult.value.cadenas;
-            filterOptions.value.canales = pvrResult.value.canales;
+         if (cadenasResult.status === 'fulfilled') {
+            filterOptions.value.cadenas = cadenasResult.value;
          } else {
-            console.error('[pvrStore] Error cargando filtros PVR exclusivos:', pvrResult.reason);
+            console.error('[pvrStore] Error cargando cadenas:', cadenasResult.reason);
          }
 
-         // Default: año más reciente disponible
+         // Default: año más reciente de InformePVR
          if (filterOptions.value.años.length > 0 && activeFilters.value.años.length === 0) {
             const latestYear = [...filterOptions.value.años].sort().at(-1)!;
             activeFilters.value.años = [latestYear];
@@ -116,9 +106,7 @@ export const usePvrStore = defineStore('pvr', () => {
       }
    }
 
-   /**
-    * Carga el informe con los filtros activos actuales.
-    */
+   /** Carga el informe con los filtros activos actuales. */
    async function fetchReport(): Promise<void> {
       isLoading.value = true;
       error.value = null;
@@ -129,13 +117,6 @@ export const usePvrStore = defineStore('pvr', () => {
          if (response.success) {
             reportData.value = response.data;
             availableCanales.value = response.meta.canales;
-
-            // Si el canal activo desapareció de la respuesta, caer a 'Total'
-            if (!availableCanales.value.includes(activeCanal.value)) {
-               activeCanal.value = availableCanales.value.includes('Total')
-                  ? 'Total'
-                  : (availableCanales.value[0] ?? 'Total');
-            }
          }
       } catch (e: unknown) {
          error.value = 'Error al obtener el informe PVR.';
@@ -164,13 +145,6 @@ export const usePvrStore = defineStore('pvr', () => {
       await fetchReport();
    }
 
-   /** Cambia el canal visible en la tabla sin re-fetchear. */
-   function setActiveCanal(canal: PvrCanal): void {
-      if (availableCanales.value.includes(canal)) {
-         activeCanal.value = canal;
-      }
-   }
-
    // ─────────────────────────────────────────
    // EXPOSE
    // ─────────────────────────────────────────
@@ -178,18 +152,15 @@ export const usePvrStore = defineStore('pvr', () => {
    return {
       reportData,
       availableCanales,
-      activeCanal,
       filterOptions,
       activeFilters,
       isLoading,
       isLoadingFilters,
       error,
-      currentCanalData,
       hasActiveFilters,
       fetchFilters,
       fetchReport,
       applyFilters,
       resetFilters,
-      setActiveCanal,
    };
 });

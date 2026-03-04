@@ -41,10 +41,10 @@ export const fmtPrice = (v: number | null): string => {
    }).format(v);
 };
 
-/** -12.5% — para porcentajes (multiplica x100 internamente) */
+/** -12.50% — para porcentajes con 2 decimales (multiplica x100 internamente) */
 export const fmtPct = (v: number | null): string => {
    if (v === null || v === undefined) return '—';
-   return mxDecimal.format(v * 100) + '%';
+   return mxRatio.format(v * 100) + '%';
 };
 
 /** Devuelve clase Tailwind de color según signo del valor */

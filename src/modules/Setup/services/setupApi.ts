@@ -17,6 +17,14 @@ export default {
    },
 
    /**
+    * Crea un nuevo módulo
+    */
+   async createModule(payload: Omit<SystemModule, 'ModuleId'>): Promise<SystemModule> {
+      const { data } = await api.post(`${V2}/setup/modules`, payload);
+      return data.data || data;
+   },
+
+   /**
     * Activa/Desactiva un módulo
     */
    async toggleModuleStatus(moduleId: number, isActive: boolean): Promise<void> {

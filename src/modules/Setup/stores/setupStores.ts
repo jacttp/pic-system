@@ -132,6 +132,20 @@ export const useSetupStore = defineStore('setup', () => {
       }
    }
 
+   // 6. Acción Admin: Crear Módulo
+   async function createModule(payload: Omit<SystemModule, 'ModuleId'>) {
+      try {
+         const newModule = await setupApi.createModule(payload);
+         if (newModule) {
+            modules.value.push(newModule);
+         }
+         return true;
+      } catch (e) {
+         console.error("Error creando módulo", e);
+         return false;
+      }
+   }
+
    return {
       modules,
       isLoading,
@@ -139,6 +153,7 @@ export const useSetupStore = defineStore('setup', () => {
       groupedMenu,
       fetchModules,
       toggleModuleStatus,
-      updateModule
+      updateModule,
+      createModule
    };
 });

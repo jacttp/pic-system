@@ -118,6 +118,11 @@ const router = createRouter({
                component: () => import('@/modules/PVR/views/PvrView.vue'),
             },
             {
+               path: 'cpfr',
+               name: 'cpfr',
+               component: () => import('@/modules/CPFR/views/CPFRView.vue'),
+            },
+            {
                path: 'setup',
                name: 'setup',
                component: () => import('@/modules/Setup/views/SystemConfigView.vue')

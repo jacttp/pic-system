@@ -11,6 +11,7 @@ export interface SystemModule {
    DisplayOrder: number;
    Category: 'Analítica' | 'Gestión' | 'Sistema' | 'Otro';
    DevStatus?: 'Finished' | 'Maintaining' | 'Development';
+   Scope?: string;
 }
 
 export type DevStatus = 'Finished' | 'Maintaining' | 'Development';

@@ -2,75 +2,97 @@
 <script setup lang="ts">
 import { onMounted, computed, ref } from 'vue';
 import { usePvrStore } from '../stores/pvrStore';
-import type { PvrActiveFilters, PvrCanal, PvrCanalData } from '../types/pvrTypes';
+import type { PvrActiveFilters } from '../types/pvrTypes';
 import PvrFilterBar from '../components/PvrFilterBar.vue';
 import PvrReportTable from '../components/PvrReportTable.vue';
+import PvrIndicatorModal from '../components/PvrIndicatorModal.vue';
 import { usePvrExport } from '../composables/userPrvExport';
-import { fmtCurrency, fmtKg, fmtPct } from '../utils/pvrFormatters';
+import { fmtCurrency, fmtKg, fmtPct, fmtPrice } from '../utils/pvrFormatters';
 
-const store        = usePvrStore();
+const store = usePvrStore();
 const { exportToExcel } = usePvrExport();
 
 // ─────────────────────────────────────────────
-// YoY: segundo set de datos para comparar
+// DATOS POR CANAL
 // ─────────────────────────────────────────────
 
-/** Toggle visible del panel YoY */
-const showYoy      = ref(false);
+const modernoData     = computed(() => store.reportData?.['Moderno']     ?? null);
+const tradicionalData = computed(() => store.reportData?.['Tradicional'] ?? null);
+const totalData       = computed(() => store.reportData?.['Total']       ?? null);
 
-/**
- * Datos del año de comparación.
- * El store siempre tiene el período actual en `reportData`.
- * Para YoY pedimos el año anterior con sus propios filtros.
- */
-const compareData  = ref<Record<PvrCanal, PvrCanalData> | null>(null);
-const isLoadingYoy = ref(false);
+// ─────────────────────────────────────────────
+// KPI CARDS — desde el Total combinado
+// ─────────────────────────────────────────────
 
-/**
- * Devuelve los datos del canal activo del período de comparación.
- */
-const currentCompareCanal = computed<PvrCanalData | null>(() => {
-  if (!compareData.value || !showYoy.value) return null;
-  return compareData.value[store.activeCanal] ?? null;
+const kpis = computed(() => {
+  const d = totalData.value;
+  if (!d) return [];
+  return [
+    {
+      label: 'Venta Neta $$',
+      value: fmtCurrency(d.ventaNeta.total),
+      icon:  'fa-solid fa-sack-dollar',
+      color: 'text-brand-600',
+      bg:    'bg-brand-50',
+      border:'border-brand-100',
+      note:  'Suma directa de BD',
+    },
+    {
+      label: 'Venta Bruta $$',
+      value: fmtCurrency(d.ventaBruta.total),
+      icon:  'fa-solid fa-file-invoice-dollar',
+      color: 'text-blue-600',
+      bg:    'bg-blue-50',
+      border:'border-blue-100',
+      note:  'Neta + Rebajas',
+    },
+    {
+      label: 'Venta KG',
+      value: fmtKg(d.ventaKg.total),
+      icon:  'fa-solid fa-weight-hanging',
+      color: 'text-emerald-600',
+      bg:    'bg-emerald-50',
+      border:'border-emerald-100',
+      note:  'Volumen físico',
+    },
+    {
+      label: 'Total Rebajas $$',
+      value: fmtCurrency(d.totalRebajas.total),
+      icon:  'fa-solid fa-tags',
+      color: 'text-red-500',
+      bg:    'bg-red-50',
+      border:'border-red-100',
+      note:  'A+B+C+D+E+F+G',
+    },
+    {
+      label: '% Rebajas vs Brutas',
+      value: fmtPct(d.pctRebajasBrutas.total),
+      icon:  'fa-solid fa-percent',
+      color: 'text-amber-600',
+      bg:    'bg-amber-50',
+      border:'border-amber-100',
+      note:  'Objetivo < 8%',
+    },
+    {
+      label: '% Rebajas vs Netas',
+      value: fmtPct(d.pctRebajasNetas.total),
+      icon:  'fa-solid fa-percent',
+      color: 'text-orange-600',
+      bg:    'bg-orange-50',
+      border:'border-orange-100',
+      note:  'Contra Venta Neta',
+    },
+    {
+      label: 'Inversión por KG',
+      value: fmtPrice(d.inversionKg.total),
+      icon:  'fa-solid fa-chart-line',
+      color: 'text-indigo-600',
+      bg:    'bg-indigo-50',
+      border:'border-indigo-100',
+      note:  'Costo de descuento x kg',
+    },
+  ];
 });
-
-/**
- * Año de comparación = año seleccionado - 1.
- * Si hay múltiples años en el filtro, tomamos el menor - 1.
- */
-const compareYear = computed<string | null>(() => {
-  const años = store.activeFilters.años;
-  if (!años.length) return null;
-  const minYear = Math.min(...años.map(Number));
-  return String(minYear - 1);
-});
-
-async function loadCompareData(): Promise<void> {
-  if (!compareYear.value) return;
-  isLoadingYoy.value = true;
-  try {
-    const { pvrApi } = await import('../services/pvrApi');
-    const response = await pvrApi.getReport({
-      ...store.activeFilters,
-      años: [compareYear.value],
-    });
-    if (response.success) {
-      compareData.value = response.data;
-    }
-  } catch (e) {
-    console.error('[PvrView] Error cargando datos YoY:', e);
-    compareData.value = null;
-  } finally {
-    isLoadingYoy.value = false;
-  }
-}
-
-async function toggleYoy(): Promise<void> {
-  showYoy.value = !showYoy.value;
-  if (showYoy.value && !compareData.value) {
-    await loadCompareData();
-  }
-}
 
 // ─────────────────────────────────────────────
 // EXPORT
@@ -82,80 +104,97 @@ function handleExport(): void {
   if (!store.reportData) return;
   isExporting.value = true;
   try {
-    // Calcular meses visibles (índices 0-based con datos)
-    const ventaKg = store.currentCanalData?.ventaKg.months ?? [];
+    const ventaKg = totalData.value?.ventaKg.months ?? [];
     const activeMonthIndices = ventaKg
       .map((v, i) => ({ i, hasData: v !== null && v !== 0 }))
       .filter((x) => x.hasData)
       .map((x) => x.i);
-
-    // Sufijo del archivo: años seleccionados + canal
-    const suffix = [
-      store.activeFilters.años.join('-'),
-      store.activeCanal !== 'Total' ? store.activeCanal : '',
-    ].filter(Boolean).join('_');
-
+    const suffix = store.activeFilters.años.join('-');
     exportToExcel(store.reportData, activeMonthIndices, suffix);
   } finally {
-    // Pequeño delay para que el spinner sea perceptible
     setTimeout(() => { isExporting.value = false; }, 600);
   }
 }
-
-// ─────────────────────────────────────────────
-// KPI CARDS
-// ─────────────────────────────────────────────
-
-const kpis = computed(() => {
-  const d = store.currentCanalData;
-  if (!d) return [];
-
-  let pctPromociones = 0;
-  if (d.ventaBruta.total && d.promociones.total !== null) {
-      pctPromociones = Math.abs(d.promociones.total) / d.ventaBruta.total;
-  }
-  const promoSuperaLimite = pctPromociones > 0.08;
-
-  return [
-    { label: 'Venta Neta $$',       value: fmtCurrency(d.ventaNeta.total),         icon: 'fa-solid fa-sack-dollar',    color: 'text-brand-600',  bg: 'bg-brand-50' },
-    { label: 'Inversión por KG',    value: fmtCurrency(d.inversionKg.total),        icon: 'fa-solid fa-chart-line',     color: 'text-indigo-600', bg: 'bg-indigo-50' },
-    { 
-      label: '% Promociones',       
-      value: fmtPct(pctPromociones),                 
-      icon: promoSuperaLimite ? 'fa-solid fa-triangle-exclamation' : 'fa-solid fa-tags', 
-      color: promoSuperaLimite ? 'text-rose-600' : 'text-emerald-600', 
-      bg: promoSuperaLimite ? 'bg-rose-100' : 'bg-emerald-50',
-      cardClass: promoSuperaLimite ? 'bg-rose-50/50 border-rose-200 ring-1 ring-rose-100' : 'bg-white border-slate-200'
-    },
-    { label: 'Venta KG',            value: fmtKg(d.ventaKg.total),                 icon: 'fa-solid fa-weight-hanging', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: '% Cumpl. Metas KG',   value: fmtPct(d.pctCumplimientoKg.total),      icon: 'fa-solid fa-bullseye',       color: 'text-violet-600', bg: 'bg-violet-50' },
-    { label: '% Rebajas vs Brutas', value: fmtPct(d.pctRebajasBrutas.total),       icon: 'fa-solid fa-percent',        color: 'text-amber-600',  bg: 'bg-amber-50' },
-  ];
-});
-
-// ─────────────────────────────────────────────
-// CANAL TABS
-// ─────────────────────────────────────────────
-
-const canalTabs = computed<Array<{ value: PvrCanal; label: string }>>(() =>
-  store.availableCanales.map((c) => ({ value: c, label: c }))
-);
 
 // ─────────────────────────────────────────────
 // HANDLERS
 // ─────────────────────────────────────────────
 
 async function handleApply(filters: PvrActiveFilters): Promise<void> {
-  // Resetear datos YoY al cambiar filtros — se recalcularán si YoY está activo
-  compareData.value = null;
   await store.applyFilters(filters);
-  if (showYoy.value) await loadCompareData();
 }
 
 function handleReset(): void {
-  compareData.value = null;
-  showYoy.value = false;
   store.resetFilters();
+}
+
+// ─────────────────────────────────────────────
+// MODAL DE CHART
+// ─────────────────────────────────────────────
+
+const showChartModal = ref(false);
+const chartTitle = ref('');
+const chartType = ref<'kg' | 'currency' | 'price' | 'pct'>('currency');
+const chartData = ref<{ moderno: (number | null)[]; tradicional: (number | null)[]; total: (number | null)[]; }>({ moderno: [], tradicional: [], total: [] });
+const visibleMonths = ref<number[]>([]);
+
+function handleRowClick(payload: { label: string; key: keyof import('../types/pvrTypes').PvrCanalData; type: 'kg' | 'currency' | 'price' | 'pct'; sectionId?: string; rebajasMode?: string }) {
+  if (!store.reportData || !payload.key) return;
+  
+  // Limpia prefijos como "(A) ", "└ ", "(-) " de forma segura sin comerse letras
+  chartTitle.value = payload.label
+    .replace(/^[\s└\-]+/, '') // Quita espacios, └ o guiones iniciales
+    .replace(/^\([A-G]\)\s*/, '') // Quita (A), (B), etc...
+    .trim();
+    
+  const isRebajasPct = payload.sectionId === 'rebajas' && payload.rebajasMode && payload.rebajasMode !== 'currency';
+  chartType.value = isRebajasPct ? 'pct' : payload.type;
+
+  if (isRebajasPct) {
+    const subtitle = payload.rebajasMode === 'brutas' ? 's/ Brutas' : 
+                     payload.rebajasMode === 'netas' ? 's/ Netas' : 's/ Rebajas';
+    chartTitle.value += ` (% ${subtitle})`;
+  }
+  
+  const getMonths = (canal: 'Moderno' | 'Tradicional' | 'Total') => {
+    const data = store.reportData![canal]?.[payload.key];
+    let months = data && typeof data === 'object' && 'months' in data ? [...(data.months as (number | null)[])] : [];
+    
+    if (isRebajasPct) {
+       let denKey: 'ventaBruta' | 'ventaNeta' | 'totalRebajas' = 'ventaBruta';
+       if (payload.rebajasMode === 'netas') denKey = 'ventaNeta';
+       else if (payload.rebajasMode === 'rebajas') denKey = 'totalRebajas';
+       
+       const denData = store.reportData![canal]?.[denKey];
+       const denMonths = denData && typeof denData === 'object' && 'months' in denData ? (denData.months as (number | null)[]) : [];
+       
+       months = months.map((val, i) => {
+         if (val === null || val === undefined) return null;
+         const denVal = denMonths[i];
+         if (!denVal) return 0;
+         return val / Math.abs(denVal);
+       });
+    }
+    return months;
+  };
+
+  chartData.value = {
+    moderno: getMonths('Moderno'),
+    tradicional: getMonths('Tradicional'),
+    total: getMonths('Total'),
+  };
+
+  const ventaKg = store.reportData['Total']?.ventaKg.months ?? [];
+  visibleMonths.value = ventaKg
+    .map((v, i) => ({ i, hasData: v !== null && v !== 0 }))
+    .filter((x) => x.hasData)
+    .map((x) => x.i);
+
+  if (visibleMonths.value.length === 0) {
+    visibleMonths.value = [0,1,2,3,4,5,6,7,8,9,10,11];
+  }
+
+  showChartModal.value = true;
 }
 
 // ─────────────────────────────────────────────
@@ -169,43 +208,21 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="p-4 lg:p-6 max-w-screen-2xl mx-auto space-y-4">
+  <div class="p-4 lg:p-6 w-full max-w-[1920px] mx-auto space-y-4">
 
-    <!-- ── Header ───────────────────────────── -->
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div class="flex flex-col gap-1">
-        <h1 class="text-xl lg:text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <div class="w-8 h-8 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
-            <i class="fa-solid fa-chart-waterfall text-sm"></i>
-          </div>
+    <!-- ── Header ────────────────────────────── -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div>
+        <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+          <i class="fa-solid fa-chart-waterfall text-brand-500"></i>
           Informe PVR
         </h1>
-        <p class="text-sm text-slate-500 max-w-2xl">
-          Análisis de Precio de Venta Real — Facturación, Rebajas y Venta Neta
+        <p class="text-sm text-slate-500 mt-0.5">
+          Precio de Venta Real — Facturación, Rebajas y Venta Neta por Canal
         </p>
       </div>
 
-      <!-- Acciones del header -->
-      <div class="flex items-center gap-2 flex-wrap self-start md:self-auto">
-
-        <!-- YoY toggle -->
-        <button
-          type="button"
-          @click="toggleYoy"
-          :disabled="isLoadingYoy || !store.reportData"
-          class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors disabled:opacity-40"
-          :class="showYoy
-            ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
-            : 'bg-white text-slate-600 border-slate-300 hover:border-violet-400 hover:text-violet-600'"
-        >
-          <i
-            class="fa-solid text-xs"
-            :class="isLoadingYoy ? 'fa-circle-notch fa-spin' : 'fa-arrow-right-arrow-left'"
-          ></i>
-          YoY
-          <span v-if="compareYear && showYoy" class="opacity-75">(vs {{ compareYear }})</span>
-        </button>
-
+      <div class="flex items-center gap-2 flex-wrap self-start sm:self-auto">
         <!-- Export Excel -->
         <button
           type="button"
@@ -227,11 +244,10 @@ onMounted(async () => {
           <i class="fa-solid fa-rotate-right text-xs" :class="{ 'fa-spin': store.isLoading }"></i>
           Actualizar
         </button>
-
       </div>
     </div>
 
-    <!-- ── Filtros ───────────────────────────── -->
+    <!-- ── Filtros (colapsables) ─────────────── -->
     <PvrFilterBar
       :filter-options="store.filterOptions"
       v-model="store.activeFilters"
@@ -240,7 +256,7 @@ onMounted(async () => {
       @reset="handleReset"
     />
 
-    <!-- ── Error ─────────────────────────────── -->
+    <!-- ── Error ──────────────────────────────── -->
     <div
       v-if="store.error"
       class="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm"
@@ -249,71 +265,47 @@ onMounted(async () => {
       {{ store.error }}
     </div>
 
-    <!-- ── Loading skeleton ─────────────────── -->
+    <!-- ── Loading skeleton ──────────────────── -->
     <template v-if="store.isLoading && !store.reportData">
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div v-for="i in 6" :key="i" class="bg-white rounded-xl border border-slate-200 p-4 h-20 animate-pulse">
+        <div v-for="i in 6" :key="i" class="bg-white rounded-xl border border-slate-200 p-4 h-24 animate-pulse">
           <div class="h-3 bg-slate-100 rounded w-2/3 mb-3"></div>
-          <div class="h-5 bg-slate-100 rounded w-1/2"></div>
+          <div class="h-5 bg-slate-100 rounded w-1/2 mb-2"></div>
+          <div class="h-2 bg-slate-100 rounded w-3/4"></div>
         </div>
       </div>
-      <div class="bg-white rounded-xl border border-slate-200 h-64 animate-pulse"></div>
+      <div class="bg-white rounded-xl border border-slate-200 h-96 animate-pulse"></div>
     </template>
 
-    <!-- ── Contenido ─────────────────────────── -->
+    <!-- ── Contenido ──────────────────────────── -->
     <template v-else-if="store.reportData">
 
       <!-- KPI Cards -->
-      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-3">
         <div
           v-for="kpi in kpis"
           :key="kpi.label"
-          class="rounded-xl border p-4 shadow-sm hover:shadow-md transition-shadow"
-          :class="kpi.cardClass || 'bg-white border-slate-200'"
+          class="bg-white rounded-xl border p-4 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden"
+          :class="kpi.border"
         >
+          <!-- Icono de fondo decorativo -->
+          <div class="absolute -right-2 -bottom-2 opacity-5">
+            <i :class="[kpi.icon, 'text-5xl', kpi.color]"></i>
+          </div>
           <div class="flex items-center gap-2 mb-2">
             <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" :class="kpi.bg">
               <i :class="[kpi.icon, 'text-xs', kpi.color]"></i>
             </div>
-            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide leading-tight">
+            <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wide leading-tight">
               {{ kpi.label }}
             </span>
           </div>
-          <p class="text-base font-bold text-slate-800 font-mono tabular-nums truncate">{{ kpi.value }}</p>
+          <p class="text-sm font-bold text-slate-800 font-mono tabular-nums truncate">{{ kpi.value }}</p>
+          <p class="text-[10px] text-slate-400 mt-0.5">{{ kpi.note }}</p>
         </div>
       </div>
 
-      <!-- Canal Tabs -->
-      <div class="flex items-center justify-between flex-wrap gap-2">
-        <div class="flex gap-1 bg-slate-100 p-1 rounded-lg">
-          <button
-            v-for="tab in canalTabs"
-            :key="tab.value"
-            type="button"
-            @click="store.setActiveCanal(tab.value)"
-            class="px-4 py-1.5 rounded-md text-xs font-semibold transition-all"
-            :class="store.activeCanal === tab.value
-              ? 'bg-white text-brand-700 shadow-sm border border-slate-200'
-              : 'text-slate-500 hover:text-slate-700'"
-          >
-            {{ tab.label }}
-          </button>
-        </div>
-
-        <!-- Indicador YoY año comparado -->
-        <div
-          v-if="showYoy && compareYear"
-          class="text-[11px] text-violet-600 font-medium flex items-center gap-1.5 bg-violet-50 px-3 py-1.5 rounded-lg border border-violet-100"
-        >
-          <i class="fa-solid fa-arrow-right-arrow-left text-[10px]"></i>
-          Comparando {{ store.activeFilters.años.join(', ') }} vs {{ compareYear }}
-          <span v-if="isLoadingYoy" class="ml-1">
-            <i class="fa-solid fa-circle-notch fa-spin text-[10px]"></i>
-          </span>
-        </div>
-      </div>
-
-      <!-- Tabla -->
+      <!-- Tabla principal -->
       <div class="relative">
         <!-- Overlay de recarga -->
         <div
@@ -327,11 +319,10 @@ onMounted(async () => {
         </div>
 
         <PvrReportTable
-          v-if="store.currentCanalData"
-          :data="store.currentCanalData"
-          :compare-data="currentCompareCanal ?? undefined"
-          :canal-label="store.activeCanal"
-          :show-yoy="showYoy && !!currentCompareCanal"
+          :moderno="modernoData"
+          :tradicional="tradicionalData"
+          :total="totalData"
+          @row-click="handleRowClick"
         />
       </div>
 
@@ -347,5 +338,13 @@ onMounted(async () => {
       <p class="text-sm mt-1">Ajusta el año o los filtros y presiona Aplicar</p>
     </div>
 
+    <!-- ── Modal Evolución ────────────────────── -->
+    <PvrIndicatorModal
+      v-model:show="showChartModal"
+      :title="chartTitle"
+      :type="chartType"
+      :monthsObjArray="chartData"
+      :visibleMonths="visibleMonths"
+    />
   </div>
 </template>

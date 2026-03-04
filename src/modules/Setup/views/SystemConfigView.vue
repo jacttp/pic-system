@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { useSetupStore } from '../stores/setupStores';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import type { SystemModule, DevStatus } from '../types/setupTypes';
+import NewModuleModal from '../components/NewModuleModal.vue';
 
 const setupStore = useSetupStore();
 const authStore = useAuthStore();
@@ -14,6 +15,13 @@ const isAdmin = computed(() => authStore.isAdmin);
 const showModal = ref(false);
 const editingModule = ref<SystemModule | null>(null);
 const form = ref<Partial<SystemModule>>({});
+
+const showNewModal = ref(false);
+
+const handleCreateModule = async (payload: Omit<SystemModule, 'ModuleId'>) => {
+    await setupStore.createModule(payload);
+    showNewModal.value = false;
+};
 
 const openEdit = (mod: SystemModule) => {
     editingModule.value = mod;
@@ -65,10 +73,18 @@ const handleToggle = (mod: SystemModule) => {
             <h1 class="text-2xl font-bold text-slate-800">Configuración del Sistema</h1>
             <p class="text-slate-500">Gestión de módulos, permisos y visibilidad.</p>
         </div>
-        <div class="text-right">
+        <div class="text-right flex items-center justify-end gap-4">
              <span class="text-xs px-2 py-1 rounded bg-slate-100 text-slate-500 font-mono">
                 Admin Mode: {{ isAdmin ? 'ON' : 'OFF' }}
              </span>
+             <button
+                 v-if="isAdmin"
+                 @click="showNewModal = true"
+                 class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 shadow-sm"
+             >
+                 <i class="fa-solid fa-plus"></i>
+                 <span>Nuevo Módulo</span>
+             </button>
         </div>
     </div>
 
@@ -192,7 +208,7 @@ const handleToggle = (mod: SystemModule) => {
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Min. Role Level</label>
-                        <input v-model="form.MinRoleLevel" type="number" min="1" max="3" class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        <input v-model="form.MinRoleLevel" type="number" min="1" max="4" class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
                     </div>
                 </div>
 
@@ -228,6 +244,13 @@ const handleToggle = (mod: SystemModule) => {
 
         </div>
     </div>
+
+    <!-- CREATE MODAL -->
+    <NewModuleModal
+        v-if="showNewModal"
+        @close="showNewModal = false"
+        @save="handleCreateModule"
+    />
 
     </div>
   </div>

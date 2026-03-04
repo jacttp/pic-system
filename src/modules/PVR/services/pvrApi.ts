@@ -16,6 +16,7 @@ function buildParams(filters: PvrActiveFilters): Record<string, string> {
    if (filters.gerencias.length) params.gerencias = filters.gerencias.join(',');
    if (filters.cadenas.length) params.cadenas = filters.cadenas.join(',');
    if (filters.canal) params.canal = filters.canal;
+
    return params;
 }
 
@@ -33,28 +34,45 @@ export const pvrApi = {
    },
 
    /**
-    * GET /api/pvr/filters
-    * Solo devuelve cadenas y canales — valores exclusivos de InformePVR
-    * que no están en filterRoutes.
+    * GET /api/pvr/stats
+    * Totales anuales de cada indicador por canal (sin desglose mensual).
+    * Útil para KPI cards.
     */
-   async getPvrExclusiveFilters(): Promise<{ cadenas: string[]; canales: string[] }> {
-      const { data } = await api.get<{ success: boolean; data: { cadenas: string[]; canales: string[] } }>(
-         `${BASE}/filters`
-      );
+   async getStats(filters: PvrActiveFilters): Promise<PvrReportResponse> {
+      const { data } = await api.get<PvrReportResponse>(`${BASE}/stats`, {
+         params: buildParams(filters),
+      });
+      return data;
+   },
+
+   /**
+    * GET /api/pvr/filters
+    * Devuelve canales y años disponibles en InformePVR.
+    * (Ya no incluye cadenas — demasiado volumen en BD)
+    */
+   async getPvrFilters(): Promise<{ canales: string[]; años: string[] }> {
+      const { data } = await api.get<{
+         success: boolean;
+         data: { canales: string[]; años: string[] };
+      }>(`${BASE}/filters`);
       return data.data;
    },
 
    /**
-    * Reutiliza los endpoints existentes de filterRoutes para años y gerencias.
-    * Estos ya tienen caché en el backend y son los datos correctos de basevPic.
+    * Reutiliza el endpoint existente de filterRoutes para gerencias.
+    * Cacheado en el backend vía metadataService.
     */
-   async getAnios(): Promise<string[]> {
-      const { data } = await api.get<string[]>('/filters/anios');
+   async getGerencias(): Promise<string[]> {
+      const { data } = await api.get<string[]>('/filters/gerencias');
       return Array.isArray(data) ? data : [];
    },
 
-   async getGerencias(): Promise<string[]> {
-      const { data } = await api.get<string[]>('/filters/gerencias');
+   /**
+    * GET /filters/cadenas
+    * Valores de cadena desde la tabla catálogo (basevPic), cacheado.
+    */
+   async getCadenas(): Promise<string[]> {
+      const { data } = await api.get<string[]>('/filters/cadenas');
       return Array.isArray(data) ? data : [];
    },
 };

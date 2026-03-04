@@ -1,85 +1,61 @@
 // src/modules/PVR/types/pvrTypes.ts
 
-// ─────────────────────────────────────────────
-// PRIMITIVOS
-// ─────────────────────────────────────────────
-
-/** Array de 12 valores mensuales (null = sin dato para ese mes) */
 export type MonthlyValues = (number | null)[];
 
-/**
- * Estructura base de cualquier indicador del informe.
- * months[0] = Enero, months[11] = Diciembre.
- */
 export interface PvrIndicator {
    months: MonthlyValues;
    total: number | null;
 }
 
-// ─────────────────────────────────────────────
-// INDICADORES POR CANAL
-// ─────────────────────────────────────────────
-
-/** Desglose interno de promociones y acuerdos (filas expandibles en UI) */
-export interface PvrBreakdown {
-   promModerno: PvrIndicator;
-   promTradicional: PvrIndicator;
-   acuerdosCadenas: PvrIndicator;
-   acuerdosTrad: PvrIndicator;
-   descuentoRapel: PvrIndicator;
-}
-
 /**
- * Todos los indicadores calculados para un canal (Moderno, Tradicional o Total).
- * Refleja exactamente la respuesta del backend buildIndicators().
+ * Datos de un canal (Moderno | Tradicional | Total).
+ * Refleja exactamente los campos que devuelve pvrController.buildIndicators().
  */
 export interface PvrCanalData {
-   // ── Volumen KG ──────────────────────────────
+   // ── Volumen KG ─────────────────────────────
    metasKg: PvrIndicator;
    ventaKg: PvrIndicator;
    degustacionKg: PvrIndicator;
 
-   // ── Facturación ─────────────────────────────
+   // ── Facturación ────────────────────────────
    facturacion: PvrIndicator;
-   indicePrecioBruto: PvrIndicator; // $/kg promedio bruto
+   indicePrecioBruto: PvrIndicator;
 
-   // ── Venta Bruta $$ ──────────────────────────
+   // ── Venta Bruta (derivada) ─────────────────
    ventaBruta: PvrIndicator;
 
-   // ── Rebajas y Descuentos ────────────────────
-   devoluciones: PvrIndicator;
-   diferenciaPrecios: PvrIndicator;
-   promociones: PvrIndicator; // agrupado: Moderno + Tradicional
-   degustacionDol: PvrIndicator;
-   cargos: PvrIndicator;
-   planesLealtad: PvrIndicator;
-   rapelYAcuerdos: PvrIndicator; // agrupado: Cadenas + Trad + Rapel
-   totalRebajas: PvrIndicator;
+   // ── Rebajas — partidas directas ────────────
+   devoluciones: PvrIndicator;        // (A)
+   diferenciaPrecios: PvrIndicator;   // (B)
+   promModerno: PvrIndicator;         // (C) parte
+   promTradicional: PvrIndicator;     // (C) parte
+   totalPromociones: PvrIndicator;    // (C) subtotal
+   degustacionDol: PvrIndicator;      // (D)
+   cargos: PvrIndicator;              // (E)
+   planesLealtad: PvrIndicator;       // (F) parte
+   acuerdosTrad: PvrIndicator;        // (F) parte
+   bonificacionesTrad: PvrIndicator;  // (F) subtotal
+   acuerdosCadenas: PvrIndicator;     // (G) parte
+   descuentoRapel: PvrIndicator;      // (G) parte
+   rapelYAcuerdos: PvrIndicator;      // (G) subtotal
+   totalRebajas: PvrIndicator;        // A+B+C+D+E+F+G
 
-   // ── Venta Neta $$ ───────────────────────────
+   // ── Venta Neta (directa de BD) ─────────────
    ventaNeta: PvrIndicator;
 
-   // ── Precios y Ratios ────────────────────────
-   precioKgNeto: PvrIndicator; // $/kg promedio neto
-   inversionKg: PvrIndicator; // rebajas/kg
-   pctRebajasBrutas: PvrIndicator; // rebajas / venta bruta
-   pctRebajasNetas: PvrIndicator; // rebajas / venta neta
-   pctCumplimientoKg: PvrIndicator; // venta kg / metas kg
+   // ── Ratios ─────────────────────────────────
+   precioKgNeto: PvrIndicator;
+   inversionKg: PvrIndicator;
+   pctRebajasBrutas: PvrIndicator;
+   pctRebajasNetas: PvrIndicator;
 
-   // ── Subproductos ────────────────────────────
+   // ── Subproductos ───────────────────────────
    subproductos: PvrIndicator;
-
-   // ── Desglose interno (expandible) ───────────
-   _breakdown: PvrBreakdown;
+   ventaNetaSubproductos: PvrIndicator;
 }
 
-// ─────────────────────────────────────────────
-// RESPUESTA API
-// ─────────────────────────────────────────────
+export type PvrCanal = string; // 'Moderno' | 'Tradicional' | 'Total'
 
-export type PvrCanal = 'Moderno' | 'Tradicional' | 'Total' | string;
-
-/** Respuesta completa de GET /api/pvr/report */
 export interface PvrReportResponse {
    success: boolean;
    data: Record<PvrCanal, PvrCanalData>;
@@ -89,30 +65,19 @@ export interface PvrReportResponse {
    };
 }
 
-/** Respuesta de GET /api/pvr/filters */
-export interface PvrFiltersResponse {
-   success: boolean;
-   data: PvrFilterOptions;
-}
-
-// ─────────────────────────────────────────────
-// FILTROS
-// ─────────────────────────────────────────────
-
-/** Opciones disponibles para poblar los selectores */
+/** Opciones disponibles para los filtros del módulo PVR */
 export interface PvrFilterOptions {
-   años: string[];
-   meses: string[];
-   gerencias: string[];
-   cadenas: string[];
-   canales: string[];
+   años: string[];      // de /pvr/filters (tabla InformePVR)
+   canales: string[];   // de /filters/canales (catálogo, cacheado)
+   gerencias: string[]; // de /filters/gerencias (catálogo, cacheado)
+   cadenas: string[];   // de /filters/cadenas (catálogo, cacheado)
+   meses: string[];     // estático 1-12
 }
 
-/** Estado de los filtros activos en el store */
 export interface PvrActiveFilters {
    años: string[];
    meses: string[];
    gerencias: string[];
-   cadenas: string[];
-   canal: PvrCanal | '';  // '' = todos los canales
+   cadenas: string[];  // solo UI, NO se envía al endpoint de reporte
+   canal: string;      // '' = todos
 }
