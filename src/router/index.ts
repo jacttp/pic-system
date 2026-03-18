@@ -123,6 +123,11 @@ const router = createRouter({
                component: () => import('@/modules/CPFR/views/CPFRView.vue'),
             },
             {
+               path: 'stock-analytics',
+               name: 'StockAnalytics',
+               component: () => import('@/modules/StockAnalytics/views/StockAnalyticsView.vue'),
+            },
+            {
                path: 'setup',
                name: 'setup',
                component: () => import('@/modules/Setup/views/SystemConfigView.vue')
@@ -173,6 +178,13 @@ const router = createRouter({
                name: 'commercial-structure-edit',
                component: () => import('@/modules/CommercialStructure/views/CommercialStructureEditView.vue')
             },
+            {
+               path: 'callbook',
+               name: 'callbook',
+               component: () => import('@/modules/Callbook/views/CallbookView.vue'),
+               meta: { requiresAuth: true },
+            },
+
 
 
          ]

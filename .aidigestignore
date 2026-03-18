@@ -24,14 +24,19 @@ src/modules/CommercialStructure
 src/modules/CustomerSegmentation
 
 src/modules/Products 
+src/modules/PVR
+src/modules/Setup
 src/modules/UserProfile
 
 src/components/HelloWorld.vue
 
-
-
 src/prueba-chat.html
 
+
+types/
+
+
+prueba-chat.html
 
 .env
 .gitignore
