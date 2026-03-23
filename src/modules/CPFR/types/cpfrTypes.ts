@@ -1,69 +1,168 @@
 // src/modules/CPFR/types/cpfrTypes.ts
+// Shapes alineados con los nuevos endpoints de dash-orders
 
-// ─── Dato base que devuelve el backend (o mock) ───────────────────────────────
+// ─── GET /cpfr/current-week ──────────────────────────────────────────────────
 
-export interface CpfrDataItem {
-    id_cliente: string
-    formatocte: string        // nombre de la tienda
-    jefatura: string
-    ruta: string
-    dia: string               // Lunes, Martes... (mock por ahora)
-    SKU_NOMBRE: string
+export interface CpfrCurrentWeek {
+    anio: number
     semana: number
-    ano: number
-    invActual: number         // VENTA_KG WHERE TRANSACCION = 'InvSis' última semana
-    ventaPromSemanal: number  // AVG(VENTA_KG) WHERE TRANSACCION = 'VtaOut' N semanas
-    pedidoCadena: number      // viene de otra tabla; mock = aleatorio
+    semana_ic: string
 }
 
-// ─── Dato calculado en frontend (composable useCpfrCalculations) ──────────────
+// ─── POST /cpfr/dash-orders · POST /cpfr/dash-orders/recalculate ─────────────
 
-export interface CpfrCalculatedRow extends CpfrDataItem {
-    criterioAplicado: number   // storeCriteria ?? skuCriteria ?? 2.5
-    semanasActuales: number    // invActual / ventaPromSemanal
-    pedidoSugerido: number     // CEIL(criterio * ventaProm - inv), mín 0
-    fillRate: number           // pedidoCadena / pedidoSugerido * 100
-    estado: 'INSTOCK' | 'BAJO' | 'AGOTADO'
+export interface CpfrContext {
+    year: number
+    week: number
+    semana_ic: string
+    nom_cadena: string
+    criterio_global: number
+    total_tiendas: number
+    total_skus: number
 }
 
-// ─── Agrupación por tienda para renderizado ───────────────────────────────────
+/** Fila de SKU dentro de una tienda (alineado con cpfrDashController.js v2) */
+export interface CpfrSkuDash {
+    // Identificación
+    oc_id: number                       // PK de CPFR_OrdenCompra (clave para edición inline)
+    sku_muliix: string | null           // null si la OC no tiene homologación
+    sku_nombre: string                  // nombre del SKU (o desc_art / sku_cadena como fallback)
 
-export interface CpfrStoreGroup {
+    // Datos de la OC
+    num_pedido: string | null
+    sku_cadena: string | null           // identificador interno cadena (DESC_ART en Soriana)
+    upc_cadena: string | null           // código EAN/UPC de la cadena
+    cant_pedida: number                 // cantidad pedida por la cadena (antes pedido_cadena_pz)
+    uni_com: string | null
+    cap_emp: number
+    desc_art: string | null
+    estado_oc: string | null
+    fec_pedido_cadena: string | null
+    fec_captura: string | null
+
+    // Inventario y sellout
+    inv_actual_kg: number
+    inv_actual_pz: number
+    venta_prom_semanal_kg: number
+    venta_prom_semanal_pz: number
+
+    // Cálculo
+    semanas_objetivo: number
+    cobertura_actual: number | null
+    pedido_sugerido_pz: number          // editable inline
+    escenario: 'A' | 'B' | null
+    demanda_requerida_kg: number | null
+
+    // Indicadores
+    instock_pct: number | null          // null=sin dato, >=100 INSTOCK, >=50 BAJO, <50 CRÍTICO
+    fill_rate: number | null
+    enviado_pz: number | null
+}
+
+/** Resumen de nivel tienda (buildStoreResumen en controller) */
+export interface CpfrStoreResumen {
+    inv_actual_kg: number
+    venta_prom_semanal_kg: number
+    semanas_objetivo: number
+    cobertura_actual: number | null
+    pedido_sugerido_pz: number
+    cant_pedida_total: number           // suma de cant_pedida de los SKUs
+    instock_pct: number | null
+    fill_rate: number | null
+}
+
+/** Tienda dentro de un día */
+export interface CpfrStoreDash {
     id_cliente: string
-    formatocte: string
+    nombre_tienda: string
     jefatura: string
-    dia: string
-    skus: CpfrCalculatedRow[]
-    // macros calculados en el componente
-    macro: CpfrStoreMacro
+    fec_envio: string | null
+    estado_pedido: 'pendiente' | 'procesado' | 'cerrado'
+    resumen: CpfrStoreResumen
+    total_skus: number
+    skus: CpfrSkuDash[]
 }
 
-export interface CpfrStoreMacro {
-    sumInv: number
-    sumVentaProm: number
-    sumSugerido: number
-    sumCadena: number
-    avgCriterio: number
-    macroSemanas: number
-    fillRate: number
-    instockPct: number
-    estado: 'INSTOCK' | 'BAJO' | 'AGOTADO'
+/** Grupo de día */
+export interface CpfrDiaDash {
+    dia_num: number
+    dia_nombre: string
+    tiendas: CpfrStoreDash[]
 }
 
-// ─── Filtros ──────────────────────────────────────────────────────────────────
-
-export interface CpfrFilterOptions {
-    anos: number[]
-    semanas: number[]
-    jefaturas: string[]
-    tiendas: { id: string; nombre: string }[]
-    dias: string[]
+/** Response completo de dash-orders */
+export interface CpfrDashResponse {
+    success: boolean
+    preview?: boolean
+    context: CpfrContext
+    dias: CpfrDiaDash[]
 }
 
-export interface CpfrActiveFilters {
-    ano: number | null
-    semana: number | null
-    jefatura: string        // '' = todas
-    tienda: string          // '' = todas
-    dia: string             // '' = todos
+// ─── Filtros activos (modifican el body del POST) ────────────────────────────
+
+export interface CpfrFilters {
+    dia?: number            // 1–7
+    jefatura?: string
+    id_cliente?: string
+}
+
+// ─── Override de criterio por tienda (para /recalculate) ────────────────────
+
+export interface CpfrOverride {
+    id_cliente: string
+    semanas_objetivo: number
+}
+
+// ─── PATCH /cpfr/order/:id ───────────────────────────────────────────────────
+
+export interface CpfrAdjustSkuBody {
+    cantidad_final_pz: number
+    semanas_objetivo?: number
+    enviado_pz?: number
+}
+
+// ─── PATCH /cpfr/orders/status ───────────────────────────────────────────────
+
+export interface CpfrUpdateStatusBody {
+    id_cliente: string
+    year: number
+    week: number
+    estado: 'pendiente' | 'procesado' | 'cerrado'
+}
+
+// ─── Config de tienda — GET|PUT /api/v2/cpfr/config/:id_cliente ─────────────
+// (usado por CpfrStoreConfigModal)
+
+export interface CpfrStoreConfig {
+    id_cliente: string
+    nombre_tienda?: string
+    dia_cadena: number           // 1=Lun…7=Dom — día que cadena envía OC
+    dia_ventas: number
+    lead_time: number
+    semanas_objetivo: number
+    semanas_sellout: number
+    factor_ajuste?: number       // SOLO LECTURA
+}
+
+// ─── SKU Overrides — GET /api/v2/cpfr/config/:id_cliente/skus ───────────────
+
+export interface CpfrSkuOverride {
+    sku_muliix: string
+    sku_nombre?: string
+    semanas_objetivo: number
+}
+
+// ─── Upload OC — POST /cpfr/upload-oc ────────────────────────────────────────
+// (usado por CpfrUploadModal)
+
+export interface CpfrUploadOCResponse {
+    success: boolean
+    id_cliente: string
+    num_tienda: string
+    num_pedido: string
+    fec_pedido_cadena: string
+    nom_cadena: string
+    inserted: number
+    skipped: number
+    skipped_detail: Array<{ row: number; sku_cadena?: string; reason: string }>
 }

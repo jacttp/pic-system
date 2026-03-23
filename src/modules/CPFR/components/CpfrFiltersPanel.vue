@@ -1,101 +1,92 @@
 <script setup lang="ts">
 // src/modules/CPFR/components/CpfrFiltersPanel.vue
-import { computed } from 'vue'
+// Filtros: Día, Jefatura, Tienda → disparan loadDashboard() en el store
 import { useCpfrStore } from '../stores/cpfrStore'
 
 const store = useCpfrStore()
 
-const jefaturasConTodas = computed(() => ['', ...store.filterOptions.jefaturas])
-const diasConTodos      = computed(() => ['', ...store.filterOptions.dias])
-
-const tiendasFiltradas = computed(() => {
-  const base = store.filterOptions.tiendas
-  if (!store.activeFilters.jefatura) return base
-  // filtra tiendas por jefatura usando rawData como catálogo
-  const ids = new Set(
-    store.rawData
-      .filter(r => r.jefatura === store.activeFilters.jefatura)
-      .map(r => r.id_cliente)
-  )
-  return base.filter(t => ids.has(t.id))
-})
-
-function onYearChange() {
-  store.fetchData()
+function onChangeDia(e: Event) {
+    const val = (e.target as HTMLSelectElement).value
+    store.setFilter('dia', val ? Number(val) : undefined)
+    store.loadDashboard()
 }
 
-function onSemanaChange() {
-  store.fetchData()
+function onChangeJefatura(e: Event) {
+    const val = (e.target as HTMLSelectElement).value
+    store.setFilter('jefatura', val || undefined)
+    store.loadDashboard()
 }
 
-function onJefaturaChange() {
-  store.activeFilters.tienda = ''
+function onChangeTienda(e: Event) {
+    const val = (e.target as HTMLSelectElement).value
+    store.setFilter('id_cliente', val || undefined)
+    store.loadDashboard()
 }
+
+function clearAll() {
+    store.clearFilters()
+    store.loadDashboard()
+}
+
+const hasFilters = () =>
+    store.filters.dia != null ||
+    !!store.filters.jefatura ||
+    !!store.filters.id_cliente
 </script>
 
 <template>
-  <div class="flex flex-wrap items-end gap-3">
-
-    <!-- Año -->
-    <div class="flex flex-col gap-1 min-w-[90px]">
-      <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Año</label>
-      <select
-        v-model="store.activeFilters.ano"
-        class="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-        @change="onYearChange"
-      >
-        <option v-for="a in store.filterOptions.anos" :key="a" :value="a">{{ a }}</option>
-      </select>
-    </div>
-
-    <!-- Semana -->
-    <div class="flex flex-col gap-1 min-w-[100px]">
-      <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Semana</label>
-      <select
-        v-model="store.activeFilters.semana"
-        class="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-        @change="onSemanaChange"
-      >
-        <option v-for="s in store.filterOptions.semanas" :key="s" :value="s">Sem. {{ s }}</option>
-      </select>
-    </div>
+  <div class="flex items-center gap-3 flex-wrap">
 
     <!-- Día -->
-    <div class="flex flex-col gap-1 min-w-[130px]">
-      <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Día</label>
+    <div class="flex flex-col gap-0.5">
+      <label class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Día</label>
       <select
-        v-model="store.activeFilters.dia"
-        class="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        class="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-500 min-w-[120px]"
+        :value="store.filters.dia ?? ''"
+        @change="onChangeDia"
       >
-        <option value="">Todos los días</option>
-        <option v-for="d in diasConTodos.slice(1)" :key="d" :value="d">{{ d }}</option>
+        <option value="">Todos</option>
+        <option v-for="d in store.diaOptions" :key="d.num" :value="d.num">
+          {{ d.nombre }}
+        </option>
       </select>
     </div>
 
     <!-- Jefatura -->
-    <div class="flex flex-col gap-1 min-w-[260px]">
-      <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Jefatura</label>
+    <div class="flex flex-col gap-0.5">
+      <label class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Jefatura</label>
       <select
-        v-model="store.activeFilters.jefatura"
-        class="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-        @change="onJefaturaChange"
+        class="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-500 min-w-[220px]"
+        :value="store.filters.jefatura ?? ''"
+        @change="onChangeJefatura"
       >
-        <option value="">Todas las jefaturas</option>
-        <option v-for="j in store.filterOptions.jefaturas" :key="j" :value="j">{{ j }}</option>
+        <option value="">Todas</option>
+        <option v-for="j in store.jefaturaOptions" :key="j" :value="j">{{ j }}</option>
       </select>
     </div>
 
     <!-- Tienda -->
-    <div class="flex flex-col gap-1 min-w-[220px]">
-      <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Tienda</label>
+    <div class="flex flex-col gap-0.5">
+      <label class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Tienda</label>
       <select
-        v-model="store.activeFilters.tienda"
-        class="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        class="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-500 min-w-[200px]"
+        :value="store.filters.id_cliente ?? ''"
+        @change="onChangeTienda"
       >
-        <option value="">Todas las tiendas</option>
-        <option v-for="t in tiendasFiltradas" :key="t.id" :value="t.id">{{ t.nombre }}</option>
+        <option value="">Todas</option>
+        <option v-for="t in store.tiendaOptions" :key="t.id" :value="t.id">{{ t.nombre }}</option>
       </select>
     </div>
+
+    <!-- Limpiar filtros -->
+    <button
+      v-if="hasFilters()"
+      class="self-end text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-rose-500 hover:border-rose-200 transition-colors"
+      @click="clearAll"
+    >
+      <i class="fa-solid fa-xmark mr-1"></i>
+      Limpiar
+    </button>
 
   </div>
 </template>

@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import { useSetupStore } from '@/modules/Setup/stores/setupStores';
 import { ROLE_LEVELS } from '@/modules/Setup/types/setupTypes';
+import UploadOCView from '@/modules/UploadOC/views/UploadOCView.vue'
 
 // Función auxiliar robusta para verificar expiración
 function isTokenExpired(token: string): boolean {
@@ -184,6 +185,16 @@ const router = createRouter({
                component: () => import('@/modules/Callbook/views/CallbookView.vue'),
                meta: { requiresAuth: true },
             },
+            {
+               path: 'upload-oc',
+               name: 'UploadOC',
+               component: UploadOCView,
+               meta: {
+                  moduleKey: 'UPLOAD_OC', // Debe coincidir con la BD
+                  title: 'Cargas OC'
+               }
+            },
+
 
 
 

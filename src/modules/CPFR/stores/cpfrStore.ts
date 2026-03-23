@@ -3,165 +3,325 @@
 import { defineStore } from 'pinia'
 import { ref, reactive, computed } from 'vue'
 import { cpfrApi } from '../services/cpfrApi'
-import { useCpfrCalculations } from '../composables/useCpfrCalculations'
-import type { CpfrDataItem, CpfrFilterOptions, CpfrActiveFilters, CpfrStoreGroup } from '../types/cpfrTypes'
+import type {
+    CpfrCurrentWeek,
+    CpfrContext,
+    CpfrDiaDash,
+    CpfrFilters,
+    CpfrOverride,
+    CpfrAdjustSkuBody,
+    CpfrUpdateStatusBody,
+    CpfrStoreConfig,
+    CpfrSkuOverride,
+} from '../types/cpfrTypes'
 
 export const useCpfrStore = defineStore('cpfr', () => {
 
-    // ── State ──────────────────────────────────────────────────────────────────
+    // ── State ─────────────────────────────────────────────────────────────────
 
-    const rawData = ref<CpfrDataItem[]>([])
-    const filterOptions = ref<CpfrFilterOptions>({ anos: [], semanas: [], jefaturas: [], tiendas: [], dias: [] })
-    const isLoading = ref(false)
-    const error = ref<string | null>(null)
+    const currentWeek   = ref<CpfrCurrentWeek | null>(null)
+    const context       = ref<CpfrContext | null>(null)
+    const dias          = ref<CpfrDiaDash[]>([])
+    const loading       = ref(false)
+    const preview       = ref(false)          // true cuando viene de /recalculate
+    const error         = ref<string | null>(null)
 
-    const activeFilters = reactive<CpfrActiveFilters>({
-        ano: null,
-        semana: null,
-        jefatura: '',
-        tienda: '',
-        dia: '',
-    })
+    const criterio_global = ref<number>(2.5)
+    const nom_cadena      = ref<string>('soriana')
 
-    // Criterio de semanas: global por SKU (default 2.5) y override por tienda
-    const skuCriteria = reactive<Record<string, number>>({})
-    const storeCriteria = reactive<Record<string, number>>({})
+    // Filtros activos — se incluyen en el body del POST
+    const filters = reactive<CpfrFilters>({})
 
-    // UI: qué grupos están expandidos
-    const expandedGroups = reactive<Record<string, boolean>>({})
+    // Override de criterio por tienda (para recalculate)
+    const overrides = ref<CpfrOverride[]>([])
 
-    // ── Init ───────────────────────────────────────────────────────────────────
+    // UI — expand state local (no viene del backend)
+    const expandedStores = reactive<Record<string, boolean>>({})
 
-    async function init() {
-        isLoading.value = true
-        error.value = null
-        try {
-            filterOptions.value = await cpfrApi.getFilters()
+    // ── Helpers internos ──────────────────────────────────────────────────────
 
-            // Defaults: última semana del ano más reciente
-            const anos = filterOptions.value.anos
-            const semanas = filterOptions.value.semanas
-            if (anos.length) activeFilters.ano = anos[anos.length - 1]!
-            if (semanas.length) activeFilters.semana = semanas[semanas.length - 1]!
-
-            await fetchData()
-        } catch (e) {
-            error.value = 'Error al cargar el módulo CPFR.'
-            console.error(e)
-        } finally {
-            isLoading.value = false
+    function buildDashBody() {
+        return {
+            year: currentWeek.value!.anio,
+            week: currentWeek.value!.semana,
+            nom_cadena: nom_cadena.value,
+            criterio_global: criterio_global.value,
+            ...(Object.keys(filters).length > 0 ? { filters: { ...filters } } : {}),
         }
     }
 
-    // ── Fetch ──────────────────────────────────────────────────────────────────
+    function applyResponse(data: { context: CpfrContext; dias: CpfrDiaDash[]; preview?: boolean }) {
+        context.value = data.context
+        dias.value    = data.dias
+        preview.value = data.preview === true
+    }
 
-    async function fetchData() {
-        if (!activeFilters.ano || !activeFilters.semana) return
-        isLoading.value = true
+    // ── Actions principales ───────────────────────────────────────────────────
+
+    async function fetchCurrentWeek(): Promise<void> {
+        const result = await cpfrApi.getCurrentWeek()
+        currentWeek.value = result
+    }
+
+    async function loadDashboard(): Promise<void> {
+        if (!currentWeek.value) return
+        loading.value = true
         error.value = null
+        // Reset expand state on fresh load
+        Object.keys(expandedStores).forEach(k => { expandedStores[k] = false })
         try {
-            rawData.value = await cpfrApi.getData(activeFilters.ano, activeFilters.semana)
-        } catch (e) {
-            error.value = 'Error al obtener datos.'
-            console.error(e)
+            const res = await cpfrApi.loadDashboard(buildDashBody())
+            applyResponse(res)
+        } catch (e: any) {
+            error.value = 'Error al cargar el dashboard CPFR.'
+            console.error('[cpfrStore.loadDashboard]', e)
         } finally {
-            isLoading.value = false
+            loading.value = false
         }
     }
 
-    // ── Computed: filteredData ─────────────────────────────────────────────────
+    async function recalculate(): Promise<void> {
+        if (!currentWeek.value) return
+        loading.value = true
+        error.value = null
+        try {
+            const body = {
+                ...buildDashBody(),
+                ...(overrides.value.length > 0 ? { overrides: overrides.value } : {}),
+            }
+            const res = await cpfrApi.recalculate(body)
+            applyResponse(res)
+        } catch (e: any) {
+            error.value = 'Error en el recálculo.'
+            console.error('[cpfrStore.recalculate]', e)
+        } finally {
+            loading.value = false
+        }
+    }
 
-    const filteredData = computed<CpfrDataItem[]>(() => {
-        return rawData.value.filter(item => {
-            if (activeFilters.jefatura && item.jefatura !== activeFilters.jefatura) return false
-            if (activeFilters.tienda && item.id_cliente !== activeFilters.tienda) return false
-            if (activeFilters.dia && item.dia !== activeFilters.dia) return false
+    // NOTA: el controller v2 retorna oc_id (CPFR_OrdenCompra.id), NO el id de CPFR_PedidoGenerado.
+    // PATCH /cpfr/order/:id espera el PK de CPFR_PedidoGenerado.
+    // Mientras el backend alinea el response, usamos oc_id como identificador de la OC.
+    async function adjustSku(oc_id: number, body: CpfrAdjustSkuBody, id_cliente: string): Promise<boolean> {
+        try {
+            await cpfrApi.adjustSku(oc_id, body)
+            // Actualizar localmente sin re-fetch completo
+            for (const dia of dias.value) {
+                const tiendaRow = dia.tiendas.find(t => t.id_cliente === id_cliente)
+                if (tiendaRow) {
+                    const sku = tiendaRow.skus.find(s => s.oc_id === oc_id)
+                    if (sku) {
+                        sku.pedido_sugerido_pz = body.cantidad_final_pz
+                        if (body.semanas_objetivo != null) sku.semanas_objetivo = body.semanas_objetivo
+                        if (body.enviado_pz != null) sku.enviado_pz = body.enviado_pz
+                        _recalcStoreResumen(tiendaRow)
+                    }
+                    break
+                }
+            }
             return true
-        })
-    })
-
-    // ── Computed: storeGroups (con cálculos) ───────────────────────────────────
-
-    // Instanciar FUERA del computed — evita dependencia circular / stack overflow
-    const { buildGroups } = useCpfrCalculations(skuCriteria, storeCriteria)
-
-    const storeGroups = computed<CpfrStoreGroup[]>(() => {
-        return buildGroups(filteredData.value)
-    })
-
-    // ── KPIs globales ──────────────────────────────────────────────────────────
-
-    const globalKpis = computed(() => {
-        const groups = storeGroups.value
-        if (!groups.length) return null
-
-        let totalSugerido = 0, totalCadena = 0, totalSkus = 0, instockSkus = 0
-
-        for (const g of groups) {
-            totalSugerido += g.macro.sumSugerido
-            totalCadena += g.macro.sumCadena
-            totalSkus += g.skus.length
-            instockSkus += g.skus.filter(s => s.invActual > 0).length
+        } catch (e: any) {
+            console.error('[cpfrStore.adjustSku]', e)
+            return false
         }
-
-        const fillRate = totalSugerido > 0 ? Math.min(100, (totalCadena / totalSugerido) * 100) : 100
-        const instockPct = totalSkus > 0 ? (instockSkus / totalSkus) * 100 : 0
-
-        return { totalSugerido, totalCadena, fillRate, instockPct, totalTiendas: groups.length, totalSkus }
-    })
-
-    // ── Criterios ──────────────────────────────────────────────────────────────
-
-    function setSkuCriteria(sku: string, value: number) {
-        skuCriteria[sku] = value
     }
 
-    function setStoreCriteria(id_cliente: string, value: number) {
-        storeCriteria[id_cliente] = value
+    async function updateStatus(body: CpfrUpdateStatusBody): Promise<boolean> {
+        try {
+            await cpfrApi.updateStatus(body)
+            // Actualizar localmente
+            for (const dia of dias.value) {
+                const store = dia.tiendas.find(t => t.id_cliente === body.id_cliente)
+                if (store) { store.estado_pedido = body.estado; break }
+            }
+            return true
+        } catch (e: any) {
+            console.error('[cpfrStore.updateStatus]', e)
+            return false
+        }
     }
 
-    function resetCriteria() {
-        Object.keys(skuCriteria).forEach(k => delete skuCriteria[k])
-        Object.keys(storeCriteria).forEach(k => delete storeCriteria[k])
+    // ── Inicialización ───────────────────────────────────────────────────────
+
+    async function init(): Promise<void> {
+        loading.value = true
+        error.value = null
+        try {
+            await fetchCurrentWeek()
+            await loadDashboard()
+        } catch (e: any) {
+            error.value = 'Error al inicializar el módulo CPFR.'
+            console.error('[cpfrStore.init]', e)
+        } finally {
+            loading.value = false
+        }
     }
 
-    // ── Expand / Collapse ──────────────────────────────────────────────────────
+    // ── UI helpers ────────────────────────────────────────────────────────────
 
-    function toggleGroup(id: string) {
-        expandedGroups[id] = !expandedGroups[id]
+    function toggleStore(id_cliente: string) {
+        expandedStores[id_cliente] = !expandedStores[id_cliente]
     }
 
     function expandAll() {
-        storeGroups.value.forEach(g => { expandedGroups[g.id_cliente] = true })
+        for (const dia of dias.value) {
+            for (const t of dia.tiendas) {
+                expandedStores[t.id_cliente] = true
+            }
+        }
     }
 
     function collapseAll() {
-        Object.keys(expandedGroups).forEach(k => { expandedGroups[k] = false })
+        Object.keys(expandedStores).forEach(k => { expandedStores[k] = false })
     }
 
-    // ── SKUs únicos (para el panel de criterios) ───────────────────────────────
+    // ── Filtros ───────────────────────────────────────────────────────────────
 
-    const uniqueSkus = computed(() => {
-        return [...new Set(rawData.value.map(r => r.SKU_NOMBRE))].sort()
-    })
-
-    const uniqueTiendas = computed(() => {
-        const seen = new Map<string, string>()
-        for (const item of filteredData.value) {
-            if (!seen.has(item.id_cliente)) seen.set(item.id_cliente, item.formatocte)
+    function setFilter(key: keyof CpfrFilters, value: number | string | undefined) {
+        if (value == null || value === '') {
+            delete (filters as Record<string, unknown>)[key]
+        } else {
+            (filters as Record<string, unknown>)[key] = value
         }
-        return Array.from(seen.entries()).map(([id, nombre]) => ({ id, nombre }))
+    }
+
+    function clearFilters() {
+        delete filters.dia
+        delete filters.jefatura
+        delete filters.id_cliente
+    }
+
+    // ── Computed ──────────────────────────────────────────────────────────────
+
+    /** Opciones de día derivadas de los dias cargados */
+    const diaOptions = computed(() =>
+        dias.value.map(d => ({ num: d.dia_num, nombre: d.dia_nombre }))
+    )
+
+    /** Jefaturas únicas de todas las tiendas cargadas */
+    const jefaturaOptions = computed(() => {
+        const set = new Set<string>()
+        for (const dia of dias.value)
+            for (const t of dia.tiendas) set.add(t.jefatura)
+        return [...set].sort()
     })
+
+    /** Tiendas únicas de todas las secciones cargadas */
+    const tiendaOptions = computed(() => {
+        const map = new Map<string, string>()
+        for (const dia of dias.value)
+            for (const t of dia.tiendas) map.set(t.id_cliente, t.nombre_tienda)
+        return [...map.entries()]
+            .map(([id, nombre]) => ({ id, nombre }))
+            .sort((a, b) => a.nombre.localeCompare(b.nombre))
+    })
+
+    // ── Recalcula resumen de tienda a partir de sus SKUs ─────────────────────
+
+    function _recalcStoreResumen(store: import('../types/cpfrTypes').CpfrStoreDash) {
+        const skus = store.skus
+        if (!skus.length) return
+        store.resumen.pedido_sugerido_pz = skus.reduce((a, s) => a + s.pedido_sugerido_pz, 0)
+        store.resumen.cant_pedida_total  = skus.reduce((a, s) => a + (s.cant_pedida ?? 0), 0)
+    }
+
+    // ── Config de tienda — conservado para CpfrStoreConfigModal ─────────────
+
+    const storeConfig       = ref<CpfrStoreConfig | null>(null)
+    const configLoading     = ref(false)
+    const configSaving      = ref(false)
+    const configError       = ref<string | null>(null)
+    const skuOverrides      = ref<CpfrSkuOverride[]>([])
+    const skuOverridesLoading = ref(false)
+
+    async function fetchConfig(id_cliente: string) {
+        configLoading.value = true
+        configError.value = null
+        storeConfig.value = null
+        try {
+            storeConfig.value = await cpfrApi.getConfig(id_cliente)
+            fetchSkuOverrides(id_cliente)
+        } catch (e: any) {
+            configError.value = 'No se pudo cargar la configuración.'
+            console.error('[cpfrStore.fetchConfig]', e)
+        } finally {
+            configLoading.value = false
+        }
+    }
+
+    async function saveConfig(
+        id_cliente: string,
+        payload: Omit<CpfrStoreConfig, 'id_cliente' | 'nombre_tienda' | 'factor_ajuste'>
+    ): Promise<boolean> {
+        configSaving.value = true
+        configError.value = null
+        try {
+            await cpfrApi.updateConfig(id_cliente, payload)
+            if (storeConfig.value) Object.assign(storeConfig.value, payload)
+            return true
+        } catch (e: any) {
+            configError.value = e?.response?.data?.message ?? 'Error al guardar configuración.'
+            console.error('[cpfrStore.saveConfig]', e)
+            return false
+        } finally {
+            configSaving.value = false
+        }
+    }
+
+    async function fetchSkuOverrides(id_cliente: string) {
+        skuOverridesLoading.value = true
+        try {
+            const res = await cpfrApi.getSkuOverrides(id_cliente)
+            skuOverrides.value = Array.isArray(res) ? res : []
+        } catch (e) {
+            skuOverrides.value = []
+            console.error('[cpfrStore.fetchSkuOverrides]', e)
+        } finally {
+            skuOverridesLoading.value = false
+        }
+    }
+
+    async function upsertSkuOverride(id_cliente: string, sku_muliix: string, semanas_objetivo: number): Promise<boolean> {
+        try {
+            await cpfrApi.upsertSkuOverride(id_cliente, sku_muliix, semanas_objetivo)
+            const existing = skuOverrides.value.find(o => o.sku_muliix === sku_muliix)
+            if (existing) existing.semanas_objetivo = semanas_objetivo
+            else skuOverrides.value.push({ sku_muliix, semanas_objetivo })
+            return true
+        } catch (e) {
+            console.error('[cpfrStore.upsertSkuOverride]', e)
+            return false
+        }
+    }
+
+    async function deleteSkuOverride(id_cliente: string, sku_muliix: string): Promise<boolean> {
+        try {
+            await cpfrApi.deleteSkuOverride(id_cliente, sku_muliix)
+            skuOverrides.value = skuOverrides.value.filter(o => o.sku_muliix !== sku_muliix)
+            return true
+        } catch (e) {
+            console.error('[cpfrStore.deleteSkuOverride]', e)
+            return false
+        }
+    }
+
+    // ── Return ────────────────────────────────────────────────────────────────
 
     return {
-        // state
-        rawData, filterOptions, isLoading, error,
-        activeFilters, skuCriteria, storeCriteria, expandedGroups,
-        // computed
-        filteredData, storeGroups, globalKpis, uniqueSkus, uniqueTiendas,
-        // actions
-        init, fetchData,
-        setSkuCriteria, setStoreCriteria, resetCriteria,
-        toggleGroup, expandAll, collapseAll,
+        // State
+        currentWeek, context, dias, loading, preview, error,
+        criterio_global, nom_cadena, filters, overrides, expandedStores,
+        // Actions
+        init, fetchCurrentWeek, loadDashboard, recalculate,
+        adjustSku, updateStatus,
+        toggleStore, expandAll, collapseAll,
+        setFilter, clearFilters,
+        // Computed
+        diaOptions, jefaturaOptions, tiendaOptions,
+        // Config de tienda (para CpfrStoreConfigModal)
+        storeConfig, configLoading, configSaving, configError,
+        skuOverrides, skuOverridesLoading,
+        fetchConfig, saveConfig,
+        fetchSkuOverrides, upsertSkuOverride, deleteSkuOverride,
     }
 })
