@@ -20,12 +20,12 @@ const savedId   = ref<number | null>(null)
 
 function startEdit(sku: CpfrSkuDash) {
     editingId.value = sku.oc_id
-    editValue.value = sku.pedido_sugerido_pz
+    editValue.value = sku.pedido_sugerido_pz_red
 }
 function cancelEdit() { editingId.value = null }
 
 async function confirmEdit(sku: CpfrSkuDash, id_cliente: string) {
-    if (editValue.value === sku.pedido_sugerido_pz) { cancelEdit(); return }
+    if (editValue.value === sku.pedido_sugerido_pz_red) { cancelEdit(); return }
     saving.value = true
     const ok = await store.adjustSku(sku.oc_id, { cantidad_final_pz: editValue.value }, id_cliente)
     saving.value = false
@@ -126,6 +126,7 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
             <th class="px-3 py-3 text-right font-bold bg-slate-100">Semanas<br>Actuales</th>
             <th class="px-3 py-3 text-right font-black text-brand-700 bg-brand-50 border-b-2 border-brand-200 shadow-sm border-x border-x-brand-100">Pedido<br>Sugerido</th>
             <th class="px-3 py-3 text-right font-bold bg-slate-100">Pedido<br>Cadena</th>
+            <th class="px-3 py-3 text-left font-bold bg-slate-100">Detalle OC</th>
             <th class="px-3 py-3 text-right font-bold bg-slate-100">Fill Rate</th>
             <th class="px-3 py-3 text-center font-bold bg-slate-100">INSTOCK</th>
             <th class="px-2 py-3 text-center font-bold bg-slate-100 w-10"></th>
@@ -142,7 +143,7 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
               class="cursor-pointer select-none group border-b border-slate-700 bg-slate-800 hover:bg-slate-700 transition-colors"
               @click="toggleDay(dia.dia_num)"
             >
-              <td colspan="11" class="px-4 py-2.5">
+              <td colspan="12" class="px-4 py-2.5">
                 <div class="flex items-center gap-3">
                   <i
                     class="fa-solid text-slate-400 text-[11px] transition-transform duration-200 group-hover:text-white"
@@ -197,7 +198,7 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
 
                   <!-- Vta. Prom. Semanal (kg) -->
                   <td class="px-3 py-3 text-right text-slate-600 text-[11px]">
-                    {{ n(tienda.resumen.venta_prom_semanal_kg, 1) }}
+                    {{ n(tienda.resumen.promedio_sellout_kg, 1) }}
                   </td>
 
                   <!-- Criterio (sem. objetivo) -->
@@ -217,13 +218,16 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
                   <td class="px-3 py-3 text-right font-black text-brand-700 bg-brand-50 border-x border-brand-100 text-sm tracking-tight relative">
                     <!-- Sutil highlight a la celda -->
                     <div class="absolute inset-y-0 left-0 w-1 bg-brand-500/20"></div>
-                    {{ tienda.resumen.pedido_sugerido_pz.toLocaleString('es-MX') }}
+                    {{ tienda.resumen.pedido_sugerido_pz_red.toLocaleString('es-MX') }}
                   </td>
 
                   <!-- Pedido Cadena (cant_pedida de la OC) -->
                   <td class="px-3 py-2.5 text-right font-semibold text-slate-600">
                     {{ tienda.resumen.cant_pedida_total.toLocaleString('es-MX') }}
                   </td>
+
+                  <!-- Detalle OC (Vacío en macro) -->
+                  <td></td>
 
                   <!-- Fill Rate -->
                   <td class="px-3 py-2.5 text-right font-medium" :class="fillClass(tienda.resumen.fill_rate)">
@@ -234,9 +238,9 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
                   <td class="px-3 py-3 text-center">
                     <span
                       class="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full"
-                      :class="instockBadge(tienda.resumen.instock_pct).cls"
+                      :class="instockBadge(tienda.resumen.instock).cls"
                     >
-                      {{ instockBadge(tienda.resumen.instock_pct).label }}
+                      {{ instockBadge(tienda.resumen.instock).label }}
                     </span>
                   </td>
 
@@ -286,7 +290,7 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
 
                   <!-- Empty -->
                   <tr v-if="!tienda.skus.length">
-                    <td colspan="11" class="px-8 py-4 bg-slate-50/60 text-slate-400 text-sm text-center border-b border-slate-100">
+                    <td colspan="12" class="px-8 py-4 bg-slate-50/60 text-slate-400 text-sm text-center border-b border-slate-100">
                       Sin SKUs registrados para esta tienda.
                     </td>
                   </tr>
@@ -322,7 +326,7 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
 
                     <!-- Vta. Prom. Semanal (kg) -->
                     <td class="px-3 py-2 text-right text-slate-600">
-                      {{ n(sku.venta_prom_semanal_kg, 2) }}
+                      {{ n(sku.promedio_sellout_kg, 2) }}
                     </td>
 
                     <!-- Criterio (sem. objetivo) -->
@@ -369,13 +373,24 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
                         @click="startEdit(sku)"
                       >
                         <i class="fa-solid fa-pen text-[9px] text-slate-300 group-hover/cell:text-brand-500 transition-colors mr-2"></i>
-                        <span class="text-[12px] font-bold text-slate-700" :class="{ 'text-brand-700': sku.pedido_sugerido_pz > 0 }">{{ n(sku.pedido_sugerido_pz, 0) }}</span>
+                        <span class="text-[12px] font-bold text-slate-700" :class="{ 'text-brand-700': sku.pedido_sugerido_pz_red > 0 }">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
                       </button>
                     </td>
 
                     <!-- Pedido Cadena (cant_pedida) -->
                     <td class="px-3 py-2 text-right font-semibold text-slate-700">
                       {{ n(sku.cant_pedida, 0) }}
+                    </td>
+
+                    <!-- Detalle OC (nuevos campos) -->
+                    <td class="px-3 py-2 text-left text-[10px] text-slate-500 whitespace-nowrap">
+                      <div v-if="sku.num_pedido">OC: <span class="font-semibold text-slate-700">{{ sku.num_pedido }}</span></div>
+                      <div v-if="sku.fec_pedido_cadena">Ped: {{ sku.fec_pedido_cadena.slice(0, 10) }}</div>
+                      <div v-if="sku.fec_fin_embarque">Emb: {{ sku.fec_fin_embarque.slice(0, 10) }}</div>
+                      <div v-if="sku.estado_oc" class="font-bold mt-1" :class="sku.estado_oc === 'pendiente' ? 'text-amber-500' : 'text-emerald-500'">
+                        {{ sku.estado_oc.toUpperCase() }}
+                      </div>
+                      <div v-else-if="!sku.num_pedido && !sku.fec_pedido_cadena" class="text-slate-300 italic">Sin Detalle OC</div>
                     </td>
 
                     <!-- Fill Rate (solo si no es null) -->
@@ -387,9 +402,9 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
                     <td class="px-3 py-2 text-center">
                       <span
                         class="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full"
-                        :class="instockBadge(sku.instock_pct).cls"
+                        :class="instockBadge(sku.instock).cls"
                       >
-                        {{ instockBadge(sku.instock_pct).label }}
+                        {{ instockBadge(sku.instock).label }}
                       </span>
                     </td>
 

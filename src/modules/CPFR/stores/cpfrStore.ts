@@ -111,7 +111,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
                 if (tiendaRow) {
                     const sku = tiendaRow.skus.find(s => s.oc_id === oc_id)
                     if (sku) {
-                        sku.pedido_sugerido_pz = body.cantidad_final_pz
+                        sku.pedido_sugerido_pz_red = body.cantidad_final_pz
                         if (body.semanas_objetivo != null) sku.semanas_objetivo = body.semanas_objetivo
                         if (body.enviado_pz != null) sku.enviado_pz = body.enviado_pz
                         _recalcStoreResumen(tiendaRow)
@@ -221,7 +221,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
     function _recalcStoreResumen(store: import('../types/cpfrTypes').CpfrStoreDash) {
         const skus = store.skus
         if (!skus.length) return
-        store.resumen.pedido_sugerido_pz = skus.reduce((a, s) => a + s.pedido_sugerido_pz, 0)
+        store.resumen.pedido_sugerido_pz_red = skus.reduce((a, s) => a + s.pedido_sugerido_pz_red, 0)
         store.resumen.cant_pedida_total  = skus.reduce((a, s) => a + (s.cant_pedida ?? 0), 0)
     }
 

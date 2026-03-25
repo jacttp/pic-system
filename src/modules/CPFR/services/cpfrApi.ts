@@ -43,7 +43,11 @@ export const cpfrApi = {
      */
     async getCurrentWeek(): Promise<CpfrCurrentWeek> {
         const { data } = await api.get('/cpfr/current-week')
-        return data.data          // { anio, semana, semana_ic }
+        return {
+            anio: data.year,
+            semana: data.week,
+            semana_ic: String(data.week).padStart(2, '0')
+        }
     },
 
     // ── Dashboard principal ───────────────────────────────────────────────────

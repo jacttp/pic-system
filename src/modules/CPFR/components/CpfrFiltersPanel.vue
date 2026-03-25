@@ -37,6 +37,28 @@ const hasFilters = () =>
 <template>
   <div class="flex items-center gap-3 flex-wrap">
 
+    <!-- Año -->
+    <div class="flex flex-col gap-0.5" v-if="store.currentWeek">
+      <label class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Año</label>
+      <input
+        type="number"
+        class="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-500 min-w-[80px]"
+        v-model.number="store.currentWeek.anio"
+        @change="store.loadDashboard()"
+      />
+    </div>
+
+    <!-- Semana -->
+    <div class="flex flex-col gap-0.5" v-if="store.currentWeek">
+      <label class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Semana</label>
+      <input
+        type="number"
+        class="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-500 min-w-[80px]"
+        v-model.number="store.currentWeek.semana"
+        @change="store.loadDashboard()"
+      />
+    </div>
+
     <!-- Día -->
     <div class="flex flex-col gap-0.5">
       <label class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Día</label>

@@ -33,28 +33,34 @@ export interface CpfrSkuDash {
     sku_cadena: string | null           // identificador interno cadena (DESC_ART en Soriana)
     upc_cadena: string | null           // código EAN/UPC de la cadena
     cant_pedida: number                 // cantidad pedida por la cadena (antes pedido_cadena_pz)
+    unidad_inventario: number
+    pzas_bolsa: number
     uni_com: string | null
     cap_emp: number
     desc_art: string | null
     estado_oc: string | null
     fec_pedido_cadena: string | null
     fec_captura: string | null
+    fec_fin_embarque: string | null
 
     // Inventario y sellout
     inv_actual_kg: number
     inv_actual_pz: number
-    venta_prom_semanal_kg: number
-    venta_prom_semanal_pz: number
+    promedio_sellout_kg: number
+    sellout_semanal_kg: number
 
     // Cálculo
     semanas_objetivo: number
     cobertura_actual: number | null
-    pedido_sugerido_pz: number          // editable inline
+    pedido_sugerido_kg: number
+    pedido_sugerido_pz_br: number
+    pedido_sugerido_pz_red: number          // editable inline
+    pedido_cadena_pz: number
     escenario: 'A' | 'B' | null
     demanda_requerida_kg: number | null
 
     // Indicadores
-    instock_pct: number | null          // null=sin dato, >=100 INSTOCK, >=50 BAJO, <50 CRÍTICO
+    instock: number | null          // null=sin dato, >=100 INSTOCK, >=50 BAJO, <50 CRÍTICO
     fill_rate: number | null
     enviado_pz: number | null
 }
@@ -62,12 +68,17 @@ export interface CpfrSkuDash {
 /** Resumen de nivel tienda (buildStoreResumen en controller) */
 export interface CpfrStoreResumen {
     inv_actual_kg: number
-    venta_prom_semanal_kg: number
+    promedio_sellout_kg: number
+    sellout_semanal_kg: number
     semanas_objetivo: number
     cobertura_actual: number | null
-    pedido_sugerido_pz: number
+    lead_time: number
+    factor_leadtime: number | null
+    pedido_sugerido_kg: number
+    pedido_sugerido_pz_br: number
+    pedido_sugerido_pz_red: number
     cant_pedida_total: number           // suma de cant_pedida de los SKUs
-    instock_pct: number | null
+    instock: number | null
     fill_rate: number | null
 }
 
