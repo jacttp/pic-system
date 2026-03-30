@@ -47,6 +47,7 @@ export interface CpfrSkuDash {
     inv_actual_kg: number
     inv_actual_pz: number
     promedio_sellout_kg: number
+    promedio_sellout_pz: number
     sellout_semanal_kg: number
 
     // Cálculo
@@ -63,12 +64,15 @@ export interface CpfrSkuDash {
     instock: number | null          // null=sin dato, >=100 INSTOCK, >=50 BAJO, <50 CRÍTICO
     fill_rate: number | null
     enviado_pz: number | null
+    sellout_semanas?: Array<{ semana: number, kg: number }>
 }
 
 /** Resumen de nivel tienda (buildStoreResumen en controller) */
 export interface CpfrStoreResumen {
     inv_actual_kg: number
+    inv_actual_pz: number
     promedio_sellout_kg: number
+    promedio_sellout_pz: number
     sellout_semanal_kg: number
     semanas_objetivo: number
     cobertura_actual: number | null
@@ -115,6 +119,8 @@ export interface CpfrFilters {
     dia?: number            // 1–7
     jefatura?: string
     id_cliente?: string
+    nombre_tienda?: string
+    semanas_sellout?: number
 }
 
 // ─── Override de criterio por tienda (para /recalculate) ────────────────────

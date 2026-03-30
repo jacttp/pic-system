@@ -15,24 +15,16 @@ const selectedYears = computed(() => store.selected.Anio.sort());
 const showDesglose = ref(true);
 
 // --- LÓGICA DE MESES VISIBLES ---
-// Si el año actual está entre los años seleccionados, sólo mostramos hasta el mes en curso.
-const currentRealYear = new Date().getFullYear();
-const currentRealMonth = new Date().getMonth() + 1; // 1-12
-
 const visibleMonthRange = computed(() => {
-    const hasCurrentYear = selectedYears.value.includes(String(currentRealYear));
-    const maxMesFinal = hasCurrentYear ? currentRealMonth : 12;
-
     if (!store.selected.usarRangoMeses) {
-        return { start: 0, end: maxMesFinal };
+        return { start: 0, end: 12 };
     }
 
     const start = Math.max(0, parseInt(store.selected.MesInicial) - 1); // 0-indexed
     let end = parseInt(store.selected.MesFinal);
 
     // Seguridad extra
-    if (end > maxMesFinal) end = maxMesFinal;
-    if (start >= end) return { start: 0, end: maxMesFinal }; // Fallback
+    if (start >= end) return { start: 0, end: 12 }; // Fallback
     
     return { start, end };
 });

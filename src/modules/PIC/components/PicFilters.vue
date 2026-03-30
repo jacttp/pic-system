@@ -11,30 +11,12 @@ const filterPanel = ref<HTMLElement | null>(null);
 const isCollapsed = ref(true); 
 const overflowVisible = ref(true); 
 
-// Lógica para limitar MesFinal
-const maxMesFinal = computed(() => {
-    const currentYear = new Date().getFullYear();
-    const hasCurrentYear = store.selected.Anio.includes(String(currentYear));
-    return hasCurrentYear ? new Date().getMonth() + 1 : 12;
-});
-
-// Watcher de seguridad: si cambian los años elegidos y el mes final/inicial quedó por encima del máximo permitido, reajustar.
-watch(() => store.selected.Anio, () => {
-    const max = maxMesFinal.value;
-    if (parseInt(store.selected.MesFinal) > max) {
-        store.selected.MesFinal = String(max);
-    }
-    if (parseInt(store.selected.MesInicial) > max) {
-        store.selected.MesInicial = String(max);
-    }
-});
-
 function toggleRangoMeses() {
     store.selected.usarRangoMeses = !store.selected.usarRangoMeses;
     if (!store.selected.usarRangoMeses) {
         // Reset a los valores por defecto al apagar el switch
         store.selected.MesInicial = '1';
-        store.selected.MesFinal = String(maxMesFinal.value);
+        store.selected.MesFinal = '12';
     }
 }
 
@@ -266,7 +248,7 @@ watch(isCollapsed, (newVal) => {
                                         <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Mes Ini</label>
                                         <div class="relative">
                                             <select v-model="store.selected.MesInicial" class="w-full text-xs font-medium border border-slate-200 rounded-lg pl-2 pr-6 h-[38px] bg-white appearance-none focus:border-brand-500 focus:ring-1 focus:ring-brand-100 outline-none cursor-pointer hover:border-slate-300">
-                                                <option v-for="i in maxMesFinal" :key="'ini-'+i" :value="String(i)">{{ i }}</option>
+                                                <option v-for="i in 12" :key="'ini-'+i" :value="String(i)">{{ i }}</option>
                                             </select>
                                             <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none"></i>
                                         </div>
@@ -275,7 +257,7 @@ watch(isCollapsed, (newVal) => {
                                         <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Mes Fin</label>
                                         <div class="relative">
                                             <select v-model="store.selected.MesFinal" class="w-full text-xs font-medium border border-slate-200 rounded-lg pl-2 pr-6 h-[38px] bg-white appearance-none focus:border-brand-500 focus:ring-1 focus:ring-brand-100 outline-none cursor-pointer hover:border-slate-300">
-                                                <option v-for="i in maxMesFinal" :key="'fin-'+i" :value="String(i)">{{ i }}</option>
+                                                <option v-for="i in 12" :key="'fin-'+i" :value="String(i)">{{ i }}</option>
                                             </select>
                                             <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none"></i>
                                         </div>

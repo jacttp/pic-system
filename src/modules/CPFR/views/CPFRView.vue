@@ -11,8 +11,6 @@ import CpfrStoreConfigModal from '../components/CpfrStoreConfigModal.vue'
 const store = useCpfrStore()
 
 // ── Modal state ────────────────────────────────────────────────────────────────
-const showFilters      = ref(false)
-const showCriteria     = ref(false)
 const showUploadModal  = ref(false)
 const configStore      = ref<{ id: string; nombre: string } | null>(null)
 
@@ -68,8 +66,11 @@ function onUploadDone() {
 
     </header>
 
-    <!-- ── Barra de acciones ──────────────────────────────────────────────── -->
-    <nav class="bg-white border-b border-slate-200 px-5 flex items-center gap-2 py-2 shrink-0 flex-wrap">
+    <!-- ── Barra de Filtros (Estática) ──────────────────────────────────────────────── -->
+    <CpfrFiltersPanel @upload-oc="showUploadModal = true" />
+
+    <!-- ── Barra de acciones (Secundaria) ──────────────────────────────────────────────── -->
+    <nav class="bg-white border-b border-slate-200 px-5 flex items-center gap-2 py-2 shrink-0 flex-wrap relative z-30">
 
       <!-- Preview banner inline -->
       <div
@@ -81,37 +82,6 @@ function onUploadDone() {
       </div>
 
       <div class="flex-1"></div>
-
-      <!-- Subir OC -->
-      <button
-        class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
-        @click="showUploadModal = true"
-      >
-        <i class="fa-solid fa-file-arrow-up text-[11px]"></i>
-        Subir OC
-      </button>
-
-      <!-- Filtros toggle -->
-      <button
-        class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors"
-        :class="showFilters ? 'bg-brand-50 border-brand-200 text-brand-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'"
-        @click="showFilters = !showFilters"
-      >
-        <i class="fa-solid fa-sliders text-[11px]"></i>
-        Filtros
-        <i :class="showFilters ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'" class="text-[10px]"></i>
-      </button>
-
-      <!-- Criterio toggle -->
-      <button
-        class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors"
-        :class="showCriteria ? 'bg-brand-50 border-brand-200 text-brand-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'"
-        @click="showCriteria = !showCriteria"
-      >
-        <i class="fa-solid fa-sliders rotate-90 text-[11px]"></i>
-        Criterio
-        <span class="text-brand-500 font-bold">{{ store.criterio_global.toFixed(1) }}x</span>
-      </button>
 
       <!-- Expandir / Contraer -->
       <button
@@ -131,42 +101,11 @@ function onUploadDone() {
 
     </nav>
 
-    <!-- ── Filter bar (colapsable) ────────────────────────────────────────── -->
-    <div v-show="showFilters" class="px-4 py-3 bg-white border-b border-slate-100 shrink-0">
-      <CpfrFiltersPanel />
-    </div>
-
     <!-- ── Content ────────────────────────────────────────────────────────── -->
-    <div class="flex flex-1 min-h-0 overflow-hidden">
-
-      <!-- Sidebar criterios -->
-      <aside
-        v-show="showCriteria"
-        class="w-64 shrink-0 border-r border-slate-200 bg-white flex flex-col overflow-y-auto"
-      >
-        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/60 shrink-0">
-          <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Criterios</p>
-          <button class="text-[10px] text-slate-300 hover:text-slate-500 transition-colors" @click="showCriteria = false">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-        </div>
-        <div class="flex-1 overflow-y-auto p-3">
-          <CpfrCriteriaPanel />
-        </div>
-      </aside>
-
-      <!-- Criteria toggle when hidden -->
-      <button
-        v-if="!showCriteria"
-        class="shrink-0 w-8 bg-white border-r border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors"
-        title="Mostrar criterios"
-        @click="showCriteria = true"
-      >
-        <i class="fa-solid fa-sliders text-slate-300 rotate-90 text-xs"></i>
-      </button>
+    <div class="flex flex-1 min-h-0 overflow-hidden relative z-20">
 
       <!-- Área principal -->
-      <div class="flex-1 flex flex-col min-h-0 min-w-0">
+      <div class="flex-1 flex flex-col min-h-0 min-w-0 p-4">
 
         <!-- Loading -->
         <div v-if="store.loading" class="flex-1 flex flex-col items-center justify-center gap-3 text-slate-400">

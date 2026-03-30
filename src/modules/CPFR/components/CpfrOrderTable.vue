@@ -2,7 +2,7 @@
 // src/modules/CPFR/components/CpfrOrderTable.vue
 // Tabla jerárquica: Día → Tienda (macro) → SKUs (detalle)
 // Columnas: INV.ACTUAL | VENTA PROM.SEM | CRITERIO | SEM.ACTUALES | PEDIDO SUGERIDO | PEDIDO CADENA | FILL RATE | INSTOCK
-import { ref } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useCpfrStore } from '../stores/cpfrStore'
 import type { CpfrSkuDash, CpfrStoreDash } from '../types/cpfrTypes'
 
@@ -33,6 +33,71 @@ async function confirmEdit(sku: CpfrSkuDash, id_cliente: string) {
     editingId.value = null
 }
 
+// ── Sellout History Popover ───────────────────────────────────────────────────
+const openSelloutId = ref<string | null>(null)
+
+function closeSellout() {
+    openSelloutId.value = null
+}
+
+function toggleSellout(id: string) {
+    if (openSelloutId.value === id) {
+        openSelloutId.value = null
+    } else {
+        openSelloutId.value = id
+    }
+}
+
+onMounted(() => {
+    document.addEventListener('click', closeSellout)
+})
+
+onBeforeUnmount(() => {
+    document.removeEventListener('click', closeSellout)
+})
+
+// ── Agrupación por Orden de Compra (OC) ────────────────────────────────────────────────────────
+export interface GroupedOC {
+    group_id: string;
+    num_pedido: string | null;
+    fec_pedido_cadena: string | null;
+    fec_fin_embarque: string | null;
+    estado_oc: string | null;
+    pedido_sugerido_pz_red_total: number;
+    cant_pedida_total: number;
+    skus: CpfrSkuDash[];
+}
+
+function groupOCs(skus: CpfrSkuDash[]): GroupedOC[] {
+    const map = new Map<string, GroupedOC>()
+    for (const sku of skus) {
+        const key = sku.num_pedido || 'UNSAVED'
+        if (!map.has(key)) {
+            map.set(key, {
+                group_id: key,
+                num_pedido: sku.num_pedido,
+                fec_pedido_cadena: sku.fec_pedido_cadena,
+                fec_fin_embarque: sku.fec_fin_embarque,
+                estado_oc: sku.estado_oc,
+                pedido_sugerido_pz_red_total: 0,
+                cant_pedida_total: 0,
+                skus: []
+            })
+        }
+        const oc = map.get(key)!
+        oc.pedido_sugerido_pz_red_total += sku.pedido_sugerido_pz_red
+        oc.cant_pedida_total += (sku.cant_pedida || 0)
+        oc.skus.push(sku)
+    }
+    return Array.from(map.values())
+}
+
+const expandedOCGroups = ref<Record<string, boolean>>({})
+function toggleOCGroup(storeId: string, groupId: string) {
+    const key = `${storeId}_${groupId}`
+    expandedOCGroups.value[key] = !expandedOCGroups.value[key]
+}
+
 // ── Secciones de días colapsadas ──────────────────────────────────────────────
 const collapsedDays = ref<Record<number, boolean>>({})
 function toggleDay(dia_num: number) {
@@ -43,15 +108,17 @@ function toggleDay(dia_num: number) {
 
 function cobClass(cob: number | null) {
     if (cob === null) return 'text-slate-400'
-    if (cob < 2.0)   return 'text-rose-500 font-semibold'
-    if (cob > 3.0)   return 'text-orange-500 font-semibold'
+    const crit = store.criterio_global || 2.0
+    if (cob < crit) return 'text-rose-500 font-semibold'
+    if (cob > crit + 1.0) return 'text-orange-500 font-semibold'
     return 'text-emerald-600 font-semibold'
 }
 
 function fillClass(fr: number | null) {
     if (fr === null) return 'text-slate-300'
-    if (fr >= 90)   return 'text-emerald-600 font-semibold'
-    if (fr >= 70)   return 'text-amber-500 font-semibold'
+    const pct = fr * 100
+    if (pct >= 90)   return 'text-emerald-600 font-semibold'
+    if (pct >= 70)   return 'text-amber-500 font-semibold'
     return 'text-rose-500 font-semibold'
 }
 
@@ -119,11 +186,12 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
         <thead class="sticky top-0 z-20 shadow-sm">
           <tr class="text-[10px] uppercase tracking-wider text-slate-600 bg-slate-100 border-b-2 border-slate-200 shadow-sm relative">
             <th class="px-4 py-3 text-left font-bold w-[240px] bg-slate-100">Tienda / SKU</th>
+            <th class="px-3 py-3 text-left font-bold bg-slate-100">UPC</th>
             <th class="px-3 py-3 text-left font-bold bg-slate-100">Jefatura</th>
-            <th class="px-3 py-3 text-right font-bold bg-slate-100">Inv.<br>Actual (kg)</th>
-            <th class="px-3 py-3 text-right font-bold bg-slate-100">Vta. Prom.<br>Semanal (kg)</th>
+            <th class="px-3 py-3 text-right font-bold bg-slate-100">Inv.<br>Actual (pz)</th>
+            <th class="px-3 py-3 text-right font-bold bg-slate-100">Sellout Prom.<br>Semanal (pz)</th>
             <th class="px-3 py-3 text-right font-bold bg-slate-100">Criterio<br>(Sem.)</th>
-            <th class="px-3 py-3 text-right font-bold bg-slate-100">Semanas<br>Actuales</th>
+            <th class="px-3 py-3 text-right font-bold bg-slate-100">Cobertura<br>(Sem.)</th>
             <th class="px-3 py-3 text-right font-black text-brand-700 bg-brand-50 border-b-2 border-brand-200 shadow-sm border-x border-x-brand-100">Pedido<br>Sugerido</th>
             <th class="px-3 py-3 text-right font-bold bg-slate-100">Pedido<br>Cadena</th>
             <th class="px-3 py-3 text-left font-bold bg-slate-100">Detalle OC</th>
@@ -138,12 +206,11 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
           <!-- ══ SECCIÓN POR DÍA ══ -->
           <template v-for="dia in store.dias" :key="dia.dia_num">
 
-            <!-- Separador de día colapsable -->
             <tr
               class="cursor-pointer select-none group border-b border-slate-700 bg-slate-800 hover:bg-slate-700 transition-colors"
               @click="toggleDay(dia.dia_num)"
             >
-              <td colspan="12" class="px-4 py-2.5">
+              <td colspan="13" class="px-4 py-2.5">
                 <div class="flex items-center gap-3">
                   <i
                     class="fa-solid text-slate-400 text-[11px] transition-transform duration-200 group-hover:text-white"
@@ -163,14 +230,13 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
             <template v-if="!collapsedDays[dia.dia_num]">
               <template v-for="tienda in dia.tiendas" :key="tienda.id_cliente">
 
-                <!-- ── Fila MACRO de tienda ── -->
                 <tr
                   class="cursor-pointer transition-colors border-b hover:bg-slate-50 relative"
                   :class="store.expandedStores[tienda.id_cliente] ? 'bg-slate-50 border-slate-200' : 'bg-white border-slate-100'"
                   @click="store.toggleStore(tienda.id_cliente)"
                 >
                   <!-- Tienda -->
-                  <td class="px-4 py-3">
+                  <td class="px-4 py-3" colspan="2">
                     <div class="flex items-start gap-2.5">
                       <i
                         class="fa-solid fa-chevron-right text-slate-300 text-[10px] transition-transform duration-200 shrink-0 mt-0.5"
@@ -191,14 +257,16 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
                     {{ tienda.jefatura }}
                   </td>
 
-                  <!-- Inv. Actual (kg) -->
-                  <td class="px-3 py-3 text-right text-slate-600 text-[11px]">
-                    {{ n(tienda.resumen.inv_actual_kg, 0) }}
+                  <!-- Inv. Actual (pz) -->
+                  <td class="px-3 py-3 text-right text-slate-600 text-[11px] cursor-help"
+                      :title="n(tienda.resumen.inv_actual_kg, 2) + ' kg totales'">
+                    <span class="border-b border-dashed border-slate-300">{{ n(tienda.resumen.inv_actual_pz, 2) }}</span>
                   </td>
 
-                  <!-- Vta. Prom. Semanal (kg) -->
-                  <td class="px-3 py-3 text-right text-slate-600 text-[11px]">
-                    {{ n(tienda.resumen.promedio_sellout_kg, 1) }}
+                  <!-- Vta. Prom. Semanal (pz) -->
+                  <td class="px-3 py-3 text-right text-slate-600 text-[11px] cursor-help"
+                      :title="n(tienda.resumen.promedio_sellout_kg, 2) + ' kg totales'">
+                    <span class="border-b border-dashed border-slate-300">{{ n(tienda.resumen.promedio_sellout_pz, 2) }}</span>
                   </td>
 
                   <!-- Criterio (sem. objetivo) -->
@@ -231,7 +299,7 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
 
                   <!-- Fill Rate -->
                   <td class="px-3 py-2.5 text-right font-medium" :class="fillClass(tienda.resumen.fill_rate)">
-                    {{ tienda.resumen.fill_rate != null ? tienda.resumen.fill_rate.toFixed(1) + '%' : '—' }}
+                    {{ tienda.resumen.fill_rate != null ? (tienda.resumen.fill_rate * 100).toFixed(1) + '%' : '—' }}
                   </td>
 
                   <!-- INSTOCK -->
@@ -290,127 +358,218 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
 
                   <!-- Empty -->
                   <tr v-if="!tienda.skus.length">
-                    <td colspan="12" class="px-8 py-4 bg-slate-50/60 text-slate-400 text-sm text-center border-b border-slate-100">
+                    <td colspan="13" class="px-8 py-4 bg-slate-50/60 text-slate-400 text-sm text-center border-b border-slate-100">
                       Sin SKUs registrados para esta tienda.
                     </td>
                   </tr>
 
-                  <!-- SKU rows -->
-                  <tr
-                    v-else
-                    v-for="sku in tienda.skus"
-                    :key="sku.oc_id"
-                    class="bg-white hover:bg-slate-50 transition-colors text-[11px] border-b border-slate-100"
-                  >
-                    <!-- Nombre SKU -->
-                    <td class="pl-10 pr-3 py-2 text-slate-700 font-medium" :title="sku.sku_nombre">
-                      <div class="flex items-center gap-1.5 min-w-0">
-                        <span
-                          class="shrink-0 inline-block text-[9px] font-bold px-1.5 py-0.5 rounded"
-                          :class="escenarioCls(sku.escenario)"
-                          :title="sku.escenario === 'B' ? 'Pedido recalculado' : ''"
-                        >{{ sku.escenario ?? '—' }}</span>
-                        <span class="truncate max-w-[170px]">{{ sku.sku_nombre }}</span>
-                      </div>
-                      <p v-if="sku.upc_cadena" class="text-[9px] text-slate-300 font-mono mt-0.5 pl-5"
-                         :title="`UPC: ${sku.upc_cadena}`">{{ sku.upc_cadena }}</p>
-                    </td>
-
-                    <!-- SKU ID (muliix) -->
-                    <td class="px-3 py-2 text-slate-300 text-[10px] italic">{{ sku.sku_muliix ?? '—' }}</td>
-
-                    <!-- Inv. Actual (kg) -->
-                    <td class="px-3 py-2 text-right text-slate-600">
-                      {{ n(sku.inv_actual_kg, 2) }}
-                    </td>
-
-                    <!-- Vta. Prom. Semanal (kg) -->
-                    <td class="px-3 py-2 text-right text-slate-600">
-                      {{ n(sku.promedio_sellout_kg, 2) }}
-                    </td>
-
-                    <!-- Criterio (sem. objetivo) -->
-                    <td class="px-3 py-2 text-right text-slate-500">
-                      {{ sku.semanas_objetivo }}
-                    </td>
-
-                    <!-- Semanas Actuales (cobertura_actual) -->
-                    <td
-                      class="px-3 py-2 text-right font-bold"
-                      :class="cobClass(sku.cobertura_actual)"
-                      :title="sku.cobertura_actual === null ? 'Sin datos de venta'
-                             : sku.cobertura_actual < 2.0 ? 'Riesgo desabasto'
-                             : sku.cobertura_actual > 3.0 ? 'Sobrestock' : 'Cobertura OK'"
+                  <!-- OC Groups -->
+                  <template v-else v-for="ocGroup in groupOCs(tienda.skus)" :key="ocGroup.group_id">
+                    
+                    <!-- Parent OC Row -->
+                    <tr
+                      class="bg-white hover:bg-slate-50 cursor-pointer transition-colors text-[11px] border-l-4 group/row"
+                      :class="expandedOCGroups[`${tienda.id_cliente}_${ocGroup.group_id}`] !== false ? 'border-b border-slate-200 border-l-brand-300 bg-slate-50/50' : 'border-b border-slate-50 border-emerald-400/0'"
+                      @click="toggleOCGroup(tienda.id_cliente, ocGroup.group_id)"
                     >
-                      {{ sku.cobertura_actual != null ? sku.cobertura_actual.toFixed(2) : '—' }}
-                    </td>
-
-                    <!-- Pedido Sugerido (editable Excel-style) -->
-                    <td class="px-2 py-1.5 align-middle bg-brand-50 border-x border-brand-100 relative group/cell">
-                      <!-- Resalte sutil vertical -->
-                      <div class="absolute inset-y-0 left-0 w-1 bg-brand-500/10"></div>
-                      
-                      <div v-if="editingId === sku.oc_id" class="flex items-center gap-1.5 justify-end h-full">
-                        <input
-                          v-model.number="editValue"
-                          type="number" min="0" step="1"
-                          class="w-full h-7 rounded-sm border-2 border-brand-500 px-1 text-xs text-right font-bold text-slate-800 shadow-inner focus:outline-none"
-                          autofocus
-                          @keyup.enter="confirmEdit(sku, tienda.id_cliente)"
-                          @keyup.escape="cancelEdit()"
-                        />
-                        <div class="flex flex-col gap-0.5">
-                          <button class="bg-emerald-500 text-white rounded w-5 h-5 flex items-center justify-center hover:bg-emerald-600 shadow-sm" @click="confirmEdit(sku, tienda.id_cliente)">
-                            <i :class="saving ? 'fa-solid fa-circle-notch fa-spin text-[8px]' : 'fa-solid fa-check text-[10px]'"></i>
-                          </button>
+                      <!-- Etiqueta OC -->
+                      <td colspan="7" class="pl-7 pr-3 py-2 text-slate-700 font-bold border-l border-slate-50">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                          <i
+                            class="fa-solid fa-chevron-right text-slate-300 text-[10px] transition-transform duration-200 shrink-0 mt-px mr-1"
+                            :class="expandedOCGroups[`${tienda.id_cliente}_${ocGroup.group_id}`] !== false ? 'rotate-90 text-brand-500' : 'group-hover/row:text-slate-400'"
+                          ></i>
+                          <span class="truncate uppercase tracking-wide text-[10px] text-slate-500 mr-2">Orden de Compra:</span>
+                          <span class="text-[12px] font-black tracking-tight" :class="ocGroup.num_pedido ? 'text-brand-600' : 'text-slate-400 italic'">
+                              {{ ocGroup.num_pedido || 'Sin número' }}
+                          </span>
+                          <span v-if="ocGroup.estado_oc" class="font-bold px-1.5 py-0.5 rounded text-[9px] border ml-1 uppercase" :class="ocGroup.estado_oc === 'pendiente' ? 'border-amber-200 text-amber-600 bg-amber-50' : 'border-emerald-200 text-emerald-600 bg-emerald-50'">
+                            {{ ocGroup.estado_oc }}
+                          </span>
+                          <span class="bg-indigo-50 text-indigo-600 border border-indigo-100 font-bold px-1.5 py-0.5 rounded text-[9px] ml-1">{{ ocGroup.skus.length }} SKUs</span>
                         </div>
-                      </div>
-                      <button
-                        v-else
-                        class="w-full text-right bg-white border border-slate-300 hover:border-brand-500 hover:shadow-sm rounded shadow-sm px-2 py-1 flex items-center justify-between transition-all"
-                        :class="{ 'ring-2 ring-emerald-400 border-transparent bg-emerald-50': savedId === sku.oc_id }"
-                        title="Doble clic o clic para editar cantidad"
-                        @click="startEdit(sku)"
+                      </td>
+
+                      <!-- Pedido Sugerido SUM -->
+                      <td class="px-3 py-2 text-right font-bold text-brand-700 bg-brand-50/70 border-x border-brand-100/70 text-sm tracking-tight relative">
+                        {{ n(ocGroup.pedido_sugerido_pz_red_total, 0) }}
+                      </td>
+
+                      <!-- Pedido Cadena SUM -->
+                      <td class="px-3 py-2 text-right font-bold text-slate-700 border-l border-slate-50">
+                        {{ n(ocGroup.cant_pedida_total, 0) }}
+                      </td>
+
+                      <!-- Detalle Fechas (Alerta límite embalaje) -->
+                      <td class="px-3 py-2 text-left whitespace-nowrap border-l border-slate-50 bg-white" colspan="4">
+                        <div class="flex items-center gap-4 text-[10px] font-medium">
+                            <div v-if="ocGroup.fec_pedido_cadena" class="text-slate-500">
+                                <i class="fa-regular fa-calendar-plus mr-1"></i>
+                                <span title="Día que se levantó el pedido">Pedido: <span class="font-bold text-slate-700">{{ ocGroup.fec_pedido_cadena.slice(0, 10) }}</span></span>
+                            </div>
+                            <div v-if="ocGroup.fec_fin_embarque" class="text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded shadow-sm flex items-center gap-1.5 group/alert hover:bg-rose-100 transition-colors cursor-help" title="Fecha límite de recepción en cadena. ¡Atención si se está próximo!">
+                                <i class="fa-solid fa-triangle-exclamation animate-pulse text-rose-500"></i>
+                                <span>Caduca Embarque: <span class="font-bold">{{ ocGroup.fec_fin_embarque.slice(0, 10) }}</span></span>
+                            </div>
+                        </div>
+                      </td>
+                    </tr>
+
+                    <!-- Children SKU Rows -->
+                    <template v-if="expandedOCGroups[`${tienda.id_cliente}_${ocGroup.group_id}`] !== false">
+                      <tr
+                        v-for="(sku, index) in ocGroup.skus"
+                        :key="sku.oc_id + '_' + index"
+                        class="bg-white/80 transition-colors text-[11px] border-b border-slate-50 hover:bg-slate-50 group/row"
                       >
-                        <i class="fa-solid fa-pen text-[9px] text-slate-300 group-hover/cell:text-brand-500 transition-colors mr-2"></i>
-                        <span class="text-[12px] font-bold text-slate-700" :class="{ 'text-brand-700': sku.pedido_sugerido_pz_red > 0 }">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
-                      </button>
-                    </td>
+                        <!-- Nombre SKU -->
+                        <td class="pl-12 pr-3 py-1.5 text-slate-700 font-medium border-l border-slate-50" :title="sku.sku_nombre">
+                          <div class="flex items-center gap-1.5 min-w-0">
+                            <div class="w-2 h-px bg-slate-300 mr-1 content-['']"></div>  
+                            <span
+                              class="shrink-0 inline-block text-[9px] font-bold px-1.5 py-0.5 rounded border"
+                              :class="escenarioCls(sku.escenario)"
+                              :title="sku.escenario === 'B' ? 'Pedido recalculado' : ''"
+                            >{{ sku.escenario ?? '—' }}</span>
+                            <span class="truncate max-w-[170px]">{{ sku.sku_nombre }}</span>
+                          </div>
+                        </td>
 
-                    <!-- Pedido Cadena (cant_pedida) -->
-                    <td class="px-3 py-2 text-right font-semibold text-slate-700">
-                      {{ n(sku.cant_pedida, 0) }}
-                    </td>
+                        <!-- UPC -->
+                        <td class="px-3 py-1.5 text-slate-500 text-[10px] font-mono border-l border-slate-50 bg-white">{{ sku.upc_cadena ?? '—' }}</td>
 
-                    <!-- Detalle OC (nuevos campos) -->
-                    <td class="px-3 py-2 text-left text-[10px] text-slate-500 whitespace-nowrap">
-                      <div v-if="sku.num_pedido">OC: <span class="font-semibold text-slate-700">{{ sku.num_pedido }}</span></div>
-                      <div v-if="sku.fec_pedido_cadena">Ped: {{ sku.fec_pedido_cadena.slice(0, 10) }}</div>
-                      <div v-if="sku.fec_fin_embarque">Emb: {{ sku.fec_fin_embarque.slice(0, 10) }}</div>
-                      <div v-if="sku.estado_oc" class="font-bold mt-1" :class="sku.estado_oc === 'pendiente' ? 'text-amber-500' : 'text-emerald-500'">
-                        {{ sku.estado_oc.toUpperCase() }}
-                      </div>
-                      <div v-else-if="!sku.num_pedido && !sku.fec_pedido_cadena" class="text-slate-300 italic">Sin Detalle OC</div>
-                    </td>
+                        <!-- SKU ID (muliix) -->
+                        <td class="px-3 py-1.5 text-slate-400 text-[10px] italic border-l border-slate-50 group-hover/row:text-slate-500">{{ sku.sku_muliix ?? '—' }}</td>
 
-                    <!-- Fill Rate (solo si no es null) -->
-                    <td class="px-3 py-2 text-right" :class="fillClass(sku.fill_rate)">
-                      {{ sku.fill_rate != null ? sku.fill_rate.toFixed(1) + '%' : '—' }}
-                    </td>
+                        <!-- Inv. Actual (pz) -->
+                        <td class="px-3 py-1.5 text-right text-slate-600 border-l border-slate-50 cursor-help"
+                            :title="`${n(sku.inv_actual_kg, 2)} kg (Inv. uni. = ${sku.unidad_inventario} kg/pz)`">
+                          <span class="border-b border-dashed border-slate-300">{{ n(sku.inv_actual_pz, 2) }}</span>
+                        </td>
 
-                    <!-- INSTOCK per SKU -->
-                    <td class="px-3 py-2 text-center">
-                      <span
-                        class="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full"
-                        :class="instockBadge(sku.instock).cls"
-                      >
-                        {{ instockBadge(sku.instock).label }}
-                      </span>
-                    </td>
+                        <!-- Vta. Prom. Semanal (pz) -->
+                        <td class="px-3 py-1.5 text-right text-slate-600 border-l border-slate-50 relative cursor-pointer group/cell hover:bg-slate-50/80 transition-colors"
+                            @click.stop="toggleSellout(tienda.id_cliente + '_' + sku.sku_cadena)">
+                          
+                          <div class="cursor-help" :title="`${n(sku.promedio_sellout_kg, 2)} kg (Inv. uni. = ${sku.unidad_inventario} kg/pz)`">
+                            <span class="border-b border-dashed border-slate-300 group-hover/cell:text-brand-600 transition-colors">{{ n(sku.promedio_sellout_pz, 2) }}</span>
+                          </div>
 
-                    <!-- vacío -->
-                    <td></td>
-                  </tr>
+                          <!-- Popover Historial Sellout -->
+                          <div v-if="openSelloutId === (tienda.id_cliente + '_' + sku.sku_cadena)"
+                               class="absolute bottom-full right-0 mb-1.5 z-50 bg-white border border-slate-300 shadow-xl shadow-slate-200/50 rounded-lg p-3 w-[220px] cursor-default"
+                               @click.stop>
+                              <div class="flex items-center justify-between mb-2 pb-1.5 border-b border-slate-100">
+                                  <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><i class="fa-solid fa-chart-line text-brand-500"></i> Histórico Sellout</span>
+                                  <button @click.stop="closeSellout" class="text-slate-300 hover:text-rose-500 transition-colors p-1"><i class="fa-solid fa-xmark text-[11px]"></i></button>
+                              </div>
+                              <table class="w-full text-[10px] text-slate-600 leading-tight">
+                                  <thead>
+                                      <tr class="text-left text-slate-400 border-b border-slate-50">
+                                          <th class="py-1 font-medium text-center">Semana</th>
+                                          <th class="py-1 text-right font-medium">Peso (kg)</th>
+                                          <th class="py-1 text-right font-bold text-brand-700">Cant. (pz)</th>
+                                      </tr>
+                                  </thead>
+                                  <tbody>
+                                      <tr v-for="s in (sku.sellout_semanas || [])" :key="s.semana" class="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                                          <td class="py-1.5 font-semibold text-slate-700 text-center">S{{ s.semana }}</td>
+                                          <td class="py-1.5 text-right">{{ n(s.kg, 2) }}</td>
+                                          <td class="py-1.5 text-right text-brand-600 font-bold bg-brand-50/50">{{ n(s.kg / (sku.unidad_inventario || 1), 2) }}</td>
+                                      </tr>
+                                      <tr v-if="!(sku.sellout_semanas && sku.sellout_semanas.length)">
+                                          <td colspan="3" class="py-4 text-center text-slate-400">Sin ventas en histórico</td>
+                                      </tr>
+                                  </tbody>
+                                  <tfoot v-if="sku.sellout_semanas && sku.sellout_semanas.length">
+                                      <tr class="bg-slate-50 border-t-2 border-slate-200">
+                                          <td class="py-1.5 font-bold text-slate-800 text-center uppercase tracking-widest text-[9px]">Prom.</td>
+                                          <td class="py-1.5 text-right font-bold text-slate-800">{{ n(sku.promedio_sellout_kg, 2) }}</td>
+                                          <td class="py-1.5 text-right font-bold text-brand-700 bg-brand-100/50">{{ n(sku.promedio_sellout_pz, 2) }}</td>
+                                      </tr>
+                                  </tfoot>
+                              </table>
+                          </div>
+                        </td>
+
+                        <!-- Criterio (sem. objetivo) -->
+                        <td class="px-3 py-1.5 text-right text-slate-500 border-l border-slate-50">
+                          {{ sku.semanas_objetivo }}
+                        </td>
+
+                        <!-- Semanas Actuales (cobertura_actual) -->
+                        <td
+                          class="px-3 py-1.5 text-right font-bold border-l border-slate-50"
+                          :class="cobClass(sku.cobertura_actual)"
+                          :title="sku.cobertura_actual === null ? 'Sin datos de venta'
+                                 : sku.cobertura_actual < (store.criterio_global || 2.0) ? 'Riesgo desabasto'
+                                 : sku.cobertura_actual > (store.criterio_global || 2.0) + 1.0 ? 'Sobrestock' : 'Cobertura OK'"
+                        >
+                          {{ sku.cobertura_actual != null ? sku.cobertura_actual.toFixed(2) : '—' }}
+                        </td>
+
+                        <!-- Pedido Sugerido (editable Excel-style) -->
+                        <td class="px-2 py-1.5 align-middle bg-brand-50 border-x border-brand-100 relative group/cell">
+                          <div class="absolute inset-y-0 left-0 w-1 bg-brand-500/10"></div>
+                          
+                          <div v-if="editingId === sku.oc_id" class="flex items-center gap-1.5 justify-end h-full">
+                            <input
+                              v-model.number="editValue"
+                              type="number" min="0" step="1"
+                              class="w-full h-7 rounded-sm border-2 border-brand-500 px-1 text-xs text-right font-bold text-slate-800 shadow-inner focus:outline-none"
+                              autofocus
+                              @keyup.enter="confirmEdit(sku, tienda.id_cliente)"
+                              @keyup.escape="cancelEdit()"
+                            />
+                            <div class="flex flex-col gap-0.5">
+                              <button class="bg-emerald-500 text-white rounded w-5 h-5 flex items-center justify-center hover:bg-emerald-600 shadow-sm" @click="confirmEdit(sku, tienda.id_cliente)">
+                                <i :class="saving ? 'fa-solid fa-circle-notch fa-spin text-[8px]' : 'fa-solid fa-check text-[10px]'"></i>
+                              </button>
+                            </div>
+                          </div>
+                          <button
+                            v-else
+                            class="w-full text-right bg-white border border-slate-300 hover:border-brand-500 hover:shadow-sm rounded shadow-sm px-2 py-1 flex items-center justify-between transition-all"
+                            :class="{ 'ring-2 ring-emerald-400 border-transparent bg-emerald-50': savedId === sku.oc_id }"
+                            title="Doble clic o clic para editar cantidad"
+                            @click="startEdit(sku)"
+                          >
+                            <i class="fa-solid fa-pen text-[9px] text-slate-300 group-hover/cell:text-brand-500 transition-colors mr-2"></i>
+                            <span class="text-[12px] font-bold text-slate-700" :class="{ 'text-brand-700': sku.pedido_sugerido_pz_red > 0 }">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
+                          </button>
+                        </td>
+
+                        <!-- Pedido Cadena (cant_pedida) -->
+                        <td class="px-3 py-1.5 text-right font-semibold text-slate-700 border-l border-slate-50 bg-white">
+                          {{ n(sku.cant_pedida, 0) }}
+                        </td>
+
+                        <!-- Detalle OC (Ya definido en padre) -->
+                        <td class="px-3 py-1.5 text-center text-slate-300 border-l border-slate-50 bg-slate-50/20 text-[10px] italic">
+                          —
+                        </td>
+
+                        <!-- Fill Rate -->
+                        <td class="px-3 py-1.5 text-right font-medium border-l border-slate-50 bg-white" :class="fillClass(sku.fill_rate)">
+                          {{ sku.fill_rate != null ? (sku.fill_rate * 100).toFixed(1) + '%' : '—' }}
+                        </td>
+
+                        <!-- INSTOCK per SKU -->
+                        <td class="px-3 py-1.5 text-center border-l border-slate-50 bg-white">
+                          <span
+                            class="inline-block text-[10px] font-bold px-2 py-0.5 rounded border block w-fit mx-auto"
+                            :class="instockBadge(sku.instock).cls"
+                          >
+                            {{ instockBadge(sku.instock).label }}
+                          </span>
+                        </td>
+
+                        <!-- vacío -->
+                        <td class="border-l border-slate-50 bg-white"></td>
+                      </tr>
+                    </template>
+
+                  </template>
 
                 </template>
 

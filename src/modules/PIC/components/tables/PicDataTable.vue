@@ -24,24 +24,17 @@ const tableData = computed(() => {
 });
 
 // --- FILTRO DE MESES FUTUROS ---
-const currentRealYear = new Date().getFullYear();
-const currentRealMonth = new Date().getMonth() + 1; // 1-12
-
 const visibleRows = computed(() => {
-    const hasCurrentYear = props.years.includes(String(currentRealYear));
-    const maxMesFinal = hasCurrentYear ? currentRealMonth : 12;
-
     if (!store.selected.usarRangoMeses) {
-        return tableData.value.rows.filter(row => row.mesIndex <= maxMesFinal);
+        return tableData.value.rows;
     }
 
     const start = Math.max(1, parseInt(store.selected.MesInicial));
     let end = parseInt(store.selected.MesFinal);
 
-    if (end > maxMesFinal) end = maxMesFinal;
-    if (start > end) return tableData.value.rows.filter(row => row.mesIndex <= maxMesFinal);
+    if (start > end) return tableData.value.rows;
 
-    return tableData.value.rows.filter(row => row.mesIndex >= start && row.mesIndex <= end);
+    return tableData.value.rows.filter((row: any) => row.mesIndex >= start && row.mesIndex <= end);
 });
 
 // --- FOOTER RECALCULADO SOBRE FILAS VISIBLES ---
