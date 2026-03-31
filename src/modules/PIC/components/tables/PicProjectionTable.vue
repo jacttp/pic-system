@@ -21,6 +21,15 @@ const isCollapsed = ref(props.initialCollapsed || false);
 const expandedRows = ref<Record<string, any[]>>({});
 const loadingRows = ref<Record<string, boolean>>({});
 
+// ⚠️ INVALIDACIÓN DE CACHÉ: Cada vez que cambia cualquier filtro del store,
+// limpiamos las filas expandidas para forzar un re-fetch con los filtros nuevos.
+watch(
+    () => JSON.stringify(store.selected),
+    () => {
+        expandedRows.value = {};
+    }
+);
+
 // Acceso al store para datos principales
 const tableData = computed(() => store.projectionData[props.dimensionKey as keyof typeof store.projectionData] || []);
 const isLoading = computed(() => store.loadingProjections[props.dimensionKey] || false);
@@ -84,9 +93,39 @@ const toggleRow = async (row: any) => {
     // 2. Si no, cargamos los datos
     loadingRows.value[rowId] = true;
     try {
-        // Obtenemos los filtros globales actuales
-        const activeFilters = JSON.parse(JSON.stringify(store.getFiltersForClientSearch())); 
-        
+        // Construir filtros completos (idénticos a fetchSingleProjection del store)
+        // para respetar TODOS los filtros activos: meses, marcas, transacciones, etc.
+        // DEBUG: Confirmar valores de mes actuales
+        console.log(`[DrillDown] MesInicial=${store.selected.MesInicial} MesFinal=${store.selected.MesFinal}`);
+        const mappings: Record<string, string> = {
+            'Transaccion': 'TRANSACCION',
+            'FormatoCliente': 'formatocte',
+            'grupo': 'grupo',
+            'Categorias': 'Categorias',
+            'SKU': 'SKU_NOMBRE'
+        };
+
+        const activeFilters: Record<string, any> = {};
+
+        for (const key in store.selected) {
+            const val = store.selected[key as keyof typeof store.selected];
+            if (Array.isArray(val) && val.length > 0) {
+                const dbKey = mappings[key] || key;
+                if (key !== 'MesInicial' && key !== 'MesFinal' && key !== 'Anio') {
+                    activeFilters[dbKey] = val;
+                }
+            }
+        }
+
+        // Agregar rango de meses (CRÍTICO: esto faltaba antes)
+        activeFilters['MesInicial'] = store.selected.MesInicial;
+        activeFilters['MesFinal'] = store.selected.MesFinal;
+
+        // Agregar clientes seleccionados si aplica
+        if (store.selectedClients.size > 0) {
+            activeFilters['IDCLIENTE'] = Array.from(store.selectedClients.keys());
+        }
+
         // Mapeamos: Si estoy en la tabla 'familias', el filtro de BD es 'grupo'
         const dimensionToFilterMap: Record<string, string> = {
             'familias': 'grupo',
@@ -100,6 +139,9 @@ const toggleRow = async (row: any) => {
         
         // AGREGAMOS EL FILTRO: "Traeme los artículos DONDE grupo = 'ZF-Jamon Pierna'"
         activeFilters[filterKey] = [row.Dimension]; 
+
+        // DEBUG: Ver payload completo que va al backend
+        console.log(`[DrillDown] Payload enviado a /projections:`, JSON.stringify({ dimension: props.drillDownTarget, filters: activeFilters, years: years.value }, null, 2));
 
         // Llamamos a la API directamente (sin pasar por el store global para no sobrescribir nada)
         const childData = await picApi.getProjection(props.drillDownTarget, activeFilters, years.value);
