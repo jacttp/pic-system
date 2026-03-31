@@ -15,16 +15,18 @@ src/lib
 src/modules/Approvals
 src/modules/Audit
 src/modules/Auth
-src/modules/Cannibalization
 
+src/modules/Callbook
+src/modules/Cannibalization
 src/modules/Clients
 src/modules/ClientValidation
-
 src/modules/CommercialStructure
+
 src/modules/CustomerSegmentation
 
 src/modules/Products 
 src/modules/PVR
+src/modules/SellOut
 src/modules/Setup
 src/modules/UserProfile
 

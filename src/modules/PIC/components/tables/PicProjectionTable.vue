@@ -152,7 +152,10 @@ const colorClass = (val: number, isPercent = false) => {
 </script>
 
 <template>
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full transition-all duration-300">
+    <div 
+        class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full transition-all duration-300"
+        :data-html2canvas-ignore="tableData.length === 0 ? 'true' : undefined"
+    >
         
         <div class="px-4 py-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center shrink-0">
             <h3 class="font-bold text-slate-700 text-xs uppercase tracking-wide flex items-center gap-2">

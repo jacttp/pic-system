@@ -27,7 +27,10 @@ const generateSummary = async () => {
 </script>
 
 <template>
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8 transition-all duration-300">
+    <div 
+        class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8 transition-all duration-300"
+        :data-html2canvas-ignore="!hasGenerated ? 'true' : undefined"
+    >
         
         <div class="p-4 bg-gradient-to-r from-slate-800 to-slate-900 text-white flex justify-between items-center">
             <div class="flex items-center gap-3">

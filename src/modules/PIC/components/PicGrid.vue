@@ -14,6 +14,10 @@ const selectedYears = computed(() => store.selected.Anio.sort());
 // <--- NUEVO: Estado para colapsar toda la sección de desglose
 const showDesglose = ref(true);
 
+const hasAnyProjectionLoaded = computed(() => {
+    return Object.values(store.projectionData).some(data => data && data.length > 0);
+});
+
 // --- LÓGICA DE MESES VISIBLES ---
 const visibleMonthRange = computed(() => {
     if (!store.selected.usarRangoMeses) {
@@ -223,7 +227,10 @@ const removeWidget = (id: string) => {
         </div>
         <PicDataTable title="Detalle Precio Promedio" type="promedio" :processed-data="dataPromedio" :years="selectedYears" />
 
-        <div class="pt-8 border-t-2 border-slate-200 border-dashed mt-12">
+        <div 
+            class="pt-8 border-t-2 border-slate-200 border-dashed mt-12"
+            :data-html2canvas-ignore="!hasAnyProjectionLoaded ? 'true' : undefined"
+        >
             <button 
                 @click="showDesglose = !showDesglose"
                 class="w-full flex justify-between items-center mb-6 group focus:outline-none"
@@ -248,7 +255,7 @@ const removeWidget = (id: string) => {
                 <PicProjectionTable title="Proyección por Zona" dimensionKey="zona" drill-down-target="articulos" />
                 <PicProjectionTable title="Proyección por Canal" dimensionKey="canal" drill-down-target="articulos"/>
                 <PicProjectionTable title="Proyección por Familias" dimensionKey="familias" drill-down-target="articulos"/>
-                <PicProjectionTable title="Proyección por Clientes (Top)" dimensionKey="clientes" drill-down-target="articulos" :initial-collapsed="true"/>
+                <PicProjectionTable title="Proyección por Clientes (Top 150)" dimensionKey="clientes" drill-down-target="articulos" :initial-collapsed="true"/>
                 <PicProjectionTable title="Proyección por Artículos" dimensionKey="articulos" :initial-collapsed="true"/>
             </div>
         </div>

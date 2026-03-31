@@ -279,7 +279,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
 
          // Regla: Clientes y Artículos limitados a Top 50 para rendimiento
          if (dimensionKey === 'clientes' || dimensionKey === 'articulos') {
-            limit = 50;
+            limit = 150;
          }
 
          // 3. Llamada API

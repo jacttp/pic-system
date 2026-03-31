@@ -4,7 +4,10 @@ import { usePicFilterStore } from '../stores/picFilterStore';
 import PicChat from '../components/PicChat.vue';
 import PicFilters from '../components/PicFilters.vue';
 import PicGrid from '../components/PicGrid.vue'; 
-import ExecutiveSummaryCard from '../components/ExecutiveSummaryCard.vue'; // <--- IMPORTAR
+import ExecutiveSummaryCard from '../components/ExecutiveSummaryCard.vue';
+import PicExportModal from '../components/modals/PicExportModal.vue';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 const store = usePicFilterStore();
 const isReportActive = ref(false);
@@ -15,11 +18,115 @@ const handleGenerate = async () => {
         isReportActive.value = true;
     }
 };
+
+const reportContent = ref<HTMLElement | null>(null);
+const isExporting = ref(false);
+const showExportModal = ref(false);
+
+const openExportModal = () => {
+    showExportModal.value = true;
+};
+
+const handleExportConfirm = async (config: any) => {
+    if (!reportContent.value) return;
+    
+    try {
+        isExporting.value = true;
+        // Pequeña espera para asegurar animaciones
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const canvas = await html2canvas(reportContent.value, {
+            scale: 2, 
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff' 
+        });
+
+        const imgData = canvas.toDataURL('image/jpeg', 0.98);
+        const pdf = new jsPDF({
+            orientation: config.orientation as any,
+            unit: 'mm',
+            format: config.format
+        });
+
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        
+        let marginX = 12;
+        if (config.margin === 'reducido') marginX = 6;
+        if (config.margin === 'ninguno') marginX = 0;
+        
+        const marginTop = 20; 
+        const marginBottom = config.showPageNumbers ? 15 : 10;
+        
+        const usableWidth = pageWidth - (marginX * 2);
+        const usableHeight = pageHeight - marginTop - marginBottom;
+
+        const imgWidth = usableWidth;
+        const imgHeight = (canvas.height * usableWidth) / canvas.width;
+        
+        const drawHeaderFooter = (pageNum: number) => {
+            pdf.setFillColor(255, 255, 255);
+            pdf.rect(0, 0, pageWidth, marginTop, 'F');
+            pdf.rect(0, pageHeight - marginBottom, pageWidth, marginBottom, 'F');
+
+            pdf.setFontSize(14);
+            pdf.setTextColor(15, 23, 42); 
+            // Titulo configurado
+            const safeTitle = config.title.trim() || 'Reporte Operativo PIC';
+            pdf.text(safeTitle, marginX === 0 ? 5 : marginX, 12);
+            
+            if (config.showDate) {
+                pdf.setFontSize(10);
+                pdf.setTextColor(100, 116, 139); 
+                pdf.text(`Fecha: ${new Date().toLocaleDateString()}`, pageWidth - (marginX === 0 ? 5 : marginX), 12, { align: 'right' });
+            }
+            
+            if (config.showPageNumbers) {
+                pdf.setTextColor(100, 116, 139);
+                pdf.setFontSize(9);
+                pdf.text(`Página ${pageNum}`, pageWidth / 2, pageHeight - 6, { align: 'center' });
+            }
+        };
+
+        let heightLeft = imgHeight;
+        let positionY = 0; 
+        let pageNum = 1;
+
+        pdf.addImage(imgData, 'JPEG', marginX, marginTop, imgWidth, imgHeight);
+        drawHeaderFooter(pageNum);
+        heightLeft -= usableHeight;
+
+        while (heightLeft > 0) {
+            positionY -= usableHeight; 
+            pdf.addPage();
+            pageNum++;
+            
+            pdf.addImage(imgData, 'JPEG', marginX, marginTop + positionY, imgWidth, imgHeight);
+            drawHeaderFooter(pageNum);
+            
+            heightLeft -= usableHeight;
+        }
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        pdf.save(`Reporte_${dateStr}.pdf`);
+    } catch (error) {
+        console.error('Error al exportar a PDF:', error);
+        alert('Hubo un error al generar el PDF.');
+    } finally {
+        isExporting.value = false;
+    }
+};
 </script>
 
 <template>
     <div class="flex h-screen overflow-hidden bg-slate-100">
         
+        <PicExportModal 
+            v-model="showExportModal" 
+            @export="handleExportConfirm"
+        />
+
         <div class="flex-1 flex flex-col relative overflow-hidden">
             
             <PicFilters v-if="isReportActive" />
@@ -54,9 +161,28 @@ const handleGenerate = async () => {
                 </div>
 
                 <div v-else class="pb-20">
-                    <ExecutiveSummaryCard />
-                    
-                    <PicGrid />
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-pie text-brand-500"></i>
+                            Resultados del Reporte
+                        </h2>
+                        <button 
+                            @click="openExportModal"
+                            :disabled="isExporting"
+                            class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5"
+                            title="Configurar y Exportar PDF"
+                        >
+                            <i v-if="isExporting" class="fa-solid fa-spinner fa-spin text-slate-400"></i>
+                            <i v-else class="fa-solid fa-file-pdf text-rose-500"></i>
+                            {{ isExporting ? 'Generando PDF...' : 'Exportar a PDF' }}
+                        </button>
+                    </div>
+
+                    <div ref="reportContent" class="bg-slate-100 -mx-4 px-4 pb-4">
+                        <ExecutiveSummaryCard />
+                        
+                        <PicGrid />
+                    </div>
                 </div>
 
             </main>
