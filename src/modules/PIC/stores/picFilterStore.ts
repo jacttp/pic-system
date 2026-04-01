@@ -38,7 +38,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       FormatoCliente: [] as string[],
       MesInicial: '1',
       MesFinal: String(new Date().getMonth() + 1),
-      usarRangoMeses: false
+      usarRangoMeses: true
    });
 
    // Almacén para las tablas
@@ -272,7 +272,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
          // 2. Años objetivo
          let yearsTarget = selected.Anio.length > 0
             ? [...selected.Anio].sort()
-            : (options.anios.length > 0 ? options.anios.slice(-3).sort() : ['2023', '2024', '2025']);
+            : (options.anios.length > 0 ? options.anios.slice(-3).sort() : [(new Date().getFullYear() - 2).toString(), (new Date().getFullYear() - 1).toString(), (new Date().getFullYear()).toString()]);
 
          // --- CAMBIO AQUÍ: Definir límite según la dimensión ---
          let limit: number | undefined = undefined;
@@ -348,7 +348,8 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       // 2. Restaurar Defaults
       selected.Transaccion = ['Venta', 'Metas', 'NC'];
       selected.MesInicial = '1';
-      selected.MesFinal = '12';
+      selected.MesFinal = String(new Date().getMonth() + 1);
+      selected.usarRangoMeses = true;
 
       // 3. Restaurar Años (Últimos 3)
       if (options.anios.length > 0) {

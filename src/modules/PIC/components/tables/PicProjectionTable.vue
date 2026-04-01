@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { usePicFilterStore } from '../../stores/picFilterStore';
-import { picApi } from '../../services/picApi'; // <--- NUEVO: Necesario para pedir el detalle
+import { picApi } from '../../services/picApi'; 
 import { formatNumber } from '../../utils/formatters';
 
 const props = defineProps<{
     title: string;
     dimensionKey: string; // La dimensión de ESTA tabla (ej: 'familias')
     initialCollapsed?: boolean;
-    // <--- NUEVO: Define qué dimensión pedir al hacer clic (ej: 'articulos')
     // Si no se pasa esta prop, la tabla no será interactiva (caso Marcas/Gerencia)
     drillDownTarget?: string; 
 }>();
@@ -35,7 +34,13 @@ const tableData = computed(() => store.projectionData[props.dimensionKey as keyo
 const isLoading = computed(() => store.loadingProjections[props.dimensionKey] || false);
 
 // Años (Sincronizados con el store)
-const years = computed(() => store.selected.Anio.length > 0 ? [...store.selected.Anio].sort() : ['2023', '2024', '2025']);
+const years = computed(() => {
+    if (store.selected.Anio.length > 0) return [...store.selected.Anio].sort();
+    if (store.options.anios.length > 0) return [...store.options.anios].slice(-3).sort();
+    
+    const currentYearNum = new Date().getFullYear();
+    return [(currentYearNum - 2).toString(), (currentYearNum - 1).toString(), currentYearNum.toString()];
+});
 const currentYear = computed(() => years.value[years.value.length - 1]);
 const prevYear = computed(() => years.value.length > 1 ? years.value[years.value.length - 2] : null);
 
@@ -280,31 +285,27 @@ const colorClass = (val: number, isPercent = false) => {
                             </td>
                         </tr>
 
-                        <tr v-if="expandedRows[row.Dimension]" class="bg-slate-50 shadow-inner">
-                            <td :colspan="8 + years.length" class="p-0">
-                                <div class="pl-8 py-2 pr-2 border-l-4 border-brand-500/20">
-                                    <table class="w-full text-[11px] text-slate-600">
-                                        <tr v-for="child in getChildRows(row.Dimension)" :key="child.Dimension" class="border-b border-slate-200/50 last:border-0 hover:bg-white transition-colors">
-                                            <td class="py-1.5 px-2 font-medium truncate w-[180px] text-slate-500 pl-4">{{ child.Dimension }}</td>
-                                            
-                                            <td v-for="y in years" :key="y" class="py-1.5 px-2 text-right font-mono w-[80px]">
-                                                {{ formatNumber(child[`Venta_${y}`]) }}
-                                            </td>
-                                            <td class="py-1.5 px-2 text-right text-emerald-700/70 font-mono w-[80px]">{{ formatNumber(child.meta) }}</td>
-                                            
-                                            <td class="py-1.5 px-2 text-right font-mono w-[80px]" :class="colorClass(child.difAnual)">{{ formatNumber(child.difAnual) }}</td>
-                                            <td class="py-1.5 px-2 text-right font-mono w-[80px]" :class="colorClass(child.difMeta)">{{ formatNumber(child.difMeta) }}</td>
-                                            <td class="py-1.5 px-2 text-right font-mono w-[60px]" :class="colorClass(child.crec)">{{ child.crec.toFixed(1) }}%</td>
-                                            <td class="py-1.5 px-2 text-right font-mono w-[60px]" :class="colorClass(child.varMeta, true)">{{ child.varMeta.toFixed(1) }}%</td>
-                                            
-                                            <td class="py-1.5 px-2 text-right font-bold text-brand-700 bg-brand-50/20 font-mono w-[60px]">
-                                                {{ child.share.toFixed(1) }}%
-                                            </td>
-                                        </tr>
-                                    </table>
-                                </div>
-                            </td>
-                        </tr>
+                        <template v-if="expandedRows[row.Dimension]">
+                            <tr v-for="child in getChildRows(row.Dimension)" :key="child.Dimension" class="bg-slate-50 border-b border-slate-100 hover:bg-slate-100 transition-colors text-[11px] text-slate-600 shadow-inner group">
+                                <td class="px-3 py-1.5 font-medium truncate max-w-[200px] text-slate-500 sticky left-0 bg-slate-50 group-hover:bg-slate-100 border-r border-slate-100 pl-8" :title="child.Dimension">
+                                    {{ child.Dimension }}
+                                </td>
+                                
+                                <td v-for="y in years" :key="y" class="px-3 py-1.5 text-right font-mono text-slate-500">
+                                    {{ formatNumber(child[`Venta_${y}`]) }}
+                                </td>
+                                <td class="px-3 py-1.5 text-right text-emerald-700/70 font-mono">{{ formatNumber(child.meta) }}</td>
+                                
+                                <td class="px-3 py-1.5 text-right font-mono" :class="colorClass(child.difAnual)">{{ formatNumber(child.difAnual) }}</td>
+                                <td class="px-3 py-1.5 text-right font-mono" :class="colorClass(child.difMeta)">{{ formatNumber(child.difMeta) }}</td>
+                                <td class="px-3 py-1.5 text-right font-mono" :class="colorClass(child.crec)">{{ child.crec.toFixed(1) }}%</td>
+                                <td class="px-3 py-1.5 text-right font-mono" :class="colorClass(child.varMeta, true)">{{ child.varMeta.toFixed(1) }}%</td>
+                                
+                                <td class="px-3 py-1.5 text-right font-bold text-brand-700 bg-brand-50/20 font-mono">
+                                    {{ child.share.toFixed(1) }}%
+                                </td>
+                            </tr>
+                        </template>
 
                     </template>
                 </tbody>

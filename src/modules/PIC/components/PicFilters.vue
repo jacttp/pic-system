@@ -16,7 +16,7 @@ function toggleRangoMeses() {
     if (!store.selected.usarRangoMeses) {
         // Reset a los valores por defecto al apagar el switch
         store.selected.MesInicial = '1';
-        store.selected.MesFinal = '12';
+        store.selected.MesFinal = String(new Date().getMonth() + 1);
     }
 }
 
