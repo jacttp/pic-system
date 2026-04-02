@@ -28,8 +28,9 @@ src/modules/Products
 src/modules/PVR
 src/modules/SellOut
 src/modules/Setup
-src/modules/UserProfile
+src/modules/StockAnalytics
 
+src/modules/UserProfile
 src/components/HelloWorld.vue
 
 src/prueba-chat.html
