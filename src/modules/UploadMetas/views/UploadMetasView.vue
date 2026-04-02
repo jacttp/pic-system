@@ -15,17 +15,21 @@ onMounted(async () => {
   await store.fetchMetas()
 })
 
-const onUploadSuccess = (message: string) => {
+const onUploadSuccess = (_message: string) => {
+  const total     = Object.values(store.uploadStats.tablas).reduce((s,t) => s + t.registrosInsertados, 0)
+  const omitidos  = Object.values(store.uploadStats.tablas).reduce((s,t) => s + t.registrosDuplicadosOmitidos, 0)
   toast({
-    title:       'Carga exitosa',
-    description: message,
-    variant:     'default',
+    title:       `✅ ${total.toLocaleString('es-MX')} registros insertados`,
+    description: omitidos > 0
+      ? `${omitidos.toLocaleString('es-MX')} duplicados fueron omitidos automáticamente.`
+      : 'No se detectaron duplicados.',
+    variant: 'default',
   })
 }
 
 const onUploadError = (error: string) => {
   toast({
-    title:       'Error de carga',
+    title:       '❌ Error en la carga',
     description: error,
     variant:     'destructive',
   })
