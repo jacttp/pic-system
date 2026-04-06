@@ -99,17 +99,18 @@ export const useCpfrStore = defineStore('cpfr', () => {
         }
     }
 
-    // NOTA: el controller v2 retorna oc_id (CPFR_OrdenCompra.id), NO el id de CPFR_PedidoGenerado.
-    // PATCH /cpfr/order/:id espera el PK de CPFR_PedidoGenerado.
-    // Mientras el backend alinea el response, usamos oc_id como identificador de la OC.
-    async function adjustSku(oc_id: number, body: CpfrAdjustSkuBody, id_cliente: string): Promise<boolean> {
+    // NOTA: patch ahora usa negocio (cliente, sku, sem, anio) para máxima robustez
+    async function adjustSku(
+        id_cliente: string, sku_muliix: string, anio: number, semana_ic: string, 
+        body: CpfrAdjustSkuBody
+    ): Promise<boolean> {
         try {
-            await cpfrApi.adjustSku(oc_id, body)
+            await cpfrApi.adjustSku({ id_cliente, sku_muliix, anio, semana_ic, ...body })
             // Actualizar localmente sin re-fetch completo
             for (const dia of dias.value) {
                 const tiendaRow = dia.tiendas.find(t => t.id_cliente === id_cliente)
                 if (tiendaRow) {
-                    const sku = tiendaRow.skus.find(s => s.oc_id === oc_id)
+                    const sku = tiendaRow.skus.find(s => s.sku_muliix === sku_muliix)
                     if (sku) {
                         sku.pedido_sugerido_pz_red = body.cantidad_final_pz
                         if (body.semanas_objetivo != null) sku.semanas_objetivo = body.semanas_objetivo

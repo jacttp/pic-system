@@ -24,7 +24,7 @@ export interface CpfrContext {
 /** Fila de SKU dentro de una tienda (alineado con cpfrDashController.js v2) */
 export interface CpfrSkuDash {
     // Identificación
-    oc_id: number                       // PK de CPFR_OrdenCompra (clave para edición inline)
+    oc_id: number                       // PK de CPFR_OrdenCompra
     sku_muliix: string | null           // null si la OC no tiene homologación
     sku_nombre: string                  // nombre del SKU (o desc_art / sku_cadena como fallback)
 

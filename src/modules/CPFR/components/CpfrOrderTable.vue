@@ -13,23 +13,31 @@ const emit = defineEmits<{
 }>()
 
 // ── Inline edit ───────────────────────────────────────────────────────────────
-const editingId = ref<number | null>(null)  // tracks oc_id
+const editingId = ref<string | null>(null)  // tracks sku_muliix
 const editValue = ref<number>(0)
 const saving    = ref(false)
-const savedId   = ref<number | null>(null)
+const savedId   = ref<string | null>(null)
 
 function startEdit(sku: CpfrSkuDash) {
-    editingId.value = sku.oc_id
+    if (!sku.sku_muliix) return; // Prevent edits on SKUs without mapping
+    editingId.value = sku.sku_muliix
     editValue.value = sku.pedido_sugerido_pz_red
 }
 function cancelEdit() { editingId.value = null }
 
 async function confirmEdit(sku: CpfrSkuDash, id_cliente: string) {
     if (editValue.value === sku.pedido_sugerido_pz_red) { cancelEdit(); return }
+    if (!sku.sku_muliix || !store.currentWeek) return
     saving.value = true
-    const ok = await store.adjustSku(sku.oc_id, { cantidad_final_pz: editValue.value }, id_cliente)
+    const ok = await store.adjustSku(
+        id_cliente, 
+        sku.sku_muliix, 
+        store.currentWeek.anio, 
+        store.currentWeek.semana_ic, 
+        { cantidad_final_pz: editValue.value }
+    )
     saving.value = false
-    if (ok) { savedId.value = sku.oc_id; setTimeout(() => { savedId.value = null }, 1800) }
+    if (ok) { savedId.value = sku.sku_muliix; setTimeout(() => { savedId.value = null }, 1800) }
     editingId.value = null
 }
 
@@ -419,7 +427,7 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
                     <template v-if="expandedOCGroups[`${tienda.id_cliente}_${ocGroup.group_id}`] !== false">
                       <tr
                         v-for="(sku, index) in ocGroup.skus"
-                        :key="sku.oc_id + '_' + index"
+                        :key="sku.sku_muliix ? sku.sku_muliix : (sku.oc_id + '_' + index)"
                         class="bg-white/80 transition-colors text-[11px] border-b border-slate-50 hover:bg-slate-50 group/row"
                       >
                         <!-- Nombre SKU -->
@@ -512,7 +520,7 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
                         <td class="px-2 py-1.5 align-middle bg-brand-50 border-x border-brand-100 relative group/cell">
                           <div class="absolute inset-y-0 left-0 w-1 bg-brand-500/10"></div>
                           
-                          <div v-if="editingId === sku.oc_id" class="flex items-center gap-1.5 justify-end h-full">
+                          <div v-if="editingId === sku.sku_muliix && sku.sku_muliix" class="flex items-center gap-1.5 justify-end h-full">
                             <input
                               v-model.number="editValue"
                               type="number" min="0" step="1"
@@ -530,7 +538,7 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
                           <button
                             v-else
                             class="w-full text-right bg-white border border-slate-300 hover:border-brand-500 hover:shadow-sm rounded shadow-sm px-2 py-1 flex items-center justify-between transition-all"
-                            :class="{ 'ring-2 ring-emerald-400 border-transparent bg-emerald-50': savedId === sku.oc_id }"
+                            :class="{ 'ring-2 ring-emerald-400 border-transparent bg-emerald-50': savedId === sku.sku_muliix }"
                             title="Doble clic o clic para editar cantidad"
                             @click="startEdit(sku)"
                           >

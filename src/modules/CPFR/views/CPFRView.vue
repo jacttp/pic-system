@@ -24,6 +24,12 @@ function onUploadDone() {
     // Tras subir OC, recargar el dashboard
     store.loadDashboard()
 }
+
+function confirmRecalculate() {
+    if (confirm('Atención: Recalcular la matemática sobrescribirá todos los cambios manuales que hayas guardado hoy en el borrador.\n\n¿Estás seguro de que deseas forzar un recálculo desde cero con el inventario más reciente?')) {
+        store.recalculate()
+    }
+}
 </script>
 
 <template>
@@ -72,16 +78,15 @@ function onUploadDone() {
     <!-- ── Barra de acciones (Secundaria) ──────────────────────────────────────────────── -->
     <nav class="bg-white border-b border-slate-200 px-5 flex items-center gap-2 py-2 shrink-0 flex-wrap relative z-30">
 
-      <!-- Preview banner inline -->
-      <div
-        v-if="store.preview"
-        class="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 mr-2"
+      <!-- Recalcular Matemática -->
+      <button
+        class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 transition-colors mr-auto"
+        @click="confirmRecalculate"
+        title="Fuerza un recálculo basado en inventario, sobrescribiendo el borrador actual"
       >
-        <i class="fa-solid fa-circle-exclamation text-amber-400 text-xs"></i>
-        <span class="text-[11px] text-amber-600 font-semibold">Vista previa — valores no guardados</span>
-      </div>
-
-      <div class="flex-1"></div>
+        <i class="fa-solid fa-rotate text-[11px]"></i>
+        Recalcular Matemática
+      </button>
 
       <!-- Expandir / Contraer -->
       <button

@@ -75,12 +75,11 @@ export const cpfrApi = {
     // ── Ajuste de SKU ─────────────────────────────────────────────────────────
 
     /**
-     * PATCH /api/cpfr/order/:id
-     * Ajuste manual de un SKU. id = PK del registro.
-     * enviado_pz es opcional — solo cuando se captura el dato real.
+     * PATCH /api/cpfr/order/adjust
+     * Ajuste manual de un SKU.
      */
-    async adjustSku(id: number, body: CpfrAdjustSkuBody): Promise<{ success: boolean; message: string }> {
-        const { data } = await api.patch(`/cpfr/order/${id}`, body)
+    async adjustSku(body: any): Promise<{ success: boolean; message: string }> {
+        const { data } = await api.patch('/cpfr/order/adjust', body)
         return data
     },
 
