@@ -129,6 +129,18 @@ const handleExportConfirm = async (config: any) => {
 
         <div class="flex-1 flex flex-col relative overflow-hidden">
             
+            <!-- Overlay de carga -->
+            <div 
+                v-if="store.isGenerating" 
+                class="absolute inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex flex-col items-center justify-center transition-all duration-300"
+            >
+                <div class="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center max-w-sm text-center">
+                    <i class="fa-solid fa-circle-notch fa-spin text-5xl text-brand-500 mb-4"></i>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2">Generando Análisis...</h3>
+                    <p class="text-sm text-slate-500">Procesando los datos, esto puede tomar unos segundos dependiendo de la carga.</p>
+                </div>
+            </div>
+
             <PicFilters v-if="isReportActive" />
             
             <header v-else class="h-16 bg-white border-b border-slate-200 flex items-center px-8 justify-between shrink-0">
@@ -153,9 +165,8 @@ const handleExportConfirm = async (config: any) => {
                             class="bg-brand-600 hover:bg-brand-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-brand-500/20 transition-transform active:scale-95 flex items-center gap-2 mx-auto disabled:opacity-70 disabled:cursor-not-allowed disabled:scale-100"
                         >
                             <i v-if="store.isGenerating" class="fa-solid fa-circle-notch fa-spin"></i>
-                            <span v-else>
-                                <i class="fa-solid fa-bolt"></i> Generar Reporte 
-                            </span>
+                            <i v-else class="fa-solid fa-bolt"></i>
+                            <span>{{ store.isGenerating ? 'Generando...' : 'Generar Reporte' }}</span>
                         </button>
                     </div>
                 </div>

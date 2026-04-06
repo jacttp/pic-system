@@ -155,9 +155,8 @@ watch(isCollapsed, (newVal) => {
                             class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold px-5 py-2 rounded-lg shadow-md shadow-brand-500/20 transition-all flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed hover:-translate-y-0.5"
                         >
                             <i v-if="store.isGenerating" class="fa-solid fa-circle-notch fa-spin"></i>
-                            <span v-else class="flex items-center gap-2">
-                                <i class="fa-solid fa-bolt"></i> GENERAR AHORA
-                            </span>
+                            <i v-else class="fa-solid fa-bolt"></i>
+                            <span>{{ store.isGenerating ? 'GENERANDO...' : 'GENERAR AHORA' }}</span>
                         </button>
                     </div>
                 </div>
