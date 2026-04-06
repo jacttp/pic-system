@@ -158,8 +158,17 @@ function n(v: number | null | undefined, dec = 1): string {
 // Estado del pedido — badge
 function estadoBadge(estado: CpfrStoreDash['estado_pedido']): { label: string; cls: string } {
     if (estado === 'procesado') return { label: 'Procesado', cls: 'bg-sky-100 text-sky-700' }
-    if (estado === 'cerrado')   return { label: 'Cerrado',   cls: 'bg-slate-100 text-slate-500' }
-    return { label: 'Pendiente', cls: 'bg-amber-100 text-amber-600' }
+    if (estado === 'pendiente') return { label: 'Pendiente', cls: 'bg-amber-100 text-amber-700' }
+    return { label: estado || 'Desconocido', cls: 'bg-slate-100 text-slate-500' }
+}
+
+function calcularCoberturaDinamica(sku: any): number | null {
+    if (!sku || !sku.promedio_sellout_kg || sku.promedio_sellout_kg <= 0) return null;
+    const qtyPz = sku.pedido_sugerido_pz_red || 0;
+    const invKg = sku.inv_actual_kg || 0;
+    const unInv = sku.unidad_inventario || 0;
+    const promKg = sku.promedio_sellout_kg;
+    return ((qtyPz * unInv) + invKg) / promKg;
 }
 
 async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['estado_pedido']) {
@@ -505,15 +514,14 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
                           {{ sku.semanas_objetivo }}
                         </td>
 
-                        <!-- Semanas Actuales (cobertura_actual) -->
+                        <!-- Semanas Actuales (cobertura dinamica) -->
                         <td
                           class="px-3 py-1.5 text-right font-bold border-l border-slate-50"
-                          :class="cobClass(sku.cobertura_actual)"
-                          :title="sku.cobertura_actual === null ? 'Sin datos de venta'
-                                 : sku.cobertura_actual < (store.criterio_global || 2.0) ? 'Riesgo desabasto'
-                                 : sku.cobertura_actual > (store.criterio_global || 2.0) + 1.0 ? 'Sobrestock' : 'Cobertura OK'"
+                          :class="cobClass(calcularCoberturaDinamica(sku))"
+                          :title="sku.cobertura_actual === null ? 'Sin datos de venta' 
+                                 : `Cobertura original: ${sku.cobertura_actual.toFixed(2)}`"
                         >
-                          {{ sku.cobertura_actual != null ? sku.cobertura_actual.toFixed(2) : '—' }}
+                          {{ calcularCoberturaDinamica(sku) != null ? calcularCoberturaDinamica(sku)!.toFixed(2) : '—' }}
                         </td>
 
                         <!-- Pedido Sugerido (editable Excel-style) -->

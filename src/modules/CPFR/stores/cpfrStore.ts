@@ -148,6 +148,11 @@ export const useCpfrStore = defineStore('cpfr', () => {
         loading.value = true
         error.value = null
         try {
+            if (!filters.dia) {
+                let num = new Date().getDay()
+                num = num === 0 ? 7 : num // JS: 0 = domingo -> Convertimos a 7
+                filters.dia = num
+            }
             await fetchCurrentWeek()
             await loadDashboard()
         } catch (e: any) {
