@@ -2,51 +2,51 @@
 .agents
 .claude
 .vscode
+
 dist
 docs
 node_modules
 prototypes
-
 public/
-src/assets
 
+src/assets
 src/lib
 
-src/modules/Approvals
+src/components/HelloWorld.vue
+
 src/modules/Audit
 src/modules/Auth
-
 src/modules/Callbook
 src/modules/Cannibalization
 src/modules/Clients
 src/modules/ClientValidation
 src/modules/CommercialStructure
-
 src/modules/CustomerSegmentation
-
+src/modules/PIC
 src/modules/Products 
 src/modules/PVR
 src/modules/SellOut
 src/modules/Setup
-src/modules/StockAnalytics
 
-src/modules/UserProfile
-src/components/HelloWorld.vue
+src/modules/StockAnalytics
+src/modules/UploadMetas
+src/modules/UploadOC
 
 src/prueba-chat.html
 
-
 types/
-
 
 prueba-chat.html
 
+.aidigestignore
 .env
 .gitignore
+skills-lock.json
+
 codebase.md
 frontend.json
 README.md
-skills-lock.json
+
 package-lock.json
 package.json
 vite.config.ts

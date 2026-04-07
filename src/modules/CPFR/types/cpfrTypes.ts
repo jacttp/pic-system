@@ -136,15 +136,17 @@ export interface CpfrAdjustSkuBody {
     cantidad_final_pz: number
     semanas_objetivo?: number
     enviado_pz?: number
+    fill_rate?: number | null
 }
+
 
 // ─── PATCH /cpfr/orders/status ───────────────────────────────────────────────
 
 export interface CpfrUpdateStatusBody {
-    id_cliente: string
+    num_pedido: string
     year: number
     week: number
-    estado: 'pendiente' | 'procesado' | 'cerrado'
+    estado: 'pendiente' | 'borrador' | 'revision' | 'aprobado' | 'procesado' | 'cerrado' | 'reemplazado' | 'enviado'
 }
 
 // ─── Config de tienda — GET|PUT /api/v2/cpfr/config/:id_cliente ─────────────

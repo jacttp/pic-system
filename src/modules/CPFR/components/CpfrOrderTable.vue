@@ -27,14 +27,20 @@ function cancelEdit() { editingId.value = null }
 
 async function confirmEdit(sku: CpfrSkuDash, id_cliente: string) {
     if (editValue.value === sku.pedido_sugerido_pz_red) { cancelEdit(); return }
-    if (!sku.sku_muliix || !store.currentWeek) return
-    saving.value = true
+    // Aquí actualizo el valor en el UI temporalmente (se confirma luego en la DB)
+    sku.pedido_sugerido_pz_red = editValue.value;
+
+    const newFillRate = calcularFillRateDinamico(sku);
+
     const ok = await store.adjustSku(
-        id_cliente, 
-        sku.sku_muliix, 
-        store.currentWeek.anio, 
-        store.currentWeek.semana_ic, 
-        { cantidad_final_pz: editValue.value }
+        id_cliente,
+        sku.sku_muliix!,
+        store.currentWeek!.anio,
+        store.currentWeek!.semana_ic,
+        {
+            cantidad_final_pz: editValue.value,
+            fill_rate: newFillRate
+        }
     )
     saving.value = false
     if (ok) { savedId.value = sku.sku_muliix; setTimeout(() => { savedId.value = null }, 1800) }
@@ -130,6 +136,20 @@ function fillClass(fr: number | null) {
     return 'text-rose-500 font-semibold'
 }
 
+function skuRowBgClass(fr: number | null): string {
+    if (fr === null) return 'bg-white/80 hover:bg-slate-50'
+    if (fr === 0) return 'bg-orange-50/60 hover:bg-orange-100/50'
+    if (fr >= 1) return 'bg-emerald-50/50 hover:bg-emerald-100/50'
+    return 'bg-white/80 hover:bg-slate-50'
+}
+
+function storeRowBgClass(fr: number | null, isExpanded: boolean): string {
+    if (fr === null) return isExpanded ? 'bg-slate-50' : 'bg-white hover:bg-slate-50'
+    if (fr === 0) return isExpanded ? 'bg-orange-100/40' : 'bg-orange-50/50 hover:bg-orange-100/40'
+    if (fr >= 1) return isExpanded ? 'bg-emerald-100/40' : 'bg-emerald-50/50 hover:bg-emerald-100/40'
+    return isExpanded ? 'bg-slate-50' : 'bg-white hover:bg-slate-50'
+}
+
 /**
  * Lógica de instock_pct → badge
  * null → gris "—"
@@ -156,9 +176,14 @@ function n(v: number | null | undefined, dec = 1): string {
 }
 
 // Estado del pedido — badge
-function estadoBadge(estado: CpfrStoreDash['estado_pedido']): { label: string; cls: string } {
+function estadoBadge(estado: string | null): { label: string; cls: string } {
+    if (estado === 'pendiente') return { label: 'Pendiente', cls: 'bg-slate-100 text-slate-500' }
+    if (estado === 'borrador')  return { label: 'Borrador',  cls: 'bg-amber-100 text-amber-700' }
+    if (estado === 'revision')  return { label: 'Revisión',  cls: 'bg-indigo-100 text-indigo-700' }
+    if (estado === 'aprobado')  return { label: 'Aprobado',  cls: 'bg-emerald-100 text-emerald-700' }
+    if (estado === 'enviado')   return { label: 'Enviado',   cls: 'bg-blue-100 text-blue-700' }
+    if (estado === 'cerrado')   return { label: 'Cerrado',   cls: 'bg-slate-200 text-slate-400' }
     if (estado === 'procesado') return { label: 'Procesado', cls: 'bg-sky-100 text-sky-700' }
-    if (estado === 'pendiente') return { label: 'Pendiente', cls: 'bg-amber-100 text-amber-700' }
     return { label: estado || 'Desconocido', cls: 'bg-slate-100 text-slate-500' }
 }
 
@@ -171,13 +196,19 @@ function calcularCoberturaDinamica(sku: any): number | null {
     return ((qtyPz * unInv) + invKg) / promKg;
 }
 
-async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['estado_pedido']) {
-    if (!store.currentWeek) return
+function calcularFillRateDinamico(sku: any): number | null {
+    if (!sku || !sku.cant_pedida || sku.cant_pedida <= 0) return null;
+    const sugerido = sku.pedido_sugerido_pz_red || 0;
+    return sugerido / sku.cant_pedida;
+}
+
+async function changeOCStatus(num_pedido: string | null, estado: string) {
+    if (!store.currentWeek || !num_pedido) return
     await store.updateStatus({
-        id_cliente: store_row.id_cliente,
+        num_pedido: num_pedido,
         year: store.currentWeek.anio,
         week: store.currentWeek.semana,
-        estado,
+        estado: estado as any,
     })
 }
 </script>
@@ -248,8 +279,11 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
               <template v-for="tienda in dia.tiendas" :key="tienda.id_cliente">
 
                 <tr
-                  class="cursor-pointer transition-colors border-b hover:bg-slate-50 relative"
-                  :class="store.expandedStores[tienda.id_cliente] ? 'bg-slate-50 border-slate-200' : 'bg-white border-slate-100'"
+                  class="cursor-pointer transition-colors border-b relative"
+                  :class="[
+                    store.expandedStores[tienda.id_cliente] ? 'border-slate-200' : 'border-slate-100',
+                    storeRowBgClass(tienda.resumen.fill_rate, !!store.expandedStores[tienda.id_cliente])
+                  ]"
                   @click="store.toggleStore(tienda.id_cliente)"
                 >
                   <!-- Tienda -->
@@ -332,32 +366,6 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
                   <!-- Acciones tienda -->
                   <td class="px-2 py-3" @click.stop>
                     <div class="flex items-center gap-1 justify-center">
-                      <!-- Badge estado + dropdown -->
-                      <div class="relative group/estado">
-                        <span
-                          class="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded cursor-pointer"
-                          :class="estadoBadge(tienda.estado_pedido).cls"
-                          :title="'Cambiar estado'"
-                        >{{ estadoBadge(tienda.estado_pedido).label }}</span>
-                        <!-- Dropdown opciones -->
-                        <div class="hidden group-hover/estado:flex absolute right-0 top-full z-20 mt-1 flex-col bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden text-[10px] font-semibold min-w-[90px]">
-                          <button
-                            v-if="tienda.estado_pedido !== 'pendiente'"
-                            class="px-3 py-1.5 text-left hover:bg-amber-50 text-amber-600"
-                            @click.stop="changeStatus(tienda, 'pendiente')"
-                          >Pendiente</button>
-                          <button
-                            v-if="tienda.estado_pedido !== 'procesado'"
-                            class="px-3 py-1.5 text-left hover:bg-sky-50 text-sky-600"
-                            @click.stop="changeStatus(tienda, 'procesado')"
-                          >Procesado</button>
-                          <button
-                            v-if="tienda.estado_pedido !== 'cerrado'"
-                            class="px-3 py-1.5 text-left hover:bg-slate-50 text-slate-500"
-                            @click.stop="changeStatus(tienda, 'cerrado')"
-                          >Cerrado</button>
-                        </div>
-                      </div>
                       <!-- Config -->
                       <button
                         class="text-slate-300 hover:text-brand-500 transition-colors p-1 rounded"
@@ -400,9 +408,28 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
                           <span class="text-[12px] font-black tracking-tight" :class="ocGroup.num_pedido ? 'text-brand-600' : 'text-slate-400 italic'">
                               {{ ocGroup.num_pedido || 'Sin número' }}
                           </span>
-                          <span v-if="ocGroup.estado_oc" class="font-bold px-1.5 py-0.5 rounded text-[9px] border ml-1 uppercase" :class="ocGroup.estado_oc === 'pendiente' ? 'border-amber-200 text-amber-600 bg-amber-50' : 'border-emerald-200 text-emerald-600 bg-emerald-50'">
-                            {{ ocGroup.estado_oc }}
-                          </span>
+                          <div v-if="ocGroup.estado_oc" class="relative group/estado ml-1 flex">
+                            <span
+                              class="font-bold px-1.5 py-0.5 rounded text-[9px] border uppercase cursor-pointer transition-colors"
+                              :class="estadoBadge(ocGroup.estado_oc).cls"
+                              title="Cambiar estado"
+                            >
+                              {{ estadoBadge(ocGroup.estado_oc).label }}
+                            </span>
+                            <!-- Dropdown opciones -->
+                            <div class="hidden group-hover/estado:flex absolute left-0 top-full z-20 mt-1 flex-col bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden text-[10px] font-semibold min-w-[90px]">
+                              <button
+                                v-if="ocGroup.estado_oc === 'pendiente'"
+                                class="px-3 py-1.5 text-left hover:bg-amber-50 text-amber-600"
+                                @click.stop="changeOCStatus(ocGroup.num_pedido, 'borrador')"
+                              >Borrador</button>
+                              <button
+                                v-if="['pendiente', 'borrador'].includes(ocGroup.estado_oc)"
+                                class="px-3 py-1.5 text-left hover:bg-indigo-50 text-indigo-600"
+                                @click.stop="changeOCStatus(ocGroup.num_pedido, 'revision')"
+                              >Revisión</button>
+                            </div>
+                          </div>
                           <span class="bg-indigo-50 text-indigo-600 border border-indigo-100 font-bold px-1.5 py-0.5 rounded text-[9px] ml-1">{{ ocGroup.skus.length }} SKUs</span>
                         </div>
                       </td>
@@ -437,7 +464,8 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
                       <tr
                         v-for="(sku, index) in ocGroup.skus"
                         :key="sku.sku_muliix ? sku.sku_muliix : (sku.oc_id + '_' + index)"
-                        class="bg-white/80 transition-colors text-[11px] border-b border-slate-50 hover:bg-slate-50 group/row"
+                        class="transition-colors text-[11px] border-b border-slate-50 group/row"
+                        :class="skuRowBgClass(calcularFillRateDinamico(sku))"
                       >
                         <!-- Nombre SKU -->
                         <td class="pl-12 pr-3 py-1.5 text-slate-700 font-medium border-l border-slate-50" :title="sku.sku_nombre">
@@ -566,8 +594,8 @@ async function changeStatus(store_row: CpfrStoreDash, estado: CpfrStoreDash['est
                         </td>
 
                         <!-- Fill Rate -->
-                        <td class="px-3 py-1.5 text-right font-medium border-l border-slate-50 bg-white" :class="fillClass(sku.fill_rate)">
-                          {{ sku.fill_rate != null ? (sku.fill_rate * 100).toFixed(1) + '%' : '—' }}
+                        <td class="px-3 py-1.5 text-right font-medium border-l border-slate-50 bg-white" :class="fillClass(calcularFillRateDinamico(sku))">
+                          {{ calcularFillRateDinamico(sku) != null ? (calcularFillRateDinamico(sku)! * 100).toFixed(1) + '%' : '—' }}
                         </td>
 
                         <!-- INSTOCK per SKU -->

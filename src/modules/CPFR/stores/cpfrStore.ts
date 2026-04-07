@@ -115,6 +115,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
                         sku.pedido_sugerido_pz_red = body.cantidad_final_pz
                         if (body.semanas_objetivo != null) sku.semanas_objetivo = body.semanas_objetivo
                         if (body.enviado_pz != null) sku.enviado_pz = body.enviado_pz
+                        if (body.fill_rate !== undefined) sku.fill_rate = body.fill_rate
                         _recalcStoreResumen(tiendaRow)
                     }
                     break
@@ -132,8 +133,13 @@ export const useCpfrStore = defineStore('cpfr', () => {
             await cpfrApi.updateStatus(body)
             // Actualizar localmente
             for (const dia of dias.value) {
-                const store = dia.tiendas.find(t => t.id_cliente === body.id_cliente)
-                if (store) { store.estado_pedido = body.estado; break }
+                for (const store of dia.tiendas) {
+                    for (const sku of store.skus) {
+                        if (sku.num_pedido === body.num_pedido) {
+                            sku.estado_oc = body.estado
+                        }
+                    }
+                }
             }
             return true
         } catch (e: any) {
