@@ -26,9 +26,16 @@ function startEdit(sku: CpfrSkuDash) {
 function cancelEdit() { editingId.value = null }
 
 async function confirmEdit(sku: CpfrSkuDash, id_cliente: string) {
-    if (editValue.value === sku.pedido_sugerido_pz_red) { cancelEdit(); return }
+    const bolsa = sku.pzas_bolsa || 1;
+    let finalValue = Math.round(editValue.value / bolsa) * bolsa;
+    if (finalValue < 0) finalValue = 0;
+
+    if (finalValue === sku.pedido_sugerido_pz_red) { cancelEdit(); return }
+    
+    saving.value = true;
+    
     // Aquí actualizo el valor en el UI temporalmente (se confirma luego en la DB)
-    sku.pedido_sugerido_pz_red = editValue.value;
+    sku.pedido_sugerido_pz_red = finalValue;
 
     const newFillRate = calcularFillRateDinamico(sku);
 
@@ -38,7 +45,7 @@ async function confirmEdit(sku: CpfrSkuDash, id_cliente: string) {
         store.currentWeek!.anio,
         store.currentWeek!.semana_ic,
         {
-            cantidad_final_pz: editValue.value,
+            cantidad_final_pz: finalValue,
             fill_rate: newFillRate
         }
     )
@@ -136,18 +143,25 @@ function fillClass(fr: number | null) {
     return 'text-rose-500 font-semibold'
 }
 
-function skuRowBgClass(fr: number | null): string {
+function skuRowBgClass(sku: any): string {
+    // Producto sin histórico de sellout → fondo amarillo
+    if (esSinSellout(sku)) return 'bg-amber-50/70 hover:bg-amber-100/60'
+    const fr = calcularFillRateDinamico(sku);
     if (fr === null) return 'bg-white/80 hover:bg-slate-50'
     if (fr === 0) return 'bg-orange-50/60 hover:bg-orange-100/50'
+    if (fr > 1.001) return 'bg-sky-50/60 hover:bg-sky-100/50' // Sobre-pedido (tolerancia decimal)
     if (fr >= 1) return 'bg-emerald-50/50 hover:bg-emerald-100/50'
     return 'bg-white/80 hover:bg-slate-50'
 }
 
-function storeRowBgClass(fr: number | null, isExpanded: boolean): string {
-    if (fr === null) return isExpanded ? 'bg-slate-50' : 'bg-white hover:bg-slate-50'
-    if (fr === 0) return isExpanded ? 'bg-orange-100/40' : 'bg-orange-50/50 hover:bg-orange-100/40'
-    if (fr >= 1) return isExpanded ? 'bg-emerald-100/40' : 'bg-emerald-50/50 hover:bg-emerald-100/40'
-    return isExpanded ? 'bg-slate-50' : 'bg-white hover:bg-slate-50'
+/**
+ * Filas de TIENDA: nivel 3 de la jerarquía, sobre el día oscuro.
+ * Fondo claro-medio consistente, con separación visual del día.
+ */
+function storeRowBgClass(isExpanded: boolean): string {
+    return isExpanded
+        ? 'bg-slate-100 border-t-2 border-t-slate-300'
+        : 'bg-slate-100 border-t-2 border-t-slate-300 hover:bg-slate-200/50'
 }
 
 /**
@@ -211,6 +225,58 @@ async function changeOCStatus(num_pedido: string | null, estado: string) {
         estado: estado as any,
     })
 }
+
+// Exponer expandedOCGroups para que el padre controle expand/collapse masivo
+defineExpose({ expandedOCGroups })
+
+// ── Indicadores de salud por SKU ─────────────────────────────────────────────
+
+/** Caso 1 – Sin histórico de sellout (producto nuevo o sin datos) */
+function esSinSellout(sku: any): boolean {
+    return !sku.promedio_sellout_kg || sku.promedio_sellout_kg <= 0;
+}
+
+/**
+ * Caso 2 – Estado de cobertura proyectada:
+ *   'ok'       → dentro de criterio ± 0.5
+ *   'bajo'     → cobertura < criterio
+ *   'sobre'    → cobertura > criterio + 0.5
+ *   'sin_datos'→ no hay sellout
+ */
+function coberturaStatus(sku: any): 'ok' | 'bajo' | 'sobre' | 'sin_datos' {
+    if (esSinSellout(sku)) return 'sin_datos';
+    const cob = calcularCoberturaDinamica(sku);
+    if (cob === null) return 'sin_datos';
+    const crit = sku.semanas_objetivo || store.criterio_global || 2.5;
+    if (cob < crit) return 'bajo';
+    if (cob > crit + 0.5) return 'sobre';
+    return 'ok';
+}
+
+function coberturaStatusIcon(status: ReturnType<typeof coberturaStatus>): string {
+    if (status === 'bajo')     return 'fa-solid fa-triangle-exclamation text-rose-400'
+    if (status === 'sobre')    return 'fa-solid fa-arrow-trend-up text-orange-400'
+    if (status === 'sin_datos') return 'fa-solid fa-circle-question text-slate-300'
+    return ''
+}
+
+function coberturaStatusTooltip(status: ReturnType<typeof coberturaStatus>, cob: number | null, crit: number): string {
+    if (status === 'bajo')      return `Bajo stock: cobertura ${cob?.toFixed(2)} sem. — criterio: ${crit} sem.`
+    if (status === 'sobre')     return `Sobrestock: cobertura ${cob?.toFixed(2)} sem. (umbral: ${(crit + 0.5).toFixed(1)} sem.)`
+    if (status === 'sin_datos') return 'Sin histórico de venta promedio'
+    return ''
+}
+
+/** Caso 3 – Fill Rate: clases de fondo + icono + tooltip */
+function fillRateBadge(fr: number | null): { bg: string; text: string; icon: string; tip: string } {
+    if (fr === null) return { bg: '', text: 'text-slate-400', icon: '', tip: 'Sin pedido cadena' }
+    const pct = fr * 100
+    if (pct === 0)    return { bg: 'bg-rose-50',    text: 'text-rose-600 font-bold',    icon: 'fa-solid fa-ban text-rose-400',              tip: 'Fill Rate 0% — el pedido sugerido es 0 frente a lo que pide la cadena' }
+    if (pct < 80)     return { bg: 'bg-amber-50',   text: 'text-amber-700 font-semibold', icon: 'fa-solid fa-arrow-down text-amber-400',   tip: `Fill Rate bajo: ${pct.toFixed(1)}% — se cubre menos del 80% del pedido cadena` }
+    if (pct <= 100)   return { bg: 'bg-emerald-50', text: 'text-emerald-700 font-semibold', icon: 'fa-solid fa-check text-emerald-400',    tip: `Fill Rate: ${pct.toFixed(1)}%` }
+    // > 100%: sugerimos más que lo que pide la cadena
+    return              { bg: 'bg-sky-50',     text: 'text-sky-700 font-semibold',    icon: 'fa-solid fa-arrow-up text-sky-400',          tip: `Sobre-pedido: ${pct.toFixed(1)}% del pedido cadena — el algoritmo sugiere más de lo solicitado` }
+}
 </script>
 
 <template>
@@ -230,22 +296,22 @@ async function changeOCStatus(num_pedido: string | null, estado: string) {
     <div v-else class="overflow-x-auto">
       <table class="w-full text-xs">
 
-        <!-- Cabecera fija -->
-        <thead class="sticky top-0 z-20 shadow-sm">
-          <tr class="text-[10px] uppercase tracking-wider text-slate-600 bg-slate-100 border-b-2 border-slate-200 shadow-sm relative">
-            <th class="px-4 py-3 text-left font-bold w-[240px] bg-slate-100">Tienda / SKU</th>
-            <th class="px-3 py-3 text-left font-bold bg-slate-100">UPC</th>
-            <th class="px-3 py-3 text-left font-bold bg-slate-100">Jefatura</th>
-            <th class="px-3 py-3 text-right font-bold bg-slate-100">Inv.<br>Actual (pz)</th>
-            <th class="px-3 py-3 text-right font-bold bg-slate-100">Sellout Prom.<br>Semanal (pz)</th>
-            <th class="px-3 py-3 text-right font-bold bg-slate-100">Criterio<br>(Sem.)</th>
-            <th class="px-3 py-3 text-right font-bold bg-slate-100">Cobertura<br>(Sem.)</th>
-            <th class="px-3 py-3 text-right font-black text-brand-700 bg-brand-50 border-b-2 border-brand-200 shadow-sm border-x border-x-brand-100">Pedido<br>Sugerido</th>
-            <th class="px-3 py-3 text-right font-bold bg-slate-100">Pedido<br>Cadena</th>
-            <th class="px-3 py-3 text-left font-bold bg-slate-100">Detalle OC</th>
-            <th class="px-3 py-3 text-right font-bold bg-slate-100">Fill Rate</th>
-            <th class="px-3 py-3 text-center font-bold bg-slate-100">INSTOCK</th>
-            <th class="px-2 py-3 text-center font-bold bg-slate-100 w-10"></th>
+        <!-- Cabecera fija: NIVEL 1 — el más oscuro, ancla la tabla -->
+        <thead class="sticky top-0 z-20">
+          <tr class="text-[10px] uppercase tracking-wider text-slate-300 bg-slate-800 border-b border-slate-700">
+            <th class="px-4 py-3 text-left font-black w-[240px]">Tienda / SKU</th>
+            <th class="px-3 py-3 text-left font-black">UPC</th>
+            <th class="px-3 py-3 text-left font-black">Jefatura</th>
+            <th class="px-3 py-3 text-right font-black">Inv.<br>Actual (pz)</th>
+            <th class="px-3 py-3 text-right font-black">Sellout Prom.<br>Semanal (pz)</th>
+            <th class="px-3 py-3 text-right font-black">Criterio<br>(Sem.)</th>
+            <th class="px-3 py-3 text-right font-black">Cobertura<br>(Sem.)</th>
+            <th class="px-3 py-3 text-right font-black text-brand-300 bg-brand-900/40 border-x border-x-brand-700/50">Pedido<br>Sugerido</th>
+            <th class="px-3 py-3 text-right font-black">Pedido<br>Cadena</th>
+            <th class="px-3 py-3 text-left font-black">Detalle OC</th>
+            <th class="px-3 py-3 text-right font-black">Fill Rate</th>
+            <th class="px-3 py-3 text-center font-black">INSTOCK</th>
+            <th class="px-2 py-3 text-center font-black w-10"></th>
           </tr>
         </thead>
 
@@ -254,8 +320,9 @@ async function changeOCStatus(num_pedido: string | null, estado: string) {
           <!-- ══ SECCIÓN POR DÍA ══ -->
           <template v-for="dia in store.dias" :key="dia.dia_num">
 
+            <!-- NIVEL 2: DÍA — un paso más claro que el thead, mismo lenguaje oscuro -->
             <tr
-              class="cursor-pointer select-none group border-b border-slate-700 bg-slate-800 hover:bg-slate-700 transition-colors"
+              class="cursor-pointer select-none group border-b border-slate-500 bg-slate-600 hover:bg-slate-500 transition-colors"
               @click="toggleDay(dia.dia_num)"
             >
               <td colspan="13" class="px-4 py-2.5">
@@ -278,11 +345,12 @@ async function changeOCStatus(num_pedido: string | null, estado: string) {
             <template v-if="!collapsedDays[dia.dia_num]">
               <template v-for="tienda in dia.tiendas" :key="tienda.id_cliente">
 
+                <!-- NIVEL 3: TIENDA — claro-medio, separador fuerte desde el día oscuro -->
                 <tr
                   class="cursor-pointer transition-colors border-b relative"
                   :class="[
-                    store.expandedStores[tienda.id_cliente] ? 'border-slate-200' : 'border-slate-100',
-                    storeRowBgClass(tienda.resumen.fill_rate, !!store.expandedStores[tienda.id_cliente])
+                    store.expandedStores[tienda.id_cliente] ? 'border-slate-300' : 'border-slate-200',
+                    storeRowBgClass(!!store.expandedStores[tienda.id_cliente])
                   ]"
                   @click="store.toggleStore(tienda.id_cliente)"
                 >
@@ -391,10 +459,12 @@ async function changeOCStatus(num_pedido: string | null, estado: string) {
                   <!-- OC Groups -->
                   <template v-else v-for="ocGroup in groupOCs(tienda.skus)" :key="ocGroup.group_id">
                     
-                    <!-- Parent OC Row -->
+                    <!-- NIVEL 4: OC — slate-50 con rail izquierdo oscuro. Abre visualmente el bloque. -->
                     <tr
-                      class="bg-white hover:bg-slate-50 cursor-pointer transition-colors text-[11px] border-l-4 group/row"
-                      :class="expandedOCGroups[`${tienda.id_cliente}_${ocGroup.group_id}`] !== false ? 'border-b border-slate-200 border-l-brand-300 bg-slate-50/50' : 'border-b border-slate-50 border-emerald-400/0'"
+                      class="cursor-pointer transition-colors text-[11px] border-b group/row"
+                      :class="expandedOCGroups[`${tienda.id_cliente}_${ocGroup.group_id}`] !== false
+                        ? 'bg-slate-50 border-b-slate-200 border-l-[4px] border-l-slate-500'
+                        : 'bg-slate-50 hover:bg-slate-100 border-b-slate-100 border-l-[4px] border-l-slate-400'"
                       @click="toggleOCGroup(tienda.id_cliente, ocGroup.group_id)"
                     >
                       <!-- Etiqueta OC -->
@@ -405,8 +475,37 @@ async function changeOCStatus(num_pedido: string | null, estado: string) {
                             :class="expandedOCGroups[`${tienda.id_cliente}_${ocGroup.group_id}`] !== false ? 'rotate-90 text-brand-500' : 'group-hover/row:text-slate-400'"
                           ></i>
                           <span class="truncate uppercase tracking-wide text-[10px] text-slate-500 mr-2">Orden de Compra:</span>
-                          <span class="text-[12px] font-black tracking-tight" :class="ocGroup.num_pedido ? 'text-brand-600' : 'text-slate-400 italic'">
+                          <!-- Número + fechas compactas en popover -->
+                          <span class="relative group/ocnum">
+                            <span class="text-[12px] font-black tracking-tight cursor-default" :class="ocGroup.num_pedido ? 'text-brand-600' : 'text-slate-400 italic'">
                               {{ ocGroup.num_pedido || 'Sin número' }}
+                            </span>
+                            <!-- Popover de fechas: aparece al hover sobre el número -->
+                            <div
+                              v-if="ocGroup.fec_pedido_cadena || ocGroup.fec_fin_embarque"
+                              class="absolute left-0 top-full z-30 mt-1.5 hidden group-hover/ocnum:flex flex-col gap-1 bg-slate-800 text-white rounded-lg shadow-xl px-3 py-2.5 min-w-[180px] pointer-events-none"
+                            >
+                              <div v-if="ocGroup.fec_pedido_cadena" class="flex items-center gap-2 text-[10px]">
+                                <i class="fa-regular fa-calendar-check text-slate-400"></i>
+                                <span class="text-slate-400">Levantado:</span>
+                                <span class="font-mono font-bold text-slate-100">{{ ocGroup.fec_pedido_cadena.slice(0, 10) }}</span>
+                              </div>
+                              <div v-if="ocGroup.fec_fin_embarque" class="flex items-center gap-2 text-[10px]">
+                                <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
+                                <span class="text-slate-400">Fin embarque:</span>
+                                <span class="font-mono font-bold text-amber-300">{{ ocGroup.fec_fin_embarque.slice(0, 10) }}</span>
+                              </div>
+                              <!-- Puntero del popover -->
+                              <div class="absolute -top-1 left-3 w-2 h-2 bg-slate-800 rotate-45"></div>
+                            </div>
+                          </span>
+                          <!-- Indicador de fecha fin embarque urgente (siempre visible si existe) -->
+                          <span
+                            v-if="ocGroup.fec_fin_embarque"
+                            class="ml-1 text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded cursor-help"
+                            :title="`Fin embarque: ${ocGroup.fec_fin_embarque.slice(0, 10)}`"
+                          >
+                            <i class="fa-solid fa-calendar-xmark mr-0.5"></i>{{ ocGroup.fec_fin_embarque.slice(0, 10) }}
                           </span>
                           <div v-if="ocGroup.estado_oc" class="relative group/estado ml-1 flex">
                             <span
@@ -444,28 +543,25 @@ async function changeOCStatus(num_pedido: string | null, estado: string) {
                         {{ n(ocGroup.cant_pedida_total, 0) }}
                       </td>
 
-                      <!-- Detalle Fechas (Alerta límite embalaje) -->
-                      <td class="px-3 py-2 text-left whitespace-nowrap border-l border-slate-50 bg-white" colspan="4">
-                        <div class="flex items-center gap-4 text-[10px] font-medium">
-                            <div v-if="ocGroup.fec_pedido_cadena" class="text-slate-500">
-                                <i class="fa-regular fa-calendar-plus mr-1"></i>
-                                <span title="Día que se levantó el pedido">Pedido: <span class="font-bold text-slate-700">{{ ocGroup.fec_pedido_cadena.slice(0, 10) }}</span></span>
-                            </div>
-                            <div v-if="ocGroup.fec_fin_embarque" class="text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded shadow-sm flex items-center gap-1.5 group/alert hover:bg-rose-100 transition-colors cursor-help" title="Fecha límite de recepción en cadena. ¡Atención si se está próximo!">
-                                <i class="fa-solid fa-triangle-exclamation animate-pulse text-rose-500"></i>
-                                <span>Caduca Embarque: <span class="font-bold">{{ ocGroup.fec_fin_embarque.slice(0, 10) }}</span></span>
-                            </div>
-                        </div>
+                      <!-- Detalle Fechas: removido de la tabla, ahora en popover del número OC -->
+                      <td class="px-3 py-2 text-center border-l border-slate-50" colspan="4">
+                        <span class="text-[10px] text-slate-300 italic">ver OC</span>
                       </td>
                     </tr>
 
                     <!-- Children SKU Rows -->
                     <template v-if="expandedOCGroups[`${tienda.id_cliente}_${ocGroup.group_id}`] !== false">
+                      <!-- NIVEL 5: SKU — riel continuo slate-300 que conecta visualmente con la OC padre -->
                       <tr
-                        v-for="(sku, index) in ocGroup.skus"
-                        :key="sku.sku_muliix ? sku.sku_muliix : (sku.oc_id + '_' + index)"
-                        class="transition-colors text-[11px] border-b border-slate-50 group/row"
-                        :class="skuRowBgClass(calcularFillRateDinamico(sku))"
+                        v-for="(sku, skuIdx) in ocGroup.skus"
+                        :key="sku.sku_muliix ? sku.sku_muliix : (sku.oc_id + '_' + skuIdx)"
+                        class="transition-colors text-[11px] group/row border-l-[4px] border-l-slate-300"
+                        :class="[
+                          skuRowBgClass(sku),
+                          skuIdx === ocGroup.skus.length - 1
+                            ? 'border-b-2 border-b-slate-300'
+                            : 'border-b border-b-slate-100'
+                        ]"
                       >
                         <!-- Nombre SKU -->
                         <td class="pl-12 pr-3 py-1.5 text-slate-700 font-medium border-l border-slate-50" :title="sku.sku_nombre">
@@ -544,12 +640,14 @@ async function changeOCStatus(num_pedido: string | null, estado: string) {
 
                         <!-- Semanas Actuales (cobertura dinamica) -->
                         <td
-                          class="px-3 py-1.5 text-right font-bold border-l border-slate-50"
+                          class="px-3 py-1.5 text-right font-bold border-l border-slate-50 relative"
                           :class="cobClass(calcularCoberturaDinamica(sku))"
-                          :title="sku.cobertura_actual === null ? 'Sin datos de venta' 
-                                 : `Cobertura original: ${sku.cobertura_actual.toFixed(2)}`"
+                          :title="coberturaStatusTooltip(coberturaStatus(sku), calcularCoberturaDinamica(sku), sku.semanas_objetivo || store.criterio_global || 2.5)"
                         >
-                          {{ calcularCoberturaDinamica(sku) != null ? calcularCoberturaDinamica(sku)!.toFixed(2) : '—' }}
+                          <span class="flex items-center justify-end gap-1">
+                            <i v-if="coberturaStatusIcon(coberturaStatus(sku))" :class="coberturaStatusIcon(coberturaStatus(sku))" class="text-[9px] flex-shrink-0"></i>
+                            {{ calcularCoberturaDinamica(sku) != null ? calcularCoberturaDinamica(sku)!.toFixed(2) : '—' }}
+                          </span>
                         </td>
 
                         <!-- Pedido Sugerido (editable Excel-style) -->
@@ -559,7 +657,7 @@ async function changeOCStatus(num_pedido: string | null, estado: string) {
                           <div v-if="editingId === sku.sku_muliix && sku.sku_muliix" class="flex items-center gap-1.5 justify-end h-full">
                             <input
                               v-model.number="editValue"
-                              type="number" min="0" step="1"
+                              type="number" min="0" :step="sku.pzas_bolsa || 1"
                               class="w-full h-7 rounded-sm border-2 border-brand-500 px-1 text-xs text-right font-bold text-slate-800 shadow-inner focus:outline-none"
                               autofocus
                               @keyup.enter="confirmEdit(sku, tienda.id_cliente)"
@@ -575,10 +673,15 @@ async function changeOCStatus(num_pedido: string | null, estado: string) {
                             v-else
                             class="w-full text-right bg-white border border-slate-300 hover:border-brand-500 hover:shadow-sm rounded shadow-sm px-2 py-1 flex items-center justify-between transition-all"
                             :class="{ 'ring-2 ring-emerald-400 border-transparent bg-emerald-50': savedId === sku.sku_muliix }"
-                            title="Doble clic o clic para editar cantidad"
+                            :title="esSinSellout(sku)
+                              ? '⚠️ Sin sellout promedio — producto nuevo o sin histórico. Se usa el pedido cadena como referencia.'
+                              : 'Clic para editar cantidad'"
                             @click="startEdit(sku)"
                           >
-                            <i class="fa-solid fa-pen text-[9px] text-slate-300 group-hover/cell:text-brand-500 transition-colors mr-2"></i>
+                            <span class="flex items-center gap-1">
+                              <i v-if="esSinSellout(sku)" class="fa-solid fa-seedling text-[9px] text-amber-400" title="Sin sellout promedio"></i>
+                              <i v-else class="fa-solid fa-pen text-[9px] text-slate-300 group-hover/cell:text-brand-500 transition-colors"></i>
+                            </span>
                             <span class="text-[12px] font-bold text-slate-700" :class="{ 'text-brand-700': sku.pedido_sugerido_pz_red > 0 }">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
                           </button>
                         </td>
@@ -594,8 +697,15 @@ async function changeOCStatus(num_pedido: string | null, estado: string) {
                         </td>
 
                         <!-- Fill Rate -->
-                        <td class="px-3 py-1.5 text-right font-medium border-l border-slate-50 bg-white" :class="fillClass(calcularFillRateDinamico(sku))">
-                          {{ calcularFillRateDinamico(sku) != null ? (calcularFillRateDinamico(sku)! * 100).toFixed(1) + '%' : '—' }}
+                        <td
+                          class="px-3 py-1.5 text-right font-medium border-l border-slate-50"
+                          :class="[fillRateBadge(calcularFillRateDinamico(sku)).bg, fillRateBadge(calcularFillRateDinamico(sku)).text]"
+                          :title="fillRateBadge(calcularFillRateDinamico(sku)).tip"
+                        >
+                          <span class="flex items-center justify-end gap-1">
+                            <i v-if="fillRateBadge(calcularFillRateDinamico(sku)).icon" :class="fillRateBadge(calcularFillRateDinamico(sku)).icon" class="text-[9px] flex-shrink-0"></i>
+                            {{ calcularFillRateDinamico(sku) != null ? (calcularFillRateDinamico(sku)! * 100).toFixed(1) + '%' : '—' }}
+                          </span>
                         </td>
 
                         <!-- INSTOCK per SKU -->

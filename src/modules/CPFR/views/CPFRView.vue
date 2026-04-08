@@ -7,12 +7,17 @@ import CpfrCriteriaPanel   from '../components/CpfrCriteriaPanel.vue'
 import CpfrOrderTable      from '../components/CpfrOrderTable.vue'
 import CpfrUploadModal     from '../components/CpfrUploadModal.vue'
 import CpfrStoreConfigModal from '../components/CpfrStoreConfigModal.vue'
+import CpfrInfoModal        from '../components/CpfrInfoModal.vue'
 
 const store = useCpfrStore()
 
-// ── Modal state ────────────────────────────────────────────────────────────────
+// ── Modal state ───────────────────────────────────────────────────────────────
 const showUploadModal  = ref(false)
+const showInfoModal    = ref(false)
 const configStore      = ref<{ id: string; nombre: string } | null>(null)
+
+// ── Ref a la tabla para acceder a expandedOCGroups expuesto ─────────────────────
+const tableRef = ref<InstanceType<typeof CpfrOrderTable> | null>(null)
 
 onMounted(() => store.init())
 
@@ -21,7 +26,6 @@ function onOpenConfig(id_cliente: string, nombre_tienda: string) {
 }
 
 function onUploadDone() {
-    // Tras subir OC, recargar el dashboard
     store.loadDashboard()
 }
 
@@ -43,6 +47,13 @@ function confirmRecalculate() {
         <h1 class="text-base font-bold text-slate-800 flex items-center gap-2">
           <i class="fa-solid fa-truck-ramp-box text-brand-500"></i>
           CPFR — Propuesta de Pedido Sugerido
+          <button 
+            @click="showInfoModal = true"
+            class="w-5 h-5 rounded-full border border-slate-200 text-slate-400 hover:text-brand-500 hover:border-brand-200 hover:bg-brand-50 transition-all flex items-center justify-center text-[10px] ml-1"
+            title="Ver guía del algoritmo y simbología"
+          >
+            <i class="fa-solid fa-question"></i>
+          </button>
         </h1>
         <p class="text-[11px] text-slate-400 mt-0.5">
           Motor de reabastecimiento basado en inventario y sellout semanal · Soriana
@@ -88,21 +99,48 @@ function confirmRecalculate() {
         Recalcular Matemática
       </button>
 
-      <!-- Expandir / Contraer -->
-      <button
-        class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
-        @click="store.expandAll()"
-      >
-        <i class="fa-solid fa-angles-down text-[11px]"></i>
-        Expandir
-      </button>
-      <button
-        class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
-        @click="store.collapseAll()"
-      >
-        <i class="fa-solid fa-angles-up text-[11px]"></i>
-        Contraer
-      </button>
+      <!-- Expandir / Contraer por niveles -->
+      <div class="flex items-center gap-1 border border-slate-200 rounded-lg overflow-hidden bg-slate-50">
+        <!-- Label -->
+        <span class="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wide border-r border-slate-200 py-1.5">Tiendas</span>
+        <button
+          class="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 text-slate-500 hover:bg-white hover:text-slate-700 transition-colors"
+          title="Expandir todas las tiendas"
+          @click="store.expandAll()"
+        >
+          <i class="fa-solid fa-chevron-down text-[10px]"></i>
+          Abrir
+        </button>
+        <button
+          class="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 text-slate-500 hover:bg-white hover:text-slate-700 transition-colors border-l border-slate-200"
+          title="Contraer todas las tiendas"
+          @click="store.collapseAll()"
+        >
+          <i class="fa-solid fa-chevron-up text-[10px]"></i>
+          Cerrar
+        </button>
+      </div>
+
+      <div class="flex items-center gap-1 border border-slate-200 rounded-lg overflow-hidden bg-slate-50">
+        <!-- Label -->
+        <span class="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wide border-r border-slate-200 py-1.5">OCs</span>
+        <button
+          class="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 text-slate-500 hover:bg-white hover:text-slate-700 transition-colors"
+          title="Expandir todas las órdenes de compra"
+          @click="tableRef && store.expandAllOCs(tableRef.expandedOCGroups)"
+        >
+          <i class="fa-solid fa-chevron-down text-[10px]"></i>
+          Abrir
+        </button>
+        <button
+          class="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 text-slate-500 hover:bg-white hover:text-slate-700 transition-colors border-l border-slate-200"
+          title="Contraer todas las órdenes de compra"
+          @click="tableRef && store.collapseAllOCs(tableRef.expandedOCGroups)"
+        >
+          <i class="fa-solid fa-chevron-up text-[10px]"></i>
+          Cerrar
+        </button>
+      </div>
 
     </nav>
 
@@ -133,6 +171,7 @@ function confirmRecalculate() {
 
         <!-- Tabla -->
         <CpfrOrderTable
+          ref="tableRef"
           v-else
           class="flex-1 min-h-0"
           @open-config="onOpenConfig"
@@ -153,6 +192,11 @@ function confirmRecalculate() {
       :id-cliente="configStore.id"
       :nombre-tienda="configStore.nombre"
       @close="configStore = null"
+    />
+
+    <CpfrInfoModal
+      v-if="showInfoModal"
+      @close="showInfoModal = false"
     />
 
   </main>

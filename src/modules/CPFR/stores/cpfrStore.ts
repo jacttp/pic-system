@@ -187,6 +187,30 @@ export const useCpfrStore = defineStore('cpfr', () => {
         Object.keys(expandedStores).forEach(k => { expandedStores[k] = false })
     }
 
+    // Agrupación local de OCs por tienda (espejo de groupOCs en el componente)
+    function _getOCKey(id_cliente: string, num_pedido: string | null): string {
+        return `${id_cliente}_${num_pedido || 'UNSAVED'}`
+    }
+
+    function expandAllOCs(ocGroupKeys: Record<string, boolean>) {
+        for (const dia of dias.value) {
+            for (const t of dia.tiendas) {
+                const seen = new Set<string>()
+                for (const sku of t.skus) {
+                    const key = _getOCKey(t.id_cliente, sku.num_pedido)
+                    if (!seen.has(key)) {
+                        seen.add(key)
+                        ocGroupKeys[key] = true
+                    }
+                }
+            }
+        }
+    }
+
+    function collapseAllOCs(ocGroupKeys: Record<string, boolean>) {
+        Object.keys(ocGroupKeys).forEach(k => { ocGroupKeys[k] = false })
+    }
+
     // ── Filtros ───────────────────────────────────────────────────────────────
 
     function setFilter(key: keyof CpfrFilters, value: number | string | undefined) {
@@ -326,7 +350,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         // Actions
         init, fetchCurrentWeek, loadDashboard, recalculate,
         adjustSku, updateStatus,
-        toggleStore, expandAll, collapseAll,
+        toggleStore, expandAll, collapseAll, expandAllOCs, collapseAllOCs,
         setFilter, clearFilters,
         // Computed
         diaOptions, jefaturaOptions, tiendaOptions,
