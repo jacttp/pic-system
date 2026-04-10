@@ -10,9 +10,9 @@ prototypes
 public/
 
 src/assets
-src/lib
+src/components/ui/HelloWorld.vue
 
-src/components/HelloWorld.vue
+src/lib
 
 src/modules/Audit
 src/modules/Auth
@@ -21,32 +21,48 @@ src/modules/Cannibalization
 src/modules/Clients
 src/modules/ClientValidation
 src/modules/CommercialStructure
+
+src/modules/CPFR/cpfr_guia.md
+src/modules/CPFR/components/CpfrBatchProgressModal.vue
+src/modules/CPFR/components/CpfrCriteriaPanel.vue
+src/modules/CPFR/components/CpfrGenerateModal.vue
+src/modules/CPFR/components/CpfrPendingStoresPanel.vue
+src/modules/CPFR/composables/useCpfrCalculations
+src/modules/CPFR/services/cpfrMock.ts
+
 src/modules/CustomerSegmentation
+src/modules/Hub
 src/modules/PIC
 src/modules/Products 
 src/modules/PVR
 src/modules/SellOut
 src/modules/Setup
-
+src/modules/Shared
 src/modules/StockAnalytics
 src/modules/UploadMetas
 src/modules/UploadOC
 
+src/modules/Users
+
 src/prueba-chat.html
 
-types/
+src/types/
+src/utils/
 
 prueba-chat.html
 
 .aidigestignore
 .env
 .gitignore
+components.json
+index.html
+
+package-lock.json
+postcss.config.js
+README.md
 skills-lock.json
 
 codebase.md
 frontend.json
-README.md
 
-package-lock.json
-package.json
 vite.config.ts

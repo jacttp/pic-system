@@ -1,10 +1,10 @@
 // src/modules/Approvals/types/approval.types.ts
 
-// Expandir este enum cada vez que un nuevo módulo requiera aprobaciones
 export type ApprovalType =
-   | 'PROMOTION'          // Módulo de Promociones (Fase futura)
-   | 'USER_ROLE_CHANGE'   // Cambio de rol desde Users
-   | 'REPORT_ACCESS'      // Acceso especial a reportes
+   | 'PROMOTION'
+   | 'USER_ROLE_CHANGE'
+   | 'REPORT_ACCESS'
+   | 'CPFR_ORDER'
 
 export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
 
@@ -17,6 +17,8 @@ export interface Approval {
    requestedBy: string
    requestedById: number
    requestedAt: string
+   // Aprobador explícito asignado al crear la solicitud
+   assignedToId?: number
    resolvedBy?: string
    resolvedById?: number
    resolvedAt?: string
@@ -34,11 +36,15 @@ export interface ApprovalCreatePayload {
    title: string
    description: string
    payload: Record<string, unknown>
+   /** ID del usuario que recibirá la notificación y será el aprobador asignado */
+   notifyUserId?: number
 }
 
 export interface ApprovalFilters {
    status?: ApprovalStatus
    type?: ApprovalType
+   /** 'assignee' → trae solicitudes donde el usuario autenticado es el aprobador asignado */
+   role?: 'assignee'
 }
 
 // Labels y colores para UI
@@ -53,4 +59,5 @@ export const APPROVAL_TYPE_CONFIG: Record<string, { label: string; color: string
    PROMOTION: { label: 'Promoción', color: 'text-violet-600', icon: 'fa-solid fa-tags' },
    USER_ROLE_CHANGE: { label: 'Cambio de Rol', color: 'text-blue-600', icon: 'fa-solid fa-user-gear' },
    REPORT_ACCESS: { label: 'Acceso Reporte', color: 'text-teal-600', icon: 'fa-solid fa-file-shield' },
+   CPFR_ORDER: { label: 'Pedido CPFR', color: 'text-indigo-600', icon: 'fa-solid fa-truck-fast' },
 }

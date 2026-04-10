@@ -2,7 +2,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import { useSetupStore } from '@/modules/Setup/stores/setupStores';
-import { ROLE_LEVELS } from '@/modules/Setup/types/setupTypes';
 import UploadOCView    from '@/modules/UploadOC/views/UploadOCView.vue'
 import UploadMetasView from '@/modules/UploadMetas/views/UploadMetasView.vue'
 
@@ -240,8 +239,7 @@ router.beforeEach(async (to, from, next) => {
       // --- ROUTE-LEVEL ROLE CHECK ---
       // Si la ruta define minRoleLevel en meta, verificar antes del módulo
       if (to.meta.minRoleLevel) {
-         const userRoleStr = authStore.user?.role || 'User';
-         const userLevel = ROLE_LEVELS[userRoleStr] || 1;
+         const userLevel = authStore.userLevel;
 
          if (userLevel < (to.meta.minRoleLevel as number)) {
             console.warn(`⛔ Acceso denegado por ruta: Nivel ${userLevel} vs Requerido ${to.meta.minRoleLevel}`);
@@ -271,10 +269,9 @@ router.beforeEach(async (to, from, next) => {
          }
 
          // 2. Verificar Rol (MinRoleLevel)
-         const userRoleStr = authStore.user?.role || 'User';
-         const userLevel = ROLE_LEVELS[userRoleStr] || 1;
+         const userLevel = authStore.userLevel;
 
-         if (userLevel < moduleConfig.MinRoleLevel) {
+         if (userLevel < Number(moduleConfig.MinRoleLevel)) {
             console.warn(`⛔ Acceso Prohibido: Nivel ${userLevel} vs Requerido ${moduleConfig.MinRoleLevel}`);
             return next('/');
          }

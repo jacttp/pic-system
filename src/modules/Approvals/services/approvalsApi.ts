@@ -4,10 +4,9 @@ import type {
    Approval,
    ApprovalCreatePayload,
    ApprovalResolution,
-   ApprovalFilters
+   ApprovalFilters,
 } from '../types/approval.types';
 
-// Mapeo de respuesta backend → frontend
 const mapApproval = (row: any): Approval => ({
    id: row.ApprovalId,
    type: row.Type,
@@ -17,6 +16,7 @@ const mapApproval = (row: any): Approval => ({
    requestedBy: row.RequestedBy,
    requestedById: row.RequestedById,
    requestedAt: row.RequestedAt,
+   assignedToId: row.AssignedToId ?? undefined,
    resolvedBy: row.ResolvedBy || undefined,
    resolvedById: row.ResolvedById || undefined,
    resolvedAt: row.ResolvedAt || undefined,
@@ -30,6 +30,7 @@ export const approvalsApi = {
       const params: Record<string, string> = {};
       if (filters?.status) params.status = filters.status;
       if (filters?.type) params.type = filters.type;
+      if (filters?.role) params.role = filters.role;
 
       const { data } = await api.get('/v2/approvals', { params });
       return (data.data || []).map(mapApproval);
@@ -53,5 +54,5 @@ export const approvalsApi = {
    async cancelApproval(id: number): Promise<boolean> {
       const { data } = await api.delete(`/v2/approvals/${id}`);
       return data.success;
-   }
+   },
 };

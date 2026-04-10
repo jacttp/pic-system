@@ -35,6 +35,20 @@ export const useCpfrStore = defineStore('cpfr', () => {
     // Override de criterio por tienda (para recalculate)
     const overrides = ref<CpfrOverride[]>([])
 
+    // Filtros de vista rápidos (Locales)
+    const statusFilters = reactive({
+        escenarioA: false,
+        escenarioB: false,
+        sinSellout: false,
+        bajoStock: false,
+        sobrestock: false,
+        fillrateBajo: false,
+        fillrate100: false,
+        sobrepedido: false,
+        desabasto: false,
+        searchOC: '',
+    })
+
     // UI — expand state local (no viene del backend)
     const expandedStores = reactive<Record<string, boolean>>({})
 
@@ -99,18 +113,23 @@ export const useCpfrStore = defineStore('cpfr', () => {
         }
     }
 
-    // NOTA: patch ahora usa negocio (cliente, sku, sem, anio) para máxima robustez
+    // NOTA: patch ahora usa negocio (cliente, sku, sem, anio, num_pedido, fec_oc) para máxima robustez
     async function adjustSku(
         id_cliente: string, sku_muliix: string, anio: number, semana_ic: string, 
+        num_pedido: string | null, fec_pedido_cadena: string | null,
         body: CpfrAdjustSkuBody
     ): Promise<boolean> {
         try {
-            await cpfrApi.adjustSku({ id_cliente, sku_muliix, anio, semana_ic, ...body })
+            await cpfrApi.adjustSku({ id_cliente, sku_muliix, anio, semana_ic, num_pedido, fec_pedido_cadena, ...body })
             // Actualizar localmente sin re-fetch completo
             for (const dia of dias.value) {
                 const tiendaRow = dia.tiendas.find(t => t.id_cliente === id_cliente)
                 if (tiendaRow) {
-                    const sku = tiendaRow.skus.find(s => s.sku_muliix === sku_muliix)
+                    const sku = tiendaRow.skus.find(s => 
+                        s.sku_muliix === sku_muliix && 
+                        s.num_pedido === num_pedido && 
+                        s.fec_pedido_cadena === fec_pedido_cadena
+                    )
                     if (sku) {
                         sku.pedido_sugerido_pz_red = body.cantidad_final_pz
                         if (body.semanas_objetivo != null) sku.semanas_objetivo = body.semanas_objetivo
@@ -128,10 +147,10 @@ export const useCpfrStore = defineStore('cpfr', () => {
         }
     }
 
-    async function updateStatus(body: CpfrUpdateStatusBody): Promise<boolean> {
+    async function updateStatus(body: CpfrUpdateStatusBody): Promise<{ ok: boolean; approvalId?: number }> {
         try {
-            await cpfrApi.updateStatus(body)
-            // Actualizar localmente
+            const res = await cpfrApi.updateStatus(body)
+            // Actualizar localmente sin re-fetch
             for (const dia of dias.value) {
                 for (const store of dia.tiendas) {
                     for (const sku of store.skus) {
@@ -141,10 +160,10 @@ export const useCpfrStore = defineStore('cpfr', () => {
                     }
                 }
             }
-            return true
+            return { ok: true, approvalId: res.approval_id ?? undefined }
         } catch (e: any) {
             console.error('[cpfrStore.updateStatus]', e)
-            return false
+            return { ok: false }
         }
     }
 
@@ -225,6 +244,23 @@ export const useCpfrStore = defineStore('cpfr', () => {
         delete filters.dia
         delete filters.jefatura
         delete filters.id_cliente
+    }
+
+    function toggleStatusFilter(key: keyof typeof statusFilters) {
+        statusFilters[key] = !statusFilters[key]
+    }
+
+    function clearStatusFilters() {
+        statusFilters.escenarioA = false
+        statusFilters.escenarioB = false
+        statusFilters.sinSellout  = false
+        statusFilters.desabasto   = false
+        statusFilters.bajoStock   = false
+        statusFilters.sobrestock  = false
+        statusFilters.fillrateBajo = false
+        statusFilters.fillrate100  = false
+        statusFilters.sobrepedido = false
+        statusFilters.searchOC    = ''
     }
 
     // ── Computed ──────────────────────────────────────────────────────────────
@@ -347,11 +383,13 @@ export const useCpfrStore = defineStore('cpfr', () => {
         // State
         currentWeek, context, dias, loading, preview, error,
         criterio_global, nom_cadena, filters, overrides, expandedStores,
+        statusFilters,
         // Actions
         init, fetchCurrentWeek, loadDashboard, recalculate,
         adjustSku, updateStatus,
         toggleStore, expandAll, collapseAll, expandAllOCs, collapseAllOCs,
         setFilter, clearFilters,
+        toggleStatusFilter, clearStatusFilters,
         // Computed
         diaOptions, jefaturaOptions, tiendaOptions,
         // Config de tienda (para CpfrStoreConfigModal)

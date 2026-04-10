@@ -136,8 +136,53 @@ const handleResolve = async (status: 'APPROVED' | 'REJECTED') => {
             <p class="text-sm text-red-700">{{ approval.rejectionReason }}</p>
          </div>
 
-         <!-- Payload (datos adicionales) -->
-         <div v-if="payloadEntries.length > 0" class="bg-slate-50 rounded-lg p-4">
+         <!-- Payload CPFR_ORDER: panel visual específico -->
+         <div v-if="approval.type === 'CPFR_ORDER' && approval.payload" class="space-y-3">
+            <p class="text-xs font-semibold text-indigo-600 flex items-center gap-1.5">
+               <i class="fa-solid fa-truck-fast"></i> Detalle del Pedido CPFR
+            </p>
+            <!-- Bloque principal de información -->
+            <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 grid grid-cols-2 gap-x-6 gap-y-3">
+               <div>
+                  <p class="text-[10px] font-medium text-indigo-400 uppercase tracking-wide mb-0.5">Cadena</p>
+                  <p class="text-sm font-semibold text-slate-800">{{ String(approval.payload.nom_cadena ?? '—').toUpperCase() }}</p>
+               </div>
+               <div>
+                  <p class="text-[10px] font-medium text-indigo-400 uppercase tracking-wide mb-0.5">Tienda</p>
+                  <p class="text-sm font-semibold text-slate-800">{{ approval.payload.nombre_tienda ?? approval.payload.id_cliente ?? '—' }}</p>
+               </div>
+               <div>
+                  <p class="text-[10px] font-medium text-indigo-400 uppercase tracking-wide mb-0.5">Semana / Año</p>
+                  <p class="text-sm font-semibold text-slate-800">Sem. {{ approval.payload.semana_ic }} / {{ approval.payload.anio }}</p>
+               </div>
+               <div>
+                  <p class="text-[10px] font-medium text-indigo-400 uppercase tracking-wide mb-0.5">Jefatura</p>
+                  <p class="text-sm font-semibold text-slate-800">{{ approval.payload.jefatura ?? 'Sin asignar' }}</p>
+               </div>
+               <div v-if="approval.payload.num_pedido">
+                  <p class="text-[10px] font-medium text-indigo-400 uppercase tracking-wide mb-0.5">No. Pedido</p>
+                  <p class="text-sm font-semibold text-slate-800 font-mono">{{ approval.payload.num_pedido }}</p>
+               </div>
+            </div>
+            <!-- Métricas del pedido -->
+            <div class="grid grid-cols-3 gap-2">
+               <div class="bg-white border border-slate-200 rounded-lg p-3 text-center">
+                  <p class="text-lg font-bold text-indigo-600">{{ approval.payload.total_skus ?? 0 }}</p>
+                  <p class="text-[10px] text-slate-400 font-medium">SKUs</p>
+               </div>
+               <div class="bg-white border border-slate-200 rounded-lg p-3 text-center">
+                  <p class="text-lg font-bold text-emerald-600">{{ Number(approval.payload.total_pzas_sugeridas ?? 0).toLocaleString('es-MX') }}</p>
+                  <p class="text-[10px] text-slate-400 font-medium">Pzas Sugeridas</p>
+               </div>
+               <div class="bg-white border border-slate-200 rounded-lg p-3 text-center">
+                  <p class="text-lg font-bold text-sky-600">{{ Number(approval.payload.total_pzas_cadena ?? 0).toLocaleString('es-MX') }}</p>
+                  <p class="text-[10px] text-slate-400 font-medium">Pzas Cadena</p>
+               </div>
+            </div>
+         </div>
+
+         <!-- Payload genérico (otros tipos) -->
+         <div v-else-if="payloadEntries.length > 0" class="bg-slate-50 rounded-lg p-4">
             <p class="text-xs font-medium text-slate-500 mb-2"><i class="fa-solid fa-database mr-1"></i> Datos adjuntos</p>
             <div class="space-y-1.5">
                <div v-for="[key, value] in payloadEntries" :key="key" class="flex items-start gap-2 text-sm">

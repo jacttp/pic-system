@@ -45,14 +45,11 @@ export const useSetupStore = defineStore('setup', () => {
 
    // 2. Computed: Menú filtrado para el usuario actual
    const userMenu = computed(() => {
-      // Normalizar rol del usuario actual
-      const userRoleStr = authStore.user?.role || 'User';
-      // Obtener nivel numérico (1=User, 2=General, 3=Admin)
-      const userLevel = ROLE_LEVELS[userRoleStr] || 1;
+      const userLevel = authStore.userLevel;
 
       return modules.value
          .filter(m => m.IsActive)                   // Solo módulos activos globalmente
-         .filter(m => m.MinRoleLevel <= userLevel)  // Solo si tengo nivel suficiente
+         .filter(m => Number(m.MinRoleLevel) <= userLevel)  // Solo si tengo nivel suficiente
          .sort((a, b) => a.DisplayOrder - b.DisplayOrder); // Ordenados por DisplayOrder
    });
 
