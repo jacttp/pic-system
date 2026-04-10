@@ -8,7 +8,7 @@ export const picApi = {
 
    // --- FILTROS ---
    async getInitialFilters(): Promise<PicFilterOptions> {
-      const [canales, gerencias, marcas, anios, transacciones, formatos] = await Promise.all([
+      const results = await Promise.allSettled([
          api.get<string[]>('/filters/canales'),
          api.get<string[]>('/filters/gerencias'),
          api.get<string[]>('/filters/marcas'),
@@ -17,14 +17,31 @@ export const picApi = {
          api.get<string[]>('/filters/formato-cliente')
       ]);
 
-      return {
-         canales: canales.data,
-         gerencias: gerencias.data,
-         marcas: marcas.data,
-         anios: anios.data,
-         transacciones: transacciones.data,
-         formatosCliente: formatos.data
+      // Helper: extrae data si fulfilled, array vacío si rejected
+      const extract = (result: PromiseSettledResult<any>, label: string): string[] => {
+         if (result.status === 'fulfilled') return result.value.data;
+         console.warn(`⚠️ [picApi] Filtro "${label}" falló:`, result.reason?.message || 'Error desconocido');
+         return [];
       };
+
+      const labels = ['canales', 'gerencias', 'marcas', 'anios', 'transacciones', 'formatosCliente'];
+      const failedFilters = results
+         .map((r, i) => r.status === 'rejected' ? labels[i] : null)
+         .filter(Boolean);
+
+      if (failedFilters.length > 0) {
+         console.warn(`⚠️ [picApi] ${failedFilters.length} filtro(s) con error: ${failedFilters.join(', ')}. Se reintentarán.`);
+      }
+
+      return {
+         canales: extract(results[0], 'canales'),
+         gerencias: extract(results[1], 'gerencias'),
+         marcas: extract(results[2], 'marcas'),
+         anios: extract(results[3], 'anios'),
+         transacciones: extract(results[4], 'transacciones'),
+         formatosCliente: extract(results[5], 'formatosCliente'),
+         _failedFilters: failedFilters as string[] // Flag interno para retry
+      } as PicFilterOptions & { _failedFilters?: string[] };
    },
 
    async getDependentOptions(endpoint: string, parentFilters: Record<string, string[]>): Promise<string[]> {

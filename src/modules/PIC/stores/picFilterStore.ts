@@ -52,6 +52,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       articulos: [] as any[]
    });
    const isLoading = ref(false);
+   const filtersReady = ref(false); // Indica si los filtros base ya se cargaron al menos parcialmente
 
    const reportData = ref<any[]>([]); // Datos crudos de la API
    const isGenerating = ref(false);   // Loading específico del botón generar
@@ -68,9 +69,12 @@ export const usePicFilterStore = defineStore('picFilter', () => {
 
    // Carga inicial (al montar el componente)
    async function initFilters() {
+      if (filtersReady.value) return; // Evitar doble carga
       isLoading.value = true;
       try {
-         const data = await picApi.getInitialFilters();
+         const data = await picApi.getInitialFilters() as any;
+         const failedFilters: string[] = data._failedFilters || [];
+         delete data._failedFilters; // Limpiar flag interno
          Object.assign(options, data);
 
          // Sanitizar: excluir años futuros que no deberían existir en la BD
@@ -109,6 +113,29 @@ export const usePicFilterStore = defineStore('picFilter', () => {
                await handleMarcaChange();
             }
          }
+
+         filtersReady.value = true;
+
+         // Retry parcial: si algunos filtros fallaron, reintentar en 3s
+         if (failedFilters.length > 0) {
+            setTimeout(async () => {
+               console.log(`🔄 [Store] Reintentando filtros fallidos: ${failedFilters.join(', ')}`);
+               try {
+                  const retryData = await picApi.getInitialFilters() as any;
+                  delete retryData._failedFilters;
+                  // Solo sobrescribir los que estaban vacíos
+                  for (const key of Object.keys(retryData) as (keyof typeof options)[]) {
+                     if (options[key] && (options[key] as string[]).length === 0 && retryData[key]?.length > 0) {
+                        (options[key] as string[]) = retryData[key];
+                        console.log(`✅ [Store] Filtro "${key}" recuperado con ${retryData[key].length} opciones`);
+                     }
+                  }
+               } catch (e) {
+                  console.warn('⚠️ [Store] Retry de filtros falló:', e);
+               }
+            }, 3000);
+         }
+
       } catch (error) {
          console.error("Error cargando filtros iniciales", error);
       } finally {
@@ -407,6 +434,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
 
       isGenerating,
       generateReport,
+      filtersReady,
 
       options,
       depOptions,

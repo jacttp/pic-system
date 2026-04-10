@@ -13,6 +13,12 @@ const store = usePicFilterStore();
 const isReportActive = ref(false);
 
 const handleGenerate = async () => {
+    // Secuenciación: Asegurar que los filtros están cargados ANTES de consultar datos
+    // Esto evita que initFilters() y generateReport() compitan simultáneamente por el pool de BD
+    if (!store.filtersReady) {
+        await store.initFilters();
+    }
+
     const success = await store.generateReport();
     if (success) {
         isReportActive.value = true;
