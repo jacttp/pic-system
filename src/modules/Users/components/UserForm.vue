@@ -111,6 +111,13 @@ watch(() => props.userToEdit, (u) => {
     loadUserData(u || null);
 }, { immediate: true });
 
+// Nueva lógica: Limpiar formulario al abrir para un usuario nuevo
+watch(() => props.modelValue, (isOpen) => {
+    if (isOpen && !props.userToEdit) {
+        loadUserData(null);
+    }
+});
+
 // Autocompletado inteligente del Servidor / Dominio
 watch(() => form.username, (newVal) => {
     if (!isEditMode.value && !isServerUserEdited.value) {
