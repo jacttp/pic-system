@@ -6,8 +6,8 @@ import PicFilters from '../components/PicFilters.vue';
 import PicGrid from '../components/PicGrid.vue'; 
 import ExecutiveSummaryCard from '../components/ExecutiveSummaryCard.vue';
 import PicExportModal from '../components/modals/PicExportModal.vue';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+// import html2canvas from 'html2canvas'; // Quitamos de aquí para evitar dependencias circulares en build
+// import jsPDF from 'jspdf';
 import CacheProgress from '../../Hub/components/CacheProgress.vue';
 
 const store = usePicFilterStore();
@@ -39,14 +39,19 @@ const handleExportConfirm = async (config: any) => {
     
     try {
         isExporting.value = true;
-        // Pequeña espera para asegurar animaciones
-        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Importación dinámica de librerías visuales pesadas (Evita errores de inicialización en build)
+        const [html2canvas, { default: jsPDF }] = await Promise.all([
+            import('html2canvas'),
+            import('jspdf')
+        ]);
 
-        const canvas = await html2canvas(reportContent.value, {
-            scale: 2, 
+        const element = reportContent.value;
+        const canvas = await html2canvas.default(element, {
+            scale: 2,
             useCORS: true,
             logging: false,
-            backgroundColor: '#ffffff' 
+            windowWidth: (element.scrollWidth > 1200 ? element.scrollWidth : 1200)
         });
 
         const imgData = canvas.toDataURL('image/jpeg', 0.98);

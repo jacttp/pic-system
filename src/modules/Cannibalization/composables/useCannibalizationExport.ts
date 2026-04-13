@@ -1,7 +1,8 @@
 import { ref } from 'vue';
 import type { DetectedCannibalization } from '../types/cannibalizationTypes';
-import jsPDF from 'jspdf'; // Importar librería
-import html2canvas from 'html2canvas'; // Importar librería
+import type { DetectedCannibalization } from '../types/cannibalizationTypes';
+// import jsPDF from 'jspdf'; // Quitamos para evitar dependencias circulares
+// import html2canvas from 'html2canvas'; 
 
 export function useCannibalizationExport() {
    const isExporting = ref(false);
@@ -77,6 +78,13 @@ export function useCannibalizationExport() {
          }
 
          // 2. Capturamos el elemento como Canvas (Foto de alta calidad)
+         // Importación dinámica para evitar TDZ en builds de producción
+         const [html2canvasModule, { default: jsPDF }] = await Promise.all([
+            import('html2canvas'),
+            import('jspdf')
+         ]);
+         const html2canvas = html2canvasModule.default;
+
          const canvas = await html2canvas(element, {
             scale: 2, // Mejor resolución
             useCORS: true, // Para íconos o imágenes externas
