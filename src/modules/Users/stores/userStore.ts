@@ -7,6 +7,7 @@ import type { UserFull, UserCreatePayload, UserUpdatePayload, MessagePayload } f
 export const useUserStore = defineStore('users', () => {
    const users = ref<UserFull[]>([]);
    const activeUsers = ref<UserFull[]>([]);
+   const jefaturas = ref<string[]>([]);
    const loading = ref(false);
    const error = ref<string | null>(null);
 
@@ -30,6 +31,22 @@ export const useUserStore = defineStore('users', () => {
          activeUsers.value = await userApi.getActiveUsers();
       } catch (e: any) {
          console.error('Error al cargar usuarios activos:', e);
+      }
+   }
+
+   async function fetchJefaturas() {
+      try {
+         const data = await userApi.getJefaturas();
+         // Inyectar 'Corporativo' si no viene, y ordenar
+         const unique = new Set([...data, 'Corporativo']);
+         jefaturas.value = Array.from(unique).sort((a, b) => {
+            if (a === 'Corporativo') return -1;
+            if (b === 'Corporativo') return 1;
+            return a.localeCompare(b);
+         });
+      } catch (e: any) {
+         console.error('Error al cargar jefaturas:', e);
+         jefaturas.value = ['Corporativo'];
       }
    }
 
@@ -123,6 +140,20 @@ export const useUserStore = defineStore('users', () => {
       }
    }
 
+   async function changePassword(id: number, newPassword: string) {
+      loading.value = true;
+      error.value = null;
+      try {
+         const success = await userApi.changePassword(id, newPassword);
+         return success;
+      } catch (e: any) {
+         error.value = e.response?.data?.message || 'Error al cambiar contraseña';
+         throw e;
+      } finally {
+         loading.value = false;
+      }
+   }
+
    // Obtener usuario por ID (desde la lista ya cargada)
    function getUserById(id: number): UserFull | undefined {
       return users.value.find(u => u.IdUser === id);
@@ -131,15 +162,18 @@ export const useUserStore = defineStore('users', () => {
    return {
       users,
       activeUsers,
+      jefaturas,
       loading,
       error,
       fetchUsers,
       fetchActiveUsers,
+      fetchJefaturas,
       createUser,
       updateUser,
       deleteUser,
       toggleBlock,
       sendMessage,
+      changePassword,
       getUserById
    };
 });

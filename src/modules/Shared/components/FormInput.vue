@@ -26,8 +26,8 @@ const updateValue = (event: Event) => {
         </label>
         
         <div class="relative">
-            <div v-if="icon" class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <i :class="[icon, 'text-slate-400 text-sm']"></i>
+            <div v-if="icon" class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <i :class="[icon, 'text-slate-400 text-base']"></i>
             </div>
             
             <input
@@ -36,8 +36,8 @@ const updateValue = (event: Event) => {
                 @input="updateValue"
                 :placeholder="placeholder"
                 :disabled="disabled"
-                class="block w-full rounded-lg border-slate-300 text-sm shadow-sm placeholder-slate-400 focus:border-brand-500 focus:ring-brand-500 disabled:bg-slate-50 disabled:text-slate-500 transition-colors"
-                :class="{'pl-10': icon, 'border-red-300 focus:border-red-500 focus:ring-red-500': error}"
+                class="block w-full h-12 rounded-xl border-slate-300 text-sm shadow-sm placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500 transition-all px-4"
+                :class="{'pl-12': icon, 'border-red-300 focus:border-red-500 focus:ring-red-500': error}"
             />
         </div>
         

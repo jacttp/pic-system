@@ -169,8 +169,8 @@ watch(isCollapsed, (newVal) => {
                         </h3>
                         <FilterDropdown label="Canal" :options="store.options.canales" v-model="store.selected.canal" />
                         <FilterDropdown label="Gerencia" :options="store.options.gerencias" v-model="store.selected.Gerencia" @change="store.handleGerenciaChange" />
-                        <FilterDropdown label="Jefatura" :options="store.depOptions.jefaturas" v-model="store.selected.Jefatura" :disabled="store.depOptions.jefaturas.length === 0" @change="store.handleJefaturaChange" />
-                        <FilterDropdown label="Ruta" :options="store.depOptions.rutas" v-model="store.selected.Ruta" :disabled="store.depOptions.rutas.length === 0" />
+                        <FilterDropdown label="Jefatura" :options="store.depOptions.jefaturas" v-model="store.selected.Jefatura" :disabled="store.depOptions.jefaturas.length === 0" :loading="store.depLoading.jefaturas" @change="store.handleJefaturaChange" />
+                        <FilterDropdown label="Ruta" :options="store.depOptions.rutas" v-model="store.selected.Ruta" :disabled="store.depOptions.rutas.length === 0" :loading="store.depLoading.rutas" />
                     </div>
 
                     <div class="space-y-4">
@@ -208,9 +208,9 @@ watch(isCollapsed, (newVal) => {
                             <i class="fa-solid fa-box-open mr-1"></i> Producto
                         </h3>
                         <FilterDropdown label="Marca" :options="store.options.marcas" v-model="store.selected.Marca" @change="store.handleMarcaChange" />
-                        <FilterDropdown label="Grupo" :options="store.depOptions.grupos" v-model="store.selected.grupo" :disabled="store.depOptions.grupos.length === 0" @change="store.handleGrupoChange" />
-                        <FilterDropdown label="Categoría" :options="store.depOptions.categorias" v-model="store.selected.Categorias" :disabled="store.depOptions.categorias.length === 0" />
-                        <FilterDropdown label="SKU" :options="store.depOptions.skus" v-model="store.selected.SKU" :disabled="store.depOptions.skus.length === 0" placeholder="Buscar SKU..." />
+                        <FilterDropdown label="Grupo" :options="store.depOptions.grupos" v-model="store.selected.grupo" :disabled="store.depOptions.grupos.length === 0" :loading="store.depLoading.grupos" @change="store.handleGrupoChange" />
+                        <FilterDropdown label="Categoría" :options="store.depOptions.categorias" v-model="store.selected.Categorias" :disabled="store.depOptions.categorias.length === 0" :loading="store.depLoading.categorias" />
+                        <FilterDropdown label="SKU" :options="store.depOptions.skus" v-model="store.selected.SKU" :disabled="store.depOptions.skus.length === 0" :loading="store.depLoading.skus" placeholder="Buscar SKU..." />
                     </div>
 
                     <div class="space-y-6">

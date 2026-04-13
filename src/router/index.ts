@@ -68,7 +68,7 @@ const router = createRouter({
             {
                path: 'users/:id',
                name: 'user-detail',
-               component: () => import('@/modules/Users/views/UserDetailView.vue'),
+               component: () => import('@/modules/Users/views/UserListView.vue'), // Unified view
                meta: { requiresAuth: true, minRoleLevel: 2 }
             },
             {
@@ -258,8 +258,11 @@ router.beforeEach(async (to, from, next) => {
       // Buscar si la ruta actual coincide con algún módulo definido
       const targetPath = to.path;
 
-      // Encontrar módulo que coincida con la ruta destino
-      const moduleConfig = setupStore.modules.find(m => targetPath.startsWith(m.Route) && m.Route !== '/');
+      // Encontrar módulo que coincida con la ruta destino (ordenando por longitud de ruta para evitar conflictos de prefijos)
+      const moduleConfig = setupStore.modules
+         .filter(m => m.Route !== '/')
+         .sort((a, b) => (b.Route?.length || 0) - (a.Route?.length || 0))
+         .find(m => targetPath.startsWith(m.Route));
 
       if (moduleConfig) {
          // 1. Verificar si está activo globalmente

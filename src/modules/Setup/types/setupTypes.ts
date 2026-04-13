@@ -6,6 +6,8 @@ export interface SystemModule {
    Route: string;
    Icon: string;
    Description?: string;
+   IconColor?: string;
+   BgColor?: string;
    MinRoleLevel: number;
    IsActive: boolean;
    DisplayOrder: number;

@@ -42,7 +42,11 @@ export const useAuthStore = defineStore('auth', () => {
          }
          return false;
       } catch (e: any) {
-         error.value = e.response?.data?.message || 'Error de conexión o credenciales inválidas';
+         if (!e.response) {
+            error.value = 'No se pudo conectar con el servidor. Verifica que el backend esté corriendo.';
+         } else {
+            error.value = e.response.data?.message || 'Error en las credenciales o en el servidor.';
+         }
          return false;
       } finally {
          isLoading.value = false;

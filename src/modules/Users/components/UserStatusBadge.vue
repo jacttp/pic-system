@@ -9,17 +9,17 @@ const props = defineProps<{
 const statusConfig: Record<UserStatus, { label: string; classes: string; icon: string }> = {
    active: {
       label: 'Activo',
-      classes: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      icon: 'fa-solid fa-circle-check'
+      classes: 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-sm',
+      icon: 'fa-solid fa-circle-check pulsate-icon'
    },
    inactive: {
       label: 'Inactivo',
-      classes: 'bg-slate-50 text-slate-500 border-slate-200',
+      classes: 'bg-slate-50 text-slate-400 border-slate-100',
       icon: 'fa-solid fa-circle-minus'
    },
    blocked: {
       label: 'Bloqueado',
-      classes: 'bg-red-50 text-red-600 border-red-200',
+      classes: 'bg-red-50 text-red-500 border-red-100 shadow-sm',
       icon: 'fa-solid fa-ban'
    }
 };
@@ -29,10 +29,23 @@ const config = statusConfig[props.status] || statusConfig.inactive;
 
 <template>
    <span
-      class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors"
+      class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border transition-all duration-300"
       :class="config.classes"
    >
-      <i :class="config.icon" class="text-[10px]"></i>
+      <i :class="config.icon" class="text-[9px]"></i>
       {{ config.label }}
    </span>
 </template>
+
+<style scoped>
+.pulsate-icon {
+   animation: pulse-soft 2s infinite;
+}
+
+@keyframes pulse-soft {
+   0% { opacity: 0.6; }
+   50% { opacity: 1; }
+   100% { opacity: 0.6; }
+}
+</style>
+

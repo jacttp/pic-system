@@ -7,6 +7,7 @@ const props = defineProps<{
     modelValue: string[]; 
     disabled?: boolean;
     placeholder?: string; // Nuevo: Texto por defecto personalizado
+    loading?: boolean;   // Nuevo: Indica si los datos se están cargando
 }>();
 
 const emit = defineEmits(['update:modelValue', 'change']);
@@ -26,6 +27,8 @@ const buttonText = computed(() => {
     if (props.modelValue.length === 1) return props.modelValue[0];
     return `${props.modelValue.length} seleccionados`;
 });
+
+const isEffectiveDisabled = computed(() => props.disabled || props.loading);
 
 const toggleSelection = (option: string) => {
     const newValue = [...props.modelValue];
@@ -55,19 +58,22 @@ const selectAll = () => {
         </label>
         
         <button 
-            @click="!disabled && (isOpen = !isOpen)"
+            @click="!isEffectiveDisabled && (isOpen = !isOpen)"
             class="w-full text-left bg-white border rounded-lg px-3 h-[38px] flex justify-between items-center text-xs transition-all shadow-sm"
             :class="[
-                disabled 
+                isEffectiveDisabled 
                     ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200' 
                     : 'hover:border-brand-400 hover:shadow-md focus:ring-2 focus:ring-brand-100',
                 isOpen ? 'border-brand-500 ring-2 ring-brand-100' : 'border-slate-200'
             ]"
-            :disabled="disabled"
+            :disabled="isEffectiveDisabled"
         >
-            <span class="truncate font-medium" :class="modelValue.length > 0 ? 'text-brand-700' : 'text-slate-600'">
-                {{ buttonText }}
-            </span>
+            <div class="flex items-center gap-2 truncate">
+                <i v-if="loading" class="fa-solid fa-circle-notch fa-spin text-brand-500"></i>
+                <span class="truncate font-medium" :class="modelValue.length > 0 ? 'text-brand-700' : 'text-slate-600'">
+                    {{ loading ? 'Cargando...' : buttonText }}
+                </span>
+            </div>
             <i class="fa-solid fa-chevron-down text-[10px] text-slate-400 transition-transform duration-200" :class="{'rotate-180': isOpen}"></i>
         </button>
 

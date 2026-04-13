@@ -8,6 +8,7 @@ import ExecutiveSummaryCard from '../components/ExecutiveSummaryCard.vue';
 import PicExportModal from '../components/modals/PicExportModal.vue';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import CacheProgress from '../../Hub/components/CacheProgress.vue';
 
 const store = usePicFilterStore();
 const isReportActive = ref(false);
@@ -151,6 +152,7 @@ const handleExportConfirm = async (config: any) => {
             
             <header v-else class="h-16 bg-white border-b border-slate-200 flex items-center px-8 justify-between shrink-0">
                 <h1 class="text-xl font-bold text-slate-800">Reporte PIC <span class="text-xs font-normal text-slate-400 ml-2">v2.1</span></h1>
+                <CacheProgress />
             </header>
 
             <main class="flex-1 overflow-y-auto p-8 relative">
@@ -183,6 +185,7 @@ const handleExportConfirm = async (config: any) => {
                             <i class="fa-solid fa-chart-pie text-brand-500"></i>
                             Resultados del Reporte
                         </h2>
+                        <CacheProgress />
                         <button 
                             @click="openExportModal"
                             :disabled="isExporting"

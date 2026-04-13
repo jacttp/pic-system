@@ -38,5 +38,15 @@ export const userApi = {
    async sendMessage(payload: MessagePayload): Promise<boolean> {
       const { data } = await api.post<{ success: boolean }>(`${V2}/users/message`, payload);
       return data.success;
+   },
+
+   async changePassword(id: number, newPassword: string): Promise<boolean> {
+      const { data } = await api.patch<{ success: boolean }>(`${V2}/users/${id}/password`, { newPassword });
+      return data.success;
+   },
+
+   async getJefaturas(): Promise<string[]> {
+      const { data } = await api.post<string[]>(`/api/filters/jefaturas`, {});
+      return data;
    }
 };

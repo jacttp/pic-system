@@ -8,6 +8,7 @@ import PvrReportTable from '../components/PvrReportTable.vue';
 import PvrIndicatorModal from '../components/PvrIndicatorModal.vue';
 import { usePvrExport } from '../composables/userPrvExport';
 import { fmtCurrency, fmtKg, fmtPct, fmtPrice } from '../utils/pvrFormatters';
+import CacheProgress from '../../Hub/components/CacheProgress.vue';
 
 const store = usePvrStore();
 const { exportToExcel } = usePvrExport();
@@ -222,9 +223,12 @@ onMounted(async () => {
         </p>
       </div>
 
-      <div class="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-        <!-- Export Excel -->
-        <button
+      <div class="flex items-center gap-4 flex-wrap self-start sm:self-auto">
+        <CacheProgress />
+        
+        <div class="flex items-center gap-2">
+          <!-- Export Excel -->
+          <button
           type="button"
           @click="handleExport"
           :disabled="isExporting || !store.reportData"
@@ -246,6 +250,7 @@ onMounted(async () => {
         </button>
       </div>
     </div>
+  </div>
 
     <!-- ── Filtros (colapsables) ─────────────── -->
     <PvrFilterBar

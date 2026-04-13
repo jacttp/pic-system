@@ -27,7 +27,7 @@ const updateValue = (event: Event) => {
             :value="modelValue"
             @change="updateValue"
             :disabled="disabled"
-            class="block w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500 disabled:bg-slate-50 disabled:text-slate-500 transition-colors"
+            class="block w-full h-12 px-4 rounded-xl border-slate-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500 transition-all"
             :class="{'border-red-300 focus:border-red-500 focus:ring-red-500': error}"
         >
             <option value="" disabled selected>Seleccionar...</option>

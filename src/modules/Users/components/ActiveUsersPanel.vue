@@ -1,15 +1,16 @@
 <!-- src/modules/Users/components/ActiveUsersPanel.vue -->
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed } from 'vue';
+import { onMounted, onUnmounted, computed } from 'vue';
 import { useUserStore } from '../stores/userStore';
-import UserStatusBadge from './UserStatusBadge.vue';
+
+const props = defineProps<{
+  isCompact?: boolean;
+}>();
 
 const userStore = useUserStore();
-const isExpanded = ref(true);
 
 let pollInterval: ReturnType<typeof setInterval> | null = null;
 
-// Polling cada 60 segundos
 onMounted(() => {
    userStore.fetchActiveUsers();
    pollInterval = setInterval(() => {
@@ -27,87 +28,73 @@ onUnmounted(() => {
 const activeCount = computed(() => userStore.activeUsers.length);
 
 const formatLastSeen = (dateStr: string | null) => {
-   if (!dateStr) return 'Sin actividad';
+   if (!dateStr) return 'Offline';
    const d = new Date(dateStr);
    const now = new Date();
    const diffMs = now.getTime() - d.getTime();
    const diffMins = Math.floor(diffMs / 60000);
    
-   if (diffMins < 1) return 'En línea';
-   if (diffMins < 60) return `Hace ${diffMins}m`;
-   const diffHours = Math.floor(diffMins / 60);
-   if (diffHours < 24) return `Hace ${diffHours}h`;
-   return `Hace ${Math.floor(diffHours / 24)}d`;
+   if (diffMins < 1) return 'Live';
+   return `${diffMins}m`;
 };
 </script>
 
 <template>
-   <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <!-- Header -->
-      <button 
-         @click="isExpanded = !isExpanded"
-         class="w-full px-4 py-3 flex items-center justify-between bg-gradient-to-r from-emerald-50 to-white border-b border-slate-100 hover:from-emerald-100 transition-colors"
-      >
-         <div class="flex items-center gap-2.5">
-            <div class="relative">
-               <i class="fa-solid fa-users text-emerald-600"></i>
-               <span class="absolute -top-1 -right-1.5 w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-            </div>
-            <span class="text-sm font-semibold text-slate-700">Usuarios Activos</span>
-            <span class="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-0.5 rounded-full">
-               {{ activeCount }}
-            </span>
-         </div>
-         <i 
-            class="fa-solid fa-chevron-down text-xs text-slate-400 transition-transform duration-200"
-            :class="{ 'rotate-180': !isExpanded }"
-         ></i>
-      </button>
+  <div 
+    class="h-full bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-md relative group"
+  >
+    <!-- Live Pulse Indicator Background -->
+    <div class="absolute top-0 right-0 p-4">
+      <span class="flex h-3 w-3">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+      </span>
+    </div>
 
-      <!-- Lista -->
-      <transition name="slide">
-         <div v-if="isExpanded" class="max-h-72 overflow-y-auto">
-            <div v-if="activeCount === 0" class="p-6 text-center text-slate-400 text-sm">
-               <i class="fa-solid fa-user-clock text-2xl mb-2 block"></i>
-               No hay usuarios activos
-            </div>
+    <div class="p-4 flex-1 flex flex-col justify-between">
+      <div>
+        <div class="flex items-center gap-2 mb-1">
+          <i class="fa-solid fa-satellite-dish text-blue-600 text-[10px]"></i>
+          <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Actividad en Vivo</span>
+        </div>
+        
+        <div class="flex items-baseline gap-2">
+          <p class="text-3xl font-black text-slate-900 tabular-nums leading-none">{{ activeCount }}</p>
+          <span class="text-xs font-bold text-blue-500 uppercase tracking-tight">Usuarios Online</span>
+        </div>
+      </div>
 
-            <div v-else class="divide-y divide-slate-50">
-               <div 
-                  v-for="user in userStore.activeUsers" 
-                  :key="user.IdUser"
-                  class="px-4 py-2.5 flex items-center justify-between hover:bg-slate-50/50 transition-colors"
-               >
-                  <div class="flex items-center gap-2.5">
-                     <div class="relative">
-                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-white flex items-center justify-center text-xs font-bold">
-                           {{ user.Usuario.substring(0, 2).toUpperCase() }}
-                        </div>
-                        <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full"></span>
-                     </div>
-                     <div>
-                        <p class="text-sm font-medium text-slate-700 leading-tight">{{ user.Usuario }}</p>
-                        <p class="text-[11px] text-slate-400">{{ user.Zona }} · {{ user.TipoUser }}</p>
-                     </div>
-                  </div>
-                  <span class="text-[11px] text-emerald-600 font-medium">
-                     {{ formatLastSeen(user.LastActivity) }}
-                  </span>
-               </div>
+      <!-- Avatar Stack -->
+      <div class="mt-4 flex items-center justify-between">
+        <div class="flex -space-x-2.5 overflow-hidden">
+          <template v-for="(user, index) in userStore.activeUsers.slice(0, 5)" :key="user.IdUser">
+            <div 
+              class="inline-block h-8 w-8 rounded-xl ring-2 ring-white bg-gradient-to-br from-slate-700 to-slate-900 border border-slate-100 flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-transform hover:scale-110 hover:z-10 cursor-help"
+              :title="`${user.Usuario} (${user.Zona}) - ${formatLastSeen(user.LastActivity)}`"
+            >
+              {{ user.Usuario.substring(0, 2).toUpperCase() }}
             </div>
-         </div>
-      </transition>
-   </div>
+          </template>
+          <div 
+            v-if="activeCount > 5"
+            class="inline-block h-8 w-8 rounded-xl ring-2 ring-white bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-500 border border-slate-200"
+          >
+            +{{ activeCount - 5 }}
+          </div>
+        </div>
+        
+        <div class="text-right">
+          <p class="text-[9px] font-black text-slate-300 uppercase tracking-tighter">Sync cada 60s</p>
+          <p class="text-[10px] font-bold text-emerald-500 flex items-center justify-end gap-1">
+            <span class="w-1 h-1 rounded-full bg-emerald-500"></span>
+            Sistema Estable
+          </p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Bottom line indicator -->
+    <div class="h-1 w-full bg-gradient-to-r from-blue-500/20 via-blue-500 to-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+  </div>
 </template>
 
-<style scoped>
-.slide-enter-active,
-.slide-leave-active {
-   transition: all 0.2s ease;
-}
-.slide-enter-from,
-.slide-leave-to {
-   max-height: 0;
-   opacity: 0;
-}
-</style>

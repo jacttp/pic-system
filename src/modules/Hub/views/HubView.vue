@@ -4,6 +4,7 @@ import { onMounted, computed } from 'vue';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import { useSetupStore } from '@/modules/Setup/stores/setupStores';
 import ModuleCard from '../components/ModuleCard.vue';
+import CacheProgress from '../components/CacheProgress.vue';
 
 const auth = useAuthStore();
 const setupStore = useSetupStore();
@@ -40,8 +41,15 @@ const MODULE_STYLES: Record<string, { color: string, bg: string, desc?: string }
     'DEFAULT': { color: 'text-slate-500', bg: 'bg-slate-50', desc: 'Módulo del sistema.' }, 
 };
 
-const getStyle = (key: string) => {
-    return MODULE_STYLES[key] || MODULE_STYLES['DEFAULT']!;
+const getStyle = (mod: any) => {
+    const key = mod.ModuleKey;
+    const fallback = MODULE_STYLES[key] || MODULE_STYLES['DEFAULT']!;
+    
+    return {
+        color: mod.IconColor || fallback.color,
+        bg: mod.BgColor || fallback.bg,
+        desc: mod.Description || fallback.desc || 'Descripción no disponible.'
+    };
 };
 
 </script>
@@ -49,9 +57,14 @@ const getStyle = (key: string) => {
 <template>
     <!-- Solo contenido — el sidebar lo provee AdminLayout -->
     <main class="flex-1 p-8 lg:p-12 overflow-y-auto">
-        <header class="mb-10 fade-in">
-            <h1 class="text-3xl font-bold text-slate-800 mb-2">Bienvenido a PIC System</h1>
-            <p class="text-slate-500">Selecciona un módulo para comenzar a trabajar.</p>
+        <header class="mb-10 fade-in flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-800 mb-2">Bienvenido a PIC System</h1>
+                <p class="text-slate-500">Selecciona un módulo para comenzar a trabajar.</p>
+            </div>
+            
+            <!-- Indicador de Caché -->
+            <CacheProgress />
         </header>
 
         <!-- Skeleton Loading -->
@@ -71,11 +84,11 @@ const getStyle = (key: string) => {
                 v-for="mod in dashboardModules"
                 :key="mod.ModuleId"
                 :title="mod.Label"
-                :description="getStyle(mod.ModuleKey).desc || 'Descripción no disponible.'"
+                :description="getStyle(mod).desc"
                 :icon="mod.Icon"
                 :to="mod.Route"
-                :color-class="getStyle(mod.ModuleKey).color"
-                :bg-class="getStyle(mod.ModuleKey).bg"
+                :color-class="getStyle(mod).color"
+                :bg-class="getStyle(mod).bg"
             />
 
             <div v-if="setupStore.userMenu.length === 0" class="col-span-full text-center py-10 text-slate-400">

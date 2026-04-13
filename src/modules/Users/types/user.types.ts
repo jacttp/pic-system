@@ -13,6 +13,8 @@ export interface UserFull {
    Status: UserStatus
    LastActivity: string | null    // ISO date string
    CreatedAt: string
+   nombre?: string
+   no_emp?: string
 }
 
 export interface UserCreatePayload {
@@ -22,6 +24,8 @@ export interface UserCreatePayload {
    zona: string
    serverUser?: string
    accessLevel?: number
+   nombre: string
+   no_emp: string
 }
 
 export interface UserUpdatePayload {
@@ -30,6 +34,8 @@ export interface UserUpdatePayload {
    status?: UserStatus
    serverUser?: string
    accessLevel?: number
+   nombre?: string
+   no_emp?: string
 }
 
 export interface MessagePayload {

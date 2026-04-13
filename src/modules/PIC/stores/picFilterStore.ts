@@ -22,6 +22,15 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       categorias: [] as string[],
       skus: [] as string[]
    });
+ 
+   // Estado de carga individual para filtros dependientes
+   const depLoading = reactive({
+      jefaturas: false,
+      rutas: false,
+      grupos: false,
+      categorias: false,
+      skus: false
+   });
 
    // 2. ESTADO: Selecciones del usuario
    const selected = reactive({
@@ -152,11 +161,29 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       selected.Ruta = [];
       depOptions.jefaturas = [];
       depOptions.rutas = [];
-
+ 
       // 2. Si hay selección, buscar nuevos datos
       if (selected.Gerencia.length > 0) {
-         const data = await picApi.getDependentOptions('jefaturas', { Gerencia: selected.Gerencia });
-         depOptions.jefaturas = data;
+         depLoading.jefaturas = true;
+         try {
+            const data = await picApi.getDependentOptions('jefaturas', { Gerencia: selected.Gerencia });
+            depOptions.jefaturas = data;
+         } catch (err) {
+            console.error('[Store] Error cargando jefaturas:', err);
+            // Reintento único si falla
+            setTimeout(async () => {
+                if (depOptions.jefaturas.length === 0 && selected.Gerencia.length > 0) {
+                    console.log('🔄 [Store] Reintentando carga de jefaturas...');
+                    try {
+                        depOptions.jefaturas = await picApi.getDependentOptions('jefaturas', { Gerencia: selected.Gerencia });
+                    } catch (e) {
+                         console.error('❌ [Store] Segundo intento de jefaturas falló');
+                    }
+                }
+            }, 2000);
+         } finally {
+            depLoading.jefaturas = false;
+         }
       }
    }
 
@@ -164,10 +191,24 @@ export const usePicFilterStore = defineStore('picFilter', () => {
    async function handleJefaturaChange() {
       selected.Ruta = [];
       depOptions.rutas = [];
-
+ 
       if (selected.Jefatura.length > 0) {
-         const data = await picApi.getDependentOptions('rutas', { Jefatura: selected.Jefatura });
-         depOptions.rutas = data;
+         depLoading.rutas = true;
+         try {
+            const data = await picApi.getDependentOptions('rutas', { Jefatura: selected.Jefatura });
+            depOptions.rutas = data;
+         } catch (err) {
+            console.error('[Store] Error cargando rutas:', err);
+            setTimeout(async () => {
+                if (depOptions.rutas.length === 0 && selected.Jefatura.length > 0) {
+                    try {
+                        depOptions.rutas = await picApi.getDependentOptions('rutas', { Jefatura: selected.Jefatura });
+                    } catch (e) {}
+                }
+            }, 2000);
+         } finally {
+            depLoading.rutas = false;
+         }
       }
    }
 
@@ -179,14 +220,23 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       depOptions.grupos = [];
       depOptions.categorias = [];
       depOptions.skus = [];
-
+ 
       if (selected.Marca.length > 0) {
-         const [grupos, skus] = await Promise.all([
-            picApi.getDependentOptions('grupos', { Marca: selected.Marca }),
-            picApi.getDependentOptions('skus', { Marca: selected.Marca })
-         ]);
-         depOptions.grupos = grupos;
-         depOptions.skus = skus;
+         depLoading.grupos = true;
+         depLoading.skus = true;
+         try {
+            const [grupos, skus] = await Promise.all([
+               picApi.getDependentOptions('grupos', { Marca: selected.Marca }),
+               picApi.getDependentOptions('skus', { Marca: selected.Marca })
+            ]);
+            depOptions.grupos = grupos;
+            depOptions.skus = skus;
+         } catch (err) {
+            console.error('[Store] Error cargando marcas/skus:', err);
+         } finally {
+            depLoading.grupos = false;
+            depLoading.skus = false;
+         }
       }
    }
 
@@ -196,18 +246,32 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       // Nota: SKU se recarga filtrado por Marca + Grupo
       selected.SKU = [];
       depOptions.categorias = [];
-
+ 
       if (selected.grupo.length > 0) {
-         const [categorias, skus] = await Promise.all([
-            picApi.getDependentOptions('categorias', { Marca: selected.Marca, grupo: selected.grupo }),
-            picApi.getDependentOptions('skus', { Marca: selected.Marca, grupo: selected.grupo })
-         ]);
-         depOptions.categorias = categorias;
-         depOptions.skus = skus;
+         depLoading.categorias = true;
+         depLoading.skus = true;
+         try {
+            const [categorias, skus] = await Promise.all([
+               picApi.getDependentOptions('categorias', { Marca: selected.Marca, grupo: selected.grupo }),
+               picApi.getDependentOptions('skus', { Marca: selected.Marca, grupo: selected.grupo })
+            ]);
+            depOptions.categorias = categorias;
+            depOptions.skus = skus;
+         } catch (err) {
+            console.error('[Store] Error cargando categorias/skus:', err);
+         } finally {
+            depLoading.categorias = false;
+            depLoading.skus = false;
+         }
       } else {
          // Si deselecciono grupo, recargar SKUs solo por Marca
          if (selected.Marca.length > 0) {
-            depOptions.skus = await picApi.getDependentOptions('skus', { Marca: selected.Marca });
+            depLoading.skus = true;
+            try {
+                depOptions.skus = await picApi.getDependentOptions('skus', { Marca: selected.Marca });
+            } finally {
+                depLoading.skus = false;
+            }
          }
       }
    }
@@ -438,6 +502,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
 
       options,
       depOptions,
+      depLoading,
       selected,
       isLoading,
       initFilters,
