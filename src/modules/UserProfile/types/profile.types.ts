@@ -8,9 +8,9 @@ export interface UserProfile {
    username: string
    serverUser: string | null
    role: UserRole
-   zona: string
+   jefatura: string
    accessLevel: number
-   gerencia: string         // read-only, viene de GerenciasUsuarios
+   Gerencia: string         // read-only, viene de GerenciasUsuarios
    presenceStatus: PresenceStatus
    lastActivity: string | null
 }

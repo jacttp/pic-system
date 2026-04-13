@@ -32,8 +32,9 @@ const canChangePasswords = computed(() => (authStore.user?.accessLevel ?? 0) >= 
 const form = reactive({
     username: '',
     password: '',
-    role: 'Gerente' as UserRole,
-    zona: 'Corporativo', // Default según requerimiento
+    role: 'Jefe' as UserRole,
+    jefatura: 'Corporativo', // Default según requerimiento
+    gerencia: 'Corporativo',
     serverUser: '',
     accessLevel: 1,
     nombre: '',
@@ -44,14 +45,22 @@ const isSubmitting = ref(false);
 const isChangingPassword = ref(false);
 const newPassword = ref('');
 const errorMessage = ref('');
+const isServerUserEdited = ref(false);
+const loadingJefaturas = ref(false);
 
 // Cargar jefaturas al montar
-onMounted(() => {
-    userStore.fetchJefaturas();
+onMounted(async () => {
+    await userStore.fetchGerencias();
+    // Cargamos jefaturas basadas en la gerencia inicial (si existe)
+    userStore.fetchJefaturas(form.gerencia);
 });
 
-const zonaOptions = computed(() => {
+const jefaturaOptions = computed(() => {
     return userStore.jefaturas.map(z => ({ value: z, label: z }));
+});
+
+const gerenciaOptions = computed(() => {
+    return userStore.gerencias.map(g => ({ value: g, label: g }));
 });
 
 // Helper para obtener el label del rol basado en el nivel
@@ -75,7 +84,8 @@ const loadUserData = (u: UserFull | null) => {
         form.username = u.Usuario;
         form.password = '';
         form.role = u.TipoUser as UserRole;
-        form.zona = u.Zona || 'Corporativo';
+        form.jefatura = u.jefatura || 'Corporativo';
+        form.gerencia = u.Gerencia || 'Corporativo';
         form.serverUser = u.ServerUser || '';
         form.accessLevel = u.AccessLevel || 1;
         form.nombre = u.nombre || '';
@@ -83,12 +93,14 @@ const loadUserData = (u: UserFull | null) => {
     } else {
         form.username = '';
         form.password = '';
-        form.role = 'Gerente';
-        form.zona = 'Corporativo';
-        form.serverUser = '';
+        form.role = 'Jefe';
+        form.jefatura = 'Corporativo';
+        form.gerencia = 'Corporativo';
+        form.serverUser = 'EMBUTIDOSCORONA\\';
         form.accessLevel = 1;
         form.nombre = '';
         form.no_emp = '';
+        isServerUserEdited.value = false;
     }
     errorMessage.value = '';
     newPassword.value = '';
@@ -98,6 +110,32 @@ const loadUserData = (u: UserFull | null) => {
 watch(() => props.userToEdit, (u) => {
     loadUserData(u || null);
 }, { immediate: true });
+
+// Autocompletado inteligente del Servidor / Dominio
+watch(() => form.username, (newVal) => {
+    if (!isEditMode.value && !isServerUserEdited.value) {
+        form.serverUser = `EMBUTIDOSCORONA\\${newVal}`;
+    }
+});
+
+// Cascada: Cuando cambia Gerencia, recargar Jefaturas
+watch(() => form.gerencia, async (newGerencia) => {
+    loadingJefaturas.value = true;
+    try {
+        await userStore.fetchJefaturas(newGerencia);
+        // Si la jefatura actual no es Corporativo y no está en la nueva lista, resetearla
+        if (form.jefatura !== 'Corporativo' && !userStore.jefaturas.includes(form.jefatura)) {
+            form.jefatura = 'Corporativo';
+        }
+    } finally {
+        loadingJefaturas.value = false;
+    }
+});
+
+// Detectar edición manual para detener el autocompletado
+const handleServerUserEdit = () => {
+    isServerUserEdited.value = true;
+};
 
 const closeModal = () => {
     emit('update:modelValue', false);
@@ -144,7 +182,8 @@ const handleSubmit = async () => {
         if (isEditMode.value && props.userToEdit) {
             await userStore.updateUser(props.userToEdit.IdUser, {
                 role: form.role,
-                zona: form.zona,
+                jefatura: form.jefatura,
+                gerencia: form.gerencia,
                 serverUser: form.serverUser || undefined,
                 accessLevel: form.accessLevel,
                 nombre: form.nombre,
@@ -155,7 +194,8 @@ const handleSubmit = async () => {
                 username: form.username,
                 password: form.password,
                 role: form.role,
-                zona: form.zona,
+                jefatura: form.jefatura,
+                gerencia: form.gerencia,
                 serverUser: form.serverUser || undefined,
                 accessLevel: form.accessLevel,
                 nombre: form.nombre,
@@ -215,11 +255,17 @@ const handleSubmit = async () => {
                 />
             </div>
 
-            <div class="space-y-2">
+            <div class="space-y-4">
                 <FormSelect 
-                    v-model="form.zona" 
-                    label="Zona de Operación" 
-                    :options="zonaOptions" 
+                    v-model="form.gerencia" 
+                    label="Gerencia" 
+                    :options="gerenciaOptions" 
+                />
+                <FormSelect 
+                    v-model="form.jefatura" 
+                    label="Jefatura" 
+                    :options="jefaturaOptions"
+                    :disabled="loadingJefaturas"
                 />
                 <p class="text-[10px] text-slate-400 font-medium px-1">Se utiliza "Corporativo" para personal administrativo no operativo.</p>
             </div>
@@ -378,17 +424,28 @@ const handleSubmit = async () => {
                     />
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 gap-6">
                     <FormInput 
                         v-model="form.serverUser"
                         label="Servidor / Dominio"
-                        placeholder="Ej: SERVIDOR\jperez"
+                        placeholder="Ej: EMBUTIDOSCORONA\usuario"
                         icon="fa-solid fa-network-wired"
+                        class="w-full"
+                        @input="handleServerUserEdit"
+                    />
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <FormSelect 
+                        v-model="form.gerencia" 
+                        label="Gerencia" 
+                        :options="gerenciaOptions" 
                     />
                     <FormSelect 
-                        v-model="form.zona" 
-                        label="Zona Administrativa" 
-                        :options="zonaOptions" 
+                        v-model="form.jefatura" 
+                        label="Jefatura" 
+                        :options="jefaturaOptions"
+                        :disabled="loadingJefaturas"
                     />
                 </div>
                 

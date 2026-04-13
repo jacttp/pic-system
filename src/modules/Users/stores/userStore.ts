@@ -8,6 +8,7 @@ export const useUserStore = defineStore('users', () => {
    const users = ref<UserFull[]>([]);
    const activeUsers = ref<UserFull[]>([]);
    const jefaturas = ref<string[]>([]);
+   const gerencias = ref<string[]>([]);
    const loading = ref(false);
    const error = ref<string | null>(null);
 
@@ -34,10 +35,9 @@ export const useUserStore = defineStore('users', () => {
       }
    }
 
-   async function fetchJefaturas() {
+   async function fetchJefaturas(gerencia?: string) {
       try {
-         const data = await userApi.getJefaturas();
-         // Inyectar 'Corporativo' si no viene, y ordenar
+         const data = await userApi.getJefaturas(gerencia);
          const unique = new Set([...data, 'Corporativo']);
          jefaturas.value = Array.from(unique).sort((a, b) => {
             if (a === 'Corporativo') return -1;
@@ -47,6 +47,21 @@ export const useUserStore = defineStore('users', () => {
       } catch (e: any) {
          console.error('Error al cargar jefaturas:', e);
          jefaturas.value = ['Corporativo'];
+      }
+   }
+
+   async function fetchGerencias() {
+      try {
+         const data = await userApi.getGerencias();
+         const unique = new Set([...data, 'Corporativo']);
+         gerencias.value = Array.from(unique).sort((a, b) => {
+            if (a === 'Corporativo') return -1;
+            if (b === 'Corporativo') return 1;
+            return a.localeCompare(b);
+         });
+      } catch (e: any) {
+         console.error('Error al cargar gerencias:', e);
+         gerencias.value = ['Corporativo'];
       }
    }
 
@@ -163,11 +178,13 @@ export const useUserStore = defineStore('users', () => {
       users,
       activeUsers,
       jefaturas,
+      gerencias,
       loading,
       error,
       fetchUsers,
       fetchActiveUsers,
       fetchJefaturas,
+      fetchGerencias,
       createUser,
       updateUser,
       deleteUser,

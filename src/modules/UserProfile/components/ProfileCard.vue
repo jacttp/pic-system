@@ -74,7 +74,7 @@ const formatDate = (dateStr: string | null) => {
                   </div>
                   <div>
                      <p class="text-xs text-slate-400">Gerencia</p>
-                     <p class="font-medium text-slate-700">{{ profile.gerencia }}</p>
+                     <p class="font-medium text-slate-700">{{ profile.Gerencia }}</p>
                   </div>
                </div>
 
@@ -83,8 +83,8 @@ const formatDate = (dateStr: string | null) => {
                      <i class="fa-solid fa-map-location-dot text-emerald-500 text-xs"></i>
                   </div>
                   <div>
-                     <p class="text-xs text-slate-400">Zona</p>
-                     <p class="font-medium text-slate-700">{{ profile.zona }}</p>
+                     <p class="text-xs text-slate-400">Jefatura</p>
+                     <p class="font-medium text-slate-700">{{ profile.jefatura }}</p>
                   </div>
                </div>
 

@@ -70,7 +70,7 @@ const formatLastSeen = (dateStr: string | null) => {
           <template v-for="(user, index) in userStore.activeUsers.slice(0, 5)" :key="user.IdUser">
             <div 
               class="inline-block h-8 w-8 rounded-xl ring-2 ring-white bg-gradient-to-br from-slate-700 to-slate-900 border border-slate-100 flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-transform hover:scale-110 hover:z-10 cursor-help"
-              :title="`${user.Usuario} (${user.Zona}) - ${formatLastSeen(user.LastActivity)}`"
+              :title="`${user.Usuario} (${user.jefatura}) - ${formatLastSeen(user.LastActivity)}`"
             >
               {{ user.Usuario.substring(0, 2).toUpperCase() }}
             </div>

@@ -45,8 +45,14 @@ export const userApi = {
       return data.success;
    },
 
-   async getJefaturas(): Promise<string[]> {
-      const { data } = await api.post<string[]>(`/api/filters/jefaturas`, {});
+   async getJefaturas(gerencia?: string): Promise<string[]> {
+      const payload = gerencia && gerencia !== 'Corporativo' ? { Gerencia: [gerencia] } : {};
+      const { data } = await api.post<string[]>(`/filters/jefaturas`, payload);
+      return data;
+   },
+
+   async getGerencias(): Promise<string[]> {
+      const { data } = await api.get<string[]>(`/filters/gerencias`);
       return data;
    }
 };

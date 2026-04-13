@@ -45,7 +45,7 @@ const getRoleBadgeConfig = (role: string) => {
       return { 
         class: 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-50', 
         icon: 'fa-solid fa-crown',
-        label: 'Super Admin'
+        label: 'Super Administrador'
       };
     case 'Admin':
       return { 
@@ -53,11 +53,17 @@ const getRoleBadgeConfig = (role: string) => {
         icon: 'fa-solid fa-shield-halved',
         label: 'Administrador'
       };
-    case 'JefeGerentes':
+    case 'Gerente':
       return { 
         class: 'bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-50', 
         icon: 'fa-solid fa-user-tie',
-        label: 'Jefe de Zona'
+        label: 'Gerente'
+      };
+    case 'Jefe':
+      return { 
+        class: 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-50', 
+        icon: 'fa-solid fa-user',
+        label: 'Jefe'
       };
     default:
       return { 
@@ -91,7 +97,7 @@ const formatActivity = (dateStr: string | null) => {
         <TableRow class="hover:bg-transparent">
           <TableHead class="w-[300px] font-bold text-slate-500 uppercase text-[10px] tracking-widest pl-6">Usuario & Nombre</TableHead>
           <TableHead class="font-bold text-slate-500 uppercase text-[10px] tracking-widest">No. Emp / Rol</TableHead>
-          <TableHead class="font-bold text-slate-500 uppercase text-[10px] tracking-widest">Zona</TableHead>
+          <TableHead class="font-bold text-slate-500 uppercase text-[10px] tracking-widest">Jefatura</TableHead>
           <TableHead class="text-right font-bold text-slate-500 uppercase text-[10px] tracking-widest pr-6">Estado</TableHead>
         </TableRow>
       </TableHeader>
@@ -166,7 +172,7 @@ const formatActivity = (dateStr: string | null) => {
           <TableCell>
             <div class="flex items-center gap-2">
               <div class="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-blue-400 transition-colors"></div>
-              <span class="text-xs font-bold text-slate-500 uppercase tracking-tighter">{{ user.Zona }}</span>
+              <span class="text-xs font-bold text-slate-500 uppercase tracking-tighter">{{ user.jefatura }}</span>
             </div>
           </TableCell>
 

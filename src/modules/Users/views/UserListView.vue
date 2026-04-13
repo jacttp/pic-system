@@ -48,7 +48,7 @@ const filteredUsers = computed(() => {
       const q = searchQuery.value.toLowerCase();
       result = result.filter(u => 
          u.Usuario.toLowerCase().includes(q) ||
-         u.Zona.toLowerCase().includes(q) ||
+         u.jefatura.toLowerCase().includes(q) ||
          u.TipoUser.toLowerCase().includes(q) ||
          (u.ServerUser && u.ServerUser.toLowerCase().includes(q)) ||
          (u.nombre && u.nombre.toLowerCase().includes(q)) ||
@@ -212,7 +212,7 @@ const handleUserSaved = () => {
               <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
               <Input
                 v-model="searchQuery"
-                placeholder="Filtrar por nombre, zona, rol o servidor..."
+                placeholder="Filtrar por nombre, jefatura, rol o servidor..."
                 class="pl-10 h-11 bg-white border-slate-200 rounded-xl shadow-sm focus-visible:ring-blue-500/20 focus-visible:border-blue-500 font-medium"
               />
             </div>
