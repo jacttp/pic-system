@@ -2,8 +2,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import { useSetupStore } from '@/modules/Setup/stores/setupStores';
-import UploadOCView    from '@/modules/UploadOC/views/UploadOCView.vue'
-import UploadMetasView from '@/modules/UploadMetas/views/UploadMetasView.vue'
+// import UploadOCView    from '@/modules/UploadOC/views/UploadOCView.vue'
+// import UploadMetasView from '@/modules/UploadMetas/views/UploadMetasView.vue'
 
 // Función auxiliar robusta para verificar expiración
 function isTokenExpired(token: string): boolean {
@@ -188,7 +188,7 @@ const router = createRouter({
             {
                path: 'upload-oc',
                name: 'UploadOC',
-               component: UploadOCView,
+               component: () => import('@/modules/UploadOC/views/UploadOCView.vue'),
                meta: {
                   moduleKey: 'UPLOAD_OC',
                   title: 'Cargas OC'
@@ -197,7 +197,7 @@ const router = createRouter({
             {
                path: 'upload-metas',
                name: 'UploadMetas',
-               component: UploadMetasView,
+               component: () => import('@/modules/UploadMetas/views/UploadMetasView.vue'),
                meta: {
                   moduleKey: 'UPLOAD_METAS',
                   title: 'Carga Metas'

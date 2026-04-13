@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, reactive } from 'vue';
-import { picApi } from '../services/picApi';
+// import { picApi } from '../services/picApi'; // Movido a las funciones para evitar ciclos síncronos
 import type { PicFilterOptions } from '../types/picTypes';
 
 export const usePicFilterStore = defineStore('picFilter', () => {
@@ -81,6 +81,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       if (filtersReady.value) return; // Evitar doble carga
       isLoading.value = true;
       try {
+         const { picApi } = await import('../services/picApi');
          const data = await picApi.getInitialFilters() as any;
          const failedFilters: string[] = data._failedFilters || [];
          delete data._failedFilters; // Limpiar flag interno
@@ -130,6 +131,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
             setTimeout(async () => {
                console.log(`🔄 [Store] Reintentando filtros fallidos: ${failedFilters.join(', ')}`);
                try {
+                  const { picApi } = await import('../services/picApi');
                   const retryData = await picApi.getInitialFilters() as any;
                   delete retryData._failedFilters;
                   // Solo sobrescribir los que estaban vacíos
@@ -166,6 +168,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       if (selected.Gerencia.length > 0) {
          depLoading.jefaturas = true;
          try {
+            const { picApi } = await import('../services/picApi');
             const data = await picApi.getDependentOptions('jefaturas', { Gerencia: selected.Gerencia });
             depOptions.jefaturas = data;
          } catch (err) {
@@ -175,6 +178,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
                 if (depOptions.jefaturas.length === 0 && selected.Gerencia.length > 0) {
                     console.log('🔄 [Store] Reintentando carga de jefaturas...');
                     try {
+                        const { picApi } = await import('../services/picApi');
                         depOptions.jefaturas = await picApi.getDependentOptions('jefaturas', { Gerencia: selected.Gerencia });
                     } catch (e) {
                          console.error('❌ [Store] Segundo intento de jefaturas falló');
@@ -195,6 +199,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       if (selected.Jefatura.length > 0) {
          depLoading.rutas = true;
          try {
+            const { picApi } = await import('../services/picApi');
             const data = await picApi.getDependentOptions('rutas', { Jefatura: selected.Jefatura });
             depOptions.rutas = data;
          } catch (err) {
@@ -202,6 +207,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
             setTimeout(async () => {
                 if (depOptions.rutas.length === 0 && selected.Jefatura.length > 0) {
                     try {
+                        const { picApi } = await import('../services/picApi');
                         depOptions.rutas = await picApi.getDependentOptions('rutas', { Jefatura: selected.Jefatura });
                     } catch (e) {}
                 }
@@ -225,6 +231,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
          depLoading.grupos = true;
          depLoading.skus = true;
          try {
+            const { picApi } = await import('../services/picApi');
             const [grupos, skus] = await Promise.all([
                picApi.getDependentOptions('grupos', { Marca: selected.Marca }),
                picApi.getDependentOptions('skus', { Marca: selected.Marca })
@@ -251,6 +258,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
          depLoading.categorias = true;
          depLoading.skus = true;
          try {
+            const { picApi } = await import('../services/picApi');
             const [categorias, skus] = await Promise.all([
                picApi.getDependentOptions('categorias', { Marca: selected.Marca, grupo: selected.grupo }),
                picApi.getDependentOptions('skus', { Marca: selected.Marca, grupo: selected.grupo })
@@ -268,6 +276,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
          if (selected.Marca.length > 0) {
             depLoading.skus = true;
             try {
+                const { picApi } = await import('../services/picApi');
                 depOptions.skus = await picApi.getDependentOptions('skus', { Marca: selected.Marca });
             } finally {
                 depLoading.skus = false;
@@ -324,6 +333,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
          // 2. Llamada a la API
          // Nota: El backend en 'picController.js' ya está programado para recibir 'IDCLIENTE'
          // y filtrar por la columna [IDCLIENTE] IN (...)
+         const { picApi } = await import('../services/picApi');
          const data = await picApi.getDashboardData(apiFilters, ['Año', 'Mes']);
          reportData.value = data;
 
@@ -374,6 +384,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
          }
 
          // 3. Llamada API
+         const { picApi } = await import('../services/picApi');
          const data = await picApi.getProjection(dimensionKey, apiFilters, yearsTarget, limit);
 
          // 4. Guardar en el slot correspondiente

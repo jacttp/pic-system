@@ -1,6 +1,5 @@
 import { ref } from 'vue';
 import type { DetectedCannibalization } from '../types/cannibalizationTypes';
-import type { DetectedCannibalization } from '../types/cannibalizationTypes';
 // import jsPDF from 'jspdf'; // Quitamos para evitar dependencias circulares
 // import html2canvas from 'html2canvas'; 
 

@@ -9,7 +9,7 @@ import { ROLE_LEVELS } from '../types/setupTypes';
 export const useSetupStore = defineStore('setup', () => {
    const modules = ref<SystemModule[]>([]);
    const isLoading = ref(false);
-   const authStore = useAuthStore();
+   // const authStore = useAuthStore(); // Movido a las computadas para evitar ciclos síncronos
 
    // Datos Mock para desarrollo (Fallback)
    const MOCK_MODULES: SystemModule[] = [
@@ -45,6 +45,7 @@ export const useSetupStore = defineStore('setup', () => {
 
    // 2. Computed: Menú filtrado para el usuario actual
    const userMenu = computed(() => {
+      const authStore = useAuthStore();
       const userLevel = authStore.userLevel;
 
       return modules.value
