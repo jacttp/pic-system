@@ -8,7 +8,7 @@ import PvrReportTable from '../components/PvrReportTable.vue';
 import PvrIndicatorModal from '../components/PvrIndicatorModal.vue';
 import { usePvrExport } from '../composables/userPrvExport';
 import { fmtCurrency, fmtKg, fmtPct, fmtPrice } from '../utils/pvrFormatters';
-import CacheProgress from '../../Hub/components/CacheProgress.vue';
+import CacheProgress from '@/modules/Shared/components/CacheProgress.vue';
 
 const store = usePvrStore();
 const { exportToExcel } = usePvrExport();

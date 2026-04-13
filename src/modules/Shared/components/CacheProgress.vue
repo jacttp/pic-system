@@ -1,4 +1,4 @@
-<!-- src/modules/Hub/components/CacheProgress.vue -->
+<!-- src/modules/Shared/components/CacheProgress.vue -->
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import api from '@/api/axios';

@@ -20,10 +20,7 @@ export default defineConfig({
          output: {
             manualChunks(id) {
                if (id.includes('node_modules')) {
-                  // Ecosistema principal de Vue
-                  if (id.includes('vue') || id.includes('pinia') || id.includes('vue-router')) {
-                     return 'vendor-vue';
-                  }
+
                   // Gráficos (ECharts y sus dependencias como zrender son muy pesados)
                   if (id.includes('echarts') || id.includes('zrender')) {
                      return 'vendor-echarts';

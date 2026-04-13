@@ -8,7 +8,7 @@ import ExecutiveSummaryCard from '../components/ExecutiveSummaryCard.vue';
 import PicExportModal from '../components/modals/PicExportModal.vue';
 // import html2canvas from 'html2canvas'; // Quitamos de aquí para evitar dependencias circulares en build
 // import jsPDF from 'jspdf';
-import CacheProgress from '../../Hub/components/CacheProgress.vue';
+import CacheProgress from '@/modules/Shared/components/CacheProgress.vue';
 
 const store = usePicFilterStore();
 const isReportActive = ref(false);

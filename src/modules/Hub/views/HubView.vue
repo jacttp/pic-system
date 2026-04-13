@@ -4,7 +4,7 @@ import { onMounted, computed } from 'vue';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import { useSetupStore } from '@/modules/Setup/stores/setupStores';
 import ModuleCard from '../components/ModuleCard.vue';
-import CacheProgress from '../components/CacheProgress.vue';
+import CacheProgress from '@/modules/Shared/components/CacheProgress.vue';
 
 const auth = useAuthStore();
 const setupStore = useSetupStore();
