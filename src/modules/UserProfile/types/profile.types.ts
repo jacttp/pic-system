@@ -11,6 +11,8 @@ export interface UserProfile {
    jefatura: string
    accessLevel: number
    Gerencia: string         // read-only, viene de GerenciasUsuarios
+   nombre: string
+   no_emp: string
    presenceStatus: PresenceStatus
    lastActivity: string | null
 }
