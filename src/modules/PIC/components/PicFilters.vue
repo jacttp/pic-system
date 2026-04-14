@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch, computed } from 'vue';
+import { onMounted, ref, watch, computed, onUnmounted } from 'vue';
 import { usePicFilterStore } from '../stores/picFilterStore';
 import FilterDropdown from './FilterDropdown.vue';
 import PicClientModal from './modals/PicClientModal.vue'; 
@@ -8,6 +8,7 @@ import { usePicChatStore } from '../stores/picChatStore';
 const store = usePicFilterStore();
 const chatStore = usePicChatStore();
 const filterPanel = ref<HTMLElement | null>(null);
+const headerRef = ref<HTMLElement | null>(null);
 const isCollapsed = ref(true); 
 const overflowVisible = ref(true); 
 
@@ -33,8 +34,26 @@ const clientButtonText = computed(() => {
     return `${count} Clientes Seleccionados`;
 });
 
+const handleClickOutside = (event: MouseEvent) => {
+    // Si el panel está colapsado, no hacemos nada
+    if (isCollapsed.value) return;
+
+    // Si el click fue dentro del panel de filtros, no cerramos
+    if (filterPanel.value && filterPanel.value.contains(event.target as Node)) {
+        return;
+    }
+
+    // Si llegamos aquí, cerramos
+    isCollapsed.value = true;
+};
+
 onMounted(() => {
     store.initFilters();
+    document.addEventListener('mousedown', handleClickOutside);
+});
+
+onUnmounted(() => {
+    document.removeEventListener('mousedown', handleClickOutside);
 });
 
 // --- TOAST NOTIFICATION ---
@@ -51,9 +70,11 @@ function showToast(type: ToastType, message: string, detail?: string) {
 }
 
 const handleUpdate = async () => {
+    // Cerramos el menú inmediatamente al presionar generar
+    isCollapsed.value = true;
+    
     const success = await store.generateReport();
     if (success) {
-        isCollapsed.value = true;
         showToast('success', 'Reporte generado exitosamente', 'Los filtros han sido aplicados y los datos actualizados.');
     } else {
         showToast('error', 'Error al generar el reporte', 'Verifica tu conexión o los filtros seleccionados.');
@@ -78,7 +99,7 @@ watch(isCollapsed, (newVal) => {
 </script>
 
 <template>
-    <div class="relative z-40 bg-white border-b border-slate-200 shadow-sm transition-all duration-300 ease-in-out">
+    <div ref="filterPanel" class="relative z-40 bg-white border-b border-slate-200 shadow-sm transition-all duration-300 ease-in-out">
         
         <PicClientModal v-model="showClientModal" />
 
@@ -141,24 +162,6 @@ watch(isCollapsed, (newVal) => {
                         </div>
                         Parámetros de Reporte
                     </h2>
-                    <div class="flex gap-3">
-                        <button 
-                            @click="handleReset"
-                            class="text-xs font-medium text-slate-500 hover:text-brand-600 flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200"
-                        >
-                            <i class="fa-solid fa-rotate-left"></i> Limpiar Filtros
-                        </button>
-                        
-                        <button 
-                            @click="handleUpdate" 
-                            :disabled="store.isGenerating"
-                            class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold px-5 py-2 rounded-lg shadow-md shadow-brand-500/20 transition-all flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed hover:-translate-y-0.5"
-                        >
-                            <i v-if="store.isGenerating" class="fa-solid fa-circle-notch fa-spin"></i>
-                            <i v-else class="fa-solid fa-bolt"></i>
-                            <span>{{ store.isGenerating ? 'GENERANDO...' : 'GENERAR AHORA' }}</span>
-                        </button>
-                    </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-6">
@@ -267,6 +270,26 @@ watch(isCollapsed, (newVal) => {
 
                     </div>
 
+                </div>
+
+                <!-- FOOTER ACTIONS -->
+                <div class="flex justify-end items-center gap-4 mt-8 pt-4 border-t border-slate-100">
+                    <button 
+                        @click="handleReset"
+                        class="text-xs font-medium text-slate-400 hover:text-rose-600 flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-rose-50 transition-all border border-transparent hover:border-rose-100"
+                    >
+                        <i class="fa-solid fa-trash-can opacity-60"></i> Limpiar Filtros
+                    </button>
+                    
+                    <button 
+                        @click="handleUpdate" 
+                        :disabled="store.isGenerating"
+                        class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold px-8 py-2.5 rounded-xl shadow-lg shadow-brand-500/25 transition-all flex items-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                        <i v-if="store.isGenerating" class="fa-solid fa-circle-notch fa-spin"></i>
+                        <i v-else class="fa-solid fa-bolt"></i>
+                        <span>{{ store.isGenerating ? 'GENERANDO REPORTE...' : 'GENERAR AHORA' }}</span>
+                    </button>
                 </div>
             </div>
         </div>
