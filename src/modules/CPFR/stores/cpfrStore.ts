@@ -30,7 +30,9 @@ export const useCpfrStore = defineStore('cpfr', () => {
     const nom_cadena      = ref<string>('soriana')
 
     // Filtros activos — se incluyen en el body del POST
-    const filters = reactive<CpfrFilters>({})
+    const filters = reactive<CpfrFilters>({
+        semanas_sellout: 6
+    })
 
     // Override de criterio por tienda (para recalculate)
     const overrides = ref<CpfrOverride[]>([])
@@ -244,6 +246,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         delete filters.dia
         delete filters.jefatura
         delete filters.id_cliente
+        filters.semanas_sellout = 6
     }
 
     function toggleStatusFilter(key: keyof typeof statusFilters) {

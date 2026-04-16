@@ -10,6 +10,21 @@ const emit = defineEmits<{
 
 const store = useCpfrStore()
 const search = ref('')
+const selectedDay = ref<number | null>(null)
+
+const dTags = [
+  { num: 1, label: 'L' },
+  { num: 2, label: 'M' },
+  { num: 3, label: 'X' },
+  { num: 4, label: 'J' },
+  { num: 5, label: 'V' },
+  { num: 6, label: 'S' },
+  { num: 7, label: 'D' },
+]
+
+function toggleDay(num: number) {
+  selectedDay.value = selectedDay.value === num ? null : num
+}
 
 // ── State for Local Changes ──────────────────────────────────────────────────
 // Usamos un Map para rastrear cambios locales sin mutar el store directamente hasta guardar
@@ -36,7 +51,13 @@ watch(() => store.allConfigs, (newVal) => {
 
 // ── Computed ─────────────────────────────────────────────────────────────────
 const filteredConfigs = computed(() => {
-  const configs = Object.values(localConfigs)
+  let configs = Object.values(localConfigs)
+
+  // Filtro por día (dia_ventas)
+  if (selectedDay.value !== null) {
+    configs = configs.filter(c => c.dia_ventas === selectedDay.value)
+  }
+
   if (!search.value) return configs
   const s = search.value.toLowerCase()
   return configs.filter(c => 
@@ -111,6 +132,20 @@ const DAY_OPTIONS = [
 function getDayLabel(val: number) {
   return DAY_OPTIONS.find(d => d.value === val)?.label || val
 }
+
+/**
+ * Cálculo del Factor de Ajuste (Espejo de SQL)
+ * Fómula: ((((dia_ventas - dia_cadena) % 7 + 7) % 7) + lead_time) / 7.0
+ */
+function calculateLiveFactor(cfg: CpfrStoreConfig) {
+  const dc = cfg.dia_cadena || 1
+  const dv = cfg.dia_ventas || dc
+  const lt = cfg.lead_time || 0
+  
+  const diff = (((dv - dc) % 7 + 7) % 7)
+  const factor = (diff + lt) / 7
+  return factor.toFixed(4)
+}
 </script>
 
 <template>
@@ -161,20 +196,35 @@ function getDayLabel(val: number) {
             </button>
           </div>
 
-          <!-- Search Bar -->
-          <div class="relative group">
-            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[11px] group-focus-within:text-indigo-500 transition-colors"></i>
-            <input 
-              v-model="search"
-              type="text"
-              placeholder="Buscar tienda, id o jefatura..."
-              class="w-full h-11 pl-10 pr-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-medium focus:bg-white focus:ring-4 focus:ring-indigo-50 focus:border-indigo-200 outline-none transition-all placeholder:text-slate-300"
-            />
+          <!-- Filters Row -->
+          <div class="flex items-center gap-4">
+            <!-- Search Bar -->
+            <div class="relative group flex-1">
+              <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[11px] group-focus-within:text-indigo-500 transition-colors"></i>
+              <input 
+                v-model="search"
+                type="text"
+                placeholder="Buscar tienda, id o jefatura..."
+                class="w-full h-11 pl-10 pr-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-medium focus:bg-white focus:ring-4 focus:ring-indigo-50 focus:border-indigo-200 outline-none transition-all placeholder:text-slate-300"
+              />
+            </div>
+
+            <!-- Day Tabs (Mirroring Dashboard) -->
+            <div class="flex flex-col gap-1 shrink-0">
+               <div class="flex gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100 shadow-inner">
+                  <button v-for="d in dTags" :key="d.num"
+                    @click="toggleDay(d.num)"
+                    class="w-[32px] h-[30px] rounded-lg font-black text-[10px] transition-all flex items-center justify-center"
+                    :class="selectedDay === d.num ? 'bg-indigo-600 text-white shadow-md scale-105' : 'bg-transparent text-slate-400 hover:bg-slate-200 hover:text-slate-600'"
+                    :title="`Filtrar por día ${d.num}`"
+                  >{{ d.label }}</button>
+               </div>
+            </div>
           </div>
         </header>
 
         <!-- Body / Card List -->
-        <div class="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/30 min-h-0 custom-scrollbar">
+        <div class="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-100/60 min-h-0 custom-scrollbar">
           
           <div v-if="store.allConfigsLoading" class="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
             <i class="fa-solid fa-circle-notch fa-spin text-2xl text-indigo-400"></i>
@@ -191,14 +241,14 @@ function getDayLabel(val: number) {
               <!-- Card Header -->
               <div class="flex items-start justify-between mb-4">
                 <div class="flex-1 min-w-0">
-                  <h3 class="text-xs font-bold text-slate-700 truncate mb-1">
+                  <div class="inline-flex items-center px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-black shadow-sm mb-2 border border-indigo-100/50">
                     {{ cfg.nombre_tienda || 'Sin Nombre' }}
-                  </h3>
+                  </div>
                   <div class="flex items-center gap-2">
                     <span class="text-[10px] font-mono text-slate-400">{{ cfg.id_cliente }}</span>
                     <span class="w-1 h-1 rounded-full bg-slate-200"></span>
-                    <span class="px-2 py-0.5 rounded-full bg-slate-50 text-[9px] font-bold text-slate-500 border border-slate-100">
-                      {{ cfg.jefatura || 'N/D' }}
+                    <span class="px-2 py-0.5 rounded-full bg-white text-[9px] font-bold text-slate-400 border border-slate-100 shadow-sm">
+                      {{ cfg.Jefatura || cfg.jefatura || 'N/D' }}
                     </span>
                   </div>
                 </div>
@@ -274,10 +324,16 @@ function getDayLabel(val: number) {
                 <!-- Factor (Footer of Card) -->
                 <div class="pt-3 border-t border-slate-50 flex items-center justify-between">
                   <div class="flex items-center gap-2">
-                    <span class="text-[10px] font-semibold text-slate-300">Factor Ajuste</span>
-                    <span class="text-xs font-mono font-black text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
-                      {{ cfg.factor_ajuste }}
-                    </span>
+                    <span class="text-[9px] font-black uppercase tracking-widest text-slate-400">Factor Ajuste</span>
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-xs font-mono font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-100 shadow-sm transition-all duration-300">
+                        {{ calculateLiveFactor(cfg) }}
+                      </span>
+                      <span v-if="calculateLiveFactor(cfg) !== (cfg.factor_ajuste?.toFixed?.(4) || cfg.factor_ajuste)" 
+                            class="text-[8px] font-bold text-amber-500 animate-pulse bg-amber-50 px-1 rounded border border-amber-100">
+                        PREVIEW
+                      </span>
+                    </div>
                   </div>
                   <i v-if="modifiedIds.has(cfg.id_cliente)" class="fa-solid fa-circle-check text-indigo-500 text-xs animate-bounce"></i>
                 </div>
