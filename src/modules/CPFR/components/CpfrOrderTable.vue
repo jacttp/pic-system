@@ -95,6 +95,7 @@ onBeforeUnmount(() => {
 export interface GroupedOC {
     group_id: string;
     num_pedido: string | null;
+    semana_ic: string | null;
     fec_pedido_cadena: string | null;
     fec_fin_embarque: string | null;
     estado_oc: string | null;
@@ -111,6 +112,7 @@ function groupOCs(skus: CpfrSkuDash[]): GroupedOC[] {
             map.set(key, {
                 group_id: key,
                 num_pedido: sku.num_pedido,
+                semana_ic: sku.semana_ic,
                 fec_pedido_cadena: sku.fec_pedido_cadena,
                 fec_fin_embarque: sku.fec_fin_embarque,
                 estado_oc: sku.estado_oc,
@@ -124,7 +126,12 @@ function groupOCs(skus: CpfrSkuDash[]): GroupedOC[] {
         oc.cant_pedida_total += (sku.cant_pedida || 0)
         oc.skus.push(sku)
     }
-    return Array.from(map.values())
+    // Retornamos ordenado por fec_pedido_cadena descendente (más reciente primero)
+    return Array.from(map.values()).sort((a, b) => {
+        const dateA = a.fec_pedido_cadena || ''
+        const dateB = b.fec_pedido_cadena || ''
+        return dateB.localeCompare(dateA)
+    })
 }
 
 const expandedOCGroups = ref<Record<string, boolean>>({})
@@ -355,6 +362,21 @@ const filteredDias = computed(() => {
         return { ...dia, tiendas: filteredTiendas };
     }).filter(dia => dia.tiendas.length > 0);
 });
+
+const totalUniqueOCs = computed(() => {
+    const ocSet = new Set<string>();
+    filteredDias.value.forEach(dia => {
+        dia.tiendas.forEach(tienda => {
+            tienda.skus.forEach(sku => {
+                if (sku.num_pedido) {
+                    // Combinamos con id_cliente por seguridad
+                    ocSet.add(`${tienda.id_cliente}|${sku.num_pedido}`);
+                }
+            });
+        });
+    });
+    return ocSet.size;
+});
 </script>
 
 <template>
@@ -379,6 +401,12 @@ const filteredDias = computed(() => {
         <div class="flex items-center gap-2 text-slate-500">
           <i class="fa-solid fa-layer-group text-slate-400"></i>
           <span class="text-[11px] font-bold uppercase tracking-wider">Control de Vista</span>
+          
+          <!-- Contador de OCs -->
+          <div v-if="totalUniqueOCs > 0" class="ml-4 flex items-center gap-2 px-2.5 py-1 bg-brand-50 border border-brand-200 rounded-lg text-brand-700 font-bold text-[10px]">
+            <i class="fa-solid fa-file-circle-check"></i>
+            <span>{{ totalUniqueOCs }} ORDENES MOSTRADAS</span>
+          </div>
         </div>
         
         <div class="flex items-center gap-4">
@@ -412,24 +440,24 @@ const filteredDias = computed(() => {
 
       <!-- ── Contenedor desplazable de la tabla ── -->
       <div class="flex-1 min-h-0 overflow-auto">
-        <table class="w-full text-left border-collapse">
+        <table class="w-full text-left border-collapse table-fixed">
 
           <!-- Cabecera fija: NIVEL 1 -->
           <thead class="sticky top-0 z-20 shadow-sm ring-1 ring-slate-200">
-            <tr class="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-50">
-              <th class="px-4 py-3.5 font-bold w-[240px]">Tienda / SKU</th>
-              <th class="px-3 py-3.5 font-bold">UPC</th>
-              <th class="px-3 py-3.5 font-bold">Jefatura</th>
-              <th class="px-3 py-3.5 font-bold text-right">Inv.<br>Actual (pz)</th>
-              <th class="px-3 py-3.5 font-bold text-right">Sellout Prom.<br>Semanal (pz)</th>
-              <th class="px-3 py-3.5 font-bold text-right">Criterio<br>(Sem.)</th>
-              <th class="px-3 py-3.5 font-bold text-right">Cobertura<br>(Sem.)</th>
-              <th class="px-3 py-3.5 font-bold text-right text-brand-700 bg-brand-50/70 border-x border-brand-100">Pedido<br>Sugerido</th>
-              <th class="px-3 py-3.5 font-bold text-right">Pedido<br>Cadena</th>
-              <th class="px-3 py-3.5 font-bold text-center">Detalle OC</th>
-              <th class="px-3 py-3.5 font-bold text-right">Fill Rate</th>
-              <th class="px-3 py-3.5 font-bold text-center">INSTOCK</th>
-              <th class="px-2 py-3.5 font-bold text-center w-10"></th>
+            <tr class="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-100/80 backdrop-blur-sm border-b border-slate-200">
+              <th class="px-4 py-3 font-bold w-64">Tienda / SKU</th>
+              <th class="px-3 py-3 font-bold w-28">UPC</th>
+              <th class="px-3 py-3 font-bold w-24">Jefatura</th>
+              <th class="px-3 py-3 font-bold text-right w-24">Inv.<br>Act. (pz)</th>
+              <th class="px-3 py-3 font-bold text-right w-28">Sellout Prom.<br>(pz)</th>
+              <th class="px-3 py-3 font-bold text-right w-20">Crit.<br>(S.)</th>
+              <th class="px-3 py-3 font-bold text-right w-20">Cob.<br>(S.)</th>
+              <th class="px-3 py-3 font-bold text-right text-brand-700 bg-brand-50 border-x border-brand-100 w-28">Pedido<br>Sugerido</th>
+              <th class="px-3 py-3 font-bold text-right w-28">Pedido<br>Cadena</th>
+              <th class="px-3 py-3 font-bold text-center w-32">Detalle OC</th>
+              <th class="px-3 py-3 font-bold text-right w-24">Fill Rate</th>
+              <th class="px-3 py-3 font-bold text-center w-24">INSTOCK</th>
+              <th class="px-2 py-3 font-bold text-center w-10"></th>
             </tr>
           </thead>
 
@@ -480,7 +508,6 @@ const filteredDias = computed(() => {
                           <p class="font-bold text-slate-800 truncate leading-tight">{{ tienda.nombre_tienda }}</p>
                           <p class="text-[10px] text-slate-500 mt-0.5 font-medium">
                             {{ tienda.total_skus }} SKUs
-                            <span v-if="tienda.fec_envio" class="text-slate-400">· Envío {{ tienda.fec_envio }}</span>
                           </p>
                         </div>
                       </div>
@@ -594,6 +621,10 @@ const filteredDias = computed(() => {
                               <span class="text-[12px] font-bold tracking-tight cursor-default" :class="ocGroup.num_pedido ? 'text-slate-800' : 'text-slate-400 italic'">
                                 {{ ocGroup.num_pedido || 'Sin número' }}
                               </span>
+                              
+                              <span v-if="ocGroup.semana_ic" class="ml-1.5 px-1.5 py-0.5 bg-brand-50 text-brand-700 text-[10px] font-bold rounded border border-brand-200" title="Semana del pedido">
+                                Sem. {{ ocGroup.semana_ic }}
+                              </span>
                               <!-- Popover -->
                               <div
                                 v-if="ocGroup.fec_pedido_cadena || ocGroup.fec_fin_embarque"
@@ -601,7 +632,7 @@ const filteredDias = computed(() => {
                               >
                                 <div v-if="ocGroup.fec_pedido_cadena" class="flex items-center gap-2 text-[10px]">
                                   <i class="fa-regular fa-calendar-check text-slate-400"></i>
-                                  <span class="text-slate-500">Levantado:</span>
+                                  <span class="text-slate-500">Pedido Cadena:</span>
                                   <span class="font-mono font-bold text-slate-800">{{ ocGroup.fec_pedido_cadena.slice(0, 10) }}</span>
                                 </div>
                                 <div v-if="ocGroup.fec_fin_embarque" class="flex items-center gap-2 text-[10px]">
@@ -612,13 +643,25 @@ const filteredDias = computed(() => {
                               </div>
                             </span>
 
-                            <span
-                              v-if="ocGroup.fec_fin_embarque"
-                              class="ml-1 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md cursor-help"
-                              :title="`Fin embarque: ${ocGroup.fec_fin_embarque.slice(0, 10)}`"
-                            >
-                              <i class="fa-solid fa-calendar-xmark mr-0.5"></i>{{ ocGroup.fec_fin_embarque.slice(0, 10) }}
-                            </span>
+                            <div v-if="ocGroup.fec_pedido_cadena" class="ml-1 relative group/fecpedido">
+                              <span
+                                class="flex items-center gap-1.5 font-bold px-2 py-0.5 rounded-md text-[10px] bg-slate-100 text-slate-600 border border-slate-200"
+                                title="Fecha de pedido oficial de la cadena"
+                              >
+                                <i class="fa-regular fa-calendar-check text-brand-300"></i>
+                                {{ ocGroup.fec_pedido_cadena.slice(0, 10) }}
+                              </span>
+                            </div>
+
+                            <div v-if="ocGroup.fec_fin_embarque" class="ml-1 relative">
+                              <span
+                                class="flex items-center gap-1.5 font-bold px-1.5 py-0.5 rounded-md text-[9px] bg-amber-50 text-amber-700 border border-amber-200 cursor-help opacity-80"
+                                :title="`Fin embarque: ${ocGroup.fec_fin_embarque.slice(0, 10)}`"
+                              >
+                                <i class="fa-solid fa-calendar-xmark"></i>
+                                {{ ocGroup.fec_fin_embarque.slice(0, 10) }}
+                              </span>
+                            </div>
                             
                             <div v-if="ocGroup.estado_oc" class="relative ml-1 flex">
                               <span

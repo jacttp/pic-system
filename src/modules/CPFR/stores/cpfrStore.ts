@@ -306,6 +306,20 @@ export const useCpfrStore = defineStore('cpfr', () => {
     const skuOverrides      = ref<CpfrSkuOverride[]>([])
     const skuOverridesLoading = ref(false)
 
+    const allConfigs = ref<CpfrStoreConfig[]>([])
+    const allConfigsLoading = ref(false)
+
+    async function fetchAllConfigs() {
+        allConfigsLoading.value = true
+        try {
+            allConfigs.value = await cpfrApi.getAllConfigs()
+        } catch (e: any) {
+            console.error('[cpfrStore.fetchAllConfigs]', e)
+        } finally {
+            allConfigsLoading.value = false
+        }
+    }
+
     async function fetchConfig(id_cliente: string) {
         configLoading.value = true
         configError.value = null
@@ -395,7 +409,9 @@ export const useCpfrStore = defineStore('cpfr', () => {
         // Config de tienda (para CpfrStoreConfigModal)
         storeConfig, configLoading, configSaving, configError,
         skuOverrides, skuOverridesLoading,
+        allConfigs, allConfigsLoading,
         fetchConfig, saveConfig,
         fetchSkuOverrides, upsertSkuOverride, deleteSkuOverride,
+        fetchAllConfigs
     }
 })

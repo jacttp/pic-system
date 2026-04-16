@@ -9,6 +9,7 @@ const store = useCpfrStore()
 
 const emit = defineEmits<{
     (e: 'upload-oc'): void
+    (e: 'open-chain-config'): void
 }>()
 
 // ── Search Store ─────────────────────────────────────────────────────────────
@@ -183,6 +184,18 @@ function clearAll() {
                   </div>
                   <CpfrCriteriaPanel />
               </div>
+          </div>
+
+          <!-- Botón Configuración Cadena (Gear Icon) -->
+          <div class="flex flex-col gap-1.5">
+              <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-1"><i class="fa-solid fa-toolbox mr-0.5"></i> Gestión</span>
+              <button 
+                @click="emit('open-chain-config')"
+                class="h-[34px] w-[38px] flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-400 hover:text-brand-600 hover:bg-brand-50 hover:border-brand-200 transition-all shadow-sm"
+                title="Abrir Catálogo de Configuración de Cadena"
+              >
+                <i class="fa-solid fa-gear text-lg"></i>
+              </button>
           </div>
       </div>
 

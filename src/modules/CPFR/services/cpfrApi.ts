@@ -114,6 +114,14 @@ export const cpfrApi = {
     // ── Config de tienda (v2) — usado por CpfrStoreConfigModal ───────────────
 
     /**
+     * GET /api/v2/cpfr/config
+     */
+    async getAllConfigs(): Promise<CpfrStoreConfig[]> {
+        const { data } = await api.get('/v2/cpfr/config')
+        return data.data
+    },
+
+    /**
      * GET /api/v2/cpfr/config/:id_cliente
      */
     async getConfig(id_cliente: string): Promise<CpfrStoreConfig> {

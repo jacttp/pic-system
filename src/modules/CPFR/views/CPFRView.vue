@@ -8,12 +8,14 @@ import CpfrOrderTable      from '../components/CpfrOrderTable.vue'
 import CpfrUploadModal     from '../components/CpfrUploadModal.vue'
 import CpfrStoreConfigModal from '../components/CpfrStoreConfigModal.vue'
 import CpfrInfoModal        from '../components/CpfrInfoModal.vue'
+import CpfrChainConfigModal from '../components/CpfrChainConfigModal.vue'
 
 const store = useCpfrStore()
 
 // ── Modal state ───────────────────────────────────────────────────────────────
 const showUploadModal  = ref(false)
 const showInfoModal    = ref(false)
+const showChainConfig  = ref(false)
 const configStore      = ref<{ id: string; nombre: string } | null>(null)
 
 
@@ -82,7 +84,10 @@ function confirmRecalculate() {
     </header>
 
     <!-- ── Barra de Filtros (Estática) ──────────────────────────────────────────────── -->
-    <CpfrFiltersPanel @upload-oc="showUploadModal = true" />
+    <CpfrFiltersPanel 
+      @upload-oc="showUploadModal = true" 
+      @open-chain-config="showChainConfig = true"
+    />
 
     <!-- ── Barra de acciones (Secundaria) ──────────────────────────────────────────────── -->
     <nav class="bg-white border-b border-slate-200 px-5 flex items-center gap-2 py-2 shrink-0 flex-wrap relative z-30">
@@ -250,6 +255,11 @@ function confirmRecalculate() {
     <CpfrInfoModal
       v-if="showInfoModal"
       @close="showInfoModal = false"
+    />
+
+    <CpfrChainConfigModal
+      v-if="showChainConfig"
+      @close="showChainConfig = false"
     />
 
   </main>
