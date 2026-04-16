@@ -119,7 +119,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
     async function adjustSku(
         id_cliente: string, sku_muliix: string, anio: number, semana_ic: string, 
         num_pedido: string | null, fec_pedido_cadena: string | null,
-        body: CpfrAdjustSkuBody
+        body: { cantidad_final_pz: number, fill_rate?: number | null, factor_ajuste?: number }
     ): Promise<boolean> {
         try {
             await cpfrApi.adjustSku({ id_cliente, sku_muliix, anio, semana_ic, num_pedido, fec_pedido_cadena, ...body })

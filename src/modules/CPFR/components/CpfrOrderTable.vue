@@ -48,7 +48,8 @@ async function confirmEdit(sku: CpfrSkuDash, id_cliente: string) {
         sku.fec_pedido_cadena,
         {
             cantidad_final_pz: finalValue,
-            fill_rate: newFillRate
+            fill_rate: newFillRate,
+            factor_ajuste: sku.factor_ajuste
         }
     )
     saving.value = false

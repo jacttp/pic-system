@@ -64,6 +64,7 @@ export interface CpfrSkuDash {
     instock: number | null          // null=sin dato, >=100 INSTOCK, >=50 BAJO, <50 CRÍTICO
     fill_rate: number | null
     enviado_pz: number | null
+    factor_ajuste: number
     sellout_semanas?: Array<{ semana: number, kg: number }>
 }
 
@@ -137,6 +138,7 @@ export interface CpfrAdjustSkuBody {
     semanas_objetivo?: number
     enviado_pz?: number
     fill_rate?: number | null
+    factor_ajuste?: number
 }
 
 
