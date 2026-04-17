@@ -13,6 +13,8 @@ import type {
     CpfrUpdateStatusBody,
     CpfrStoreConfig,
     CpfrSkuOverride,
+    CpfrSkuUnit,
+    CpfrSkuUnitPayload,
 } from '../types/cpfrTypes'
 
 export const useCpfrStore = defineStore('cpfr', () => {
@@ -312,6 +314,10 @@ export const useCpfrStore = defineStore('cpfr', () => {
     const allConfigs = ref<CpfrStoreConfig[]>([])
     const allConfigsLoading = ref(false)
 
+    // ── Config de unidades SKU ────────────────────────────────────────────────
+    const allSkusConfig = ref<CpfrSkuUnit[]>([])
+    const skusConfigLoading = ref(false)
+
     async function fetchAllConfigs() {
         allConfigsLoading.value = true
         try {
@@ -383,6 +389,27 @@ export const useCpfrStore = defineStore('cpfr', () => {
         }
     }
 
+    async function fetchAllSkusConfig() {
+        skusConfigLoading.value = true
+        try {
+            allSkusConfig.value = await cpfrApi.getAllSkusConfig()
+        } catch (e) {
+            console.error('[cpfrStore.fetchAllSkusConfig]', e)
+        } finally {
+            skusConfigLoading.value = false
+        }
+    }
+
+    async function saveSkuConfig(sku: string, payload: Partial<CpfrSkuUnitPayload>): Promise<boolean> {
+        try {
+            await cpfrApi.updateSkuConfig(sku, payload)
+            return true
+        } catch (e) {
+            console.error('[cpfrStore.saveSkuConfig]', e)
+            return false
+        }
+    }
+
     async function deleteSkuOverride(id_cliente: string, sku_muliix: string): Promise<boolean> {
         try {
             await cpfrApi.deleteSkuOverride(id_cliente, sku_muliix)
@@ -415,6 +442,9 @@ export const useCpfrStore = defineStore('cpfr', () => {
         allConfigs, allConfigsLoading,
         fetchConfig, saveConfig,
         fetchSkuOverrides, upsertSkuOverride, deleteSkuOverride,
-        fetchAllConfigs
+        fetchAllConfigs,
+        // Config de unidades SKU (para CpfrChainConfigModal)
+        allSkusConfig, skusConfigLoading,
+        fetchAllSkusConfig, saveSkuConfig
     }
 })

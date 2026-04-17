@@ -173,6 +173,23 @@ export interface CpfrSkuOverride {
     semanas_objetivo: number
 }
 
+// ─── SKU Unit Config — GET|PATCH /api/cpfr/units ────────────────────────────
+// Unidades de conversión de un SKU en skus_IC
+
+export interface CpfrSkuUnit {
+    sku_muliix: string
+    sku_nombre: string
+    unidad_inventario: number | null
+    pzas_caja: number | null
+    kg_caja: number | null
+    cajas_pallet: number | null
+    pzas_pallet: number | null
+    pzas_bolsa: number | null
+    unidad_ventau: number | null
+}
+
+export type CpfrSkuUnitPayload = Omit<CpfrSkuUnit, 'sku_muliix' | 'sku_nombre'>
+
 // ─── Upload OC — POST /cpfr/upload-oc ────────────────────────────────────────
 // (usado por CpfrUploadModal)
 
@@ -186,4 +203,4 @@ export interface CpfrUploadOCResponse {
     inserted: number
     skipped: number
     skipped_detail: Array<{ row: number; sku_cadena?: string; reason: string }>
-}
+}

@@ -16,6 +16,8 @@ import type {
     CpfrUploadOCResponse,
     CpfrStoreConfig,
     CpfrSkuOverride,
+    CpfrSkuUnit,
+    CpfrSkuUnitPayload,
 } from '../types/cpfrTypes'
 
 // ── Body para dash-orders ────────────────────────────────────────────────────
@@ -164,6 +166,26 @@ export const cpfrApi = {
      */
     async deleteSkuOverride(id_cliente: string, sku_muliix: string): Promise<{ success: boolean }> {
         const { data } = await api.delete(`/v2/cpfr/config/${id_cliente}/skus/${sku_muliix}`)
+        return data
+    },
+
+    // ── SKU Unit Config (v1 analytics) ───────────────────────────────────────
+
+    /**
+     * GET /api/cpfr/units
+     * Lista todos los SKUs con sus unidades de conversión desde skus_IC.
+     */
+    async getAllSkusConfig(): Promise<CpfrSkuUnit[]> {
+        const { data } = await api.get('/cpfr/units')
+        return data.data
+    },
+
+    /**
+     * PATCH /api/cpfr/units/:sku
+     * Actualización parcial de unidades de conversión de un SKU.
+     */
+    async updateSkuConfig(sku: string, payload: Partial<CpfrSkuUnitPayload>): Promise<{ success: boolean }> {
+        const { data } = await api.patch(`/cpfr/units/${encodeURIComponent(sku)}`, payload)
         return data
     },
 }
