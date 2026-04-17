@@ -11,6 +11,16 @@ const emit = defineEmits<{
     (e: 'open-config', id_cliente: string, nombre_tienda: string): void
 }>()
 
+// ── Tabs State ────────────────────────────────────────────────────────────────
+const currentTab = ref('centralizados')
+const tabs = [
+    { id: 'centralizados', label: 'Centralizados' },
+    { id: 'revision',       label: 'Revisión' },
+    { id: 'aprobada',       label: 'Aprobada' },
+    { id: 'sin_embarcar',   label: 'Sin Embarcar' },
+    { id: 'historial',      label: 'Historial' },
+]
+
 // ── Inline edit ───────────────────────────────────────────────────────────────
 const editingId = ref<string | null>(null)
 const editValue = ref<number>(0)
@@ -21,6 +31,7 @@ const savedId   = ref<string | null>(null)
 const submittingOC = ref<string | null>(null)
 
 function startEdit(sku: CpfrSkuDash) {
+    if (currentTab.value !== 'centralizados') return;
     if (!sku.sku_muliix) return;
     editingId.value = sku.sku_muliix
     editValue.value = sku.pedido_sugerido_pz_red
@@ -324,20 +335,48 @@ const filteredDias = computed(() => {
                            sf.bajoStock || sf.sobrestock || sf.fillrateBajo || 
                            sf.fillrate100 || sf.sobrepedido;
     
-    // Si no hay ningún filtro (ni búsqueda ni estados), retornamos todo
-    if (!hasStatusFilter && !sf.searchOC) return store.dias;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const curWeekIc = store.currentWeek?.semana_ic ? parseInt(store.currentWeek.semana_ic) : 0;
+    const curYear = store.currentWeek?.anio || 0;
+
+    const isCurrentWeek = (sku: any) => {
+        const skuYear = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0;
+        const skuWeek = sku.semana_ic ? parseInt(sku.semana_ic) : 0;
+        return skuYear === curYear && skuWeek === curWeekIc;
+    };
+
+    const isPreviousWeek = (sku: any) => {
+        const skuYear = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0;
+        const skuWeek = sku.semana_ic ? parseInt(sku.semana_ic) : 0;
+        return (skuYear < curYear) || (skuYear === curYear && skuWeek < curWeekIc);
+    };
 
     return store.dias.map(dia => {
         const filteredTiendas = dia.tiendas.map(tienda => {
             const filteredSkus = tienda.skus.filter(sku => {
-                // 1. Filtro de Búsqueda (Mandatorio)
+                // 1. Filtro por Pestaña (Tab)
+                const state = sku.estado_oc;
+                if (currentTab.value === 'centralizados') {
+                    if (!isCurrentWeek(sku) || state === 'revision' || state === 'aprobado') return false;
+                } else if (currentTab.value === 'revision') {
+                    if (!isCurrentWeek(sku) || state !== 'revision') return false;
+                } else if (currentTab.value === 'aprobada') {
+                    if (!isCurrentWeek(sku) || state !== 'aprobado') return false;
+                } else if (currentTab.value === 'sin_embarcar') {
+                    const fecFin = sku.fec_fin_embarque ? sku.fec_fin_embarque.slice(0, 10) : null;
+                    if (!fecFin || fecFin >= todayStr || state === 'aprobado') return false;
+                } else if (currentTab.value === 'historial') {
+                    if (!isPreviousWeek(sku)) return false;
+                }
+
+                // 2. Filtro de Búsqueda
                 if (sf.searchOC) {
                     const term = sf.searchOC.toLowerCase();
                     const num = (sku.num_pedido || '').toLowerCase();
                     if (!num.includes(term)) return false;
                 }
 
-                // 2. Filtros de Estado (Si hay alguno activo, basta con que cumpla uno - OR)
+                // 3. Filtros de Estado dinámicos (OR)
                 if (!hasStatusFilter) return true;
 
                 const fr = calcularFillRateDinamico(sku);
@@ -406,7 +445,17 @@ const totalUniqueOCs = computed(() => {
           <!-- Contador de OCs -->
           <div v-if="totalUniqueOCs > 0" class="ml-4 flex items-center gap-2 px-2.5 py-1 bg-brand-50 border border-brand-200 rounded-lg text-brand-700 font-bold text-[10px]">
             <i class="fa-solid fa-file-circle-check"></i>
-            <span>{{ totalUniqueOCs }} ORDENES MOSTRADAS</span>
+            <span>{{ totalUniqueOCs }} OC</span>
+          </div>
+
+          <!-- Pestañas (Tabs) -->
+          <div class="ml-4 flex items-center gap-1 bg-slate-100/50 p-1 rounded-xl border border-slate-200 shadow-inner">
+            <button
+               v-for="t in tabs" :key="t.id"
+               class="px-3 py-1.5 rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all"
+               :class="currentTab === t.id ? 'bg-brand-600 text-white shadow-sm shadow-brand-200' : 'text-slate-500 hover:bg-white hover:text-slate-700'"
+               @click="currentTab = t.id"
+            >{{ t.label }}</button>
           </div>
         </div>
         
