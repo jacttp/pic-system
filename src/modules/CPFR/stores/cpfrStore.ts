@@ -56,6 +56,14 @@ export const useCpfrStore = defineStore('cpfr', () => {
     // UI — expand state local (no viene del backend)
     const expandedStores = reactive<Record<string, boolean>>({})
 
+    // UI — vista actual (tabla o tarjetas) persistida
+    const viewMode = ref<'table' | 'cards'>((localStorage.getItem('cpfr_view_mode') as any) || 'table')
+
+    function setViewMode(mode: 'table' | 'cards') {
+        viewMode.value = mode
+        localStorage.setItem('cpfr_view_mode', mode)
+    }
+
     // ── Helpers internos ──────────────────────────────────────────────────────
 
     function buildDashBody() {
@@ -427,13 +435,13 @@ export const useCpfrStore = defineStore('cpfr', () => {
         // State
         currentWeek, context, dias, loading, preview, error,
         criterio_global, nom_cadena, filters, overrides, expandedStores,
-        statusFilters,
+        statusFilters, viewMode,
         // Actions
         init, fetchCurrentWeek, loadDashboard, recalculate,
         adjustSku, updateStatus,
         toggleStore, expandAll, collapseAll, expandAllOCs, collapseAllOCs,
         setFilter, clearFilters,
-        toggleStatusFilter, clearStatusFilters,
+        toggleStatusFilter, clearStatusFilters, setViewMode,
         // Computed
         diaOptions, jefaturaOptions, tiendaOptions,
         // Config de tienda (para CpfrStoreConfigModal)

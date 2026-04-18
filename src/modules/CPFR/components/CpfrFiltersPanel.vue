@@ -8,7 +8,7 @@ import CpfrCriteriaPanel from './CpfrCriteriaPanel.vue'
 const store = useCpfrStore()
 
 const emit = defineEmits<{
-    (e: 'upload-oc'): void
+    (e: 'open-export'): void
     (e: 'open-chain-config'): void
 }>()
 
@@ -205,8 +205,8 @@ function clearAll() {
              <i class="fa-solid fa-rotate-left"></i> <span class="hidden sm:inline">Limpiar</span>
           </button>
           
-          <button @click="emit('upload-oc')" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold px-4 h-[34px] rounded-lg shadow-sm shadow-brand-500/30 transition-all flex items-center gap-2 hover:-translate-y-px active:translate-y-0">
-             <i class="fa-solid fa-file-arrow-up"></i> <span class="hidden sm:inline">Subir OC</span>
+          <button @click="emit('open-export')" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold px-4 h-[34px] rounded-lg shadow-sm shadow-brand-500/30 transition-all flex items-center gap-2 hover:-translate-y-px active:translate-y-0">
+             <i class="fa-solid fa-wand-magic-sparkles"></i> <span class="hidden sm:inline">Generar</span>
           </button>
       </div>
 

@@ -5,15 +5,15 @@ import { useCpfrStore } from '../stores/cpfrStore'
 import CpfrFiltersPanel    from '../components/CpfrFiltersPanel.vue'
 import CpfrCriteriaPanel   from '../components/CpfrCriteriaPanel.vue'
 import CpfrOrderTable      from '../components/CpfrOrderTable.vue'
-import CpfrUploadModal     from '../components/CpfrUploadModal.vue'
+import CpfrExportPanel     from '../components/CpfrExportPanel.vue'
 import CpfrStoreConfigModal from '../components/CpfrStoreConfigModal.vue'
 import CpfrInfoModal        from '../components/CpfrInfoModal.vue'
 import CpfrChainConfigModal from '../components/CpfrChainConfigModal.vue'
 
 const store = useCpfrStore()
 
-// ── Modal state ───────────────────────────────────────────────────────────────
-const showUploadModal  = ref(false)
+// ── Panel state ───────────────────────────────────────────────────────────────
+const showExportPanel  = ref(false)
 const showInfoModal    = ref(false)
 const showChainConfig  = ref(false)
 const configStore      = ref<{ id: string; nombre: string } | null>(null)
@@ -23,10 +23,6 @@ onMounted(() => store.init())
 
 function onOpenConfig(id_cliente: string, nombre_tienda: string) {
     configStore.value = { id: id_cliente, nombre: nombre_tienda }
-}
-
-function onUploadDone() {
-    store.loadDashboard()
 }
 
 function confirmRecalculate() {
@@ -54,6 +50,26 @@ function confirmRecalculate() {
           >
             <i class="fa-solid fa-question"></i>
           </button>
+
+          <!-- Switch de Vista -->
+          <div class="flex items-center gap-1 ml-4 bg-slate-100/50 border border-slate-200 p-0.5 rounded-lg">
+            <button 
+              @click="store.setViewMode('table')"
+              class="w-6 h-6 flex items-center justify-center rounded-md transition-all"
+              :class="store.viewMode === 'table' ? 'bg-white text-brand-600 shadow-sm border border-slate-200' : 'text-slate-400 hover:text-slate-600 hover:bg-white/50'"
+              title="Vista de Tabla"
+            >
+              <i class="fa-solid fa-table-list text-[11px]"></i>
+            </button>
+            <button 
+              @click="store.setViewMode('cards')"
+              class="w-6 h-6 flex items-center justify-center rounded-md transition-all"
+              :class="store.viewMode === 'cards' ? 'bg-white text-brand-600 shadow-sm border border-slate-200' : 'text-slate-400 hover:text-slate-600 hover:bg-white/50'"
+              title="Vista de Tarjetas"
+            >
+              <i class="fa-solid fa-table-cells-large text-[11px]"></i>
+            </button>
+          </div>
         </h1>
         <p class="text-[11px] text-slate-400 mt-0.5">
           Motor de reabastecimiento basado en inventario y sellout semanal · Soriana
@@ -85,7 +101,7 @@ function confirmRecalculate() {
 
     <!-- ── Barra de Filtros (Estática) ──────────────────────────────────────────────── -->
     <CpfrFiltersPanel 
-      @upload-oc="showUploadModal = true" 
+      @open-export="showExportPanel = true" 
       @open-chain-config="showChainConfig = true"
     />
 
@@ -238,11 +254,10 @@ function confirmRecalculate() {
       </div>
     </div>
 
-    <!-- ── Modales conservados ────────────────────────────────────────────── -->
-    <CpfrUploadModal
-      v-if="showUploadModal"
-      @close="showUploadModal = false"
-      @uploaded="onUploadDone"
+    <!-- ── Paneles y Modales ────────────────────────────────────────────── -->
+    <CpfrExportPanel
+      v-if="showExportPanel"
+      @close="showExportPanel = false"
     />
 
     <CpfrStoreConfigModal
