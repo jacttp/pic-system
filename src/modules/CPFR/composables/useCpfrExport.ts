@@ -19,7 +19,7 @@ export interface ExportRow {
     num_pedido: string
     cant_pedida: number   // pedido_sugerido_pz_red
     upc: string           // upc_cadena
-    desc: string          // sku_muliix + sku_nombre
+    desc: string          // JUST sku_nombre
 }
 
 export interface ExportTiendaItem {
@@ -69,7 +69,7 @@ export function buildExportItems(dias: any[]): ExportTiendaItem[] {
                     num_pedido: sku.num_pedido || '',
                     cant_pedida: sku.pedido_sugerido_pz_red ?? 0,
                     upc: sku.upc_cadena || '',
-                    desc: `${sku.sku_muliix || ''} ${sku.sku_nombre || ''}`.trim()
+                    desc: sku.sku_nombre || ''
                 }))
 
                 items.push({
@@ -88,7 +88,7 @@ export function buildExportItems(dias: any[]): ExportTiendaItem[] {
 
 export function useCpfrExport() {
 
-    function generateExcel(selectedItems: ExportTiendaItem[], dayNum: number): string {
+    function generateExcel(selectedItems: ExportTiendaItem[], dayNums: number[]): string {
         const allRows: (string | number)[][] = []
 
         // Headers
@@ -127,7 +127,12 @@ export function useCpfrExport() {
 
         const now = new Date()
         const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '')
-        const dayCode = DAY_MAP[dayNum] || 'XX'
+        
+        let dayCode = 'MIX'
+        if (dayNums.length === 1) {
+            dayCode = DAY_MAP[dayNums[0]] || 'XX'
+        }
+
         const filename = `CPFR_Soriana_${dayCode}_${dateStr}.xlsx`
 
         XLSX.writeFile(wb, filename)
