@@ -168,10 +168,13 @@ async function updateStatusesSilently() {
 </script>
 
 <template>
-  <div class="fixed inset-0 z-50 flex flex-col bg-slate-900/60 backdrop-blur-sm p-4 lg:p-10 overflow-hidden">
+  <div 
+    class="fixed inset-0 z-50 flex justify-end bg-slate-900/30 backdrop-blur-[2px] overflow-hidden transition-all duration-500"
+    @click.self="emit('close')"
+  >
     
-    <!-- ═══ MAIN WORKSTATION ═══ -->
-    <div class="w-full h-full max-w-[1400px] mx-auto bg-slate-50 shadow-2xl rounded-2xl border border-slate-200 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <!-- ═══ MAIN PANEL ═══ -->
+    <div class="w-1/2 h-full bg-slate-50 shadow-[-20px_0_50px_-12px_rgba(0,0,0,0.2)] rounded-l-[3.5rem] border-l border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-right duration-500">
       
       <!-- ═══ HEADER ═══ -->
       <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shrink-0">
@@ -196,18 +199,18 @@ async function updateStatusesSilently() {
       <!-- ═══ BODY (SplitContainer) ═══ -->
       <div class="flex-1 min-h-0 flex overflow-hidden">
         
-        <!-- ── COL IZQ: Preview (50%) ── -->
-        <div class="w-1/2 flex flex-col border-r border-slate-200 bg-slate-100/50">
-            <div class="p-4 border-b border-slate-200 bg-white shadow-sm flex items-center justify-between shrink-0">
-                <h3 class="text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                    <i class="fa-solid fa-eye text-sky-500"></i> Vista Previa (Tickets)
+        <!-- ── COL IZQ: Preview (Narrower) ── -->
+        <div class="w-[320px] flex flex-col border-r border-slate-200 bg-slate-100/40 shrink-0">
+            <div class="px-4 py-3 border-b border-slate-200 bg-white/80 backdrop-blur flex items-center justify-between shrink-0">
+                <h3 class="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                    <i class="fa-solid fa-receipt text-brand-500"></i> Vista Previa
                 </h3>
-                <div class="text-[10px] font-bold text-slate-400">
-                    Incluidos: <span class="text-sky-700">{{ includedItems.length }}</span> OCs
+                <div class="text-[9px] font-bold text-slate-400">
+                    <span class="text-brand-700">{{ includedItems.length }}</span> OCs
                 </div>
             </div>
 
-            <div class="flex-1 overflow-y-auto p-6 space-y-4 scroll-smooth scrollbar-thin">
+            <div class="flex-1 overflow-y-auto p-4 space-y-3 scroll-smooth scrollbar-thin bg-slate-50/50">
                 <div v-if="includedItems.length === 0" class="flex flex-col items-center justify-center h-full text-slate-400 gap-3 grayscale opacity-40">
                     <i class="fa-solid fa-file-circle-exclamation text-5xl"></i>
                     <p class="text-xs font-medium italic">No hay pedidos incluidos para mostrar.</p>
@@ -220,84 +223,75 @@ async function updateStatusesSilently() {
                     class="bg-white rounded-xl border border-sky-100 shadow-sm overflow-hidden"
                 >
                     <!-- Header -->
-                    <div class="bg-sky-600 px-5 py-2.5 flex items-center justify-between">
-                        <div>
-                            <p class="font-black text-[13px] text-white leading-tight uppercase tracking-tight">{{ item.nombre_tienda }}</p>
-                            <p class="text-sky-200 text-[10px] font-mono mt-0.5">{{ item.id_cliente }}</p>
+                    <div class="bg-brand-600 px-4 py-2 flex items-center justify-between">
+                        <div class="min-w-0">
+                            <p class="font-black text-[11px] text-white leading-tight uppercase truncate">{{ item.nombre_tienda }}</p>
+                            <p class="text-brand-200 text-[8px] font-mono mt-0.5 truncate">{{ item.id_cliente }} · {{ item.nombre_tienda }}</p>
                         </div>
-                        <div class="text-right">
-                            <p class="text-sky-200 text-[8px] font-bold uppercase tracking-widest">Pedido No.</p>
-                            <p class="font-black text-white text-[12px] font-mono tracking-widest">{{ item.num_pedido }}</p>
+                        <div class="text-right shrink-0">
+                            <p class="text-brand-200 text-[8px] font-bold uppercase tracking-widest">OC</p>
+                            <p class="font-black text-white text-[10px] font-mono tracking-widest">{{ item.num_pedido }}</p>
                         </div>
                     </div>
 
                     <!-- Meta -->
-                    <div class="flex items-center gap-5 px-5 py-1.5 bg-sky-50/50 border-b border-dashed border-sky-100 text-[10px] font-mono text-slate-500">
-                        <span><b class="font-sans font-black text-slate-600">SUC</b> {{ item.rows[0]?.sucursal || '—' }}</span>
-                        <span><b class="font-sans font-black text-slate-600">CLI</b> {{ item.rows[0]?.cliente || '—' }}</span>
-                        <span><b class="font-sans font-black text-slate-600">EMB</b> {{ item.rows[0]?.fec_fin_embarque || '—' }}</span>
-                        <span class="ml-auto px-1.5 py-0.5 rounded-md border font-bold font-sans text-[8px] uppercase bg-sky-100 text-sky-700 border-sky-200">
-                            {{ DAY_NAMES[item.dayNum] }}
+                    <div class="flex items-center gap-3 px-4 py-1.5 bg-brand-50/50 border-b border-dashed border-brand-100 text-[9px] font-mono text-slate-500">
+                        <span><b class="font-sans font-black text-slate-600">S</b> {{ item.rows[0]?.sucursal || '—' }}</span>
+                        <span class="truncate pr-2"><b class="font-sans font-black text-slate-600">C</b> {{ item.id_cliente }} — {{ item.nombre_tienda }}</span>
+                        <span class="ml-auto px-1.5 py-0.5 rounded-md border font-bold font-sans text-[7px] uppercase bg-brand-100 text-brand-700 border-brand-200">
+                            {{ DAY_CODES[item.dayNum] }}
                         </span>
                     </div>
 
-                    <!-- Table Condensada -->
-                    <div class="grid px-5 py-1.5 bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200" style="grid-template-columns: 2fr 3.5fr 1fr">
-                        <span>UPC</span>
-                        <span>Descripción</span>
-                        <span class="text-right">Pzas.</span>
-                    </div>
-
+                    <!-- Filas SKU (Súper condensadas) -->
                     <div class="divide-y divide-slate-50">
-                        <div v-for="(row, idx) in item.rows" :key="idx" class="grid items-center px-5 py-1.5 text-[10px]" :class="idx % 2 === 1 ? 'bg-slate-50/30' : ''" style="grid-template-columns: 2fr 3.5fr 1fr">
-                            <span class="font-mono text-slate-400 truncate pr-2" :title="row.upc">{{ row.upc || '—' }}</span>
-                            <span class="text-slate-800 font-semibold truncate pr-2 uppercase" :title="row.desc">{{ row.desc }}</span>
-                            <span class="text-right font-black text-sky-700">{{ row.cant_pedida.toLocaleString('es-MX') }}</span>
+                        <div v-for="(row, idx) in item.rows" :key="idx" class="flex items-center justify-between px-4 py-1 text-[9px]" :class="idx % 2 === 1 ? 'bg-slate-50/30' : ''">
+                            <span class="text-slate-700 font-semibold truncate pr-2 uppercase flex-1">{{ row.desc }}</span>
+                            <span class="font-black text-brand-700 shrink-0">{{ row.cant_pedida }} pz</span>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- ── COL DER: Config (50%) ── -->
-        <div class="w-1/2 flex flex-col bg-white">
+        <!-- ── COL DER: Config (Fixed Width) ── -->
+        <div class="flex-1 min-w-0 flex flex-col bg-white">
             
             <!-- Filter Bar -->
-            <div class="p-6 border-b border-slate-100 space-y-4 shrink-0">
+            <div class="p-4 border-b border-slate-100 space-y-3 shrink-0">
                 <div class="flex items-center justify-between">
-                    <h3 class="text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                        <i class="fa-solid fa-sliders text-sky-500"></i> Configuración de Exportación
+                    <h3 class="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                        <i class="fa-solid fa-sliders text-brand-500"></i> Filtros
                     </h3>
                 </div>
 
-                <!-- Días Multi-Select -->
-                <div class="flex items-center gap-3">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider w-16">Días:</span>
-                    <div class="flex flex-wrap items-center gap-1.5 flex-1">
+                <div class="flex items-center gap-2">
+                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider w-10">Días:</span>
+                    <div class="flex flex-wrap items-center gap-1 flex-1">
                         <button
                             v-for="d in availableDays" :key="d.num"
                             @click="toggleDay(d.num)"
-                            class="px-3 h-8 rounded-xl font-black text-xs transition-all border shrink-0 flex items-center justify-center gap-2"
+                            class="px-2 h-6 rounded-lg font-black text-[10px] transition-all border shrink-0 flex items-center justify-center gap-1"
                             :class="selectedDays.has(d.num)
-                                ? 'bg-sky-600 text-white border-sky-600 shadow-md shadow-sky-600/20'
-                                : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-sky-300 hover:text-sky-600'"
+                                ? 'bg-brand-600 text-white border-brand-700 shadow-sm'
+                                : 'bg-white text-brand-600 border-brand-200 hover:bg-brand-50'"
                         >
-                            <i v-if="selectedDays.has(d.num)" class="fa-solid fa-check text-[10px]"></i>
-                            {{ d.name }}
+                            <i v-if="selectedDays.has(d.num)" class="fa-solid fa-check text-[7px]"></i>
+                            {{ d.label === 'M' && d.num === 3 ? 'X' : d.label }}
                         </button>
                     </div>
                 </div>
 
                 <!-- Search -->
-                <div class="flex items-center gap-3">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider w-16">Buscar:</span>
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider w-12">Buscar:</span>
                     <div class="relative flex-1">
-                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"></i>
                         <input
                             v-model="search"
                             type="text"
                             placeholder="Tienda, OC o ID..."
-                            class="w-full pl-9 pr-4 h-10 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-200 focus:bg-white transition-all transition-duration-200"
+                            class="w-full pl-8 pr-4 h-8 text-[11px] font-medium bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200 focus:bg-white transition-all"
                         />
                     </div>
                 </div>
@@ -306,43 +300,38 @@ async function updateStatusesSilently() {
             <!-- Listado de Tiendas/OCs para exclusión -->
             <div class="flex-1 overflow-y-auto px-6 py-4 scrollbar-thin">
                 <div class="space-y-6">
-                    <div v-for="[id_cliente, group] in storesMap" :key="id_cliente" class="space-y-2">
-                       <div class="flex items-center gap-3 group">
+                    <div v-for="[id_cliente, group] in storesMap" :key="id_cliente" class="space-y-1.5">
+                       <div class="flex items-center gap-2 group p-1.5 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer" @click="toggleStore(id_cliente)">
                             <button
-                                @click="toggleStore(id_cliente)"
-                                class="w-5 h-5 rounded-md border flex items-center justify-center transition-all"
+                                class="w-4 h-4 rounded border flex items-center justify-center transition-all"
                                 :class="!excludedStores.has(id_cliente)
-                                    ? 'bg-sky-600 border-sky-600 text-white shadow-sm'
+                                    ? 'bg-sky-700 border-sky-800 text-white shadow-sm'
                                     : 'bg-white border-slate-200 text-slate-300'"
                             >
-                                <i v-if="!excludedStores.has(id_cliente)" class="fa-solid fa-check text-[10px]"></i>
+                                <i v-if="!excludedStores.has(id_cliente)" class="fa-solid fa-check text-[9px]"></i>
                             </button>
-                            <div class="flex-1">
-                                <p class="text-[11px] font-black text-slate-700 truncate uppercase">{{ group.name }}</p>
-                                <p class="text-[9px] text-slate-400 font-medium">{{ id_cliente }}</p>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-[10px] font-black text-slate-700 truncate uppercase">{{ group.name }}</p>
+                                <p class="text-[8px] text-slate-400 font-medium">{{ id_cliente }}</p>
                             </div>
                        </div>
                        
                        <!-- OCs list inside store -->
-                       <div class="ml-8 space-y-1.5 border-l-2 border-slate-100 pl-4">
-                           <div v-for="oc in group.items" :key="itemKey(oc)" class="flex items-center gap-3 group/oc">
+                       <div class="ml-6 space-y-1 border-l border-slate-100 pl-3">
+                           <div v-for="oc in group.items" :key="itemKey(oc)" class="flex items-center gap-2 group/oc cursor-pointer" @click.stop="toggleOC(oc)">
                                 <button
-                                    @click="toggleOC(oc)"
-                                    class="w-4 h-4 rounded border flex items-center justify-center transition-all"
+                                    class="w-3.5 h-3.5 rounded border flex items-center justify-center transition-all"
                                     :class="!excludedOCs.has(itemKey(oc)) && !excludedStores.has(id_cliente)
                                         ? 'bg-sky-100 border-sky-300 text-sky-700'
                                         : 'bg-white border-slate-200 text-slate-300'"
                                 >
-                                    <i v-if="!excludedOCs.has(itemKey(oc)) && !excludedStores.has(id_cliente)" class="fa-solid fa-check text-[9px]"></i>
+                                    <i v-if="!excludedOCs.has(itemKey(oc)) && !excludedStores.has(id_cliente)" class="fa-solid fa-check text-[8px]"></i>
                                 </button>
-                                <div class="flex-1 flex items-center justify-between gap-4">
-                                    <span class="text-[10px] font-mono font-bold" :class="!excludedOCs.has(itemKey(oc)) ? 'text-slate-600' : 'text-slate-300'">
+                                <div class="flex-1 flex items-center justify-between gap-3 min-w-0">
+                                    <span class="text-[9px] font-mono font-bold truncate" :class="!excludedOCs.has(itemKey(oc)) ? 'text-slate-600' : 'text-slate-300'">
                                         OC: {{ oc.num_pedido }}
                                     </span>
-                                    <div class="flex items-center gap-3">
-                                        <span class="text-[9px] text-slate-400">{{ oc.rows.length }} skus</span>
-                                        <span class="text-[9px] font-black text-sky-600/70">{{ oc.rows.reduce((a,r) => a+r.cant_pedida, 0) }} pz</span>
-                                    </div>
+                                    <span class="text-[8px] font-black text-sky-600/70 shrink-0">{{ oc.rows.reduce((a,r) => a+r.cant_pedida, 0) }} pz</span>
                                 </div>
                            </div>
                        </div>
@@ -350,39 +339,43 @@ async function updateStatusesSilently() {
                 </div>
             </div>
 
-            <!-- Footer con Acciones -->
-            <footer class="p-8 border-t border-slate-100 bg-slate-50/50 flex flex-col gap-6 shrink-0">
-                <div class="flex items-center justify-between">
-                    <div class="space-y-1">
-                        <p class="text-[9px] text-slate-400 font-black uppercase tracking-widest">Resumen de Exportación</p>
-                        <div class="flex items-center gap-4 text-xs">
-                             <span class="font-black text-slate-700">{{ includedItems.length }} <small class="text-slate-400">PEDIDOS</small></span>
-                             <span class="font-black text-slate-700">{{ totalRows }} <small class="text-slate-400">SKUS</small></span>
-                             <span class="font-black text-sky-700">{{ totalCantidad.toLocaleString('es-MX') }} <small class="text-sky-500">PIEZAS</small></span>
-                        </div>
+            <!-- Footer con Acciones (Double buttons) -->
+            <footer class="p-5 border-t border-slate-100 bg-slate-50 flex flex-col gap-3 shrink-0">
+                <div class="space-y-1">
+                    <div class="flex items-center justify-between text-[11px]">
+                         <span class="font-black text-slate-700 uppercase tracking-tighter">{{ includedItems.length }} PEDIDOS</span>
+                         <span class="font-black text-brand-700">{{ totalCantidad.toLocaleString('es-MX') }} <small class="text-brand-500 font-bold">PZ</small></span>
                     </div>
-                    <div class="text-right">
-                         <p class="text-[9px] text-slate-400 font-black uppercase tracking-widest">Archivo</p>
-                         <p class="text-[10px] font-mono text-sky-600 font-bold">
-                            CPFR_Soriana_{{ selectedDays.size > 1 ? 'MIX' : DAY_CODES[Array.from(selectedDays)[0]] }}_{{ new Date().toISOString().slice(0,10).replace(/-/g,'') }}.xlsx
-                         </p>
-                    </div>
+                    <p class="text-[9px] font-mono text-brand-600 font-bold truncate p-1.5 bg-brand-50 rounded-lg border border-brand-100 text-center">
+                        {{ selectedDays.size > 1 ? 'MIX' : DAY_CODES[Array.from(selectedDays)[0]] }}_{{ new Date().toISOString().slice(0,10).replace(/-/g,'') }}.xlsx
+                    </p>
                 </div>
 
-                <div class="flex gap-4">
+                <div class="space-y-2">
+                    <!-- Botón 1: Solo descargar -->
+                    <button
+                        @click="() => {
+                            const filename = generateExcel(includedItems, Array.from(selectedDays))
+                            toast({ title: '✅ Documento generado', description: filename })
+                        }"
+                        :disabled="processing || includedItems.length === 0"
+                        class="w-full h-9 border-2 border-brand-600 text-brand-700 hover:bg-brand-50 disabled:bg-slate-50 disabled:text-slate-300 disabled:border-slate-200 rounded-xl font-black text-[11px] transition-all flex items-center justify-center gap-2 group"
+                    >
+                        <i class="fa-solid fa-file-excel transition-transform group-hover:scale-110"></i>
+                        DESCARGAR EXCEL
+                    </button>
+
+                    <!-- Botón 2: Descargar & Aprobar -->
                     <button
                         @click="handleAprobarExportar"
                         :disabled="processing || includedItems.length === 0"
-                        class="flex-1 h-14 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-300 text-white rounded-2xl shadow-xl shadow-sky-600/20 transition-all flex flex-col items-center justify-center group overflow-hidden"
+                        class="w-full h-11 bg-brand-600 hover:bg-brand-700 disabled:bg-slate-300 text-white rounded-xl shadow-lg shadow-brand-900/10 transition-all flex flex-col items-center justify-center group"
                     >
-                        <div class="flex items-center gap-3 font-black text-sm tracking-tight transition-transform group-hover:-translate-y-1 group-active:scale-95">
+                        <div class="flex items-center gap-2 font-black text-[11px] tracking-tight">
                             <i v-if="processing" class="fa-solid fa-circle-notch fa-spin"></i>
-                            <i v-else class="fa-solid fa-cloud-arrow-down"></i>
-                            GENERAR EXCEL & APROBAR PEDIDOS
+                            <i v-else class="fa-solid fa-check-double scale-110"></i>
+                            DESCARGAR & APROBAR OC
                         </div>
-                        <p class="text-[9px] font-bold text-sky-200 opacity-80 uppercase tracking-widest mt-1">
-                             Esta acción descargará el archivo y actualizará los estados
-                        </p>
                     </button>
                 </div>
             </footer>
