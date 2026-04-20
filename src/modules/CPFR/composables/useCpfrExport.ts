@@ -28,6 +28,8 @@ export interface ExportTiendaItem {
     num_pedido: string
     estado_oc: string | null
     dayNum: number
+    semana_ic: string | null
+    anio: number | null
     rows: ExportRow[]
 }
 
@@ -77,6 +79,8 @@ export function buildExportItems(dias: any[]): ExportTiendaItem[] {
                     nombre_tienda: tienda.nombre_tienda,
                     num_pedido,
                     estado_oc: skus[0]?.estado_oc || null,
+                    semana_ic: skus[0]?.semana_ic || null,
+                    anio: skus[0]?.fec_pedido_cadena ? parseInt(skus[0].fec_pedido_cadena.slice(0, 4)) : null,
                     dayNum: dia.dia_num,
                     rows
                 })

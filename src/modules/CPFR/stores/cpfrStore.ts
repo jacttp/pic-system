@@ -57,11 +57,16 @@ export const useCpfrStore = defineStore('cpfr', () => {
     const expandedStores = reactive<Record<string, boolean>>({})
 
     // UI — vista actual (tabla o tarjetas) persistida
-    const viewMode = ref<'table' | 'cards'>((localStorage.getItem('cpfr_view_mode') as any) || 'table')
+    const viewMode  = ref<'table' | 'cards'>((localStorage.getItem('cpfr_view_mode') as any) || 'table')
+    const activeTab = ref('centralizados')
 
     function setViewMode(mode: 'table' | 'cards') {
         viewMode.value = mode
         localStorage.setItem('cpfr_view_mode', mode)
+    }
+
+    function setActiveTab(tab: string) {
+        activeTab.value = tab
     }
 
     // ── Helpers internos ──────────────────────────────────────────────────────
@@ -435,13 +440,13 @@ export const useCpfrStore = defineStore('cpfr', () => {
         // State
         currentWeek, context, dias, loading, preview, error,
         criterio_global, nom_cadena, filters, overrides, expandedStores,
-        statusFilters, viewMode,
+        statusFilters, viewMode, activeTab,
         // Actions
         init, fetchCurrentWeek, loadDashboard, recalculate,
         adjustSku, updateStatus,
         toggleStore, expandAll, collapseAll, expandAllOCs, collapseAllOCs,
         setFilter, clearFilters,
-        toggleStatusFilter, clearStatusFilters, setViewMode,
+        toggleStatusFilter, clearStatusFilters, setViewMode, setActiveTab,
         // Computed
         diaOptions, jefaturaOptions, tiendaOptions,
         // Config de tienda (para CpfrStoreConfigModal)

@@ -12,7 +12,10 @@ const emit = defineEmits<{
 }>()
 
 // ── Tabs State ────────────────────────────────────────────────────────────────
-const currentTab = ref('centralizados')
+const currentTab = computed({
+  get: () => store.activeTab,
+  set: (val) => store.setActiveTab(val)
+})
 const tabs = [
     { id: 'centralizados', label: 'Centralizados' },
     { id: 'revision',       label: 'Revisión' },
@@ -556,23 +559,21 @@ const totalUniqueOCs = computed(() => {
       <div class="flex-1 min-h-0 overflow-auto scrollbar-thin">
         
         <!-- ── Vista de Tabla ── -->
-        <table v-if="store.viewMode === 'table'" class="w-full text-left border-collapse table-fixed">
+        <table v-if="store.viewMode === 'table'" class="w-full min-w-[1200px] text-left border-collapse">
 
           <!-- Cabecera fija: NIVEL 1 -->
           <thead class="sticky top-0 z-20 shadow-sm ring-1 ring-slate-200">
             <tr class="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-100/80 backdrop-blur-sm border-b border-slate-200">
-              <th class="px-4 py-3 font-bold w-64">Tienda / SKU</th>
-              <th class="px-3 py-3 font-bold w-28">UPC</th>
-              <th class="px-3 py-3 font-bold w-24">Jefatura</th>
-              <th class="px-3 py-3 font-bold text-right w-24">Inv.<br>Act. (pz)</th>
-              <th class="px-3 py-3 font-bold text-right w-28">Sellout Prom.<br>(pz)</th>
-              <th class="px-3 py-3 font-bold text-right w-20">Crit.<br>(S.)</th>
-              <th class="px-3 py-3 font-bold text-right w-20">Cob.<br>(S.)</th>
-              <th class="px-3 py-3 font-bold text-right text-amber-700 bg-amber-50 border-x border-amber-100 w-28">Pedido<br>Sugerido</th>
-              <th class="px-3 py-3 font-bold text-right w-28">Centralizado</th>
-              <th class="px-3 py-3 font-bold text-center w-32">Detalle OC</th>
-              <th class="px-3 py-3 font-bold text-right w-24">Fill Rate</th>
-              <th class="px-3 py-3 font-bold text-center w-24">INSTOCK</th>
+              <th class="px-4 py-3 font-bold w-full min-w-[350px]">Tienda / SKU</th>
+              <th class="px-3 py-3 font-bold w-28 whitespace-nowrap">UPC</th>
+              <th class="px-3 py-3 font-bold text-right w-24 whitespace-nowrap">Inv.<br>Act. (pz)</th>
+              <th class="px-3 py-3 font-bold text-right w-28 whitespace-nowrap">Sellout Prom.<br>(pz)</th>
+              <th class="px-3 py-3 font-bold text-right w-20 whitespace-nowrap">Crit.<br>(S.)</th>
+              <th class="px-3 py-3 font-bold text-right w-20 whitespace-nowrap">Cob.<br>(S.)</th>
+              <th class="px-3 py-3 font-bold text-right text-amber-700 bg-amber-50 border-x border-amber-100 w-28 whitespace-nowrap">Pedido<br>Sugerido</th>
+              <th class="px-3 py-3 font-bold text-right w-28 whitespace-nowrap">Centralizado</th>
+              <th class="px-3 py-3 font-bold text-right w-24 whitespace-nowrap">Fill Rate</th>
+              <th class="px-3 py-3 font-bold text-center w-24 whitespace-nowrap">INSTOCK</th>
               <th class="px-2 py-3 font-bold text-center w-10"></th>
             </tr>
           </thead>
@@ -622,17 +623,13 @@ const totalUniqueOCs = computed(() => {
                         ></i>
                         <div class="min-w-0">
                           <p class="font-bold text-slate-800 truncate leading-tight">{{ tienda.nombre_tienda }}</p>
-                          <p class="text-[10px] text-slate-500 mt-0.5 font-medium">
-                            {{ tienda.total_skus }} SKUs
+                          <p class="text-[10px] text-brand-600 mt-0.5 font-bold uppercase tracking-wider">
+                            {{ tienda.jefatura }}
                           </p>
                         </div>
                       </div>
                     </td>
 
-                    <!-- Jefatura -->
-                    <td class="px-3 py-3 text-slate-600 max-w-[160px] truncate" :title="tienda.jefatura">
-                      {{ tienda.jefatura }}
-                    </td>
 
                     <!-- Inv. Actual (pz) -->
                     <td class="px-3 py-3 text-right text-slate-700 text-[11px] cursor-help"
@@ -670,8 +667,6 @@ const totalUniqueOCs = computed(() => {
                       {{ tienda.resumen.cant_pedida_total.toLocaleString('es-MX') }}
                     </td>
 
-                    <!-- Detalle OC (Vacío en macro) -->
-                    <td></td>
 
                     <!-- Fill Rate -->
                     <td class="px-3 py-2.5 text-right font-semibold" :class="fillClass(tienda.resumen.fill_rate)">
@@ -724,8 +719,8 @@ const totalUniqueOCs = computed(() => {
                         @click="toggleOCGroup(tienda.id_cliente, ocGroup.group_id)"
                       >
                         <!-- Etiqueta OC -->
-                        <td colspan="7" class="pl-8 pr-3 py-2 text-slate-700 font-semibold border-l-[3px] border-l-slate-200">
-                          <div class="flex items-center gap-2 min-w-0">
+                        <td colspan="6" class="pl-8 pr-3 py-2 text-slate-700 font-semibold border-l-[3px] border-l-slate-200">
+                          <div class="flex items-center flex-wrap gap-2 min-w-0 max-w-4xl">
                             <i
                               class="fa-solid fa-chevron-right text-slate-300 text-[10px] transition-transform duration-200 shrink-0"
                               :class="expandedOCGroups[`${tienda.id_cliente}_${ocGroup.group_id}`] !== false ? 'rotate-90 text-slate-500' : 'group-hover/row:text-slate-400'"
@@ -830,7 +825,7 @@ const totalUniqueOCs = computed(() => {
                           {{ n(ocGroup.cant_pedida_total, 0) }}
                         </td>
 
-                        <td class="px-3 py-2 text-center text-slate-400" colspan="4">
+                        <td class="px-3 py-2 text-center text-slate-400" colspan="3">
                           <span class="text-[10px] italic">Detalle en fila inferior</span>
                         </td>
                       </tr>
@@ -855,15 +850,12 @@ const totalUniqueOCs = computed(() => {
                                 :class="escenarioCls(sku.escenario)"
                                 :title="sku.escenario === 'B' ? 'Pedido recalculado' : ''"
                               >{{ sku.escenario ?? '—' }}</span>
-                              <span class="truncate max-w-[170px]">{{ sku.sku_nombre }}</span>
+                              <span class="truncate">{{ sku.sku_nombre }}</span>
                             </div>
                           </td>
 
                           <!-- UPC -->
                           <td class="px-3 py-2 text-slate-500 text-[10px] font-mono">{{ sku.upc_cadena ?? '—' }}</td>
-
-                          <!-- SKU ID -->
-                          <td class="px-3 py-2 text-slate-400 text-[10px] italic">{{ sku.sku_muliix ?? '—' }}</td>
 
                           <!-- Inv. Actual (pz) -->
                           <td class="px-3 py-2 text-right text-slate-700 cursor-help"
@@ -974,10 +966,6 @@ const totalUniqueOCs = computed(() => {
                             {{ n(sku.cant_pedida, 0) }}
                           </td>
 
-                          <!-- Detalle OC (Ya definido en padre) -->
-                          <td class="px-3 py-2 text-center text-slate-400 text-[10px] italic">
-                            —
-                          </td>
 
                           <!-- Fill Rate -->
                           <td

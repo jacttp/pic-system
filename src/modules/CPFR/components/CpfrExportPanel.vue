@@ -41,11 +41,69 @@ const search = ref('')
 // All flat items
 const allItems = computed<ExportTiendaItem[]>(() => buildExportItems(store.dias))
 
-// Items filtered by DAY and SEARCH (candidate list)
+// Items filtered by TAB, WEEK, DAY and SEARCH (candidate list)
+const selectedWeeks = ref<Set<string>>(new Set())
+
+const availableWeeks = computed(() => {
+    const set = new Set<string>()
+    allItems.value.forEach(i => {
+        if (i.anio && i.semana_ic) set.add(`${i.anio}-${i.semana_ic}`)
+    })
+    // Sort reverse to show newest weeks on top
+    return Array.from(set).sort((a, b) => b.localeCompare(a))
+})
+
+function toggleWeek(weekKey: string) {
+    if (selectedWeeks.value.has(weekKey)) {
+        selectedWeeks.value.delete(weekKey)
+    } else {
+        selectedWeeks.value.add(weekKey)
+    }
+    selectedWeeks.value = new Set(selectedWeeks.value)
+}
+
 const filteredItems = computed<ExportTiendaItem[]>(() => {
     const term = search.value.trim().toLowerCase()
+    const todayStr = new Date().toISOString().split('T')[0]
+    const curYear = store.currentWeek?.anio || 0
+    const curWeekIc = store.currentWeek?.semana_ic ? parseInt(store.currentWeek.semana_ic) : 0
+
+    const isCurrentWeek = (i: ExportTiendaItem) => {
+        return i.anio === curYear && (i.semana_ic ? parseInt(i.semana_ic) === curWeekIc : false)
+    }
+    const isPreviousWeek = (i: ExportTiendaItem) => {
+        const iWeek = i.semana_ic ? parseInt(i.semana_ic) : 0
+        return (i.anio! < curYear) || (i.anio === curYear && iWeek < curWeekIc)
+    }
+
     return allItems.value.filter(i => {
+        // 1. Tab Context (Replicates CpfrOrderTable logic)
+        const state = i.estado_oc
+        if (store.activeTab === 'centralizados') {
+            if (!isCurrentWeek(i) || state === 'revision' || state === 'aprobado') return false
+        } else if (store.activeTab === 'revision') {
+            if (!isCurrentWeek(i) || state !== 'revision') return false
+        } else if (store.activeTab === 'aprobada') {
+            if (!isCurrentWeek(i) || state !== 'aprobado') return false
+        } else if (store.activeTab === 'sin_embarcar') {
+            // Check fec_fin_embarque (item.rows[0].fec_fin_embarque is AAAAMMDD)
+            const f = i.rows[0]?.fec_fin_embarque || ''
+            if (!f) return false
+            const dateStr = `${f.slice(0,4)}-${f.slice(4,6)}-${f.slice(6,8)}`
+            if (dateStr >= todayStr || state === 'aprobado') return false
+        } else if (store.activeTab === 'historial') {
+            if (!isPreviousWeek(i)) return false
+        }
+
+        // 2. Week Filter
+        if (selectedWeeks.value.size > 0 && i.anio && i.semana_ic) {
+            if (!selectedWeeks.value.has(`${i.anio}-${i.semana_ic}`)) return false
+        }
+
+        // 3. Day Filter
         if (!selectedDays.value.has(i.dayNum)) return false
+
+        // 4. Search Filter
         if (term) {
             return (
                 i.nombre_tienda.toLowerCase().includes(term) ||
@@ -61,9 +119,16 @@ const filteredItems = computed<ExportTiendaItem[]>(() => {
 // We use exclusions because "Everything is included by default" is the requested UX
 const excludedStores = ref<Set<string>>(new Set())
 const excludedOCs     = ref<Set<string>>(new Set())
+const excludedSKUs    = ref<Set<string>>(new Set())
+const expandedOCs     = ref<Set<string>>(new Set())
+const expandedStores  = ref<Set<string>>(new Set())
 
 function itemKey(i: ExportTiendaItem) {
     return `${i.id_cliente}|${i.num_pedido}`
+}
+
+function skuKey(i: ExportTiendaItem, row: { upc: string }) {
+    return `${itemKey(i)}|${row.upc}`
 }
 
 function toggleStore(id_cliente: string) {
@@ -85,26 +150,65 @@ function toggleOC(i: ExportTiendaItem) {
         excludedOCs.value.delete(k)
         // If the store was excluded, the individual toggle restores the store too
         excludedStores.value.delete(i.id_cliente)
+        
+        // Restore all SKUs of this OC if re-included
+        const prefix = k + '|'
+        const toDelete = [...excludedSKUs.value].filter(sk => sk.startsWith(prefix))
+        toDelete.forEach(sk => excludedSKUs.value.delete(sk))
     } else {
         excludedOCs.value.add(k)
     }
     excludedOCs.value     = new Set(excludedOCs.value)
-    excludedStores.value = new Set(excludedStores.value)
+    excludedStores.value  = new Set(excludedStores.value)
+    excludedSKUs.value    = new Set(excludedSKUs.value)
+}
+
+function toggleSku(i: ExportTiendaItem, row: { upc: string }) {
+    const k = skuKey(i, row)
+    if (excludedSKUs.value.has(k)) {
+        excludedSKUs.value.delete(k)
+    } else {
+        excludedSKUs.value.add(k)
+    }
+    excludedSKUs.value = new Set(excludedSKUs.value)
+}
+
+function toggleExpandOC(i: ExportTiendaItem) {
+    const k = itemKey(i)
+    if (expandedOCs.value.has(k)) expandedOCs.value.delete(k)
+    else expandedOCs.value.add(k)
+    expandedOCs.value = new Set(expandedOCs.value)
+}
+
+function toggleExpandStore(id_cliente: string) {
+    if (expandedStores.value.has(id_cliente)) expandedStores.value.delete(id_cliente)
+    else expandedStores.value.add(id_cliente)
+    expandedStores.value = new Set(expandedStores.value)
 }
 
 // Reset exclusions when multi-filters change
-watch([selectedDays, search], () => {
+watch([selectedDays, search, selectedWeeks, () => store.activeTab], () => {
     excludedStores.value = new Set()
     excludedOCs.value     = new Set()
+    excludedSKUs.value    = new Set()
 })
 
 // The actual final list for Preview & Export
 const includedItems = computed(() => {
-    return filteredItems.value.filter(i => {
-        if (excludedStores.value.has(i.id_cliente)) return false
-        if (excludedOCs.value.has(itemKey(i))) return false
-        return true
-    })
+    return filteredItems.value.map(i => {
+        // If store or OC is excluded, skip entire item
+        if (excludedStores.value.has(i.id_cliente)) return null
+        if (excludedOCs.value.has(itemKey(i))) return null
+
+        // Filter SKU rows
+        const filteredRows = i.rows.filter(r => !excludedSKUs.value.has(skuKey(i, r)))
+        if (filteredRows.length === 0) return null
+
+        return {
+            ...i,
+            rows: filteredRows
+        }
+    }).filter(i => i !== null) as ExportTiendaItem[]
 })
 
 const totalRows     = computed(() => includedItems.value.reduce((a, i) => a + i.rows.length, 0))
@@ -203,7 +307,7 @@ async function updateStatusesSilently() {
         <div class="w-[320px] flex flex-col border-r border-slate-200 bg-slate-100/40 shrink-0">
             <div class="px-4 py-3 border-b border-slate-200 bg-white/80 backdrop-blur flex items-center justify-between shrink-0">
                 <h3 class="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                    <i class="fa-solid fa-receipt text-brand-500"></i> Vista Previa
+                    <i class="fa-solid fa-receipt text-brand-500"></i> Vista Previa | Template OV
                 </h3>
                 <div class="text-[9px] font-bold text-slate-400">
                     <span class="text-brand-700">{{ includedItems.length }}</span> OCs
@@ -238,9 +342,14 @@ async function updateStatusesSilently() {
                     <div class="flex items-center gap-3 px-4 py-1.5 bg-brand-50/50 border-b border-dashed border-brand-100 text-[9px] font-mono text-slate-500">
                         <span><b class="font-sans font-black text-slate-600">S</b> {{ item.rows[0]?.sucursal || '—' }}</span>
                         <span class="truncate pr-2"><b class="font-sans font-black text-slate-600">C</b> {{ item.id_cliente }} — {{ item.nombre_tienda }}</span>
-                        <span class="ml-auto px-1.5 py-0.5 rounded-md border font-bold font-sans text-[7px] uppercase bg-brand-100 text-brand-700 border-brand-200">
-                            {{ DAY_CODES[item.dayNum] }}
-                        </span>
+                        <div class="ml-auto flex items-center gap-1">
+                            <span v-if="item.semana_ic" class="px-1.5 py-0.5 rounded-md border font-bold font-sans text-[7px] uppercase bg-indigo-50 text-indigo-700 border-indigo-200">
+                                SEM {{ item.semana_ic }}
+                            </span>
+                            <span class="px-1.5 py-0.5 rounded-md border font-bold font-sans text-[7px] uppercase bg-brand-100 text-brand-700 border-brand-200">
+                                {{ DAY_CODES[item.dayNum] }}
+                            </span>
+                        </div>
                     </div>
 
                     <!-- Filas SKU (Súper condensadas) -->
@@ -282,6 +391,24 @@ async function updateStatusesSilently() {
                     </div>
                 </div>
 
+                <!-- Weeks filter (Contextual) -->
+                <div v-if="availableWeeks.length > 1" class="flex items-center gap-2">
+                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider w-10">Sem:</span>
+                    <div class="flex flex-wrap items-center gap-1 flex-1">
+                        <button
+                            v-for="w in availableWeeks" :key="w"
+                            @click="toggleWeek(w)"
+                            class="px-2 h-6 rounded-lg font-black text-[10px] transition-all border shrink-0 flex items-center justify-center gap-1"
+                            :class="selectedWeeks.has(w)
+                                ? 'bg-brand-600 text-white border-brand-700 shadow-sm'
+                                : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'"
+                        >
+                            <i v-if="selectedWeeks.has(w)" class="fa-solid fa-check text-[7px]"></i>
+                            S{{ w.split('-')[1] }}
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Search -->
                 <div class="flex items-center gap-2">
                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider w-12">Buscar:</span>
@@ -301,8 +428,9 @@ async function updateStatusesSilently() {
             <div class="flex-1 overflow-y-auto px-6 py-4 scrollbar-thin">
                 <div class="space-y-6">
                     <div v-for="[id_cliente, group] in storesMap" :key="id_cliente" class="space-y-1.5">
-                       <div class="flex items-center gap-2 group p-1.5 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer" @click="toggleStore(id_cliente)">
+                       <div class="flex items-center gap-2 group p-1.5 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer" @click="toggleExpandStore(id_cliente)">
                             <button
+                                @click.stop="toggleStore(id_cliente)"
                                 class="w-4 h-4 rounded border flex items-center justify-center transition-all"
                                 :class="!excludedStores.has(id_cliente)
                                     ? 'bg-sky-700 border-sky-800 text-white shadow-sm'
@@ -314,24 +442,61 @@ async function updateStatusesSilently() {
                                 <p class="text-[10px] font-black text-slate-700 truncate uppercase">{{ group.name }}</p>
                                 <p class="text-[8px] text-slate-400 font-medium">{{ id_cliente }}</p>
                             </div>
+                            <div class="shrink-0 flex items-center gap-2">
+                                <span class="text-[8px] font-bold text-slate-400">{{ group.items.length }} OC</span>
+                                <button class="w-5 h-5 rounded-md flex items-center justify-center bg-slate-100/50 text-slate-400 transition-colors">
+                                    <i class="fa-solid text-[9px]" :class="expandedStores.has(id_cliente) ? 'fa-angle-up' : 'fa-angle-down'"></i>
+                                </button>
+                            </div>
                        </div>
                        
                        <!-- OCs list inside store -->
-                       <div class="ml-6 space-y-1 border-l border-slate-100 pl-3">
-                           <div v-for="oc in group.items" :key="itemKey(oc)" class="flex items-center gap-2 group/oc cursor-pointer" @click.stop="toggleOC(oc)">
-                                <button
-                                    class="w-3.5 h-3.5 rounded border flex items-center justify-center transition-all"
-                                    :class="!excludedOCs.has(itemKey(oc)) && !excludedStores.has(id_cliente)
-                                        ? 'bg-sky-100 border-sky-300 text-sky-700'
-                                        : 'bg-white border-slate-200 text-slate-300'"
-                                >
-                                    <i v-if="!excludedOCs.has(itemKey(oc)) && !excludedStores.has(id_cliente)" class="fa-solid fa-check text-[8px]"></i>
-                                </button>
-                                <div class="flex-1 flex items-center justify-between gap-3 min-w-0">
-                                    <span class="text-[9px] font-mono font-bold truncate" :class="!excludedOCs.has(itemKey(oc)) ? 'text-slate-600' : 'text-slate-300'">
-                                        OC: {{ oc.num_pedido }}
-                                    </span>
-                                    <span class="text-[8px] font-black text-sky-600/70 shrink-0">{{ oc.rows.reduce((a,r) => a+r.cant_pedida, 0) }} pz</span>
+                       <div v-if="expandedStores.has(id_cliente)" class="ml-6 space-y-2 border-l border-slate-100 pl-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                           <div v-for="oc in group.items" :key="itemKey(oc)" class="space-y-1.5">
+                                <div class="flex items-center gap-2 group/oc cursor-pointer" @click.stop="toggleOC(oc)">
+                                    <button
+                                        class="w-3.5 h-3.5 rounded border flex items-center justify-center transition-all"
+                                        :class="!excludedOCs.has(itemKey(oc)) && !excludedStores.has(id_cliente)
+                                            ? 'bg-sky-100 border-sky-300 text-sky-700'
+                                            : 'bg-white border-slate-200 text-slate-300'"
+                                    >
+                                        <i v-if="!excludedOCs.has(itemKey(oc)) && !excludedStores.has(id_cliente)" class="fa-solid fa-check text-[8px]"></i>
+                                    </button>
+                                    <div class="flex-1 flex items-center justify-between gap-3 min-w-0">
+                                        <span class="text-[9px] font-mono font-bold truncate" :class="!excludedOCs.has(itemKey(oc)) ? 'text-slate-600' : 'text-slate-300'">
+                                            OC: {{ oc.num_pedido }}
+                                        </span>
+                                        <div class="flex items-center gap-1.5 shrink-0">
+                                            <span class="text-[8px] font-black text-sky-600/70">{{ oc.rows.reduce((a,r) => a+r.cant_pedida, 0) }} pz</span>
+                                            <button 
+                                                @click.stop="toggleExpandOC(oc)"
+                                                class="w-4 h-4 rounded-md flex items-center justify-center bg-slate-50 hover:bg-slate-200 text-slate-400 border border-slate-100 transition-colors shadow-sm"
+                                            >
+                                                <i class="fa-solid text-[7px]" :class="expandedOCs.has(itemKey(oc)) ? 'fa-minus' : 'fa-plus'"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- SKUs List (Nested) -->
+                                <div v-if="expandedOCs.has(itemKey(oc))" class="ml-5 space-y-1 border-l border-slate-100 pl-3 py-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                                    <div v-for="sku in oc.rows" :key="skuKey(oc, sku)" 
+                                        class="flex items-center gap-2 group/sku cursor-pointer hover:bg-slate-50 rounded p-0.5 pr-2 transition-colors"
+                                        @click.stop="toggleSku(oc, sku)"
+                                    >
+                                        <button
+                                            class="w-3 h-3 rounded border flex items-center justify-center transition-all"
+                                            :class="!excludedSKUs.has(skuKey(oc, sku)) && !excludedOCs.has(itemKey(oc)) && !excludedStores.has(id_cliente)
+                                                ? 'bg-emerald-500 border-emerald-600 text-white'
+                                                : 'bg-white border-slate-200 text-slate-300'"
+                                        >
+                                            <i v-if="!excludedSKUs.has(skuKey(oc, sku)) && !excludedOCs.has(itemKey(oc)) && !excludedStores.has(id_cliente)" class="fa-solid fa-check text-[6px]"></i>
+                                        </button>
+                                        <span class="text-[8px] font-medium truncate" :class="!excludedSKUs.has(skuKey(oc, sku)) ? 'text-slate-500' : 'text-slate-300'">
+                                            {{ sku.desc }}
+                                        </span>
+                                        <span class="ml-auto text-[7px] font-bold text-brand-600/60">{{ sku.cant_pedida }} pz</span>
+                                    </div>
                                 </div>
                            </div>
                        </div>
@@ -365,8 +530,9 @@ async function updateStatusesSilently() {
                         DESCARGAR EXCEL
                     </button>
 
-                    <!-- Botón 2: Descargar & Aprobar -->
+                    <!-- Botón 2: Descargar & Aprobar (Solo en tabs de gestión actual) -->
                     <button
+                        v-if="store.activeTab !== 'sin_embarcar' && store.activeTab !== 'historial'"
                         @click="handleAprobarExportar"
                         :disabled="processing || includedItems.length === 0"
                         class="w-full h-11 bg-brand-600 hover:bg-brand-700 disabled:bg-slate-300 text-white rounded-xl shadow-lg shadow-brand-900/10 transition-all flex flex-col items-center justify-center group"
