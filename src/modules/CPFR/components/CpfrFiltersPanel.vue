@@ -12,41 +12,13 @@ const emit = defineEmits<{
     (e: 'open-chain-config'): void
 }>()
 
-// ── Search Store ─────────────────────────────────────────────────────────────
-const searchText = ref(store.filters.nombre_tienda || store.filters.id_cliente || '')
-const searchType = ref<'nombre'|'id'>(store.filters.id_cliente ? 'id' : 'nombre')
-
-function handleSearch() {
-    const val = searchText.value.trim()
-    if (!val) {
-        store.setFilter('nombre_tienda', undefined)
-        store.setFilter('id_cliente', undefined)
-    } else if (searchType.value === 'id') {
-        store.setFilter('id_cliente', val)
-        store.setFilter('nombre_tienda', undefined)
-    } else {
-        store.setFilter('nombre_tienda', val)
-        store.setFilter('id_cliente', undefined)
-    }
-    store.loadDashboard()
-}
-
-watch(searchType, () => {
-    if (searchText.value.trim() !== '') handleSearch()
-})
-
 // Sincronizar búsqueda si se limpia local o globalmente
 watch(() => [store.filters.nombre_tienda, store.filters.id_cliente], ([nt, id]) => {
-    if (!nt && !id) searchText.value = ''
+    if (!nt && !id) {
+       // Si se limpia desde el store, avisar de alguna forma? 
+       // No es necesario ya que se manejará en el padre.
+    }
 })
-
-let searchTimeout: ReturnType<typeof setTimeout> | null = null
-function onInputSearch() {
-    if (searchTimeout) clearTimeout(searchTimeout)
-    searchTimeout = setTimeout(() => {
-        handleSearch()
-    }, 400)
-}
 
 // ── Day Tags ─────────────────────────────────────────────────────────────────
 const dTags = [
@@ -68,12 +40,6 @@ function toggleDay(num: number) {
     store.loadDashboard()
 }
 
-// ── Jefatura ─────────────────────────────────────────────────────────────────
-function onChangeJefatura(e: Event) {
-    const val = (e.target as HTMLSelectElement).value
-    store.setFilter('jefatura', val || undefined)
-    store.loadDashboard()
-}
 
 // ── Criteria Popover ─────────────────────────────────────────────────────────
 const showCriteria = ref(false)
@@ -96,7 +62,6 @@ function toggleCriteria() {
 // ── Global Actions ───────────────────────────────────────────────────────────
 function clearAll() {
     store.clearFilters()
-    searchText.value = ''
     store.loadDashboard()
 }
 </script>
@@ -120,40 +85,88 @@ function clearAll() {
           </div>
       </div>
 
-      <!-- Buscador (Input) -->
-      <div class="flex flex-col gap-1.5 flex-1 min-w-[200px] max-w-[280px]">
-          <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-1 flex items-center justify-between">
-              <span><i class="fa-solid fa-store mr-0.5"></i> Tienda</span>
-              <!-- Toggle badge hidden label -->
-              <span class="text-[8px] font-medium text-slate-300 mr-1 opacity-0 group-hover:opacity-100 transition-opacity">Clic para alternar</span>
+      <!-- Quick Status Filters -->
+      <div class="flex flex-col gap-1.5 shrink-0">
+          <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-1">
+              <i class="fa-solid fa-list-check mr-0.5"></i> Estados
           </span>
-          <div class="relative group/search">
-             <input type="text" :placeholder="searchType === 'nombre' ? 'Ej. Cumbres...' : 'Ej. 742...'" 
-               class="w-full text-xs font-semibold border border-slate-200 rounded-lg pl-8 pr-12 h-[34px] bg-slate-50 focus:bg-white focus:border-brand-500 focus:ring-1 focus:ring-brand-100 outline-none transition-all placeholder:text-slate-400 placeholder:font-medium" 
-               v-model="searchText" @input="onInputSearch" />
-             <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"></i>
-             
-             <!-- Modo Toggle Embedded -->
-             <button @click="searchType = searchType === 'nombre' ? 'id' : 'nombre'" 
-               class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[8px] font-black uppercase tracking-wider px-1.5 py-1 rounded bg-white border border-slate-200 text-slate-400 hover:text-brand-600 hover:border-brand-200 hover:bg-brand-50 transition-colors shadow-sm select-none"
-               title="Alternar entre buscar por Nombre o por ID de Cliente">
-                 {{ searchType === 'nombre' ? 'NOM' : 'ID' }}
-             </button>
+          <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 p-1 rounded-lg shadow-inner h-[34px]">
+            
+            <div class="flex items-center gap-1 px-1 border-r border-slate-200">
+              <button 
+                @click="store.toggleStatusFilter('escenarioA')"
+                class="w-[28px] h-[24px] flex items-center justify-center rounded transition-all text-[11px]"
+                :class="store.statusFilters.escenarioA ? 'bg-sky-500 text-white shadow-sm ring-2 ring-sky-200' : 'text-sky-600 hover:bg-white border border-transparent hover:border-sky-100'"
+                title="Escenario A"
+              ><i class="fa-solid fa-font"></i></button>
+              
+              <button 
+                @click="store.toggleStatusFilter('escenarioB')"
+                class="w-[28px] h-[24px] flex items-center justify-center rounded transition-all text-[11px]"
+                :class="store.statusFilters.escenarioB ? 'bg-amber-500 text-white shadow-sm ring-2 ring-amber-200' : 'text-amber-600 hover:bg-white border border-transparent hover:border-amber-100'"
+                title="Escenario B"
+              ><i class="fa-solid fa-bold"></i></button>
+            </div>
+
+            <div class="flex items-center gap-1">
+              <button 
+                @click="store.toggleStatusFilter('sinSellout')"
+                class="w-[28px] h-[24px] flex items-center justify-center rounded transition-all"
+                :class="store.statusFilters.sinSellout ? 'bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-200' : 'text-emerald-500 hover:bg-emerald-50 border border-transparent hover:border-emerald-100'"
+                title="Sin Sellout"
+              ><i class="fa-solid fa-seedling text-[11px]"></i></button>
+
+              <button 
+                @click="store.toggleStatusFilter('desabasto')"
+                class="w-[28px] h-[24px] flex items-center justify-center rounded transition-all"
+                :class="store.statusFilters.desabasto ? 'bg-rose-500 text-white shadow-sm ring-2 ring-rose-200' : 'text-rose-500 hover:bg-rose-50 border border-transparent hover:border-rose-100'"
+                title="Desabasto (Inv <= 0)"
+              ><i class="fa-solid fa-ban text-[11px]"></i></button>
+
+              <button 
+                @click="store.toggleStatusFilter('bajoStock')"
+                class="w-[28px] h-[24px] flex items-center justify-center rounded transition-all"
+                :class="store.statusFilters.bajoStock ? 'bg-rose-500 text-white shadow-sm ring-2 ring-rose-200' : 'text-rose-500 hover:bg-rose-50 border border-transparent hover:border-rose-100'"
+                title="Bajo Stock"
+              ><i class="fa-solid fa-triangle-exclamation text-[11px]"></i></button>
+
+              <button 
+                @click="store.toggleStatusFilter('sobrestock')"
+                class="w-[28px] h-[24px] flex items-center justify-center rounded transition-all"
+                :class="store.statusFilters.sobrestock ? 'bg-orange-500 text-white shadow-sm ring-2 ring-orange-200' : 'text-orange-500 hover:bg-orange-50 border border-transparent hover:border-orange-100'"
+                title="Sobrestock"
+              ><i class="fa-solid fa-arrow-trend-up text-[11px]"></i></button>
+
+              <button 
+                @click="store.toggleStatusFilter('fillrateBajo')"
+                class="w-[28px] h-[24px] flex items-center justify-center rounded transition-all"
+                :class="store.statusFilters.fillrateBajo ? 'bg-amber-500 text-white shadow-sm ring-2 ring-amber-200' : 'text-amber-600 hover:bg-amber-50 border border-transparent hover:border-amber-100'"
+                title="Fill Rate Bajo"
+              ><i class="fa-solid fa-arrow-down text-[11px]"></i></button>
+
+              <button 
+                @click="store.toggleStatusFilter('fillrate100')"
+                class="w-[28px] h-[24px] flex items-center justify-center rounded transition-all"
+                :class="store.statusFilters.fillrate100 ? 'bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-200' : 'text-emerald-600 hover:bg-emerald-50 border border-transparent hover:border-emerald-100'"
+                title="Fill Rate 100%"
+              ><i class="fa-solid fa-check text-[11px]"></i></button>
+
+              <button 
+                @click="store.toggleStatusFilter('sobrepedido')"
+                class="w-[28px] h-[24px] flex items-center justify-center rounded transition-all"
+                :class="store.statusFilters.sobrepedido ? 'bg-sky-500 text-white shadow-sm ring-2 ring-sky-200' : 'text-sky-600 hover:bg-sky-50 border border-transparent hover:border-sky-100'"
+                title="Sobrepedido"
+              ><i class="fa-solid fa-arrow-up text-[11px]"></i></button>
+            </div>
+
+            <button 
+              v-if="Object.values(store.statusFilters).some(v => v)"
+              @click="store.clearStatusFilters()"
+              class="ml-1 px-2 py-1 text-[9px] font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase border-l border-slate-200 h-full flex items-center"
+            >Limpiar</button>
           </div>
       </div>
 
-      <!-- Select Jefatura -->
-      <div class="flex flex-col gap-1.5 shrink-0 w-[140px]">
-          <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-1"><i class="fa-solid fa-user-tie mr-0.5"></i> Jefatura</span>
-          <div class="relative">
-              <select class="w-full text-xs font-semibold border border-slate-200 rounded-lg pl-3 pr-6 h-[34px] bg-slate-50 focus:bg-white appearance-none focus:border-brand-500 focus:ring-1 focus:ring-brand-100 outline-none cursor-pointer group hover:border-slate-300 transition-all truncate" 
-                :value="store.filters.jefatura ?? ''" @change="onChangeJefatura">
-                  <option value="">Todas</option>
-                  <option v-for="j in store.jefaturaOptions" :key="j" :value="j">{{ j }}</option>
-              </select>
-              <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none group-hover:text-brand-500"></i>
-          </div>
-      </div>
 
       <div class="w-px h-8 bg-slate-200 hidden md:block self-end mb-1"></div>
 
@@ -161,7 +174,7 @@ function clearAll() {
       <div class="flex gap-4 items-end shrink-0">
           <!-- Semanas Histórico -->
           <div class="flex flex-col gap-1.5 w-[75px]">
-             <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-1" title="Semanas usadas para calcular el Sellout Promedio">Semanas</span>
+             <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-1" title="Semanas usadas para calcular el Sellout Promedio"><i class="fa-solid fa-calendar-week mr-0.5"></i>Semanas</span>
              <input type="number" min="1" max="24" 
                class="w-full text-xs font-bold border border-slate-200 rounded-lg text-center h-[34px] bg-slate-50 focus:bg-white focus:border-brand-500 focus:ring-1 focus:ring-brand-100 outline-none" 
                v-model.number="store.filters.semanas_sellout" @change="store.loadDashboard()" placeholder="Auto" />

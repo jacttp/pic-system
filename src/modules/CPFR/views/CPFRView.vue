@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // src/modules/CPFR/views/CPFRView.vue
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useCpfrStore } from '../stores/cpfrStore'
 import CpfrFiltersPanel    from '../components/CpfrFiltersPanel.vue'
 import CpfrCriteriaPanel   from '../components/CpfrCriteriaPanel.vue'
@@ -17,6 +17,47 @@ const showExportPanel  = ref(false)
 const showInfoModal    = ref(false)
 const showChainConfig  = ref(false)
 const configStore      = ref<{ id: string; nombre: string } | null>(null)
+
+// ── Search Store Logic (Migrada de Panel) ───────────────────────────────────
+const searchText = ref(store.filters.nombre_tienda || store.filters.id_cliente || '')
+const searchType = ref<'nombre'|'id'>(store.filters.id_cliente ? 'id' : 'nombre')
+
+function handleSearch() {
+    const val = searchText.value.trim()
+    if (!val) {
+        store.setFilter('nombre_tienda', undefined)
+        store.setFilter('id_cliente', undefined)
+    } else if (searchType.value === 'id') {
+        store.setFilter('id_cliente', val)
+        store.setFilter('nombre_tienda', undefined)
+    } else {
+        store.setFilter('nombre_tienda', val)
+        store.setFilter('id_cliente', undefined)
+    }
+    store.loadDashboard()
+}
+
+watch(searchType, () => {
+    if (searchText.value.trim() !== '') handleSearch()
+})
+
+watch(() => [store.filters.nombre_tienda, store.filters.id_cliente], ([nt, id]) => {
+    if (!nt && !id) searchText.value = ''
+})
+
+let searchTimeout: ReturnType<typeof setTimeout> | null = null
+function onInputSearch() {
+    if (searchTimeout) clearTimeout(searchTimeout)
+    searchTimeout = setTimeout(() => {
+        handleSearch()
+    }, 400)
+}
+
+function onChangeJefatura(e: Event) {
+    const val = (e.target as HTMLSelectElement).value
+    store.setFilter('jefatura', val || undefined)
+    store.loadDashboard()
+}
 
 
 onMounted(() => store.init())
@@ -106,116 +147,82 @@ function confirmRecalculate() {
     />
 
     <!-- ── Barra de acciones (Secundaria) ──────────────────────────────────────────────── -->
-    <nav class="bg-white border-b border-slate-200 px-5 flex items-center gap-2 py-2 shrink-0 flex-wrap relative z-30">
+    <nav class="bg-white border-b border-slate-200 px-5 flex items-center gap-6 py-3 shrink-0 flex-wrap relative z-30">
 
-      <!-- Buscador de OC (Ahora a la izquierda) -->
-      <div class="relative flex items-center h-8">
-        <i class="fa-solid fa-magnifying-glass absolute left-3 text-slate-400 text-[10px]"></i>
-        <input 
-          v-model="store.statusFilters.searchOC"
-          type="text"
-          placeholder="Buscar OC..."
-          class="pl-8 pr-3 h-full w-40 bg-slate-50 border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:ring-2 focus:ring-brand-200 focus:bg-white transition-all placeholder:text-slate-400 placeholder:font-medium"
-        />
-        <button 
-          v-if="store.statusFilters.searchOC"
-          @click="store.statusFilters.searchOC = ''"
-          class="absolute right-2 text-slate-300 hover:text-slate-500 transition-colors"
-        >
-          <i class="fa-solid fa-circle-xmark text-[11px]"></i>
-        </button>
+      <!-- Grupo Buscador OC -->
+      <div class="flex flex-col gap-1.5 shrink-0">
+          <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-1">
+              <i class="fa-solid fa-hashtag mr-0.5"></i> Orden Compra
+          </span>
+          <div class="relative flex items-center h-[34px]">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 text-slate-400 text-[10px]"></i>
+            <input 
+              v-model="store.statusFilters.searchOC"
+              type="text"
+              placeholder="Buscar OC..."
+              class="pl-8 pr-10 h-full w-40 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-100 focus:bg-white focus:border-brand-500 transition-all placeholder:text-slate-400 placeholder:font-medium"
+            />
+            <button 
+              v-if="store.statusFilters.searchOC"
+              @click="store.statusFilters.searchOC = ''"
+              class="absolute right-2 text-slate-300 hover:text-slate-500 transition-colors"
+            >
+              <i class="fa-solid fa-circle-xmark text-[11px]"></i>
+            </button>
+          </div>
       </div>
 
-      <!-- Divisor sutil -->
-      <div class="w-px h-6 bg-slate-200 mx-2"></div>
-
-      <!-- Quick Status Filters (Con mr-auto para empujar lo que sigue a la derecha) -->
-      <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 p-1 rounded-xl mr-auto">
-        <span class="px-2 text-[9px] font-black text-slate-400 uppercase tracking-tighter">Filtros</span>
-        
-        <div class="flex items-center gap-1 px-1 border-r border-slate-200 mr-1">
-          <button 
-            @click="store.toggleStatusFilter('escenarioA')"
-            class="w-7 h-7 flex items-center justify-center rounded-lg transition-all text-[11px]"
-            :class="store.statusFilters.escenarioA ? 'bg-sky-500 text-white shadow-sm ring-2 ring-sky-200' : 'text-sky-600 hover:bg-white border border-transparent hover:border-sky-100'"
-            title="Escenario A"
-          ><i class="fa-solid fa-font"></i></button>
-          
-          <button 
-            @click="store.toggleStatusFilter('escenarioB')"
-            class="w-7 h-7 flex items-center justify-center rounded-lg transition-all text-[11px]"
-            :class="store.statusFilters.escenarioB ? 'bg-amber-500 text-white shadow-sm ring-2 ring-amber-200' : 'text-amber-600 hover:bg-white border border-transparent hover:border-amber-100'"
-            title="Escenario B"
-          ><i class="fa-solid fa-bold"></i></button>
-        </div>
-
-        <div class="flex items-center gap-1">
-          <button 
-            @click="store.toggleStatusFilter('sinSellout')"
-            class="w-7 h-7 flex items-center justify-center rounded-lg transition-all"
-            :class="store.statusFilters.sinSellout ? 'bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-200' : 'text-emerald-500 hover:bg-emerald-50 border border-transparent hover:border-emerald-100'"
-            title="Sin Sellout"
-          ><i class="fa-solid fa-seedling text-[11px]"></i></button>
-
-          <button 
-            @click="store.toggleStatusFilter('desabasto')"
-            class="w-7 h-7 flex items-center justify-center rounded-lg transition-all"
-            :class="store.statusFilters.desabasto ? 'bg-rose-500 text-white shadow-sm ring-2 ring-rose-200' : 'text-rose-500 hover:bg-rose-50 border border-transparent hover:border-rose-100'"
-            title="Desabasto (Inv <= 0)"
-          ><i class="fa-solid fa-ban text-[11px]"></i></button>
-
-          <button 
-            @click="store.toggleStatusFilter('bajoStock')"
-            class="w-7 h-7 flex items-center justify-center rounded-lg transition-all"
-            :class="store.statusFilters.bajoStock ? 'bg-rose-500 text-white shadow-sm ring-2 ring-rose-200' : 'text-rose-500 hover:bg-rose-50 border border-transparent hover:border-rose-100'"
-            title="Bajo Stock"
-          ><i class="fa-solid fa-triangle-exclamation text-[11px]"></i></button>
-
-          <button 
-            @click="store.toggleStatusFilter('sobrestock')"
-            class="w-7 h-7 flex items-center justify-center rounded-lg transition-all"
-            :class="store.statusFilters.sobrestock ? 'bg-orange-500 text-white shadow-sm ring-2 ring-orange-200' : 'text-orange-500 hover:bg-orange-50 border border-transparent hover:border-orange-100'"
-            title="Sobrestock"
-          ><i class="fa-solid fa-arrow-trend-up text-[11px]"></i></button>
-
-          <button 
-            @click="store.toggleStatusFilter('fillrateBajo')"
-            class="w-7 h-7 flex items-center justify-center rounded-lg transition-all"
-            :class="store.statusFilters.fillrateBajo ? 'bg-amber-500 text-white shadow-sm ring-2 ring-amber-200' : 'text-amber-600 hover:bg-amber-50 border border-transparent hover:border-amber-100'"
-            title="Fill Rate Bajo"
-          ><i class="fa-solid fa-arrow-down text-[11px]"></i></button>
-
-          <button 
-            @click="store.toggleStatusFilter('fillrate100')"
-            class="w-7 h-7 flex items-center justify-center rounded-lg transition-all"
-            :class="store.statusFilters.fillrate100 ? 'bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-200' : 'text-emerald-600 hover:bg-emerald-50 border border-transparent hover:border-emerald-100'"
-            title="Fill Rate 100%"
-          ><i class="fa-solid fa-check text-[11px]"></i></button>
-
-          <button 
-            @click="store.toggleStatusFilter('sobrepedido')"
-            class="w-7 h-7 flex items-center justify-center rounded-lg transition-all"
-            :class="store.statusFilters.sobrepedido ? 'bg-sky-500 text-white shadow-sm ring-2 ring-sky-200' : 'text-sky-600 hover:bg-sky-50 border border-transparent hover:border-sky-100'"
-            title="Sobrepedido"
-          ><i class="fa-solid fa-arrow-up text-[11px]"></i></button>
-        </div>
-
-        <button 
-          v-if="Object.values(store.statusFilters).some(v => v)"
-          @click="store.clearStatusFilters()"
-          class="ml-1 px-2 py-1 text-[9px] font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase"
-        >Limpiar</button>
+      <!-- Grupo Buscador Tienda -->
+      <div class="flex flex-col gap-1.5 shrink-0">
+          <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-1">
+              <i class="fa-solid fa-store mr-0.5"></i> Tienda
+          </span>
+          <div class="relative flex items-center h-[34px]">
+             <input type="text" :placeholder="searchType === 'nombre' ? 'Buscar tienda...' : 'ID Cliente...'" 
+               class="w-48 text-xs font-semibold border border-slate-200 rounded-lg pl-8 pr-12 h-full bg-slate-50 focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none transition-all placeholder:text-slate-400 placeholder:font-medium" 
+               v-model="searchText" @input="onInputSearch" />
+             <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"></i>
+             
+             <!-- Modo Toggle Embedded -->
+             <button @click="searchType = searchType === 'nombre' ? 'id' : 'nombre'" 
+               class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-400 hover:text-brand-600 hover:border-brand-200 hover:bg-brand-50 transition-colors shadow-sm select-none"
+               title="Alternar entre buscar por Nombre o por ID de Cliente">
+                 {{ searchType === 'nombre' ? 'NOM' : 'ID' }}
+             </button>
+          </div>
       </div>
 
-      <!-- Recalcular Matemática (Ahora a la derecha) -->
-      <button
-        class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 transition-colors"
-        @click="confirmRecalculate"
-        title="Fuerza un recálculo basado en inventario, sobrescribiendo el borrador actual"
-      >
-        <i class="fa-solid fa-rotate text-[11px]"></i>
-        Recalcular Matemática
-      </button>
+      <!-- Grupo Select Jefatura -->
+      <div class="flex flex-col gap-1.5 shrink-0 mr-auto">
+          <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-1">
+              <i class="fa-solid fa-user-tie mr-0.5"></i> Jefatura
+          </span>
+          <div class="relative h-[34px]">
+              <select 
+                class="w-40 text-xs border border-slate-200 rounded-lg pl-3 pr-8 h-full bg-slate-50 focus:bg-white appearance-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none cursor-pointer group hover:border-slate-300 transition-all truncate" 
+                :class="store.filters.jefatura ? 'text-slate-700 font-bold uppercase' : 'text-slate-400 font-medium'"
+                :value="store.filters.jefatura ?? ''" 
+                @change="onChangeJefatura"
+              >
+                  <option value="" class="text-slate-400 font-medium">Seleccionar Jefatura...</option>
+                  <option v-for="j in store.jefaturaOptions" :key="j" :value="j" class="text-slate-700 font-semibold uppercase">{{ j }}</option>
+              </select>
+              <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 pointer-events-none group-hover:text-brand-500"></i>
+          </div>
+      </div>
+
+      <!-- Botón Recalcular Matemática -->
+      <div class="flex flex-col gap-1.5">
+          <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-1 text-right invisible">Acción</span>
+          <button
+            class="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-1.5 h-[34px] rounded-lg border border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 transition-colors shadow-sm"
+            @click="confirmRecalculate"
+            title="Fuerza un recálculo basado en inventario, sobrescribiendo el borrador actual"
+          >
+            <i class="fa-solid fa-rotate text-[11px]"></i>
+            Recalcular Matemática
+          </button>
+      </div>
 
     </nav>
 
