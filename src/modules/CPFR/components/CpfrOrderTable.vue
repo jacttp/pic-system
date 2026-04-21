@@ -564,13 +564,13 @@ const totalUniqueOCs = computed(() => {
           <!-- Cabecera fija: NIVEL 1 -->
           <thead class="sticky top-0 z-20 shadow-sm ring-1 ring-slate-200">
             <tr class="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-100/80 backdrop-blur-sm border-b border-slate-200">
-              <th class="px-4 py-3 font-bold w-full min-w-[350px]">Tienda / SKU</th>
+              <th class="px-4 py-3 font-bold w-full min-w-[300px]">Tienda / SKU</th>
               <th class="px-3 py-3 font-bold w-28 whitespace-nowrap">UPC</th>
               <th class="px-3 py-3 font-bold text-right w-24 whitespace-nowrap">Inv.<br>Act. (pz)</th>
               <th class="px-3 py-3 font-bold text-right w-28 whitespace-nowrap">Sellout Prom.<br>(pz)</th>
               <th class="px-3 py-3 font-bold text-right w-20 whitespace-nowrap">Crit.<br>(S.)</th>
               <th class="px-3 py-3 font-bold text-right w-20 whitespace-nowrap">Cob.<br>(S.)</th>
-              <th class="px-3 py-3 font-bold text-right text-amber-700 bg-amber-50 border-x border-amber-100 w-28 whitespace-nowrap">Pedido<br>Sugerido</th>
+              <th class="px-3 py-3 font-bold text-right text-amber-700 bg-amber-50 border-x border-amber-100 w-36 whitespace-nowrap">Pedido<br>Sugerido</th>
               <th class="px-3 py-3 font-bold text-right w-28 whitespace-nowrap">Centralizado</th>
               <th class="px-3 py-3 font-bold text-right w-24 whitespace-nowrap">Fill Rate</th>
               <th class="px-3 py-3 font-bold text-center w-24 whitespace-nowrap">INSTOCK</th>
