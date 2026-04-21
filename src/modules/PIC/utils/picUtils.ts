@@ -150,7 +150,130 @@ export function getChartConfig(labels: string[], datasets: any[], type: 'bar' | 
       }
    };
 }
+/**
+ * Genera configuración para ECharts con escala Y siempre desde 0,
+ * tooltips enriquecidos, dataZoom interactivo y soporte de series mixtas bar+line.
+ */
+export function getEChartConfig(labels: string[], datasets: any[], type: 'bar' | 'line' = 'bar') {
+
+    // Convertir datasets (formato Chart.js-like) a series de ECharts
+    const series: any[] = datasets.map(ds => {
+        const isLineSeries = ds.type === 'line';
+        const isMeta = ds.label?.toString().includes('Meta');
+        const rawColor = ds.borderColor || (Array.isArray(ds.backgroundColor) ? null : ds.backgroundColor);
+
+        const base: any = {
+            name: ds.label,
+            type: isLineSeries ? 'line' : type,
+            data: ds.data,
+            smooth: isLineSeries,
+            symbol: isLineSeries ? 'circle' : 'none',
+            symbolSize: isLineSeries ? 5 : 4,
+            connectNulls: false,
+            emphasis: { focus: 'series', blurScope: 'coordinateSystem' },
+        };
+
+        if (isLineSeries) {
+            base.lineStyle = { color: rawColor, width: 2.5, type: isMeta ? 'dashed' : 'solid' };
+            base.itemStyle = { color: rawColor };
+        } else {
+            base.barMaxWidth = 50;
+            base.itemStyle = { borderRadius: [3, 3, 0, 0] };
+            // Si backgroundColor es array (gráficos anuales con color por barra)
+            if (Array.isArray(ds.backgroundColor)) {
+                base.data = ds.data.map((v: number, j: number) => ({
+                    value: v,
+                    itemStyle: { color: ds.backgroundColor[j], borderRadius: [3, 3, 0, 0] }
+                }));
+            } else {
+                base.itemStyle.color = rawColor;
+            }
+        }
+
+        return base;
+    });
+
+    const axisLabelFormatter = (value: number) => {
+        if (value >= 1_000_000) return (value / 1_000_000).toFixed(1) + 'M';
+        if (value >= 1_000) return (value / 1_000).toFixed(0) + 'k';
+        return String(value);
+    };
+
+    const tooltipFormatter = (params: any[]) => {
+        const title = params[0]?.axisValue ?? '';
+        let html = `<div style="font-weight:700;margin-bottom:5px;color:#0f172a;font-size:13px">${title}</div>`;
+        params.forEach(p => {
+            const raw = typeof p.value === 'object' && p.value !== null ? p.value.value : p.value;
+            if (raw === null || raw === undefined) return;
+            const name = p.seriesName || '';
+            const isKG = name.includes('KG') || name.includes('Meta');
+            const formatted = isKG
+                ? new Intl.NumberFormat('es-MX').format(Math.round(raw)) + ' KG'
+                : formatCurrency(raw);
+            html += `<div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                ${p.marker}
+                <span style="color:#64748b;flex:1">${name}</span>
+                <b style="margin-left:8px">${formatted}</b>
+            </div>`;
+        });
+        return html;
+    };
+
+    return {
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(148,163,184,0.07)' } },
+            backgroundColor: 'rgba(255,255,255,0.97)',
+            borderColor: '#e2e8f0',
+            borderWidth: 1,
+            padding: [8, 12],
+            textStyle: { color: '#1e293b', fontSize: 12 },
+            formatter: tooltipFormatter
+        },
+        legend: {
+            top: 2,
+            textStyle: { color: '#64748b', fontSize: 11 },
+            icon: 'roundRect',
+            itemWidth: 10,
+            itemHeight: 7,
+            itemGap: 12
+        },
+        grid: {
+            top: 38,
+            left: 4,
+            right: 8,
+            bottom: 4,
+            containLabel: true
+        },
+        xAxis: {
+            type: 'category',
+            data: labels,
+            axisLine: { lineStyle: { color: '#e2e8f0' } },
+            axisTick: { show: false },
+            axisLabel: { color: '#94a3b8', fontSize: 11 }
+        },
+        yAxis: {
+            type: 'value',
+            min: 0, // Siempre desde 0 para proporcionalidad real
+            axisLabel: {
+                color: '#94a3b8',
+                fontSize: 10,
+                formatter: axisLabelFormatter
+            },
+            splitLine: { lineStyle: { color: '#f1f5f9' } }
+        },
+        // Zoom interactivo: scroll con rueda del mouse, drag para paneo
+        dataZoom: [
+            { type: 'inside', start: 0, end: 100, zoomOnMouseWheel: true, moveOnMouseMove: true }
+        ],
+        series,
+        animationDuration: 600,
+        animationEasingUpdate: 'cubicOut'
+    };
+}
+
 /* Calcula la estructura completa para una tabla de datos (Filas + Totales + Comparativas)*/
+
 
 export function calculateTableData(
    processedData: any[],

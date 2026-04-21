@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'; // <--- AGREGAR ref
 import { usePicFilterStore } from '../stores/picFilterStore';
-import { processChartData, processAnnualData, getChartConfig, CHART_COLORS, CHART_COLORS_GREEN, MONTH_NAMES } from '../utils/picUtils';
-import BaseChart from './charts/BaseChart.vue';
+import { processChartData, processAnnualData, getEChartConfig, CHART_COLORS, CHART_COLORS_GREEN, MONTH_NAMES } from '../utils/picUtils';
+import PicEChart from './charts/PicEChart.vue';
+import BaseChart from './charts/BaseChart.vue'; // Mantener para widgets dinámicos de IA
 import PicDataTable from './tables/PicDataTable.vue';
 import PicProjectionTable from './tables/PicProjectionTable.vue';
 import KpiCardWidget from './widgets/KpiCardWidget.vue';       
@@ -44,12 +45,12 @@ const configPesosMensual = computed(() => {
         backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
         borderRadius: 4
     }));
-    return getChartConfig(labels, datasets, 'bar');
+    return getEChartConfig(labels, datasets, 'bar');
 });
 
 const dataPesosAnual = computed(() => processAnnualData(store.reportData, selectedYears.value, 'pesos'));
 const configPesosAnual = computed(() => {
-    return getChartConfig(selectedYears.value, [{
+    return getEChartConfig(selectedYears.value, [{
         label: 'Total Anual ($)',
         data: dataPesosAnual.value,
         backgroundColor: selectedYears.value.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]),
@@ -83,12 +84,12 @@ const configKilosMensual = computed(() => {
             order: 1
         });
     }
-    return getChartConfig(labels, datasets, 'bar');
+    return getEChartConfig(labels, datasets, 'bar');
 });
 
 const dataKilosAnual = computed(() => processAnnualData(store.reportData, selectedYears.value, 'kilos'));
 const configKilosAnual = computed(() => {
-    return getChartConfig(selectedYears.value, [{
+    return getEChartConfig(selectedYears.value, [{
         label: 'Total Anual (KG)',
         data: dataKilosAnual.value,
         backgroundColor: selectedYears.value.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]),
@@ -109,12 +110,12 @@ const configPromedioMensual = computed(() => {
         backgroundColor: CHART_COLORS_GREEN[i % CHART_COLORS_GREEN.length],
         borderRadius: 4
     }));
-    return getChartConfig(labels, datasets, 'bar');
+    return getEChartConfig(labels, datasets, 'bar');
 });
 
 const dataPromedioAnual = computed(() => processAnnualData(store.reportData, selectedYears.value, 'promedio'));
 const configPromedioAnual = computed(() => {
-    return getChartConfig(selectedYears.value, [{
+    return getEChartConfig(selectedYears.value, [{
         label: 'Promedio Anual ($/KG)',
         data: dataPromedioAnual.value,
         backgroundColor: selectedYears.value.map((_, i) => CHART_COLORS_GREEN[i % CHART_COLORS_GREEN.length]),
@@ -183,13 +184,13 @@ const removeWidget = (id: string) => {
 
        <div class="grid grid-cols-1 @split:grid-cols-3 gap-6">
             <div class="@split:col-span-2">
-                <BaseChart 
-                :config="configPesosMensual" 
-                title="Facturación Mensual ($)" 
-                :enable-switch="true"/>
+                <PicEChart
+                :option="configPesosMensual"
+                title="Facturación Mensual ($)"
+                :enable-switch="true" />
             </div>
             <div class="@split:col-span-1">
-                <BaseChart :config="configPesosAnual" title="Facturación Anual ($)" />
+                <PicEChart :option="configPesosAnual" title="Facturación Anual ($)" />
             </div>
         </div>
         <PicDataTable title="Detalle Facturación ($)" type="pesos" :processed-data="dataPesos" :years="selectedYears" />
@@ -198,14 +199,13 @@ const removeWidget = (id: string) => {
 
         <div class="grid grid-cols-1 @split:grid-cols-3 gap-6">
             <div class="@split:col-span-2">
-                <BaseChart 
-                :config="configKilosMensual" 
-                title="Venta vs Metas (KG)" 
-                :enable-switch="true"
-                />
+                <PicEChart
+                :option="configKilosMensual"
+                title="Venta vs Metas (KG)"
+                :enable-switch="true" />
             </div>
             <div class="@split:col-span-1">
-                <BaseChart :config="configKilosAnual" title="Facturación Anual (KG)" />
+                <PicEChart :option="configKilosAnual" title="Facturación Anual (KG)" />
             </div>
         </div>
         <PicDataTable title="Detalle Volumen (KG)" type="kilos" 
@@ -216,13 +216,13 @@ const removeWidget = (id: string) => {
 
         <div class="grid grid-cols-1 @4xl:grid-cols-3 gap-6">
             <div class="@split:col-span-2">
-                <BaseChart 
-                :config="configPromedioMensual" 
+                <PicEChart
+                :option="configPromedioMensual"
                 title="Precio Promedio Mensual ($/KG)"
                 :enable-switch="true" />
             </div>
             <div class="@split:col-span-1">
-                <BaseChart :config="configPromedioAnual" title="Precio Promedio Anual ($/KG)" />
+                <PicEChart :option="configPromedioAnual" title="Precio Promedio Anual ($/KG)" />
             </div>
         </div>
         <PicDataTable title="Detalle Precio Promedio" type="promedio" :processed-data="dataPromedio" :years="selectedYears" />
