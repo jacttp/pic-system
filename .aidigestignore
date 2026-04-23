@@ -24,10 +24,9 @@ src/modules/CommercialStructure
 
 src/modules/CPFR/cpfr_guia.md
 src/modules/CPFR/components/CpfrBatchProgressModal.vue
-src/modules/CPFR/components/CpfrCriteriaPanel.vue
 src/modules/CPFR/components/CpfrGenerateModal.vue
 src/modules/CPFR/components/CpfrPendingStoresPanel.vue
-src/modules/CPFR/composables/useCpfrCalculations
+src/modules/CPFR/composables/useCpfrCalculations  
 src/modules/CPFR/services/cpfrMock.ts
 
 src/modules/CustomerSegmentation
@@ -41,7 +40,7 @@ src/modules/Shared
 src/modules/StockAnalytics
 src/modules/UploadMetas
 src/modules/UploadOC
-
+src/modules/UserProfile
 src/modules/Users
 
 src/prueba-chat.html

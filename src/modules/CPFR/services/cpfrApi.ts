@@ -20,8 +20,8 @@ import type {
     CpfrSkuUnitPayload,
 } from '../types/cpfrTypes'
 
+import type {CpfrDashZ8Response } from '../types/cpfrZ8Types'
 // ── Body para dash-orders ────────────────────────────────────────────────────
-
 interface DashOrdersBody {
     year: number
     week: number
@@ -188,4 +188,17 @@ export const cpfrApi = {
         const { data } = await api.patch(`/cpfr/units/${encodeURIComponent(sku)}`, payload)
         return data
     },
+
+
+    /**
+     * POST /api/cpfr/dash-orders/z8
+     * Artículos Z8 ausentes en la semana actual.
+     * Mismo body que loadDashboard.
+     * Response: CpfrDashZ8Response (tiendas con ocs_z8 en lugar de skus directos)
+     */
+    async loadZ8Dashboard(body: DashOrdersBody): Promise<CpfrDashZ8Response> {
+        const { data } = await api.post('/cpfr/dash-orders/z8', body)
+        return data
+    },
+    
 }
