@@ -156,88 +156,8 @@ function clearAll() {
     >
       <div v-show="!isCollapsed" class="px-5 py-4 border-t border-slate-50 bg-white">
         
-        <!-- Primera Fila: Buscadores Principales -->
-        <div class="flex flex-wrap items-center gap-6 mb-5 pb-5 border-b border-slate-100">
-           
-           <!-- Grupo Buscador Tienda -->
-           <div class="flex flex-col gap-1.5 shrink-0">
-               <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-1">
-                   <i class="fa-solid fa-store mr-0.5"></i> Filtro de Tienda
-               </span>
-               <div class="relative flex items-center h-[34px]">
-                  <input type="text" :placeholder="searchType === 'nombre' ? 'Buscar por nombre...' : 'ID Cliente...'" 
-                    class="w-56 text-xs font-semibold border border-slate-200 rounded-lg pl-8 pr-12 h-full bg-slate-50 focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none transition-all placeholder:text-slate-400 placeholder:font-medium" 
-                    v-model="searchText" @input="onInputSearch" />
-                  <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"></i>
-                  
-                  <button @click.stop="searchType = searchType === 'nombre' ? 'id' : 'nombre'" 
-                    class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-400 hover:text-brand-600 hover:border-brand-200 hover:bg-brand-50 transition-colors shadow-sm select-none"
-                    title="Alternar entre buscar por Nombre o por ID de Cliente">
-                      {{ searchType === 'nombre' ? 'NOM' : 'ID' }}
-                  </button>
-               </div>
-           </div>
-
-           <!-- Grupo Select Jefatura -->
-           <div class="flex flex-col gap-1.5 shrink-0">
-               <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-1">
-                   <i class="fa-solid fa-user-tie mr-0.5"></i> Jefatura
-               </span>
-               <div class="relative h-[34px]">
-                   <select 
-                     class="w-44 text-xs border border-slate-200 rounded-lg pl-3 pr-8 h-full bg-slate-50 focus:bg-white appearance-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none cursor-pointer group hover:border-slate-300 transition-all truncate" 
-                     :class="store.filters.jefatura ? 'text-slate-700 font-bold uppercase' : 'text-slate-400 font-medium'"
-                     :value="store.filters.jefatura ?? ''" 
-                     @change="onChangeJefatura"
-                   >
-                       <option value="" class="text-slate-400 font-medium">Todas las Jefaturas...</option>
-                       <option v-for="j in store.jefaturaOptions" :key="j" :value="j" class="text-slate-700 font-semibold uppercase">{{ j }}</option>
-                   </select>
-                   <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 pointer-events-none group-hover:text-brand-500"></i>
-               </div>
-           </div>
-
-           <!-- Grupo Buscador OC -->
-           <div class="flex flex-col gap-1.5 shrink-0">
-               <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-1">
-                   <i class="fa-solid fa-hashtag mr-0.5"></i> Orden Compra
-               </span>
-               <div class="relative flex items-center h-[34px]">
-                 <i class="fa-solid fa-magnifying-glass absolute left-3 text-slate-400 text-[10px]"></i>
-                 <input 
-                   v-model="store.statusFilters.searchOC"
-                   type="text"
-                   placeholder="Buscar OC..."
-                   class="pl-8 pr-10 h-full w-44 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-100 focus:bg-white focus:border-brand-500 transition-all placeholder:text-slate-400 placeholder:font-medium"
-                 />
-                 <button 
-                   v-if="store.statusFilters.searchOC"
-                   @click.stop="store.statusFilters.searchOC = ''"
-                   class="absolute right-2 text-slate-300 hover:text-slate-500 transition-colors"
-                 >
-                   <i class="fa-solid fa-circle-xmark text-[11px]"></i>
-                 </button>
-               </div>
-           </div>
-
-           <div class="ml-auto self-end flex flex-col gap-1.5">
-               <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-1 text-right flex items-center justify-end gap-1.5">
-                 <i class="fa-solid fa-circle-info text-rose-400 cursor-help" title="Atención: Recalcular sobrescribirá todos los cambios manuales guardados hoy en el borrador."></i>
-                 Motor de Cálculo
-               </span>
-               <button
-                 class="inline-flex items-center gap-2 text-xs font-bold px-4 h-[34px] rounded-lg border border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 transition-all shadow-sm"
-                 @click.stop="confirmRecalculate"
-                 title="Fuerza un recálculo basado en inventario, sobrescribiendo el borrador actual"
-               >
-                 <i class="fa-solid fa-rotate text-[11px]"></i>
-                 Recalcular Propuesta
-               </button>
-           </div>
-        </div>
-
-        <!-- Segunda Fila: Filtros Rápidos y Acciones -->
-        <div class="flex flex-wrap items-center gap-x-6 gap-y-4">
+        <!-- Primera Fila: Filtros, Configuración y Acciones -->
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-4 mb-5 pb-5 border-b border-slate-100">
           
           <!-- Días (Tags) -->
           <div class="flex flex-col gap-1.5 shrink-0">
@@ -379,8 +299,26 @@ function clearAll() {
               </div>
           </div>
 
-          <!-- Actions (Right side) -->
+          <!-- Actions & Motor (Right side) -->
           <div class="flex flex-1 items-end justify-end gap-3 shrink-0 ml-auto">
+              <!-- Motor de Cálculo -->
+              <div class="flex flex-col gap-1.5 mr-2">
+                  <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-1 text-right flex items-center justify-end gap-1.5">
+                    <i class="fa-solid fa-circle-info text-rose-400 cursor-help" title="Atención: Recalcular sobrescribirá todos los cambios manuales guardados hoy en el borrador."></i>
+                    Motor
+                  </span>
+                  <button
+                    class="inline-flex items-center gap-2 text-xs font-bold px-4 h-[34px] rounded-lg border border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 transition-all shadow-sm"
+                    @click.stop="confirmRecalculate"
+                    title="Fuerza un recálculo basado en inventario"
+                  >
+                    <i class="fa-solid fa-rotate text-[11px]"></i>
+                    <span class="hidden xl:inline">Recalcular</span>
+                  </button>
+              </div>
+
+              <div class="w-px h-8 bg-slate-200 self-end mb-1 mx-1"></div>
+
               <button @click.stop="clearAll" class="text-xs font-bold text-slate-500 hover:text-brand-600 px-3 h-[34px] rounded-lg bg-slate-50 hover:bg-brand-50 transition-colors border border-slate-200 hover:border-brand-200 flex items-center gap-2 shadow-sm" title="Limpiar todos los filtros">
                  <i class="fa-solid fa-rotate-left"></i> <span class="hidden xl:inline">Limpiar</span>
               </button>
@@ -389,6 +327,71 @@ function clearAll() {
                  <i class="fa-solid fa-wand-magic-sparkles"></i> <span class="hidden xl:inline">Generar</span>
               </button>
           </div>
+        </div>
+
+        <!-- Segunda Fila: Buscadores (Orden solicitado: OC, Tienda, Jefatura) -->
+        <div class="flex flex-wrap items-center gap-6">
+           
+           <!-- Grupo Buscador OC -->
+           <div class="flex flex-col gap-1.5 shrink-0">
+               <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-1">
+                   <i class="fa-solid fa-hashtag mr-0.5"></i> Orden Compra
+               </span>
+               <div class="relative flex items-center h-[34px]">
+                 <i class="fa-solid fa-magnifying-glass absolute left-3 text-slate-400 text-[10px]"></i>
+                 <input 
+                   v-model="store.statusFilters.searchOC"
+                   type="text"
+                   placeholder="Buscar OC..."
+                   class="pl-8 pr-10 h-full w-44 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-100 focus:bg-white focus:border-brand-500 transition-all placeholder:text-slate-400 placeholder:font-medium"
+                 />
+                 <button 
+                   v-if="store.statusFilters.searchOC"
+                   @click.stop="store.statusFilters.searchOC = ''"
+                   class="absolute right-2 text-slate-300 hover:text-slate-500 transition-colors"
+                 >
+                   <i class="fa-solid fa-circle-xmark text-[11px]"></i>
+                 </button>
+               </div>
+           </div>
+
+           <!-- Grupo Buscador Tienda -->
+           <div class="flex flex-col gap-1.5 shrink-0">
+               <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-1">
+                   <i class="fa-solid fa-store mr-0.5"></i> Filtro de Tienda
+               </span>
+               <div class="relative flex items-center h-[34px]">
+                  <input type="text" :placeholder="searchType === 'nombre' ? 'Buscar por nombre...' : 'ID Cliente...'" 
+                    class="w-56 text-xs font-semibold border border-slate-200 rounded-lg pl-8 pr-12 h-full bg-slate-50 focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none transition-all placeholder:text-slate-400 placeholder:font-medium" 
+                    v-model="searchText" @input="onInputSearch" />
+                  <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"></i>
+                  
+                  <button @click.stop="searchType = searchType === 'nombre' ? 'id' : 'nombre'" 
+                    class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-400 hover:text-brand-600 hover:border-brand-200 hover:bg-brand-50 transition-colors shadow-sm select-none"
+                    title="Alternar entre buscar por Nombre o por ID de Cliente">
+                      {{ searchType === 'nombre' ? 'NOM' : 'ID' }}
+                  </button>
+               </div>
+           </div>
+
+           <!-- Grupo Select Jefatura -->
+           <div class="flex flex-col gap-1.5 shrink-0">
+               <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-1">
+                   <i class="fa-solid fa-user-tie mr-0.5"></i> Jefatura
+               </span>
+               <div class="relative h-[34px]">
+                   <select 
+                     class="w-44 text-xs border border-slate-200 rounded-lg pl-3 pr-8 h-full bg-slate-50 focus:bg-white appearance-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none cursor-pointer group hover:border-slate-300 transition-all truncate" 
+                     :class="store.filters.jefatura ? 'text-slate-700 font-bold uppercase' : 'text-slate-400 font-medium'"
+                     :value="store.filters.jefatura ?? ''" 
+                     @change="onChangeJefatura"
+                   >
+                       <option value="" class="text-slate-400 font-medium">Todas las Jefaturas...</option>
+                       <option v-for="j in store.jefaturaOptions" :key="j" :value="j" class="text-slate-700 font-semibold uppercase">{{ j }}</option>
+                   </select>
+                   <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 pointer-events-none group-hover:text-brand-500"></i>
+               </div>
+           </div>
 
         </div>
       </div>

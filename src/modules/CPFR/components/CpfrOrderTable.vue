@@ -1,6 +1,10 @@
 <script setup lang="ts">
 // src/modules/CPFR/components/CpfrOrderTable.vue
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, defineOptions } from 'vue'
+
+defineOptions({
+  inheritAttrs: false
+})
 import { useCpfrStore } from '../stores/cpfrStore'
 import { toast } from '@/components/ui/toast/use-toast'
 import type { CpfrSkuDash, CpfrStoreDash } from '../types/cpfrTypes'
@@ -504,7 +508,10 @@ const totalUniqueOCs = computed(() => {
 
 <template>
   <!-- Envoltura principal: Ahora incluye la Toolbar y la Tabla, con bordes redondeados y sombra sutil -->
-  <div class="flex-1 flex flex-col min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+  <div 
+    v-bind="$attrs"
+    class="flex-1 flex flex-col min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden"
+  >
 
     <!-- Sin datos -->
     <div
