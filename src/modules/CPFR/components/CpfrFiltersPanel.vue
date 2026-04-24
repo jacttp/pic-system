@@ -107,7 +107,7 @@ function confirmRecalculate() {
 }
 
 // ── Collapse State ───────────────────────────────────────────────────────────
-const isCollapsed = ref(false)
+const isCollapsed = ref(true)
 
 function toggleCollapse() {
     isCollapsed.value = !isCollapsed.value
@@ -122,11 +122,10 @@ function clearAll() {
 
 <template>
   <div class="bg-white border-b border-slate-200 shadow-sm shrink-0 relative z-40 select-none transition-all duration-300">
-    <!-- Header / Toggle Bar -->
+    <!-- Contenedor de Contenido (Sin header toggle) -->
     <div 
-      class="px-5 py-2 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 transition-colors border-b border-transparent"
+      class="px-5 py-2 flex items-center justify-between border-b border-transparent"
       :class="{ 'border-slate-100': !isCollapsed }"
-      @click="toggleCollapse"
     >
       <div class="flex items-center gap-3">
         <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center text-brand-600 shadow-sm border border-brand-100">
@@ -144,9 +143,6 @@ function clearAll() {
           </p>
         </div>
       </div>
-      <button class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-brand-600 transition-all rounded-full hover:bg-white hover:shadow-sm">
-        <i class="fa-solid fa-chevron-down transition-transform duration-300" :class="{ 'rotate-180': !isCollapsed }"></i>
-      </button>
     </div>
 
     <!-- Collapsible Content -->
@@ -397,5 +393,27 @@ function clearAll() {
         </div>
       </div>
     </transition>
+
+    <!-- Toggle Button en el Bottom Center -->
+    <div class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full z-50">
+        <button 
+            @click="toggleCollapse"
+            class="flex items-center gap-2 px-6 py-1.5 rounded-b-xl shadow-md border-x border-b border-t-0 transition-all duration-300 group"
+            :class="[
+                isCollapsed 
+                    ? 'bg-brand-600 border-brand-700 text-white hover:bg-brand-700 hover:pt-3' 
+                    : 'bg-white border-slate-200 text-slate-300 hover:text-brand-600 hover:bg-slate-50'
+            ]"
+            :title="isCollapsed ? 'Mostrar Filtros' : 'Ocultar Filtros'"
+        >
+            <i 
+                class="fa-solid transition-transform duration-300"
+                :class="isCollapsed ? 'fa-filter' : 'fa-chevron-up group-hover:-translate-y-0.5'"
+            ></i>
+            <span v-if="isCollapsed" class="text-xs font-bold tracking-wide uppercase">
+                Filtros
+            </span>
+        </button>
+    </div>
   </div>
 </template>

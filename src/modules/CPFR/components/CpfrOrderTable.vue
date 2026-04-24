@@ -554,14 +554,7 @@ const totalUniqueOCs = computed(() => {
               <button @click="store.collapseAll()" class="px-3 py-1.5 text-slate-500 hover:bg-slate-50 hover:text-rose-600 transition-colors" title="Contraer todas las tiendas">
                   <i class="fa-solid fa-chevron-up"></i>
               </button>
-              <button
-                  @click="showZ8Panel = true"
-                  class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-bold shadow-sm transition-all"
-                  title="Ver artículos del catálogo Z8 no pedidos esta semana"
-               >
-                  <i class="fa-solid fa-clipboard-list text-xs"></i>
-                  Ver Z8
-               </button>
+              
           </div>
 
           <!-- Controles OCs -->
@@ -1035,95 +1028,95 @@ const totalUniqueOCs = computed(() => {
         </table>
 
         <!-- ── Vista de Tarjetas ── -->
-        <div v-else class="p-6 space-y-12 bg-slate-50/50 min-h-full">
-            <div v-for="dia in filteredDias" :key="dia.dia_num" class="space-y-6">
+        <div v-else class="p-5 space-y-10 bg-slate-50/50 min-h-full">
+            <div v-for="dia in filteredDias" :key="dia.dia_num" class="space-y-5">
                 <!-- Título del día -->
-                <div class="flex items-center gap-4 px-1 cursor-pointer select-none group/day" @click="toggleDay(dia.dia_num)">
-                    <div class="flex items-center gap-3">
-                        <i class="fa-solid text-slate-400 text-sm transition-transform duration-300" 
+                <div class="flex items-center gap-3 px-1 cursor-pointer select-none group/day" @click="toggleDay(dia.dia_num)">
+                    <div class="flex items-center gap-2.5">
+                        <i class="fa-solid text-slate-400 text-xs transition-transform duration-300" 
                            :class="collapsedDays[dia.dia_num] ? 'fa-chevron-right' : 'fa-chevron-down rotate-0'"></i>
                         <div class="flex flex-col">
-                            <span class="text-[10px] font-black text-brand-500 uppercase tracking-[0.3em] mb-0.5">Calendario de Atención</span>
-                            <h2 class="text-lg font-black text-slate-800 uppercase tracking-tight">{{ dia.dia_nombre }}</h2>
+                            <span class="text-[8px] font-black text-brand-500 uppercase tracking-[0.3em] mb-0.5">Calendario de Atención</span>
+                            <h2 class="text-sm font-black text-slate-800 uppercase tracking-tight">{{ dia.dia_nombre }}</h2>
                         </div>
                     </div>
                     <div class="h-px flex-1 bg-gradient-to-r from-slate-300 to-transparent"></div>
-                    <span class="text-[10px] text-slate-400 font-bold uppercase">{{ dia.tiendas.length }} Tienda{{ dia.tiendas.length !== 1 ? 's' : '' }}</span>
+                    <span class="text-[9px] text-slate-400 font-bold uppercase">{{ dia.tiendas.length }} Tienda{{ dia.tiendas.length !== 1 ? 's' : '' }}</span>
                 </div>
 
                 <!-- Listado de tarjetas (Una por fila) -->
-                <div v-if="!collapsedDays[dia.dia_num]" class="flex flex-col gap-8 max-w-[1600px] mx-auto transition-all">
+                <div v-if="!collapsedDays[dia.dia_num]" class="flex flex-col gap-6 max-w-[1600px] mx-auto transition-all">
                     <div v-for="tienda in dia.tiendas" :key="tienda.id_cliente" 
-                         class="bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-brand-200 transition-all duration-300 flex flex-col group/card relative overflow-hidden"
+                         class="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-brand-200 transition-all duration-300 flex flex-col group/card relative overflow-hidden"
                          :class="{ 'z-50': isAnySelloutOpenInTienda(tienda.id_cliente) }"
                     >
                         <!-- Cabecera Tarjeta (Layout Horizontal) -->
-                        <div class="p-6 border-b border-slate-100 bg-gradient-to-br from-white to-slate-50/50 flex flex-col lg:flex-row lg:items-center gap-8 rounded-t-3xl cursor-pointer"
+                        <div class="p-5 border-b border-slate-100 bg-gradient-to-br from-white to-slate-50/50 flex flex-col lg:flex-row lg:items-center gap-6 rounded-t-2xl cursor-pointer"
                              @click="store.toggleStore(tienda.id_cliente)">
                             
                             <!-- Info Tienda -->
                             <div class="min-w-0 flex-1">
-                                <div class="flex items-center gap-4 mb-2">
-                                    <div class="w-10 h-10 rounded-2xl bg-brand-50 flex items-center justify-center text-brand-600 shrink-0 shadow-sm border border-brand-100">
-                                        <i class="fa-solid fa-store text-lg"></i>
+                                <div class="flex items-center gap-3 mb-1.5">
+                                    <div class="w-8 h-8 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600 shrink-0 shadow-sm border border-brand-100">
+                                        <i class="fa-solid fa-store text-base"></i>
                                     </div>
                                     <div class="min-w-0">
-                                        <h3 class="font-black text-slate-800 text-xl leading-tight truncate group-hover/card:text-brand-700 transition-colors">{{ tienda.nombre_tienda }}</h3>
-                                        <p class="text-[12px] text-slate-500 font-bold flex items-center gap-2 mt-0.5 uppercase tracking-wide">
+                                        <h3 class="font-black text-slate-800 text-lg leading-tight truncate group-hover/card:text-brand-700 transition-colors">{{ tienda.nombre_tienda }}</h3>
+                                        <p class="text-[10px] text-slate-500 font-bold flex items-center gap-1.5 mt-0.5 uppercase tracking-wide">
                                             <i class="fa-solid fa-location-dot text-slate-300"></i>
                                             {{ tienda.jefatura }}
                                         </p>
                                     </div>
                                 </div>
-                                <div class="flex items-center gap-3">
-                                    <span class="px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider" :class="instockBadge(tienda.resumen.instock).cls">
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2 py-0.5 rounded-full text-[9px] font-black border uppercase tracking-wider" :class="instockBadge(tienda.resumen.instock).cls">
                                         {{ instockBadge(tienda.resumen.instock).label }}
                                     </span>
-                                    <span class="text-[11px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 uppercase">
+                                    <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200 uppercase">
                                        <i class="fa-solid fa-boxes-stacked mr-1 opacity-70"></i> {{ tienda.total_skus }} SKUs
                                     </span>
                                 </div>
                             </div>
 
                             <!-- KPIs (Fila Horizontal) -->
-                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 shrink-0">
-                                <div class="bg-white/80 border border-slate-100 rounded-2xl p-3 shadow-sm min-w-[120px] hover:border-slate-200 transition-colors">
-                                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Inv. Actual</p>
-                                    <p class="text-sm font-black text-slate-700">{{ n(tienda.resumen.inv_actual_pz, 0) }} <span class="text-[10px] text-slate-400 font-medium">pz</span></p>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
+                                <div class="bg-white/80 border border-slate-100 rounded-xl p-2.5 shadow-sm min-w-[100px] hover:border-slate-200 transition-colors">
+                                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Inv. Actual</p>
+                                    <p class="text-[13px] font-black text-slate-700">{{ n(tienda.resumen.inv_actual_pz, 0) }} <span class="text-[9px] text-slate-400 font-medium">pz</span></p>
                                 </div>
-                                <div class="bg-white/80 border border-slate-100 rounded-2xl p-3 shadow-sm min-w-[120px] hover:border-slate-200 transition-colors">
-                                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Vta. Prom</p>
-                                    <p class="text-sm font-black text-slate-700">{{ n(tienda.resumen.promedio_sellout_pz, 1) }} <span class="text-[10px] text-slate-400 font-medium">pz</span></p>
+                                <div class="bg-white/80 border border-slate-100 rounded-xl p-2.5 shadow-sm min-w-[100px] hover:border-slate-200 transition-colors">
+                                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Vta. Prom</p>
+                                    <p class="text-[13px] font-black text-slate-700">{{ n(tienda.resumen.promedio_sellout_pz, 1) }} <span class="text-[9px] text-slate-400 font-medium">pz</span></p>
                                 </div>
-                                <div class="bg-amber-50/50 border border-amber-100 rounded-2xl p-3 shadow-sm min-w-[120px] hover:bg-amber-50 transition-colors">
-                                    <p class="text-[9px] font-black text-amber-400 uppercase tracking-widest mb-1">Sugerido</p>
-                                    <p class="text-sm font-black text-amber-700">{{ tienda.resumen.pedido_sugerido_pz_red.toLocaleString('es-MX') }}</p>
+                                <div class="bg-amber-50/50 border border-amber-100 rounded-xl p-2.5 shadow-sm min-w-[100px] hover:bg-amber-50 transition-colors">
+                                    <p class="text-[8px] font-black text-amber-400 uppercase tracking-widest mb-0.5">Sugerido</p>
+                                    <p class="text-[13px] font-black text-amber-700">{{ tienda.resumen.pedido_sugerido_pz_red.toLocaleString('es-MX') }}</p>
                                 </div>
-                                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3 shadow-sm min-w-[120px] hover:bg-slate-100 transition-colors">
-                                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Cobertura</p>
-                                    <p class="text-sm font-black" :class="cobClass(tienda.resumen.cobertura_actual)">{{ n(tienda.resumen.cobertura_actual, 1) }} <span class="text-[10px] font-medium opacity-60">sem</span></p>
+                                <div class="bg-slate-50 border border-slate-200 rounded-xl p-2.5 shadow-sm min-w-[100px] hover:bg-slate-100 transition-colors">
+                                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Cobertura</p>
+                                    <p class="text-[13px] font-black" :class="cobClass(tienda.resumen.cobertura_actual)">{{ n(tienda.resumen.cobertura_actual, 1) }} <span class="text-[9px] font-medium opacity-60">sem</span></p>
                                 </div>
                             </div>
 
                             <!-- Acciones Cabecera -->
-                            <div class="flex items-center gap-3 pl-6 border-l border-slate-100 hidden lg:flex">
+                            <div class="flex items-center gap-2 pl-5 border-l border-slate-100 hidden lg:flex">
                                 <button
-                                    class="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-brand-600 hover:bg-white hover:shadow-md border border-slate-100 hover:border-brand-200 transition-all rounded-2xl"
+                                    class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-brand-600 hover:bg-white hover:shadow-md border border-slate-100 hover:border-brand-200 transition-all rounded-xl"
                                     @click.stop="emit('open-config', tienda.id_cliente, tienda.nombre_tienda)"
                                 >
-                                    <i class="fa-solid fa-gear"></i>
+                                    <i class="fa-solid fa-gear text-sm"></i>
                                 </button>
-                                <div class="flex items-center justify-center w-8 h-8 rounded-full bg-slate-50 text-slate-300 group-hover/card:bg-brand-50 group-hover/card:text-brand-500 transition-all">
-                                    <i class="fa-solid transition-transform duration-300" :class="store.expandedStores[tienda.id_cliente] ? 'fa-chevron-up text-brand-500' : 'fa-chevron-down'"></i>
+                                <div class="flex items-center justify-center w-7 h-7 rounded-full bg-slate-50 text-slate-300 group-hover/card:bg-brand-50 group-hover/card:text-brand-500 transition-all">
+                                    <i class="fa-solid transition-transform duration-300 text-xs" :class="store.expandedStores[tienda.id_cliente] ? 'fa-chevron-up text-brand-500' : 'fa-chevron-down'"></i>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Grupos OC (Apiladas hacia abajo) con Transición -->
                         <div v-if="store.expandedStores[tienda.id_cliente]" class="flex-1 flex flex-col animate-in fade-in slide-in-from-top-4 duration-300">
-                            <div class="p-10 space-y-14 bg-slate-50/30">
+                            <div class="p-8 space-y-11 bg-slate-50/30">
                             <div v-for="oc in groupOCs(tienda.skus)" :key="oc.group_id" 
-                                 class="w-full flex flex-col border rounded-2xl shadow-sm hover:shadow-md transition-all border-l-4 relative" 
+                                 class="w-full flex flex-col border rounded-xl shadow-sm hover:shadow-md transition-all border-l-4 relative" 
                                   :class="[
                                     isAnySelloutOpenInOC(tienda.id_cliente, oc.skus) ? 'z-50' : '',
                                     isZ8(oc.num_pedido) ? 'bg-purple-50/30 border-purple-100 border-l-purple-500' : 'bg-white border-slate-100'
@@ -1131,34 +1124,36 @@ const totalUniqueOCs = computed(() => {
                                  
                                  :style="!isZ8(oc.num_pedido) ? `border-left-color: ${estadoBadge(oc.estado_oc).color || '#e2e8f0'}` : ''">
                                 <!-- OC Header -->
-                                <div class="px-4 py-2.5 border-b flex items-center justify-between rounded-tr-2xl cursor-pointer hover:bg-slate-100 transition-colors"
+                                <div class="px-3.5 py-2 border-b flex flex-wrap items-center justify-between gap-3 rounded-tr-xl cursor-pointer hover:bg-slate-100 transition-colors"
                                       :class="isZ8(oc.num_pedido) ? 'bg-purple-100/40 border-purple-100' : 'bg-slate-50 border-slate-100'"
                                      @click.stop="toggleOCGroup(tienda.id_cliente, oc.group_id)">
-                                    <div class="flex items-center gap-3">
-                                        <i class="fa-solid text-slate-300 text-[10px] transition-transform duration-300"
+                                    <div class="flex flex-wrap items-center gap-2.5">
+                                        <i class="fa-solid text-slate-300 text-[9px] transition-transform duration-300"
                                            :class="expandedOCGroups[tienda.id_cliente + '_' + oc.group_id] !== false ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
-                                        <div class="flex items-center gap-2">
-                                            <i class="fa-solid fa-file-invoice text-slate-400 text-xs"></i>
-                                            <span class="text-[11px] font-black text-slate-700 tracking-tight">{{ oc.num_pedido || 'SIN FOLIO' }}</span>
+                                        <div class="flex items-center gap-1.5">
+                                            <i class="fa-solid fa-file-invoice text-slate-400 text-[10px]"></i>
+                                            <span class="text-[10px] font-black text-slate-700 tracking-tight">{{ oc.num_pedido || 'SIN FOLIO' }}</span>
                                         </div>
-                                        <span v-if="oc.semana_ic" class="text-[9px] font-bold px-1.5 py-0.5 bg-brand-50 text-brand-700 rounded-md border border-brand-100">Sem. {{ oc.semana_ic }}</span>
+                                        <span v-if="oc.semana_ic" class="text-[8px] font-bold px-1.5 py-0.5 bg-brand-50 text-brand-700 rounded-md border border-brand-100">Sem. {{ oc.semana_ic }}</span>
                                         
                                         <!-- Badges de Fecha solicitados -->
-                                        <div v-if="oc.fec_pedido_cadena" class="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200" title="Fecha Pedido Cadena">
-                                            <i class="fa-regular fa-calendar-check text-brand-400"></i>
-                                            {{ oc.fec_pedido_cadena.slice(0, 10) }}
-                                        </div>
-                                        <div v-if="oc.fec_fin_embarque" class="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100" title="Fin Embarque">
-                                            <i class="fa-solid fa-triangle-exclamation text-amber-500"></i>
-                                            {{ oc.fec_fin_embarque.slice(0, 10) }}
+                                        <div class="flex flex-wrap items-center gap-1.5">
+                                            <div v-if="oc.fec_pedido_cadena" class="flex items-center gap-1.5 px-1.5 py-0.5 rounded-md text-[8px] font-bold bg-slate-100 text-slate-600 border border-slate-200" title="Fecha Pedido Cadena">
+                                                <i class="fa-regular fa-calendar-check text-brand-400"></i>
+                                                {{ oc.fec_pedido_cadena.slice(0, 10) }}
+                                            </div>
+                                            <div v-if="oc.fec_fin_embarque" class="flex items-center gap-1.5 px-1.5 py-0.5 rounded-md text-[8px] font-bold bg-amber-50 text-amber-700 border border-amber-100" title="Fin Embarque">
+                                                <i class="fa-solid fa-triangle-exclamation text-amber-500"></i>
+                                                {{ oc.fec_fin_embarque.slice(0, 10) }}
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="flex items-center gap-2">
                                         <!-- Status Badge & Dropdown -->
-                                        <div class="relative flex items-center gap-2">
+                                        <div class="relative flex items-center gap-1.5">
                                             <button 
                                               @click.stop="toggleStatusOC(tienda.id_cliente + '_' + oc.group_id)"
-                                              class="text-[10px] b-1 font-black px-2 py-1 rounded-lg border uppercase tracking-wider transition-all hover:shadow-md hover:-translate-y-0.5 active:translate-y-0" 
+                                              class="text-[9px] b-1 font-black px-1.5 py-0.5 rounded-lg border uppercase tracking-wider transition-all hover:shadow-md hover:-translate-y-0.5 active:translate-y-0" 
                                               :class="estadoBadge(oc.estado_oc).cls"
                                               :disabled="submittingOC === oc.num_pedido"
                                             >
@@ -1186,40 +1181,40 @@ const totalUniqueOCs = computed(() => {
 
                                 <!-- SKU List -->
                                 <div v-if="expandedOCGroups[tienda.id_cliente + '_' + oc.group_id] !== false" class="divide-y divide-slate-100 animate-in fade-in slide-in-from-top-2 duration-200">
-                                    <div v-for="(sku, skuIdx) in oc.skus" :key="sku.sku_muliix" class="p-8 hover:bg-slate-50/80 transition-colors group/sku relative" :class="{ 'z-50': openSelloutId === (tienda.id_cliente + '_' + sku.sku_cadena) }">
-                                        <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+                                    <div v-for="(sku, skuIdx) in oc.skus" :key="sku.sku_muliix" class="p-6 hover:bg-slate-50/80 transition-colors group/sku relative" :class="{ 'z-50': openSelloutId === (tienda.id_cliente + '_' + sku.sku_cadena) }">
+                                        <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-5">
                                             
                                             <!-- Info Principal SKU (Nombre y detalles debajo) -->
                                             <div class="min-w-0 flex-1">
-                                                <h4 class="text-[14px] font-black text-slate-800 leading-tight truncate mb-1.5" :title="sku.sku_nombre">{{ sku.sku_nombre }}</h4>
-                                                <div class="flex flex-wrap items-center gap-3">
-                                                    <span class="text-[9px] font-black px-1.5 py-0.5 rounded border uppercase shadow-xs bg-white" :class="escenarioCls(sku.escenario)">
+                                                <h4 class="text-[12px] font-black text-slate-800 leading-tight truncate mb-1" :title="sku.sku_nombre">{{ sku.sku_nombre }}</h4>
+                                                <div class="flex flex-wrap items-center gap-2.5">
+                                                    <span class="text-[8px] font-black px-1 py-0.5 rounded border uppercase shadow-xs bg-white" :class="escenarioCls(sku.escenario)">
                                                         {{ sku.escenario || '—' }}
                                                     </span>
-                                                    <div class="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono bg-white px-2 py-0.5 rounded border border-slate-100">
+                                                    <div class="flex items-center gap-1 text-[9px] text-slate-400 font-mono bg-white px-1.5 py-0.5 rounded border border-slate-100">
                                                         <span class="font-bold text-slate-300">UPC:</span> {{ sku.upc_cadena }}
                                                     </div>
-                                                    <div class="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono bg-white px-2 py-0.5 rounded border border-slate-100">
+                                                    <div class="flex items-center gap-1 text-[9px] text-slate-400 font-mono bg-white px-1.5 py-0.5 rounded border border-slate-100">
                                                         <span class="font-bold text-slate-300">SKU:</span> {{ sku.sku_muliix }}
                                                     </div>
                                                 </div>
                                             </div>
 
                                             <!-- Métricas Centrales -->
-                                            <div class="flex items-center gap-6 xl:px-8 xl:border-x xl:border-slate-100">
-                                                <div class="text-right">
-                                                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">Inv. Actual</p>
-                                                    <div class="flex items-center justify-end gap-1.5 text-sm font-black text-slate-700">
-                                                        <i v-if="sku.inv_actual_pz <= 0" class="fa-solid fa-ban text-[10px] text-rose-500" title="Desabasto"></i>
-                                                        {{ n(sku.inv_actual_pz, 0) }} <span class="text-[10px] text-slate-400 font-medium">pz</span>
+                                            <div class="grid grid-cols-3 gap-3 w-full lg:w-auto lg:px-5 lg:border-x lg:border-slate-100 shrink-0">
+                                                <div class="text-center lg:text-right">
+                                                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">Inv. Actual</p>
+                                                    <div class="flex items-center justify-center lg:justify-end gap-1.5 text-[13px] font-black text-slate-700">
+                                                        <i v-if="sku.inv_actual_pz <= 0" class="fa-solid fa-ban text-[9px] text-rose-500" title="Desabasto"></i>
+                                                        {{ n(sku.inv_actual_pz, 0) }} <span class="text-[9px] text-slate-400 font-medium">pz</span>
                                                     </div>
                                                 </div>
-                                                <div class="text-right relative cursor-pointer group/cell hover:bg-slate-50 p-2 rounded-xl transition-all" @click.stop="toggleSellout(tienda.id_cliente + '_' + sku.sku_cadena)">
-                                                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-0.5 group-hover/cell:text-brand-600">Vta. Prom</p>
-                                                    <p class="text-sm font-black text-slate-700 border-b border-dashed border-slate-200 group-hover/cell:border-brand-300 transition-all">
-                                                        {{ n(sku.promedio_sellout_pz, 1) }} <span class="text-[10px] text-slate-400 font-medium">pz</span>
+                                                <div class="text-center lg:text-right relative cursor-pointer group/cell hover:bg-slate-50 p-1.5 rounded-xl transition-all" @click.stop="toggleSellout(tienda.id_cliente + '_' + sku.sku_cadena)">
+                                                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-tighter mb-0.5 group-hover/cell:text-brand-600">Vta. Prom</p>
+                                                    <p class="text-[13px] font-black text-slate-700 border-b border-dashed border-slate-200 group-hover/cell:border-brand-300 transition-all inline-block">
+                                                        {{ n(sku.promedio_sellout_pz, 1) }} <span class="text-[9px] text-slate-400 font-medium">pz</span>
                                                     </p>
-
+                                                    
                                                     <!-- Popover Historial Sellout: abre hacia arriba en el último SKU, hacia abajo en el resto -->
                                                     <div v-if="openSelloutId === (tienda.id_cliente + '_' + sku.sku_cadena)"
                                                          class="absolute right-0 z-[999] bg-white border border-slate-200 shadow-2xl rounded-2xl p-4 w-[280px] cursor-default ring-1 ring-black/5"
@@ -1267,64 +1262,62 @@ const totalUniqueOCs = computed(() => {
                                                     </div>
                                                 </div>
                                                 <div class="text-right">
-                                                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">Criterio</p>
-                                                    <p class="text-sm font-black text-slate-500">{{ sku.semanas_objetivo || '—' }} <span class="text-[10px] text-slate-400 font-medium">sem</span></p>
+                                                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">Criterio</p>
+                                                    <p class="text-[13px] font-black text-slate-500">{{ sku.semanas_objetivo || '—' }} <span class="text-[9px] text-slate-400 font-medium">sem</span></p>
                                                 </div>
                                             </div>
 
-                                            <!-- Acciones y Resultados (Derecha) -->
-                                            <div class="shrink-0 flex items-center min-w-[450px]">
-                                                <!-- Cadena -->
-                                                <div class="flex flex-col items-center w-[80px]">
-                                                     <p class="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1">Centralizado</p>
-                                                     <span class="text-sm font-black text-slate-800">{{ n(sku.cant_pedida, 0) }}</span>
-                                                </div>
 
-                                                <!-- Pedido Sugerido -->
-                                                <div class="flex flex-col items-center justify-center border-l border-slate-100 w-[140px] bg-amber-50/30">
-                                                    <p class="text-[9px] font-black text-amber-600 uppercase tracking-tighter mb-1">Sugerido</p>
-                                                    <div class="flex items-center justify-center gap-1.5 w-full">
-                                                        <div v-if="editingId === sku.sku_muliix" class="flex items-center justify-center gap-1">
-                                                            <input 
-                                                                v-model.number="editValue" 
-                                                                type="number" min="0" :step="sku.pzas_bolsa || 1"
-                                                                class="w-16 h-8 text-[12px] font-black text-right border-2 border-brand-400 rounded-xl px-2 outline-none shadow-sm"
-                                                                @keyup.enter="confirmEdit(sku, tienda.id_cliente)"
-                                                                @keyup.escape="cancelEdit()"
-                                                            />
-                                                            <button @click="confirmEdit(sku, tienda.id_cliente)" class="w-8 h-8 bg-brand-500 text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-brand-600 transition-colors">
-                                                                <i :class="saving ? 'fa-spin fa-circle-notch' : 'fa-check'" class="fa-solid text-xs"></i>
+                                            <!-- Acciones y Resultados (Derecha) -->
+                                            <div class="shrink-0 flex flex-wrap lg:flex-nowrap items-center gap-3 w-full lg:w-auto">
+                                                <div class="flex items-center grow lg:grow-0 divide-x divide-slate-100 bg-slate-50 lg:bg-transparent rounded-xl lg:rounded-none overflow-hidden border lg:border-0 border-slate-100">
+                                                    <!-- Cadena -->
+                                                    <div class="flex flex-col items-center justify-center w-[65px] h-12 lg:h-auto">
+                                                        <p class="text-[7px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">Central</p>
+                                                        <span class="text-[12px] font-black text-slate-800">{{ n(sku.cant_pedida, 0) }}</span>
+                                                    </div>
+    
+                                                    <!-- Pedido Sugerido -->
+                                                    <div class="flex flex-col items-center justify-center w-[110px] h-12 lg:h-auto bg-amber-50/50">
+                                                        <p class="text-[7px] font-black text-amber-600 uppercase tracking-tighter mb-0.5">Sugerido</p>
+                                                        <div class="flex items-center justify-center gap-1 w-full px-1">
+                                                            <div v-if="editingId === sku.sku_muliix" class="flex items-center justify-center gap-1">
+                                                                <input 
+                                                                    v-model.number="editValue" 
+                                                                    type="number" min="0" :step="sku.pzas_bolsa || 1"
+                                                                    class="w-12 h-6 text-[10px] font-black text-right border border-brand-400 rounded-md px-1 outline-none shadow-sm"
+                                                                    @keyup.enter="confirmEdit(sku, tienda.id_cliente)"
+                                                                    @keyup.escape="cancelEdit()"
+                                                                />
+                                                            </div>
+                                                            <button v-else @click="startEdit(sku)" class="h-7 w-[70px] bg-white border border-slate-200 hover:border-brand-400 rounded-lg flex items-center justify-center gap-1 transition-all group/edit">
+                                                                <i v-if="esSinSellout(sku)" class="fa-solid fa-seedling text-[8px] text-amber-500 shrink-0"></i>
+                                                                <span class="text-[12px] font-black truncate" :class="sku.pedido_sugerido_pz_red > 0 ? 'text-brand-700' : 'text-slate-800'">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
                                                             </button>
                                                         </div>
-                                                        <button v-else @click="startEdit(sku)" class="h-10 w-[100px] px-3 bg-white border-2 border-slate-100 hover:border-brand-400 hover:shadow-lg rounded-2xl flex items-center justify-center gap-2 transition-all group/edit">
-                                                            <i v-if="esSinSellout(sku)" class="fa-solid fa-seedling text-[10px] text-amber-500 shrink-0" title="Sin sellout promedio"></i>
-                                                            <i v-else class="fa-solid fa-pen text-[10px] text-slate-300 group-hover/edit:text-brand-500 transition-colors shrink-0"></i>
-                                                            <span class="text-[15px] font-black truncate" :class="sku.pedido_sugerido_pz_red > 0 ? 'text-brand-700' : 'text-slate-800'">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
-                                                        </button>
                                                     </div>
-                                                </div>
-
-                                                <!-- Cobertura & Fill Rate (A la derecha de Sugerido) -->
-                                                <div class="flex items-center border-l border-slate-100">
-                                                    <div class="flex flex-col items-center w-[90px]">
-                                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1">Cobertura</p>
-                                                        <span class="flex items-center justify-center gap-1.5 text-sm font-black" :class="cobClass(calcularCoberturaDinamica(sku))">
-                                                            <i v-if="coberturaStatusIcon(coberturaStatus(sku))" :class="coberturaStatusIcon(coberturaStatus(sku))" class="text-[10px] shrink-0"></i>
+    
+                                                    <!-- Cobertura -->
+                                                    <div class="flex flex-col items-center justify-center w-[70px] h-12 lg:h-auto">
+                                                        <p class="text-[7px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">Cob.</p>
+                                                        <span class="flex items-center justify-center gap-1 text-[12px] font-black" :class="cobClass(calcularCoberturaDinamica(sku))">
+                                                            <i v-if="coberturaStatusIcon(coberturaStatus(sku))" :class="coberturaStatusIcon(coberturaStatus(sku))" class="text-[8px] shrink-0"></i>
                                                             {{ calcularCoberturaDinamica(sku) != null ? calcularCoberturaDinamica(sku)!.toFixed(1) : '—' }}
                                                         </span>
                                                     </div>
-                                                    <div class="flex flex-col items-center border-l border-slate-50 w-[100px]">
-                                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1">Fill Rate</p>
-                                                        <span class="flex items-center justify-center gap-1.5 text-sm font-black" :class="fillRateBadge(calcularFillRateDinamico(sku)).text.replace('font-semibold', '').replace('font-bold', '')">
-                                                            <i v-if="fillRateBadge(calcularFillRateDinamico(sku)).icon" :class="fillRateBadge(calcularFillRateDinamico(sku)).icon" class="text-[10px] shrink-0"></i>
+
+                                                    <!-- Fill Rate -->
+                                                    <div class="flex flex-col items-center justify-center w-[70px] h-12 lg:h-auto">
+                                                        <p class="text-[7px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">Fill</p>
+                                                        <span class="flex items-center justify-center gap-1 text-[12px] font-black" :class="fillRateBadge(calcularFillRateDinamico(sku)).text">
                                                             {{ calcularFillRateDinamico(sku) != null ? (calcularFillRateDinamico(sku)! * 100).toFixed(0) + '%' : '—' }}
                                                         </span>
                                                     </div>
                                                 </div>
-
+ 
                                                 <!-- Status Fill Rate (Dot) -->
-                                                <div class="border-l border-slate-100 h-10 flex items-center justify-center w-[40px]" :title="fillRateStatusDot(sku).label">
-                                                    <span class="w-3 h-3 rounded-full block border shadow-inner transition-colors" :class="fillRateStatusDot(sku).cls"></span>
+                                                <div class="hidden lg:flex border-l border-slate-100 h-8 items-center justify-center w-[30px]" :title="fillRateStatusDot(sku).label">
+                                                    <span class="w-2.5 h-2.5 rounded-full block border shadow-inner transition-colors" :class="fillRateStatusDot(sku).cls"></span>
                                                 </div>
                                             </div>
                                         </div>
