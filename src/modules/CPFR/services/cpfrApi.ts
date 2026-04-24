@@ -200,5 +200,27 @@ export const cpfrApi = {
         const { data } = await api.post('/cpfr/dash-orders/z8', body)
         return data
     },
+
+    // ── Sku Cadena Mappings (v2) ───────────────────────────────────────────────
+
+    async getSkuCadenas(): Promise<import('../types/cpfrTypes').CpfrSkuCadena[]> {
+        const { data } = await api.get('/v2/skuscadenas')
+        return data.data
+    },
+
+    async createSkuCadena(payload: Partial<import('../types/cpfrTypes').CpfrSkuCadena>): Promise<{ success: boolean; message?: string }> {
+        const { data } = await api.post('/v2/skuscadenas', payload)
+        return data
+    },
+
+    async updateSkuCadena(id: number, payload: Partial<import('../types/cpfrTypes').CpfrSkuCadena>): Promise<{ success: boolean; message?: string }> {
+        const { data } = await api.put(`/v2/skuscadenas/${id}`, payload)
+        return data
+    },
+
+    async deleteSkuCadena(id: number): Promise<{ success: boolean; message?: string }> {
+        const { data } = await api.delete(`/v2/skuscadenas/${id}`)
+        return data
+    },
     
 }

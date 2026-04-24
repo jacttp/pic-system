@@ -2,7 +2,7 @@
 // src/modules/CPFR/components/CpfrChainConfigModal.vue
 import { ref, computed, onMounted, reactive, watch } from 'vue'
 import { useCpfrStore } from '../stores/cpfrStore'
-import type { CpfrStoreConfig, CpfrSkuUnit } from '../types/cpfrTypes'
+import type { CpfrStoreConfig, CpfrSkuUnit, CpfrSkuCadena } from '../types/cpfrTypes'
 
 const emit = defineEmits<{
   (e: 'close'): void
@@ -13,7 +13,7 @@ const store = useCpfrStore()
 // ── Tab System ───────────────────────────────────────────────────────────────
 // 'stores' = configuración de tiendas (pestaña original)
 // 'skus'   = configuración de unidades SKU (nueva pestaña)
-const activeTab = ref<'stores' | 'skus'>('stores')
+const activeTab = ref<'stores' | 'skus' | 'cadenas'>('stores')
 
 // ── Pestaña 1: Configuración de Tiendas ──────────────────────────────────────
 
@@ -147,6 +147,17 @@ watch(activeTab, async (tab) => {
     })
     skusLoaded.value = true
   }
+  if (tab === 'cadenas' && !cadenasLoaded.value) {
+    if (!skusLoaded.value) {
+      await store.fetchAllSkusConfig()
+      store.allSkusConfig.forEach(s => {
+        localSkus[s.sku_muliix] = { ...s }
+      })
+      skusLoaded.value = true
+    }
+    await store.fetchSkusCadenas()
+    cadenasLoaded.value = true
+  }
 })
 
 // Sincronizar si el store se refresca externamente
@@ -211,6 +222,95 @@ async function saveAllSkuChanges() {
     saveSkuMessage.value = 'Error al guardar algunos cambios.'
   } finally {
     isSavingSkus.value = false
+  }
+}
+
+// ── Pestaña 3: Configuración Cadenas ────────────────────────────────────────
+const cadenasSearch = ref('')
+const cadenasLoaded = ref(false)
+
+const CADENAS_OPTIONS = ['soriana', 'walmart', 'chedraui', 'sams']
+
+const isSavingCadena = ref(false)
+const saveCadenaMessage = ref('')
+
+const newCadenaForm = reactive({
+  sku_muliix: '',
+  upc_cadena: '',
+  sku_cadena: '',
+  nom_cadena: 'soriana'
+})
+
+const editingCadenaId = ref<number | null>(null)
+const editingCadenaForm = reactive<Partial<CpfrSkuCadena>>({})
+
+const filteredCadenas = computed(() => {
+  let list = store.skusCadenas
+  if (!cadenasSearch.value) return list
+  const q = cadenasSearch.value.toLowerCase()
+  return list.filter(c => 
+    c.sku_muliix.toLowerCase().includes(q) ||
+    c.sku_nombre.toLowerCase().includes(q) ||
+    (c.sku_cadena && c.sku_cadena.toLowerCase().includes(q)) ||
+    (c.upc_cadena && c.upc_cadena.toLowerCase().includes(q)) ||
+    c.nom_cadena.toLowerCase().includes(q)
+  )
+})
+
+async function submitNewCadena() {
+  isSavingCadena.value = true
+  saveCadenaMessage.value = ''
+  try {
+    await store.addSkuCadena({ ...newCadenaForm })
+    newCadenaForm.sku_muliix = ''
+    newCadenaForm.upc_cadena = ''
+    newCadenaForm.sku_cadena = ''
+    saveCadenaMessage.value = 'Mapeo añadido correctamente.'
+    setTimeout(() => { saveCadenaMessage.value = '' }, 3000)
+  } catch (e: any) {
+    saveCadenaMessage.value = e.message
+  } finally {
+    isSavingCadena.value = false
+  }
+}
+
+function startEditCadena(cadena: CpfrSkuCadena) {
+  editingCadenaId.value = cadena.idskuscadenas
+  Object.assign(editingCadenaForm, { ...cadena })
+}
+
+function cancelEditCadena() {
+  editingCadenaId.value = null
+}
+
+async function saveEditCadena() {
+  if (!editingCadenaId.value) return
+  isSavingCadena.value = true
+  saveCadenaMessage.value = ''
+  try {
+    await store.updateSkuCadena(editingCadenaId.value, editingCadenaForm)
+    editingCadenaId.value = null
+    saveCadenaMessage.value = 'Mapeo actualizado.'
+    setTimeout(() => { saveCadenaMessage.value = '' }, 3000)
+  } catch (e: any) {
+    saveCadenaMessage.value = e.message
+  } finally {
+    isSavingCadena.value = false
+  }
+}
+
+async function deleteCadena(id: number) {
+  if (!confirm('¿Eliminar este mapeo?')) return
+  isSavingCadena.value = true
+  saveCadenaMessage.value = ''
+  try {
+    await store.removeSkuCadena(id)
+    saveCadenaMessage.value = 'Mapeo eliminado.'
+    setTimeout(() => { saveCadenaMessage.value = '' }, 3000)
+  } catch(e: any) {
+    saveCadenaMessage.value = e.message
+  } finally {
+    isSavingCadena.value = false
   }
 }
 
@@ -288,7 +388,17 @@ const activeModifiedCount = computed(() =>
                 : 'text-slate-400 hover:text-sky-600'"
             >
               <i class="fa-solid fa-boxes-stacked text-[10px]"></i>
-              Config. Unidades SKU
+              Unidades SKU
+            </button>
+            <button
+              @click="activeTab = 'cadenas'"
+              class="flex-1 h-9 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+              :class="activeTab === 'cadenas'
+                ? 'bg-sky-100 text-sky-700 shadow-sm border border-sky-200'
+                : 'text-slate-400 hover:text-sky-600'"
+            >
+              <i class="fa-solid fa-link text-[10px]"></i>
+              Cadenas
             </button>
           </div>
 
@@ -316,12 +426,23 @@ const activeModifiedCount = computed(() =>
           </div>
 
           <!-- ── TAB 2: Filtros de SKUs ── -->
-          <div v-else class="relative group">
+          <div v-else-if="activeTab === 'skus'" class="relative group">
             <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[11px] group-focus-within:text-sky-600 transition-colors"></i>
             <input
               v-model="skuSearch"
               type="text"
               placeholder="Buscar por SKU o nombre de producto..."
+              class="w-full h-11 pl-10 pr-4 bg-white border border-sky-200 rounded-2xl text-xs font-medium focus:bg-white focus:ring-4 focus:ring-sky-100 focus:border-sky-400 outline-none transition-all placeholder:text-slate-300"
+            />
+          </div>
+
+          <!-- ── TAB 3: Filtros Cadenas ── -->
+          <div v-else class="relative group">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[11px] group-focus-within:text-sky-600 transition-colors"></i>
+            <input
+              v-model="cadenasSearch"
+              type="text"
+              placeholder="Buscar por SKU, nombre, UPC o cadena..."
               class="w-full h-11 pl-10 pr-4 bg-white border border-sky-200 rounded-2xl text-xs font-medium focus:bg-white focus:ring-4 focus:ring-sky-100 focus:border-sky-400 outline-none transition-all placeholder:text-slate-300"
             />
           </div>
@@ -452,7 +573,7 @@ const activeModifiedCount = computed(() =>
           </template>
 
           <!-- ── TAB 2: Lista de SKUs ────────────────────────────────────── -->
-          <template v-else>
+          <template v-else-if="activeTab === 'skus'">
             <!-- Loading -->
             <div v-if="store.skusConfigLoading" class="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
               <i class="fa-solid fa-circle-notch fa-spin text-2xl text-indigo-400"></i>
@@ -580,6 +701,132 @@ const activeModifiedCount = computed(() =>
               </div>
               <p class="text-xs font-bold text-slate-400">No se encontraron productos</p>
               <button @click="skuSearch = ''" class="mt-2 text-[10px] text-indigo-500 font-bold hover:underline">Limpiar búsqueda</button>
+            </div>
+          </template>
+
+          <!-- ── TAB 3: Lista Cadenas ──────────────────────────────────────── -->
+          <template v-else>
+            <!-- Loading -->
+            <div v-if="store.skusCadenasLoading" class="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
+              <i class="fa-solid fa-circle-notch fa-spin text-2xl text-indigo-400"></i>
+              <span class="text-[10px] font-bold uppercase tracking-widest">Cargando Mapeos...</span>
+            </div>
+
+            <template v-else>
+              <!-- Formulario nuevo mapeo -->
+              <div class="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 shadow-sm mb-4">
+                <h3 class="text-xs font-black text-indigo-800 uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <i class="fa-solid fa-plus-circle text-indigo-500"></i> Añadir Nuevo Mapeo
+                </h3>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                  <div class="flex flex-col gap-1.5 col-span-2">
+                    <label class="text-[9px] font-black text-indigo-400 uppercase tracking-widest ml-1">SKU Oficial</label>
+                    <select v-model="newCadenaForm.sku_muliix" class="h-9 px-3 bg-white border border-indigo-200 rounded-xl text-[11px] font-semibold text-slate-700 focus:ring-2 focus:ring-indigo-100 outline-none transition-all w-full truncate">
+                      <option value="" disabled>Seleccione un producto...</option>
+                      <option v-for="sku in store.allSkusConfig" :key="sku.sku_muliix" :value="sku.sku_muliix">
+                        {{ sku.sku_muliix }} - {{ sku.sku_nombre }}
+                      </option>
+                    </select>
+                  </div>
+                  <div class="flex flex-col gap-1.5">
+                    <label class="text-[9px] font-black text-indigo-400 uppercase tracking-widest ml-1">UPC Cadena</label>
+                    <input v-model="newCadenaForm.upc_cadena" type="text" placeholder="Ej. 7501000..." class="h-9 px-3 bg-white border border-indigo-200 rounded-xl text-[11px] font-semibold text-slate-700 focus:ring-2 focus:ring-indigo-100 outline-none transition-all w-full" />
+                  </div>
+                  <div class="flex flex-col gap-1.5">
+                    <label class="text-[9px] font-black text-indigo-400 uppercase tracking-widest ml-1">Cadena</label>
+                    <select v-model="newCadenaForm.nom_cadena" class="h-9 px-3 bg-white border border-indigo-200 rounded-xl text-[11px] font-semibold text-slate-700 focus:ring-2 focus:ring-indigo-100 outline-none transition-all w-full capitalize">
+                      <option v-for="opt in CADENAS_OPTIONS" :key="opt" :value="opt">{{ opt }}</option>
+                    </select>
+                  </div>
+                  <div class="flex flex-col gap-1.5 col-span-2">
+                    <label class="text-[9px] font-black text-indigo-400 uppercase tracking-widest ml-1">Nombre en Cadena</label>
+                    <input v-model="newCadenaForm.sku_cadena" type="text" placeholder="Descripción que usa la cadena..." class="h-9 px-3 bg-white border border-indigo-200 rounded-xl text-[11px] font-semibold text-slate-700 focus:ring-2 focus:ring-indigo-100 outline-none transition-all w-full" />
+                  </div>
+                </div>
+                <div class="flex justify-end">
+                  <button @click="submitNewCadena" :disabled="!newCadenaForm.sku_muliix || isSavingCadena" class="h-9 px-4 bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-colors disabled:opacity-50">
+                    <i v-if="isSavingCadena" class="fa-solid fa-spinner fa-spin mr-1"></i> Guardar
+                  </button>
+                </div>
+              </div>
+
+              <!-- Lista de Mapeos -->
+              <div
+                v-for="cadena in filteredCadenas"
+                :key="cadena.idskuscadenas"
+                class="group relative bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all duration-300"
+              >
+                <!-- Modo Edición -->
+                <div v-if="editingCadenaId === cadena.idskuscadenas" class="space-y-3">
+                  <div class="grid grid-cols-2 gap-3">
+                    <div class="flex flex-col gap-1.5">
+                      <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">UPC Cadena</label>
+                      <input v-model="editingCadenaForm.upc_cadena" type="text" class="h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-semibold text-slate-700 focus:bg-white focus:border-indigo-200 outline-none w-full" />
+                    </div>
+                    <div class="flex flex-col gap-1.5">
+                      <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Cadena</label>
+                      <select v-model="editingCadenaForm.nom_cadena" class="h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-semibold text-slate-700 focus:bg-white focus:border-indigo-200 outline-none w-full capitalize">
+                        <option v-for="opt in CADENAS_OPTIONS" :key="opt" :value="opt">{{ opt }}</option>
+                      </select>
+                    </div>
+                    <div class="flex flex-col gap-1.5 col-span-2">
+                      <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre en Cadena</label>
+                      <input v-model="editingCadenaForm.sku_cadena" type="text" class="h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-semibold text-slate-700 focus:bg-white focus:border-indigo-200 outline-none w-full" />
+                    </div>
+                  </div>
+                  <div class="flex justify-end gap-2 pt-2 border-t border-slate-50">
+                    <button @click="cancelEditCadena" class="h-8 px-3 text-[10px] font-bold text-slate-400 hover:text-slate-600">Cancelar</button>
+                    <button @click="saveEditCadena" :disabled="isSavingCadena" class="h-8 px-4 bg-indigo-500 text-white rounded-lg text-[10px] font-bold hover:bg-indigo-600 disabled:opacity-50">Guardar</button>
+                  </div>
+                </div>
+
+                <!-- Modo Vista -->
+                <div v-else>
+                  <div class="flex items-start justify-between mb-2">
+                    <div class="flex-1 min-w-0">
+                      <div class="inline-flex items-center px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 text-[11px] font-black shadow-sm mb-1.5 border border-sky-100 max-w-full truncate">
+                        {{ cadena.sku_nombre }}
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">
+                          {{ cadena.sku_muliix }}
+                        </span>
+                        <span class="px-2 py-0.5 rounded-full text-[9px] font-bold border capitalize shadow-sm"
+                          :class="cadena.nom_cadena === 'soriana' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-slate-50 text-slate-500 border-slate-200'">
+                          {{ cadena.nom_cadena }}
+                        </span>
+                      </div>
+                    </div>
+                    <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button @click="startEditCadena(cadena)" class="w-7 h-7 rounded-lg bg-slate-50 text-indigo-500 hover:bg-indigo-50 transition-colors flex items-center justify-center">
+                        <i class="fa-solid fa-pen text-[10px]"></i>
+                      </button>
+                      <button @click="deleteCadena(cadena.idskuscadenas)" class="w-7 h-7 rounded-lg bg-slate-50 text-rose-500 hover:bg-rose-50 transition-colors flex items-center justify-center">
+                        <i class="fa-solid fa-trash text-[10px]"></i>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-slate-50">
+                     <div>
+                       <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">UPC Cadena</p>
+                       <p class="text-[11px] font-bold text-slate-700 font-mono">{{ cadena.upc_cadena || 'N/D' }}</p>
+                     </div>
+                     <div>
+                       <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Nombre Cadena</p>
+                       <p class="text-[11px] font-semibold text-slate-600 truncate" :title="cadena.sku_cadena || ''">{{ cadena.sku_cadena || 'N/D' }}</p>
+                     </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- Empty State -->
+            <div v-if="!store.skusCadenasLoading && !filteredCadenas.length" class="text-center py-10 px-10">
+              <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-200">
+                <i class="fa-solid fa-link-slash text-2xl"></i>
+              </div>
+              <p class="text-xs font-bold text-slate-400">No se encontraron mapeos</p>
+              <button @click="cadenasSearch = ''" class="mt-2 text-[10px] text-indigo-500 font-bold hover:underline">Limpiar búsqueda</button>
             </div>
           </template>
 

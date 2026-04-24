@@ -434,6 +434,54 @@ export const useCpfrStore = defineStore('cpfr', () => {
         }
     }
 
+    // ── Configuración SKU Cadenas (skuscadenas_IC) ──────────────────────────
+    const skusCadenas = ref<import('../types/cpfrTypes').CpfrSkuCadena[]>([])
+    const skusCadenasLoading = ref(false)
+
+    async function fetchSkusCadenas() {
+        skusCadenasLoading.value = true
+        try {
+            skusCadenas.value = await cpfrApi.getSkuCadenas()
+        } catch (e) {
+            console.error('[cpfrStore.fetchSkusCadenas]', e)
+        } finally {
+            skusCadenasLoading.value = false
+        }
+    }
+
+    async function addSkuCadena(payload: Partial<import('../types/cpfrTypes').CpfrSkuCadena>): Promise<boolean> {
+        try {
+            await cpfrApi.createSkuCadena(payload)
+            await fetchSkusCadenas()
+            return true
+        } catch (e: any) {
+            console.error('[cpfrStore.addSkuCadena]', e)
+            throw new Error(e?.response?.data?.message || 'Error al añadir mapeo.')
+        }
+    }
+
+    async function updateSkuCadena(id: number, payload: Partial<import('../types/cpfrTypes').CpfrSkuCadena>): Promise<boolean> {
+        try {
+            await cpfrApi.updateSkuCadena(id, payload)
+            await fetchSkusCadenas()
+            return true
+        } catch (e: any) {
+            console.error('[cpfrStore.updateSkuCadena]', e)
+            throw new Error(e?.response?.data?.message || 'Error al actualizar mapeo.')
+        }
+    }
+
+    async function removeSkuCadena(id: number): Promise<boolean> {
+        try {
+            await cpfrApi.deleteSkuCadena(id)
+            skusCadenas.value = skusCadenas.value.filter(s => s.idskuscadenas !== id)
+            return true
+        } catch (e: any) {
+            console.error('[cpfrStore.removeSkuCadena]', e)
+            throw new Error(e?.response?.data?.message || 'Error al eliminar mapeo.')
+        }
+    }
+
     // ── Return ────────────────────────────────────────────────────────────────
 
     return {
@@ -458,6 +506,9 @@ export const useCpfrStore = defineStore('cpfr', () => {
         fetchAllConfigs,
         // Config de unidades SKU (para CpfrChainConfigModal)
         allSkusConfig, skusConfigLoading,
-        fetchAllSkusConfig, saveSkuConfig
+        fetchAllSkusConfig, saveSkuConfig,
+        // Config SKU Cadenas
+        skusCadenas, skusCadenasLoading, fetchSkusCadenas,
+        addSkuCadena, updateSkuCadena, removeSkuCadena
     }
 })

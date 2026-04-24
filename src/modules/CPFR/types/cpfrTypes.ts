@@ -203,4 +203,16 @@ export interface CpfrUploadOCResponse {
     inserted: number
     skipped: number
     skipped_detail: Array<{ row: number; sku_cadena?: string; reason: string }>
-}
+}
+
+// ─── Sku Cadena Mappings — CRUD /api/v2/skuscadenas ─────────────────────────
+
+export interface CpfrSkuCadena {
+    idskuscadenas: number
+    sku_muliix: string
+    sku_nombre: string
+    sku_cadena: string | null
+    upc_cadena: string | null
+    nom_cadena: string
+}
+
