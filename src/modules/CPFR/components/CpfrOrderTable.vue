@@ -135,6 +135,7 @@ function isZ8(num: string | null): boolean {
 function groupOCs(skus: CpfrSkuDash[]): GroupedOC[] {
     const map = new Map<string, GroupedOC>()
     for (const sku of skus) {
+        if (sku.pedido_sugerido_pz_red === 0) continue
         const key = sku.num_pedido || 'UNSAVED'
         if (!map.has(key)) {
             map.set(key, {
@@ -154,10 +155,10 @@ function groupOCs(skus: CpfrSkuDash[]): GroupedOC[] {
         oc.cant_pedida_total += (sku.cant_pedida || 0)
         oc.skus.push(sku)
     }
-    // Retornamos: 
+    // Retornamos:
     // 1. Órdenes normales primero, Z8 al final
     // 2. Por fec_pedido_cadena descendente (más reciente primero)
-    return Array.from(map.values()).sort((a, b) => {
+    return Array.from(map.values()).filter(oc => oc.skus.length > 0).sort((a, b) => {
         const dateA = a.fec_pedido_cadena ? new Date(a.fec_pedido_cadena).getTime() : 0;
         const dateB = b.fec_pedido_cadena ? new Date(b.fec_pedido_cadena).getTime() : 0;
         
@@ -655,7 +656,7 @@ const totalUniqueOCs = computed(() => {
                     <span class="text-[10px] text-slate-500 font-medium ml-2 border-l border-slate-300 pl-3">
                       {{ dia.tiendas.length }} tienda{{ dia.tiendas.length !== 1 ? 's' : '' }}
                       ·
-                      {{ dia.tiendas.reduce((a, t) => a + t.total_skus, 0) }} SKUs
+                      {{ dia.tiendas.reduce((a, t) => a + (t.skus || []).filter(s => s.pedido_sugerido_pz_red !== 0).length, 0) }} SKUs
                     </span>
                   </div>
                 </td>

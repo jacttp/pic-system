@@ -27,6 +27,8 @@ export const useCpfrStore = defineStore('cpfr', () => {
     const loading       = ref(false)
     const preview       = ref(false)          // true cuando viene de /recalculate
     const error         = ref<string | null>(null)
+    const z8Loading     = ref(false)
+    const z8Result      = ref<{ message: string; created: number } | null>(null)
 
     const criterio_global = ref<number>(2.5)
     const nom_cadena      = ref<string>('soriana')
@@ -181,6 +183,23 @@ export const useCpfrStore = defineStore('cpfr', () => {
         } catch (e: any) {
             console.error('[cpfrStore.updateStatus]', e)
             return { ok: false }
+        }
+    }
+
+    async function generateZ8(): Promise<void> {
+        if (!currentWeek.value) return
+        z8Loading.value = true
+        z8Result.value = null
+        try {
+            const res = await cpfrApi.generateZ8(buildDashBody())
+            z8Result.value = { message: res.message, created: res.created }
+            // Recargar dashboard para reflejar los nuevos cascarones Z8
+            await loadDashboard()
+        } catch (e: any) {
+            z8Result.value = { message: 'Error al generar Z8.', created: 0 }
+            console.error('[cpfrStore.generateZ8]', e)
+        } finally {
+            z8Loading.value = false
         }
     }
 
@@ -487,10 +506,11 @@ export const useCpfrStore = defineStore('cpfr', () => {
     return {
         // State
         currentWeek, context, dias, loading, preview, error,
+        z8Loading, z8Result,
         criterio_global, nom_cadena, filters, overrides, expandedStores,
         statusFilters, viewMode, activeTab,
         // Actions
-        init, fetchCurrentWeek, loadDashboard, recalculate,
+        init, fetchCurrentWeek, loadDashboard, recalculate, generateZ8,
         adjustSku, updateStatus,
         toggleStore, expandAll, collapseAll, expandAllOCs, collapseAllOCs,
         setFilter, clearFilters,

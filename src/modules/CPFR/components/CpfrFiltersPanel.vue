@@ -106,6 +106,10 @@ function confirmRecalculate() {
     }
 }
 
+async function triggerGenerateZ8() {
+    await store.generateZ8()
+}
+
 // ── Collapse State ───────────────────────────────────────────────────────────
 const isCollapsed = ref(true)
 
@@ -307,14 +311,41 @@ function clearAll() {
                     <i class="fa-solid fa-circle-info text-rose-400 cursor-help" title="Atención: Recalcular sobrescribirá todos los cambios manuales guardados hoy en el borrador."></i>
                     Motor
                   </span>
-                  <button
-                    class="inline-flex items-center gap-2 text-xs font-bold px-4 h-[34px] rounded-lg border border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 transition-all shadow-sm"
-                    @click.stop="confirmRecalculate"
-                    title="Fuerza un recálculo basado en inventario"
-                  >
-                    <i class="fa-solid fa-rotate text-[11px]"></i>
-                    <span class="hidden xl:inline">Recalcular</span>
-                  </button>
+                  <div class="flex items-center gap-2">
+                    <button
+                      class="inline-flex items-center gap-2 text-xs font-bold px-4 h-[34px] rounded-lg border border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 transition-all shadow-sm"
+                      @click.stop="confirmRecalculate"
+                      title="Fuerza un recálculo basado en inventario"
+                    >
+                      <i class="fa-solid fa-rotate text-[11px]"></i>
+                      <span class="hidden xl:inline">Recalcular</span>
+                    </button>
+
+                    <!-- Generar Z8 -->
+                    <div class="flex flex-col items-end gap-0.5">
+                      <button
+                        class="inline-flex items-center gap-2 text-xs font-bold px-4 h-[34px] rounded-lg border transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        :class="store.z8Loading
+                          ? 'border-violet-300 bg-violet-100 text-violet-600 cursor-wait'
+                          : 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100'"
+                        @click.stop="triggerGenerateZ8"
+                        :disabled="store.z8Loading"
+                        title="Genera los cascarones Z8 para la semana activa"
+                      >
+                        <i
+                          class="fa-solid text-[11px]"
+                          :class="store.z8Loading ? 'fa-circle-notch fa-spin' : 'fa-bolt'"
+                        ></i>
+                        <span class="hidden xl:inline">{{ store.z8Loading ? 'Generando…' : 'Generar Z8' }}</span>
+                      </button>
+                      <span
+                        v-if="store.z8Result"
+                        class="text-[9px] font-semibold px-1 truncate max-w-[140px]"
+                        :class="store.z8Result.created > 0 ? 'text-violet-600' : 'text-slate-400'"
+                        :title="store.z8Result.message"
+                      >{{ store.z8Result.created > 0 ? `+${store.z8Result.created} Z8` : 'Sin cambios' }}</span>
+                    </div>
+                  </div>
               </div>
 
               <div class="w-px h-8 bg-slate-200 self-end mb-1 mx-1"></div>

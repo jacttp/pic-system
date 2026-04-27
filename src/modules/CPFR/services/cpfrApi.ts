@@ -201,6 +201,16 @@ export const cpfrApi = {
         return data
     },
 
+    /**
+     * POST /api/cpfr/generate-z8
+     * Genera manualmente los cascarones Z8 para la semana activa.
+     * Devuelve { success, message, created }.
+     */
+    async generateZ8(body: DashOrdersBody): Promise<{ success: boolean; message: string; created: number }> {
+        const { data } = await api.post('/cpfr/generate-z8', body)
+        return data
+    },
+
     // ── Sku Cadena Mappings (v2) ───────────────────────────────────────────────
 
     async getSkuCadenas(): Promise<import('../types/cpfrTypes').CpfrSkuCadena[]> {
