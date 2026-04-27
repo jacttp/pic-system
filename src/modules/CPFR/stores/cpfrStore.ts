@@ -87,6 +87,8 @@ export const useCpfrStore = defineStore('cpfr', () => {
         context.value = data.context
         dias.value    = data.dias
         preview.value = data.preview === true
+        // Expand all stores by default
+        expandAll()
     }
 
     // ── Actions principales ───────────────────────────────────────────────────
@@ -100,8 +102,8 @@ export const useCpfrStore = defineStore('cpfr', () => {
         if (!currentWeek.value) return
         loading.value = true
         error.value = null
-        // Reset expand state on fresh load
-        Object.keys(expandedStores).forEach(k => { expandedStores[k] = false })
+        // Expand all stores by default on load
+        Object.keys(expandedStores).forEach(k => { expandedStores[k] = true })
         try {
             const res = await cpfrApi.loadDashboard(buildDashBody())
             applyResponse(res)

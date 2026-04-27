@@ -772,18 +772,18 @@ const totalUniqueOCs = computed(() => {
                       <tr
                         class="cursor-pointer transition-colors text-[11px] border-b border-slate-200 group/row"
                         :class="[
-                          expandedOCGroups[`${tienda.id_cliente}_${ocGroup.group_id}`] !== false ? 'bg-slate-100/40' : 'bg-white hover:bg-slate-50/80',
+                          expandedOCGroups[`${tienda.id_cliente}_${ocGroup.group_id}`] === true ? 'bg-slate-100/40' : 'bg-white hover:bg-slate-50/80',
                           isZ8(ocGroup.num_pedido) ? 'bg-purple-50/30' : ''
                         ]"
                         @click="toggleOCGroup(tienda.id_cliente, ocGroup.group_id)"
                       >
                         <!-- Etiqueta OC -->
-                        <td colspan="6" class="pl-10 pr-3 py-4 text-slate-700 font-semibold border-l-[6px]"
+                        <td colspan="6" class="pl-16 pr-3 py-2 text-slate-700 font-semibold border-l-[6px] border-t-[12px] border-t-white"
                             :class="isZ8(ocGroup.num_pedido) ? 'border-l-purple-500 bg-purple-50/20' : 'border-l-brand-300'">
                           <div class="flex items-center flex-wrap gap-2 min-w-0 max-w-4xl">
                             <i
                               class="fa-solid fa-chevron-right text-slate-300 text-[10px] transition-transform duration-200 shrink-0"
-                              :class="expandedOCGroups[`${tienda.id_cliente}_${ocGroup.group_id}`] !== false ? 'rotate-90 text-slate-500' : 'group-hover/row:text-slate-400'"
+                              :class="expandedOCGroups[`${tienda.id_cliente}_${ocGroup.group_id}`] === true ? 'rotate-90 text-slate-500' : 'group-hover/row:text-slate-400'"
                             ></i>
                             <span class="truncate uppercase tracking-wider text-[10px] text-slate-500">Orden de Compra:</span>
                             
@@ -875,23 +875,23 @@ const totalUniqueOCs = computed(() => {
                           </div>
                         </td>
 
-                        <!-- Pedido Sugerido SUM -->
-                        <td class="px-3 py-4 text-right font-bold text-amber-700 bg-amber-50/50 border-x border-amber-100/70 text-sm tracking-tight">
+                          <!-- Pedido Sugerido SUM -->
+                        <td class="px-3 py-2 text-right font-bold text-amber-700 bg-amber-50/50 border-x border-amber-100/70 border-t-[12px] border-t-white text-sm tracking-tight">
                           {{ n(ocGroup.pedido_sugerido_pz_red_total, 0) }}
                         </td>
 
                         <!-- Pedido Cadena SUM -->
-                        <td class="px-3 py-4 text-right font-bold text-slate-800">
+                        <td class="px-3 py-2 text-right font-bold text-slate-800 border-t-[12px] border-t-white">
                           {{ n(ocGroup.cant_pedida_total, 0) }}
                         </td>
 
-                        <td class="px-3 py-4 text-center text-slate-400" colspan="3">
+                        <td class="px-3 py-2 text-center text-slate-400 border-t-[12px] border-t-white" colspan="3">
                           <span class="text-[10px] italic">Detalle en fila inferior</span>
                         </td>
                       </tr>
 
                       <!-- Children SKU Rows -->
-                      <template v-if="expandedOCGroups[`${tienda.id_cliente}_${ocGroup.group_id}`] !== false">
+                      <template v-if="expandedOCGroups[`${tienda.id_cliente}_${ocGroup.group_id}`] === true">
                         <!-- NIVEL 5: SKU — Indentación profunda, estilos condicionales mantenidos -->
                         <tr
                           v-for="(sku, skuIdx) in ocGroup.skus"
@@ -903,7 +903,7 @@ const totalUniqueOCs = computed(() => {
                           ]"
                         >
                           <!-- Nombre SKU -->
-                          <td class="pl-14 pr-3 py-4 text-slate-700 font-medium" :title="sku.sku_nombre">
+                          <td class="pl-24 pr-3 py-2 text-slate-700 font-medium" :title="sku.sku_nombre">
                             <div class="flex items-center gap-2 min-w-0">
                               <span
                                 class="shrink-0 inline-flex text-[9px] font-bold px-1.5 py-0.5 rounded-md border"
@@ -915,16 +915,16 @@ const totalUniqueOCs = computed(() => {
                           </td>
 
                           <!-- UPC -->
-                          <td class="px-3 py-6 text-slate-500 text-[10px] font-mono">{{ sku.upc_cadena ?? '—' }}</td>
+                          <td class="px-3 py-2 text-slate-500 text-[10px] font-mono">{{ sku.upc_cadena ?? '—' }}</td>
 
                           <!-- Inv. Actual (pz) -->
-                          <td class="px-3 py-4 text-right text-slate-700 cursor-help"
+                          <td class="px-3 py-2 text-right text-slate-700 cursor-help"
                               :title="`${n(sku.inv_actual_kg, 2)} kg (Inv. uni. = ${sku.unidad_inventario} kg/pz)`">
                             <span class="border-b border-dashed border-slate-300">{{ n(sku.inv_actual_pz, 2) }}</span>
                           </td>
 
                           <!-- Vta. Prom. Semanal (pz) -->
-                          <td class="px-3 py-4 text-right text-slate-700 relative cursor-pointer group/cell hover:bg-slate-100 transition-colors rounded-lg"
+                          <td class="px-3 py-2 text-right text-slate-700 relative cursor-pointer group/cell hover:bg-slate-100 transition-colors rounded-lg"
                               @click.stop="toggleSellout(tienda.id_cliente + '_' + sku.sku_cadena)">
                             
                             <div class="cursor-help" :title="`${n(sku.promedio_sellout_kg, 2)} kg (Inv. uni. = ${sku.unidad_inventario} kg/pz)`">
@@ -969,13 +969,13 @@ const totalUniqueOCs = computed(() => {
                           </td>
 
                           <!-- Criterio (sem. objetivo) -->
-                          <td class="px-3 py-4 text-right text-slate-500">
+                          <td class="px-3 py-2 text-right text-slate-500">
                             {{ sku.semanas_objetivo }}
                           </td>
 
                           <!-- Semanas Actuales (cobertura dinamica) -->
                           <td
-                            class="px-3 py-6 text-right font-bold relative"
+                            class="px-3 py-2 text-right font-bold relative"
                             :class="cobClass(calcularCoberturaDinamica(sku))"
                             :title="coberturaStatusTooltip(coberturaStatus(sku), calcularCoberturaDinamica(sku), sku.semanas_objetivo || store.criterio_global || 2.5)"
                           >
@@ -986,7 +986,7 @@ const totalUniqueOCs = computed(() => {
                           </td>
 
                           <!-- Pedido Sugerido (editable Excel-style) -->
-                          <td class="px-2 py-4 align-middle bg-amber-50/50 border-x border-amber-100/50 relative group/cell">
+                          <td class="px-2 py-2 align-middle bg-amber-50/50 border-x border-amber-100/50 relative group/cell">
                             <div class="absolute inset-y-0 left-0 w-[2px] bg-amber-400/20"></div>
                             
                             <div v-if="editingId === sku.sku_muliix && sku.sku_muliix" class="flex items-center gap-1.5 justify-end h-full">
@@ -1022,14 +1022,14 @@ const totalUniqueOCs = computed(() => {
                           </td>
 
                           <!-- Pedido Cadena (cant_pedida) -->
-                          <td class="px-3 py-4 text-right font-semibold text-slate-800">
+                          <td class="px-3 py-2 text-right font-semibold text-slate-800">
                             {{ n(sku.cant_pedida, 0) }}
                           </td>
 
 
                           <!-- Fill Rate -->
                           <td
-                            class="px-3 py-4 text-right font-medium"
+                            class="px-3 py-2 text-right font-medium"
                             :class="[fillRateBadge(calcularFillRateDinamico(sku)).bg, fillRateBadge(calcularFillRateDinamico(sku)).text]"
                             :title="fillRateBadge(calcularFillRateDinamico(sku)).tip"
                           >
@@ -1040,7 +1040,7 @@ const totalUniqueOCs = computed(() => {
                           </td>
 
                           <!-- INSTOCK per SKU -->
-                          <td class="px-3 py-4 text-center">
+                          <td class="px-3 py-2 text-center">
                             <span
                               class="inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-md border w-fit mx-auto"
                               :class="instockBadge(sku.instock).cls"
@@ -1054,8 +1054,8 @@ const totalUniqueOCs = computed(() => {
                         </tr>
                       </template>
 
-                      <!-- Fila de respiro entre Grupos de OC -->
-                      <tr class="h-12 bg-transparent"><td colspan="11"></td></tr>
+                      <!-- Margin Bottom para el grupo de OC -->
+                      <tr class="bg-white border-none"><td colspan="13" class="py-2.5"></td></tr>
 
                     </template>
 
@@ -1155,7 +1155,7 @@ const totalUniqueOCs = computed(() => {
 
                         <!-- Grupos OC (Apiladas hacia abajo) con Transición -->
                         <div v-if="store.expandedStores[tienda.id_cliente]" class="flex-1 flex flex-col animate-in fade-in slide-in-from-top-4 duration-300">
-                            <div class="p-8 space-y-11 bg-slate-50/30">
+                            <div class="p-8 space-y-4 bg-slate-50/30">
                             <div v-for="oc in groupOCs(tienda.skus)" :key="oc.group_id" 
                                  class="w-full flex flex-col border rounded-xl shadow-sm hover:shadow-md transition-all border-l-4 relative" 
                                   :class="[
@@ -1170,7 +1170,7 @@ const totalUniqueOCs = computed(() => {
                                      @click.stop="toggleOCGroup(tienda.id_cliente, oc.group_id)">
                                     <div class="flex flex-wrap items-center gap-2.5">
                                         <i class="fa-solid text-slate-300 text-[9px] transition-transform duration-300"
-                                           :class="expandedOCGroups[tienda.id_cliente + '_' + oc.group_id] !== false ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
+                                           :class="expandedOCGroups[tienda.id_cliente + '_' + oc.group_id] === true ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
                                         <div class="flex items-center gap-1.5">
                                             <i class="fa-solid fa-file-invoice text-slate-400 text-[10px]"></i>
                                             <span class="text-[10px] font-black text-slate-700 tracking-tight">{{ oc.num_pedido || 'SIN FOLIO' }}</span>
@@ -1221,7 +1221,7 @@ const totalUniqueOCs = computed(() => {
                                 </div>
 
                                 <!-- SKU List -->
-                                <div v-if="expandedOCGroups[tienda.id_cliente + '_' + oc.group_id] !== false" class="divide-y divide-slate-100 animate-in fade-in slide-in-from-top-2 duration-200">
+                                <div v-if="expandedOCGroups[tienda.id_cliente + '_' + oc.group_id] === true" class="divide-y divide-slate-100 animate-in fade-in slide-in-from-top-2 duration-200">
                                     <div v-for="(sku, skuIdx) in oc.skus" :key="sku.sku_muliix" class="p-6 hover:bg-slate-50/80 transition-colors group/sku relative" :class="{ 'z-50': openSelloutId === (tienda.id_cliente + '_' + sku.sku_cadena) }">
                                         <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-5">
                                             
