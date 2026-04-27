@@ -423,19 +423,31 @@ const filteredDias = computed(() => {
                            sf.fillrate100 || sf.sobrepedido;
     
     const todayStr = new Date().toISOString().split('T')[0];
-    const curWeekIc = store.currentWeek?.semana_ic ? parseInt(store.currentWeek.semana_ic) : 0;
-    const curYear = store.currentWeek?.anio || 0;
+
+    // --- Cálculo de Semana Calendario Real (ISO) ---
+    const getISOContext = (date: Date) => {
+        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        const week = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+        return { year: d.getUTCFullYear(), week };
+    };
+
+    const realContext = getISOContext(new Date());
+    const realYear = realContext.year;
+    const realWeek = realContext.week;
 
     const isCurrentWeek = (sku: any) => {
         const skuYear = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0;
         const skuWeek = sku.semana_ic ? parseInt(sku.semana_ic) : 0;
-        return skuYear === curYear && skuWeek === curWeekIc;
+        return skuYear === realYear && skuWeek === realWeek;
     };
 
     const isPreviousWeek = (sku: any) => {
         const skuYear = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0;
         const skuWeek = sku.semana_ic ? parseInt(sku.semana_ic) : 0;
-        return (skuYear < curYear) || (skuYear === curYear && skuWeek < curWeekIc);
+        return (skuYear < realYear) || (skuYear === realYear && skuWeek < realWeek);
     };
 
     return store.dias.map(dia => {
