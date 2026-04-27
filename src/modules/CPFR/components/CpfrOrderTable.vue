@@ -158,14 +158,18 @@ function groupOCs(skus: CpfrSkuDash[]): GroupedOC[] {
     // 1. Órdenes normales primero, Z8 al final
     // 2. Por fec_pedido_cadena descendente (más reciente primero)
     return Array.from(map.values()).sort((a, b) => {
-        const isZA = isZ8(a.num_pedido)
-        const isZB = isZ8(b.num_pedido)
-        if (isZA && !isZB) return 1
-        if (!isZA && isZB) return -1
+        const dateA = a.fec_pedido_cadena ? new Date(a.fec_pedido_cadena).getTime() : 0;
+        const dateB = b.fec_pedido_cadena ? new Date(b.fec_pedido_cadena).getTime() : 0;
+        
+        if (dateB !== dateA) return dateB - dateA;
 
-        const dateA = a.fec_pedido_cadena || ''
-        const dateB = b.fec_pedido_cadena || ''
-        return dateB.localeCompare(dateA)
+        // Si la fecha es igual, ponemos Z8 arriba
+        const isZA = isZ8(a.num_pedido);
+        const isZB = isZ8(b.num_pedido);
+        if (isZA && !isZB) return -1;
+        if (!isZA && isZB) return 1;
+
+        return 0;
     })
 }
 
@@ -424,7 +428,7 @@ const filteredDias = computed(() => {
     
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // --- Cálculo de Semana Calendario Real (ISO) ---
+    // --- Cálculo de Semanas Calendario (ISO) ---
     const getISOContext = (date: Date) => {
         const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
         const dayNum = d.getUTCDay() || 7;
@@ -434,20 +438,26 @@ const filteredDias = computed(() => {
         return { year: d.getUTCFullYear(), week };
     };
 
-    const realContext = getISOContext(new Date());
-    const realYear = realContext.year;
-    const realWeek = realContext.week;
+    const today = new Date();
+    const curr = getISOContext(today);
+    const last = getISOContext(new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000));
 
     const isCurrentWeek = (sku: any) => {
-        const skuYear = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0;
-        const skuWeek = sku.semana_ic ? parseInt(sku.semana_ic) : 0;
-        return skuYear === realYear && skuWeek === realWeek;
+        const y = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0;
+        const w = sku.semana_ic ? parseInt(sku.semana_ic) : 0;
+        return y === curr.year && w === curr.week;
     };
 
     const isPreviousWeek = (sku: any) => {
-        const skuYear = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0;
-        const skuWeek = sku.semana_ic ? parseInt(sku.semana_ic) : 0;
-        return (skuYear < realYear) || (skuYear === realYear && skuWeek < realWeek);
+        const y = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0;
+        const w = sku.semana_ic ? parseInt(sku.semana_ic) : 0;
+        return y === last.year && w === last.week;
+    };
+
+    const isOlderWeek = (sku: any) => {
+        const y = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0;
+        const w = sku.semana_ic ? parseInt(sku.semana_ic) : 0;
+        return (y < last.year) || (y === last.year && w < last.week);
     };
 
     return store.dias.map(dia => {
@@ -456,16 +466,20 @@ const filteredDias = computed(() => {
                 // 1. Filtro por Pestaña (Tab)
                 const state = sku.estado_oc;
                 if (currentTab.value === 'centralizados') {
-                    if (!isCurrentWeek(sku) || state === 'revision' || state === 'aprobado') return false;
+                    const isPending = (state === 'pendiente' || state === 'borrador' || !state);
+                    const isFocus = isCurrentWeek(sku) || (isPreviousWeek(sku) && isPending);
+                    if (!isFocus || state === 'revision' || state === 'aprobado') return false;
                 } else if (currentTab.value === 'revision') {
-                    if (!isCurrentWeek(sku) || state !== 'revision') return false;
+                    if ((!isCurrentWeek(sku) && !isPreviousWeek(sku)) || state !== 'revision') return false;
                 } else if (currentTab.value === 'aprobada') {
-                    if (!isCurrentWeek(sku) || state !== 'aprobado') return false;
+                    if ((!isCurrentWeek(sku) && !isPreviousWeek(sku)) || state !== 'aprobado') return false;
                 } else if (currentTab.value === 'sin_embarcar') {
                     const fecFin = sku.fec_fin_embarque ? sku.fec_fin_embarque.slice(0, 10) : null;
                     if (!fecFin || fecFin >= todayStr || state === 'aprobado') return false;
                 } else if (currentTab.value === 'historial') {
-                    if (!isPreviousWeek(sku)) return false;
+                    if (!isOlderWeek(sku)) return false;
+                    // También enviamos a historial lo que sea semana anterior pero ya esté aprobado/revisión?
+                    // No, eso lo manejan las pestañas de arriba. El historial muestra lo que es ESTRICTAMENTE viejo.
                 }
 
                 // 2. Filtro de Búsqueda
@@ -495,6 +509,13 @@ const filteredDias = computed(() => {
                 
                 return false;
             });
+            // Ordenar por fecha de pedido (más recientes arriba)
+            filteredSkus.sort((a, b) => {
+                const dateA = a.fec_pedido_cadena ? new Date(a.fec_pedido_cadena).getTime() : 0;
+                const dateB = b.fec_pedido_cadena ? new Date(b.fec_pedido_cadena).getTime() : 0;
+                return dateB - dateA;
+            });
+
             return { ...tienda, skus: filteredSkus };
         }).filter(tienda => tienda.skus.length > 0);
         
