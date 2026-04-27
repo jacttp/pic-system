@@ -199,6 +199,17 @@ function toggleDay(dia_num: number) {
     collapsedDays.value[dia_num] = !collapsedDays.value[dia_num]
 }
 
+// ── Motor de Cálculo y Generación ─────────────────────────────────────────────
+function confirmRecalculate() {
+    if (confirm('Atención: Recalcular la matemática sobrescribirá todos los cambios manuales que hayas guardado hoy en el borrador.\n\n¿Estás seguro de que deseas forzar un recálculo desde cero con el inventario más reciente?')) {
+        store.recalculate()
+    }
+}
+
+async function triggerGenerateZ8() {
+    await store.generateZ8()
+}
+
 // ── Utilities de estilo ───────────────────────────────────────────────────────
 
 function cobClass(cob: number | null) {
@@ -584,6 +595,44 @@ const totalUniqueOCs = computed(() => {
         </div>
         
         <div class="flex items-center gap-4">
+          <!-- Motor de Cálculo y Generación -->
+          <div class="flex items-center gap-2 mr-2">
+            <!-- Recalcular -->
+            <button
+              class="inline-flex items-center gap-2 text-[10px] font-bold px-3 h-[32px] rounded-lg border border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 transition-all shadow-sm"
+              @click.stop="confirmRecalculate"
+              title="Fuerza un recálculo basado en inventario"
+            >
+              <i class="fa-solid fa-rotate text-[10px]"></i>
+              <span class="hidden xl:inline">Recalcular</span>
+            </button>
+
+            <!-- Generar Z8 -->
+            <div class="flex flex-col items-end gap-0.5 relative group/z8info">
+              <button
+                class="inline-flex items-center gap-2 text-[10px] font-bold px-3 h-[32px] rounded-lg border transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                :class="store.z8Loading
+                  ? 'border-violet-300 bg-violet-100 text-violet-600 cursor-wait'
+                  : 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100'"
+                @click.stop="triggerGenerateZ8"
+                :disabled="store.z8Loading"
+                title="Genera los cascarones Z8 para la semana activa"
+              >
+                <i
+                  class="fa-solid text-[10px]"
+                  :class="store.z8Loading ? 'fa-circle-notch fa-spin' : 'fa-bolt'"
+                ></i>
+                <span class="hidden xl:inline">{{ store.z8Loading ? 'Generando…' : 'Generar Z8' }}</span>
+              </button>
+              <span
+                v-if="store.z8Result"
+                class="absolute top-full mt-0.5 right-0 text-[8px] font-black px-1 truncate max-w-[100px] whitespace-nowrap bg-white/80 rounded"
+                :class="store.z8Result.created > 0 ? 'text-violet-600' : 'text-slate-400'"
+                :title="store.z8Result.message"
+              >{{ store.z8Result.created > 0 ? `+${store.z8Result.created} Z8` : 'Sin cambios' }}</span>
+            </div>
+          </div>
+
           <!-- Controles Tiendas -->
           <div class="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm text-[11px] font-semibold overflow-hidden">
               <span class="px-3 py-1.5 bg-slate-50 text-slate-500 border-r border-slate-200 flex items-center gap-1.5">
