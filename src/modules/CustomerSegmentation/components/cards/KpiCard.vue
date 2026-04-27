@@ -37,7 +37,7 @@ const numericValue = computed(() =>
 )
 
 const { displayed } = useCounterAnimation(
-  () => (props.animate && !is NaN(numericValue.value) ? numericValue.value : 0)
+  () => (props.animate && !isNaN(numericValue.value) ? numericValue.value : 0)
 )
 
 const displayValue = computed(() => {
