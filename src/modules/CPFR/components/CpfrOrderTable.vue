@@ -13,6 +13,7 @@ import CpfrZ8Panel from '../components/CpfrZ8Panel.vue'
 const showZ8Panel = ref(false)
 
 const store = useCpfrStore()
+const showZeroZ8 = ref(false)
 
 const emit = defineEmits<{
     (e: 'open-config', id_cliente: string, nombre_tienda: string): void
@@ -135,7 +136,10 @@ function isZ8(num: string | null): boolean {
 function groupOCs(skus: CpfrSkuDash[]): GroupedOC[] {
     const map = new Map<string, GroupedOC>()
     for (const sku of skus) {
-        if (sku.pedido_sugerido_pz_red === 0) continue
+        // Regla de visibilidad: ocultar 0s excepto si es Z8 y el toggle está activo
+        if (sku.pedido_sugerido_pz_red === 0) {
+            if (!isZ8(sku.num_pedido) || !showZeroZ8.value) continue
+        }
         const key = sku.num_pedido || 'UNSAVED'
         if (!map.has(key)) {
             map.set(key, {
@@ -541,8 +545,11 @@ const totalUniqueOCs = computed(() => {
         dia.tiendas.forEach(tienda => {
             tienda.skus.forEach(sku => {
                 if (sku.num_pedido) {
-                    // Combinamos con id_cliente por seguridad
-                    ocSet.add(`${tienda.id_cliente}|${sku.num_pedido}`);
+                    // Solo contamos la OC si tiene al menos un SKU visible según la lógica de groupOCs
+                    const isVisible = sku.pedido_sugerido_pz_red !== 0 || (isZ8(sku.num_pedido) && showZeroZ8.value);
+                    if (isVisible) {
+                        ocSet.add(`${tienda.id_cliente}|${sku.num_pedido}`);
+                    }
                 }
             });
         });
@@ -597,16 +604,6 @@ const totalUniqueOCs = computed(() => {
         <div class="flex items-center gap-4">
           <!-- Motor de Cálculo y Generación -->
           <div class="flex items-center gap-2 mr-2">
-            <!-- Recalcular -->
-            <button
-              class="inline-flex items-center gap-2 text-[10px] font-bold px-3 h-[32px] rounded-lg border border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 transition-all shadow-sm"
-              @click.stop="confirmRecalculate"
-              title="Fuerza un recálculo basado en inventario"
-            >
-              <i class="fa-solid fa-rotate text-[10px]"></i>
-              <span class="hidden xl:inline">Recalcular</span>
-            </button>
-
             <!-- Generar Z8 -->
             <div class="flex flex-col items-end gap-0.5 relative group/z8info">
               <button
@@ -631,6 +628,28 @@ const totalUniqueOCs = computed(() => {
                 :title="store.z8Result.message"
               >{{ store.z8Result.created > 0 ? `+${store.z8Result.created} Z8` : 'Sin cambios' }}</span>
             </div>
+
+            <!-- Toggle Visibilidad 0s en Z8 -->
+            <button
+              class="inline-flex items-center justify-center w-[32px] h-[32px] rounded-lg border transition-all shadow-sm"
+              :class="showZeroZ8 
+                ? 'bg-violet-600 text-white border-violet-700' 
+                : 'bg-white text-slate-400 border-slate-200 hover:text-slate-600 hover:border-slate-300'"
+              @click.stop="showZeroZ8 = !showZeroZ8"
+              :title="showZeroZ8 ? 'Ocultar sugeridos en 0 (Z8)' : 'Mostrar sugeridos en 0 (Z8)'"
+            >
+              <i class="fa-solid" :class="showZeroZ8 ? 'fa-eye' : 'fa-eye-slash'"></i>
+            </button>
+
+            <!-- Recalcular -->
+            <button
+              class="inline-flex items-center gap-2 text-[10px] font-bold px-3 h-[32px] rounded-lg border border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 transition-all shadow-sm"
+              @click.stop="confirmRecalculate"
+              title="Fuerza un recálculo basado en inventario"
+            >
+              <i class="fa-solid fa-rotate text-[10px]"></i>
+              <span class="hidden xl:inline">Recalcular</span>
+            </button>
           </div>
 
           <!-- Controles Tiendas -->
@@ -705,7 +724,7 @@ const totalUniqueOCs = computed(() => {
                     <span class="text-[10px] text-slate-500 font-medium ml-2 border-l border-slate-300 pl-3">
                       {{ dia.tiendas.length }} tienda{{ dia.tiendas.length !== 1 ? 's' : '' }}
                       ·
-                      {{ dia.tiendas.reduce((a, t) => a + (t.skus || []).filter(s => s.pedido_sugerido_pz_red !== 0).length, 0) }} SKUs
+                      {{ dia.tiendas.reduce((a, t) => a + (t.skus || []).filter(s => s.pedido_sugerido_pz_red !== 0 || (isZ8(s.num_pedido) && showZeroZ8)).length, 0) }} SKUs
                     </span>
                   </div>
                 </td>

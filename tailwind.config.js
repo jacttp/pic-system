@@ -83,6 +83,7 @@ export default {
   },
   plugins: [
     require('@tailwindcss/container-queries'),
-      require("tailwindcss-animate")
+    require('@tailwindcss/typography'),
+    require("tailwindcss-animate")
 ],
 }

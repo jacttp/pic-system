@@ -203,6 +203,15 @@ const router = createRouter({
                   title: 'Carga Metas'
                }
             },
+            {
+               path: 'documentation',
+               name: 'documentation',
+               component: () => import('@/modules/Documentation/DocumentationView.vue'),
+               meta: {
+                  moduleKey: 'DOCUMENTS',
+                  title: 'Documentación'
+               }
+            },
 
 
 
