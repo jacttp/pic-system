@@ -33,10 +33,16 @@ export const useClientValidationStore = defineStore('clientValidation', () => {
 
    const setCandidateForComparison = (candidate: ClientGeoMatch | null) => {
       candidateToCompare.value = candidate;
+      if (candidate) {
+         (candidate as any)._originalUmaf = (candidate as any).Umaf || (candidate as any).umaf;
+      }
    };
 
    const selectClientForReview = async (client: ClientPending) => {
       selectedClient.value = client;
+      // Guardar valor original de Umaf para poder restaurarlo si se cambia de opinión
+      (client as any)._originalUmaf = (client as any).Umaf || (client as any).umaf;
+
       nearbyCandidates.value = []; // Limpiar anteriores
       candidateToCompare.value = null; // Reset comparison
 
@@ -151,8 +157,9 @@ export const useClientValidationStore = defineStore('clientValidation', () => {
       (master as any).Zona = (candidate as any).Zona;
       (master as any).Jefatura = (candidate as any).Jefatura;
 
-      // 4. UMAF
-      if ((candidate as any).umaf) (master as any).umaf = (candidate as any).umaf;
+      // 4. UMAF (Sincronización bidireccional)
+      if ((candidate as any).Umaf) (master as any).Umaf = (candidate as any).Umaf;
+      (candidate as any).Umaf = (master as any).Umaf;
 
       // 5. Formato & TipoCli (CONDICIONAL)
       if (!isCandidateM) {
@@ -182,12 +189,23 @@ export const useClientValidationStore = defineStore('clientValidation', () => {
    const applyNewClientLogic = () => {
       if (!selectedClient.value) return;
 
+      // RESTAURAR UMAF ORIGINAL (Solo este campo)
+      if ((selectedClient.value as any)._originalUmaf !== undefined) {
+         (selectedClient.value as any).Umaf = (selectedClient.value as any)._originalUmaf;
+      }
+      if (candidateToCompare.value && (candidateToCompare.value as any)._originalUmaf !== undefined) {
+         (candidateToCompare.value as any).Umaf = (candidateToCompare.value as any)._originalUmaf;
+      }
+
       const currentDate = new Date();
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1; // getMonth is 0-indexed
 
-      selectedClient.value.TipoCli = `Nuevo${year}`;
-      (selectedClient.value as any).Est2017 = `Act${month}`;
+      selectedClient.value.TipoCli = `Nuevo ${year}`;
+      (selectedClient.value as any).Est2017 = `ActA${month}`;
+      
+      const yearShort = year.toString().slice(-2);
+      (selectedClient.value as any).formatocte = `Detalle-Nuevo${yearShort}`;
 
       // Reset exception state
       manualCheckRequired.value = false;

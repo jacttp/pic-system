@@ -45,7 +45,8 @@ const FIELD_LABELS: Record<string, string> = {
   clienteid: 'Id Cliente',
   Est2017: 'Estatus 2017',
   Canalm: 'Canal M',
-  formatocte: 'Formato'
+  formatocte: 'Formato',
+  TipoCli: 'Tipo Cliente'
 };
 
 // Helper de normalización

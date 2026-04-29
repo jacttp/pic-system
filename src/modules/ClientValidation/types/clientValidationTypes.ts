@@ -17,7 +17,7 @@ export interface ClientPending {
    Ruta?: string;
    canalm?: string;
    formato?: string; // Alias para formatocte
-   umaf?: string;
+   Umaf?: string;
 }
 
 export interface ClientGeoMatch extends ClientPending {
