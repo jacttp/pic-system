@@ -136,9 +136,9 @@ function isZ8(num: string | null): boolean {
 function groupOCs(skus: CpfrSkuDash[]): GroupedOC[] {
     const map = new Map<string, GroupedOC>()
     for (const sku of skus) {
-        // Regla de visibilidad: ocultar 0s excepto si es Z8 y el toggle está activo
+        // Regla de visibilidad: ocultar 0s solo si es Z8 y el toggle está desactivado
         if (sku.pedido_sugerido_pz_red === 0) {
-            if (!isZ8(sku.num_pedido) || !showZeroZ8.value) continue
+            if (isZ8(sku.num_pedido) && !showZeroZ8.value) continue
         }
         const key = sku.num_pedido || 'UNSAVED'
         if (!map.has(key)) {
@@ -546,7 +546,7 @@ const totalUniqueOCs = computed(() => {
             tienda.skus.forEach(sku => {
                 if (sku.num_pedido) {
                     // Solo contamos la OC si tiene al menos un SKU visible según la lógica de groupOCs
-                    const isVisible = sku.pedido_sugerido_pz_red !== 0 || (isZ8(sku.num_pedido) && showZeroZ8.value);
+                    const isVisible = sku.pedido_sugerido_pz_red !== 0 || !isZ8(sku.num_pedido) || showZeroZ8.value;
                     if (isVisible) {
                         ocSet.add(`${tienda.id_cliente}|${sku.num_pedido}`);
                     }
@@ -724,7 +724,7 @@ const totalUniqueOCs = computed(() => {
                     <span class="text-[10px] text-slate-500 font-medium ml-2 border-l border-slate-300 pl-3">
                       {{ dia.tiendas.length }} tienda{{ dia.tiendas.length !== 1 ? 's' : '' }}
                       ·
-                      {{ dia.tiendas.reduce((a, t) => a + (t.skus || []).filter(s => s.pedido_sugerido_pz_red !== 0 || (isZ8(s.num_pedido) && showZeroZ8)).length, 0) }} SKUs
+                      {{ dia.tiendas.reduce((a, t) => a + (t.skus || []).filter(s => s.pedido_sugerido_pz_red !== 0 || !isZ8(s.num_pedido) || showZeroZ8).length, 0) }} SKUs
                     </span>
                   </div>
                 </td>
@@ -1395,11 +1395,15 @@ const totalUniqueOCs = computed(() => {
                                                                     v-model.number="editValue" 
                                                                     type="number" min="0" :step="sku.pzas_bolsa || 1"
                                                                     class="w-12 h-6 text-[10px] font-black text-right border border-brand-400 rounded-md px-1 outline-none shadow-sm"
+                                                                    autofocus
                                                                     @keyup.enter="confirmEdit(sku, tienda.id_cliente)"
                                                                     @keyup.escape="cancelEdit()"
                                                                 />
+                                                                <button class="bg-emerald-500 text-white rounded-md w-6 h-6 flex items-center justify-center hover:bg-emerald-600 shadow-sm transition-colors" @click="confirmEdit(sku, tienda.id_cliente)">
+                                                                  <i :class="saving ? 'fa-solid fa-circle-notch fa-spin text-[10px]' : 'fa-solid fa-check text-[11px]'"></i>
+                                                                </button>
                                                             </div>
-                                                            <button v-else @click="startEdit(sku)" class="h-7 w-[70px] bg-white border border-slate-200 hover:border-brand-400 rounded-lg flex items-center justify-center gap-1 transition-all group/edit">
+                                                            <button v-else @click="startEdit(sku)" class="h-7 w-[70px] bg-white border border-slate-200 hover:border-brand-400 rounded-lg flex items-center justify-center gap-1 transition-all group/edit" :class="{ 'ring-2 ring-emerald-400 border-transparent bg-emerald-50': savedId === sku.sku_muliix }">
                                                                 <i v-if="esSinSellout(sku)" class="fa-solid fa-seedling text-[8px] text-amber-500 shrink-0"></i>
                                                                 <span class="text-[12px] font-black truncate" :class="sku.pedido_sugerido_pz_red > 0 ? 'text-brand-700' : 'text-slate-800'">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
                                                             </button>
