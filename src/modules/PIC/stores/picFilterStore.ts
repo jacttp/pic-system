@@ -192,6 +192,8 @@ export const usePicFilterStore = defineStore('picFilter', () => {
                lockedJefatura.value = userContext.jefatura;
                isJefaturaLocked.value = true;
                selected.Jefatura = [userContext.jefatura];
+               // Cargar las rutas de su jefatura
+               await handleJefaturaChange();
             }
          }
       } catch (err: any) {
@@ -519,7 +521,10 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       if (!isGerenciaLocked.value) {
          depOptions.jefaturas = [];
       }
-      depOptions.rutas = [];
+      // Si Jefatura está bloqueada, conservar las rutas de su jefatura
+      if (!isJefaturaLocked.value) {
+         depOptions.rutas = [];
+      }
       depOptions.grupos = [];
       depOptions.categorias = [];
       depOptions.skus = [];
