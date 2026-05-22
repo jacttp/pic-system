@@ -49,6 +49,16 @@ export const picApi = {
       return data;
    },
 
+   /**
+    * Obtiene el contexto de acceso del usuario autenticado desde GerenciaUsuarios.
+    * - gerencia/jefatura = null => sin restricción en esa dimensión
+    * - gerencia/jefatura = string => valor real a pre-seleccionar y bloquear
+    */
+   async getUserFilterContext(): Promise<{ role: string; gerencia: string | null; jefatura: string | null }> {
+      const { data } = await api.get('/filters/my-context');
+      return data;
+   },
+
    async searchClients(searchTerm: string, page: number, filters: Record<string, any>) {
       const { data } = await api.post('/filters/clients', {
          searchTerm,

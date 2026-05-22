@@ -171,8 +171,38 @@ watch(isCollapsed, (newVal) => {
                             <i class="fa-solid fa-briefcase mr-1"></i> Comercial
                         </h3>
                         <FilterDropdown label="Canal" :options="store.options.canales" v-model="store.selected.canal" />
-                        <FilterDropdown label="Gerencia" :options="store.options.gerencias" v-model="store.selected.Gerencia" @change="store.handleGerenciaChange" />
-                        <FilterDropdown label="Jefatura" :options="store.depOptions.jefaturas" v-model="store.selected.Jefatura" :disabled="store.depOptions.jefaturas.length === 0" :loading="store.depLoading.jefaturas" @change="store.handleJefaturaChange" />
+
+                        <!-- Gerencia: bloqueada si el usuario tiene gerencia asignada por rol -->
+                        <div>
+                            <FilterDropdown
+                                label="Gerencia"
+                                :options="store.options.gerencias"
+                                v-model="store.selected.Gerencia"
+                                @change="store.handleGerenciaChange"
+                                :disabled="store.isGerenciaLocked"
+                            />
+                            <p v-if="store.isGerenciaLocked" class="text-[10px] text-brand-500 mt-1 ml-1 flex items-center gap-1">
+                                <i class="fa-solid fa-lock text-[9px]"></i>
+                                Vista restringida a tu gerencia
+                            </p>
+                        </div>
+
+                        <!-- Jefatura: bloqueada si el usuario tiene jefatura asignada por rol -->
+                        <div>
+                            <FilterDropdown
+                                label="Jefatura"
+                                :options="store.depOptions.jefaturas"
+                                v-model="store.selected.Jefatura"
+                                :disabled="store.depOptions.jefaturas.length === 0 || store.isJefaturaLocked"
+                                :loading="store.depLoading.jefaturas"
+                                @change="store.handleJefaturaChange"
+                            />
+                            <p v-if="store.isJefaturaLocked" class="text-[10px] text-brand-500 mt-1 ml-1 flex items-center gap-1">
+                                <i class="fa-solid fa-lock text-[9px]"></i>
+                                Vista restringida a tu jefatura
+                            </p>
+                        </div>
+
                         <FilterDropdown label="Ruta" :options="store.depOptions.rutas" v-model="store.selected.Ruta" :disabled="store.depOptions.rutas.length === 0" :loading="store.depLoading.rutas" />
                     </div>
 
@@ -274,7 +304,9 @@ watch(isCollapsed, (newVal) => {
 
                 <!-- FOOTER ACTIONS -->
                 <div class="flex justify-end items-center gap-4 mt-8 pt-4 border-t border-slate-100">
+                    <!-- Ocultar Limpiar si ambos filtros principales están bloqueados -->
                     <button 
+                        v-if="!(store.isGerenciaLocked && store.isJefaturaLocked)"
                         @click="handleReset"
                         class="text-xs font-medium text-slate-400 hover:text-rose-600 flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-rose-50 transition-all border border-transparent hover:border-rose-100"
                     >

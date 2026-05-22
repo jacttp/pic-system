@@ -72,17 +72,29 @@ export const usePicFilterStore = defineStore('picFilter', () => {
 
    const dynamicWidgets = ref<DynamicWidget[]>([]);
 
+   // Control de acceso por rol (poblado en initFilters desde GerenciaUsuarios)
+   const isGerenciaLocked = ref(false);
+   const isJefaturaLocked = ref(false);
+   // Valores bloqueados: se usan en resetFilters para no borrarlos
+   const lockedGerencia = ref<string | null>(null);
+   const lockedJefatura = ref<string | null>(null);
+
 
 
    // 3. ACCIONES
 
    // Carga inicial (al montar el componente)
    async function initFilters() {
-      if (filtersReady.value) return; // Evitar doble carga
+      // Siempre aplicar contexto de usuario (aunque los filtros ya estén listos)
+      // Esto garantiza que los locks se apliquen en cada sesión/recarga
+      await applyUserContext();
+
+      if (filtersReady.value) return; // Evitar doble carga de opciones
       isLoading.value = true;
       try {
 
          const data = await picApi.getInitialFilters() as any;
+
          const failedFilters: string[] = data._failedFilters || [];
          delete data._failedFilters; // Limpiar flag interno
          Object.assign(options, data);
@@ -124,6 +136,9 @@ export const usePicFilterStore = defineStore('picFilter', () => {
             }
          }
 
+         // --- APLICAR RESTRICCIONES POR CONTEXTO DE USUARIO ---
+         await applyUserContext();
+
          filtersReady.value = true;
 
          // Retry parcial: si algunos filtros fallaron, reintentar en 3s
@@ -151,6 +166,36 @@ export const usePicFilterStore = defineStore('picFilter', () => {
          console.error("Error cargando filtros iniciales", error);
       } finally {
          isLoading.value = false;
+      }
+   }
+
+   /**
+    * Aplica restricciones de acceso basadas en el contexto del usuario autenticado.
+    * Consulta GerenciaUsuarios via /filters/my-context.
+    * Se llama siempre al montar PicFilters, independientemente de filtersReady.
+    */
+   async function applyUserContext() {
+      // Evitar re-aplicar si ya está bloqueado (contexto ya aplicado en esta sesión)
+      if (isGerenciaLocked.value || isJefaturaLocked.value) return;
+
+      try {
+         const userContext = await picApi.getUserFilterContext();
+
+         if (userContext.gerencia) {
+            lockedGerencia.value = userContext.gerencia;
+            isGerenciaLocked.value = true;
+            selected.Gerencia = [userContext.gerencia];
+            // Cargar las jefaturas de su gerencia
+            await handleGerenciaChange();
+
+            if (userContext.jefatura) {
+               lockedJefatura.value = userContext.jefatura;
+               isJefaturaLocked.value = true;
+               selected.Jefatura = [userContext.jefatura];
+            }
+         }
+      } catch (err: any) {
+         console.warn('[Store] No se pudo aplicar contexto de usuario, sin restricciones:', err.message);
       }
    }
 
@@ -438,8 +483,13 @@ export const usePicFilterStore = defineStore('picFilter', () => {
    function resetFilters() {
       // 1. Limpiar arrays de selección
       selected.canal = [];
-      selected.Gerencia = [];
-      selected.Jefatura = [];
+      // Respetar Gerencia/Jefatura bloqueadas por rol
+      if (!isGerenciaLocked.value) {
+         selected.Gerencia = [];
+      }
+      if (!isJefaturaLocked.value) {
+         selected.Jefatura = [];
+      }
       selected.Ruta = [];
       selected.Marca = [];
       selected.grupo = [];
@@ -465,7 +515,10 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       selectedClients.clear();
 
       // 5. Limpiar opciones dependientes (Cascada)
-      depOptions.jefaturas = [];
+      // Si Gerencia está bloqueada, conservar las jefaturas de su gerencia
+      if (!isGerenciaLocked.value) {
+         depOptions.jefaturas = [];
+      }
       depOptions.rutas = [];
       depOptions.grupos = [];
       depOptions.categorias = [];
@@ -510,6 +563,13 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       isGenerating,
       generateReport,
       filtersReady,
+
+      // Control de acceso por rol
+      isGerenciaLocked,
+      isJefaturaLocked,
+      lockedGerencia,
+      lockedJefatura,
+      applyUserContext,
 
       options,
       depOptions,
