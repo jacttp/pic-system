@@ -52,6 +52,15 @@ export const cpfrApi = {
         }
     },
 
+    /**
+     * GET /api/cpfr/weeks
+     * Devuelve la lista completa de semanas y años disponibles de las órdenes en CPFR_OrdenCompra.
+     */
+    async getWeeks(): Promise<Array<{ anio: number; semana: number; semana_ic: string; key: string }>> {
+        const { data } = await api.get('/cpfr/weeks')
+        return data.data
+    },
+
     // ── Dashboard principal ───────────────────────────────────────────────────
 
     /**

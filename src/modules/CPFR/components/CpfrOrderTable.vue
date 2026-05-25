@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // src/modules/CPFR/components/CpfrOrderTable.vue
-import { ref, computed, onMounted, onBeforeUnmount, defineOptions } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, defineOptions, watch } from 'vue'
 
 defineOptions({
   inheritAttrs: false
@@ -31,6 +31,21 @@ const tabs = [
     { id: 'sin_embarcar',   label: 'Sin Embarcar' },
     { id: 'historial',      label: 'Historial' },
 ]
+
+const selectedFilterWeek = ref<string>('TODAS')
+
+const availableWeeks = computed(() => {
+  return store.allCpfrWeeks
+})
+
+watch(currentTab, (newTab) => {
+  if (newTab !== 'sin_embarcar' && newTab !== 'historial') {
+    selectedFilterWeek.value = 'TODAS'
+  }
+  if (newTab === 'historial' && !store.historialLoading) {
+    store.loadHistorial()
+  }
+})
 
 // ── Inline edit ───────────────────────────────────────────────────────────────
 const editingId = ref<string | null>(null)
@@ -476,7 +491,7 @@ const filteredDias = computed(() => {
         return (y < last.year) || (y === last.year && w < last.week);
     };
 
-    return store.dias.map(dia => {
+    return (currentTab.value === 'historial' ? store.historialDias : store.dias).map(dia => {
         const filteredTiendas = dia.tiendas.map(tienda => {
             const filteredSkus = tienda.skus.filter(sku => {
                 // 1. Filtro por Pestaña (Tab)
@@ -492,10 +507,25 @@ const filteredDias = computed(() => {
                 } else if (currentTab.value === 'sin_embarcar') {
                     const fecFin = sku.fec_fin_embarque ? sku.fec_fin_embarque.slice(0, 10) : null;
                     if (!fecFin || fecFin >= todayStr || state === 'aprobado') return false;
+                    
+                    if (selectedFilterWeek.value !== 'TODAS') {
+                        const y = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0;
+                        const w = sku.semana_ic ? parseInt(sku.semana_ic) : 0;
+                        const key = `${y}-W${w.toString().padStart(2, '0')}`;
+                        if (key !== selectedFilterWeek.value) return false;
+                    }
                 } else if (currentTab.value === 'historial') {
-                    if (!isOlderWeek(sku)) return false;
-                    // También enviamos a historial lo que sea semana anterior pero ya esté aprobado/revisión?
-                    // No, eso lo manejan las pestañas de arriba. El historial muestra lo que es ESTRICTAMENTE viejo.
+                    // Historial: mostrar OCs de semanas pasadas sin importar estado
+                    // Solo excluir la semana actual y la anterior (que ya aparecen en otras pestañas)
+                    const isCurrentOrPrev = isCurrentWeek(sku) || isPreviousWeek(sku);
+                    if (isCurrentOrPrev) return false;
+
+                    if (selectedFilterWeek.value !== 'TODAS') {
+                        const y = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0;
+                        const w = sku.semana_ic ? parseInt(sku.semana_ic) : 0;
+                        const key = `${y}-W${w.toString().padStart(2, '0')}`;
+                        if (key !== selectedFilterWeek.value) return false;
+                    }
                 }
 
                 // 2. Filtro de Búsqueda
@@ -565,9 +595,9 @@ const totalUniqueOCs = computed(() => {
     class="flex-1 flex flex-col min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden"
   >
 
-    <!-- Sin datos -->
+    <!-- Sin datos (solo para pestañas normales, no historial) -->
     <div
-      v-if="!store.dias.length"
+      v-if="!store.dias.length && currentTab !== 'historial'"
       class="flex-1 flex flex-col items-center justify-center gap-3 text-slate-400 p-12 bg-slate-50/50"
     >
       <i class="fa-solid fa-box-open text-3xl text-slate-300"></i>
@@ -576,7 +606,7 @@ const totalUniqueOCs = computed(() => {
     </div>
 
     <!-- ── Tabla y Toolbar ──────────────────────────────────────────────── -->
-    <template v-else>
+    <template v-else-if="store.dias.length || currentTab === 'historial'">
       
       <!-- ── Toolbar de Control de Vistas ── -->
       <div class="shrink-0 px-5 py-3 border-b border-slate-200 bg-white flex items-center justify-between">
@@ -598,6 +628,19 @@ const totalUniqueOCs = computed(() => {
                :class="currentTab === t.id ? 'bg-brand-600 text-white shadow-sm shadow-brand-200' : 'text-slate-500 hover:bg-white hover:text-slate-700'"
                @click="currentTab = t.id"
             >{{ t.label }}</button>
+          </div>
+
+          <!-- Selector de semanas anteriores (discreto y elegante, aparece solo si es sin_embarcar o historial) -->
+          <div v-if="currentTab === 'sin_embarcar' || currentTab === 'historial'" class="ml-2 flex items-center animate-in fade-in slide-in-from-left-2 duration-200">
+            <select
+              v-model="selectedFilterWeek"
+              class="bg-white border border-slate-200 text-slate-700 text-[10px] font-bold uppercase tracking-wider rounded-lg px-2.5 py-1.5 shadow-sm focus:outline-none focus:ring-1 focus:ring-brand-500 cursor-pointer hover:border-slate-300 transition-colors"
+            >
+              <option value="TODAS">Semana: Todas</option>
+              <option v-for="w in availableWeeks" :key="w.key" :value="w.key">
+                Semana {{ w.semana }} ({{ w.anio }})
+              </option>
+            </select>
           </div>
         </div>
         
@@ -683,9 +726,28 @@ const totalUniqueOCs = computed(() => {
 
       <!-- ── Contenedor desplazable ── -->
       <div class="flex-1 min-h-0 overflow-auto scrollbar-thin">
+
+        <!-- ── Loading Historial ── -->
+        <div
+          v-if="currentTab === 'historial' && store.historialLoading"
+          class="flex flex-col items-center justify-center gap-3 text-slate-400 py-16"
+        >
+          <i class="fa-solid fa-circle-notch fa-spin text-2xl text-brand-400"></i>
+          <p class="text-sm font-medium">Cargando historial de órdenes…</p>
+        </div>
+
+        <!-- ── Sin datos en Historial ── -->
+        <div
+          v-else-if="currentTab === 'historial' && !store.historialLoading && filteredDias.length === 0"
+          class="flex flex-col items-center justify-center gap-3 text-slate-400 py-16"
+        >
+          <i class="fa-solid fa-clock-rotate-left text-3xl text-slate-300"></i>
+          <p class="text-sm font-medium">No hay órdenes históricas para los filtros seleccionados.</p>
+          <p class="text-xs text-slate-400">Selecciona una semana diferente o ajusta los filtros.</p>
+        </div>
         
         <!-- ── Vista de Tabla ── -->
-        <table v-if="store.viewMode === 'table'" class="w-full min-w-[1400px] text-left border-collapse table-fixed transition-all duration-300">
+        <table v-else-if="store.viewMode === 'table'" class="w-full min-w-[1400px] text-left border-collapse table-fixed transition-all duration-300">
 
           <!-- Cabecera fija: NIVEL 1 -->
           <thead class="sticky top-0 z-20 shadow-sm ring-1 ring-slate-200">
@@ -700,7 +762,6 @@ const totalUniqueOCs = computed(() => {
               <th class="px-3 py-3 font-bold text-right w-24 whitespace-nowrap">Centralizado</th>
               <th class="px-3 py-3 font-bold text-right w-28 whitespace-nowrap">Fill Rate</th>
               <th class="px-3 py-3 font-bold text-center w-20 whitespace-nowrap">INSTOCK</th>
-              <th class="px-2 py-3 font-bold text-center w-10"></th>
             </tr>
           </thead>
 
@@ -809,18 +870,7 @@ const totalUniqueOCs = computed(() => {
                       </span>
                     </td>
 
-                    <!-- Acciones tienda -->
-                    <td class="px-2 py-3" @click.stop>
-                      <div class="flex items-center gap-1 justify-center">
-                        <button
-                          class="text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition-colors p-1.5 rounded-lg"
-                          title="Configuración de tienda"
-                          @click.stop="emit('open-config', tienda.id_cliente, tienda.nombre_tienda)"
-                        >
-                          <i class="fa-solid fa-gear text-[12px]"></i>
-                        </button>
-                      </div>
-                    </td>
+
                   </tr>
 
                   <!-- ── Filas de SKUs ── -->
@@ -953,7 +1003,7 @@ const totalUniqueOCs = computed(() => {
                           {{ n(ocGroup.cant_pedida_total, 0) }}
                         </td>
 
-                        <td class="px-3 py-2 text-center text-slate-400 border-t-[12px] border-t-white" colspan="3">
+                        <td class="px-3 py-2 text-center text-slate-400 border-t-[12px] border-t-white" colspan="2">
                           <span class="text-[10px] italic">Detalle en fila inferior</span>
                         </td>
                       </tr>
@@ -1117,8 +1167,7 @@ const totalUniqueOCs = computed(() => {
                             </span>
                           </td>
 
-                          <!-- vacío -->
-                          <td></td>
+
                         </tr>
                       </template>
 
@@ -1209,12 +1258,6 @@ const totalUniqueOCs = computed(() => {
 
                             <!-- Acciones Cabecera -->
                             <div class="flex items-center gap-2 pl-5 border-l border-slate-100 hidden lg:flex">
-                                <button
-                                    class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-brand-600 hover:bg-white hover:shadow-md border border-slate-100 hover:border-brand-200 transition-all rounded-xl"
-                                    @click.stop="emit('open-config', tienda.id_cliente, tienda.nombre_tienda)"
-                                >
-                                    <i class="fa-solid fa-gear text-sm"></i>
-                                </button>
                                 <div class="flex items-center justify-center w-7 h-7 rounded-full bg-slate-50 text-slate-300 group-hover/card:bg-brand-50 group-hover/card:text-brand-500 transition-all">
                                     <i class="fa-solid transition-transform duration-300 text-xs" :class="store.expandedStores[tienda.id_cliente] ? 'fa-chevron-up text-brand-500' : 'fa-chevron-down'"></i>
                                 </div>

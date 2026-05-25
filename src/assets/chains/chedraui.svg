@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <rect width="100" height="100" rx="24" fill="#FFFFFF" stroke="#F1F5F9" stroke-width="2"/>
+  <!-- Chedraui corporate premium identity -->
+  <defs>
+    <linearGradient id="chedrauiGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF9E00"/>
+      <stop offset="100%" stop-color="#FF6B00"/>
+    </linearGradient>
+  </defs>
+  <path d="M25 25h36c14 0 25 11 25 25s-11 25-25 25H25V25z" fill="none" stroke="url(#chedrauiGrad)" stroke-width="12"/>
+  <path d="M40 37h20c7 0 13 6 13 13s-6 13-13 13H40V37z" fill="url(#chedrauiGrad)"/>
+  <rect x="25" y="25" width="8" height="50" fill="#002F6C" rx="2"/>
+</svg>

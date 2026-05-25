@@ -35,12 +35,16 @@ const onUploadError = (error: string) => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6 p-6 h-full bg-slate-50">
-    <div class="flex flex-col gap-1">
-      <h1 class="text-2xl font-bold text-slate-900">Carga de Órdenes de Compra</h1>
-      <p class="text-sm text-slate-500">
-        Importa archivos Excel de clientes y visualiza el historial normalizado.
-      </p>
+  <div class="flex flex-col gap-6 pt-12 px-6 pb-6 h-full bg-slate-50">
+    <!-- Cabecera del Módulo: Título + Pestañas de Cadenas -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4 shrink-0">
+      <div class="flex flex-col gap-1">
+        <h1 class="text-2xl font-bold text-slate-900">Carga de Órdenes de Compra</h1>
+        <p class="text-sm text-slate-500">
+          Importa archivos Excel de clientes y visualiza el historial normalizado.
+        </p>
+      </div>
+      <ChainTabs class="md:self-end" />
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
@@ -63,11 +67,10 @@ const onUploadError = (error: string) => {
       </div>
 
       <div class="lg:col-span-2 flex flex-col gap-4 min-h-0">
-        <ChainTabs />
         <OrderFilters />
         <OrdersTable />
       </div>
 
     </div>
   </div>
-</template>
+</template>

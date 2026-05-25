@@ -191,7 +191,10 @@ export const useUploadOcStore = defineStore('uploadOc', () => {
         } else {
             filters.cadenas = [chain]
         }
-        pagination.page = 1 // Resetear a la primera página al cambiar de pestaña
+        // Al cambiar de pestaña, limpiar el filtro de estado para mostrar todos los registros
+        // de la cadena seleccionada sin importar su estado. El usuario puede refinar desde la UI.
+        filters.estado = ''
+        pagination.page = 1
         await fetchOrders()
     }
 

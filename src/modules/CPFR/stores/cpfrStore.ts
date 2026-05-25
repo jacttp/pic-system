@@ -29,6 +29,12 @@ export const useCpfrStore = defineStore('cpfr', () => {
     const error         = ref<string | null>(null)
     const z8Loading     = ref(false)
     const z8Result      = ref<{ message: string; created: number } | null>(null)
+    const allCpfrWeeks  = ref<Array<{ anio: number; semana: number; semana_ic: string; key: string }>>([])
+    const weeksLoading  = ref(false)
+
+    // Historial — datos cargados con estado='all' para mostrar OC de semanas pasadas sin importar estado
+    const historialDias   = ref<CpfrDiaDash[]>([])
+    const historialLoading = ref(false)
 
     const criterio_global = ref<number>(2.5)
     const nom_cadena      = ref<string>('soriana')
@@ -96,6 +102,40 @@ export const useCpfrStore = defineStore('cpfr', () => {
     async function fetchCurrentWeek(): Promise<void> {
         const result = await cpfrApi.getCurrentWeek()
         currentWeek.value = result
+    }
+
+    async function fetchAllCpfrWeeks(): Promise<void> {
+        weeksLoading.value = true
+        try {
+            allCpfrWeeks.value = await cpfrApi.getWeeks()
+        } catch (e) {
+            console.error('[cpfrStore.fetchAllCpfrWeeks]', e)
+        } finally {
+            weeksLoading.value = false
+        }
+    }
+
+    async function loadHistorial(): Promise<void> {
+        if (!currentWeek.value) return
+        historialLoading.value = true
+        try {
+            const body = {
+                year: currentWeek.value!.anio,
+                week: currentWeek.value!.semana,
+                nom_cadena: nom_cadena.value,
+                criterio_global: criterio_global.value,
+                filters: {
+                    ...filters,
+                    estado_pedido: 'all',     // Traer OCs de cualquier estado
+                }
+            }
+            const res = await cpfrApi.loadDashboard(body)
+            historialDias.value = res.dias
+        } catch (e: any) {
+            console.error('[cpfrStore.loadHistorial]', e)
+        } finally {
+            historialLoading.value = false
+        }
     }
 
     async function loadDashboard(): Promise<void> {
@@ -217,7 +257,10 @@ export const useCpfrStore = defineStore('cpfr', () => {
                 filters.dia = num
             }
             await fetchCurrentWeek()
-            await loadDashboard()
+            await Promise.all([
+                loadDashboard(),
+                fetchAllCpfrWeeks()
+            ])
         } catch (e: any) {
             error.value = 'Error al inicializar el módulo CPFR.'
             console.error('[cpfrStore.init]', e)
@@ -508,11 +551,12 @@ export const useCpfrStore = defineStore('cpfr', () => {
     return {
         // State
         currentWeek, context, dias, loading, preview, error,
-        z8Loading, z8Result,
+        z8Loading, z8Result, allCpfrWeeks, weeksLoading,
+        historialDias, historialLoading,
         criterio_global, nom_cadena, filters, overrides, expandedStores,
         statusFilters, viewMode, activeTab,
         // Actions
-        init, fetchCurrentWeek, loadDashboard, recalculate, generateZ8,
+        init, fetchCurrentWeek, fetchAllCpfrWeeks, loadDashboard, loadHistorial, recalculate, generateZ8,
         adjustSku, updateStatus,
         toggleStore, expandAll, collapseAll, expandAllOCs, collapseAllOCs,
         setFilter, clearFilters,
