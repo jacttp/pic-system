@@ -9,6 +9,7 @@ import CpfrExportPanel     from '../components/CpfrExportPanel.vue'
 import CpfrStoreConfigModal from '../components/CpfrStoreConfigModal.vue'
 import CpfrInfoModal        from '../components/CpfrInfoModal.vue'
 import CpfrChainConfigModal from '../components/CpfrChainConfigModal.vue'
+import CpfrZ8ManagerPanel  from '../components/CpfrZ8ManagerPanel.vue'
 
 const store = useCpfrStore()
 
@@ -16,6 +17,7 @@ const store = useCpfrStore()
 const showExportPanel  = ref(false)
 const showInfoModal    = ref(false)
 const showChainConfig  = ref(false)
+const showZ8Manager    = ref(false)
 const configStore      = ref<{ id: string; nombre: string } | null>(null)
 
 onMounted(() => store.init())
@@ -96,6 +98,7 @@ function onOpenConfig(id_cliente: string, nombre_tienda: string) {
     <CpfrFiltersPanel 
       @open-export="showExportPanel = true" 
       @open-chain-config="showChainConfig = true"
+      @open-z8-manager="showZ8Manager = true"
     />
 
     <!-- ── Content ────────────────────────────────────────────────────────── -->
@@ -137,6 +140,13 @@ function onOpenConfig(id_cliente: string, nombre_tienda: string) {
     <CpfrExportPanel
       v-if="showExportPanel"
       @close="showExportPanel = false"
+    />
+
+    <!-- Panel Gestión de Borradores Z8 -->
+    <CpfrZ8ManagerPanel
+      v-if="showZ8Manager"
+      @close="showZ8Manager = false"
+      @deleted="store.loadDashboard()"
     />
 
     <CpfrStoreConfigModal

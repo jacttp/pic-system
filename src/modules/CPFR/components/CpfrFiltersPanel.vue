@@ -10,6 +10,7 @@ const store = useCpfrStore()
 const emit = defineEmits<{
     (e: 'open-export'): void
     (e: 'open-chain-config'): void
+    (e: 'open-z8-manager'): void
 }>()
 
 // Sincronizar búsqueda si se limpia local o globalmente
@@ -281,16 +282,27 @@ function clearAll() {
                   </div>
               </div>
 
-              <!-- Botón Configuración Cadena (Gear Icon) -->
+              <!-- Botón Configuración Cadena (Gear Icon) + Gestión Z8 -->
               <div class="flex flex-col gap-1.5">
                   <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-1"><i class="fa-solid fa-toolbox mr-0.5"></i> Gestión</span>
-                  <button 
-                    @click.stop="emit('open-chain-config')"
-                    class="h-[34px] w-[38px] flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-400 hover:text-brand-600 hover:bg-brand-50 hover:border-brand-200 transition-all shadow-sm"
-                    title="Abrir Catálogo de Configuración de Cadena"
-                  >
-                    <i class="fa-solid fa-gear text-lg"></i>
-                  </button>
+                  <div class="flex items-center gap-1">
+                    <!-- Gear: Configuración de Cadena -->
+                    <button 
+                      @click.stop="emit('open-chain-config')"
+                      class="h-[34px] w-[38px] flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-400 hover:text-brand-600 hover:bg-brand-50 hover:border-brand-200 transition-all shadow-sm"
+                      title="Abrir Catálogo de Configuración de Cadena"
+                    >
+                      <i class="fa-solid fa-gear text-lg"></i>
+                    </button>
+                    <!-- Trash: Gestión de Borradores Z8 -->
+                    <button
+                      @click.stop="emit('open-z8-manager')"
+                      class="h-[34px] w-[38px] flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-400 hover:text-rose-600 hover:bg-rose-100 hover:border-rose-300 transition-all shadow-sm"
+                      title="Gestión de Borradores Z8 — Limpiar registros en borrador"
+                    >
+                      <i class="fa-solid fa-trash-can-arrow-up text-lg"></i>
+                    </button>
+                  </div>
               </div>
           </div>
 

@@ -241,5 +241,25 @@ export const cpfrApi = {
         const { data } = await api.delete(`/v2/skuscadenas/${id}`)
         return data
     },
+
+    /**
+     * DELETE /api/cpfr/z8/drafts
+     * Elimina cascarones Z8 en estado borrador de un rango de fechas.
+     * Limpia CPFR_ocz8 (fuente) y CPFR_PedidoGenerado (cálculo persistido).
+     */
+    async deleteZ8Drafts(body: {
+        fec_inicio: string
+        fec_fin: string
+        nom_cadena: string
+        id_cliente?: string
+    }): Promise<{
+        success: boolean
+        deleted: number
+        detail: { ocz8: number; pedido_generado: number }
+        message: string
+    }> {
+        const { data } = await api.delete('/cpfr/z8/drafts', { data: body })
+        return data
+    },
     
 }
