@@ -124,6 +124,16 @@ const router = createRouter({
                component: () => import('@/modules/CPFR/views/CPFRView.vue'),
             },
             {
+               path: 'chain-config',
+               name: 'chain-config',
+               component: () => import('@/modules/ChainConfig/views/ChainConfigView.vue'),
+               meta: {
+                  requiresAuth: true,
+                  moduleKey: 'CHAIN_CONFIG',
+                  title: 'Configuración de Cadenas'
+               }
+            },
+            {
                path: 'stock-analytics',
                name: 'StockAnalytics',
                component: () => import('@/modules/StockAnalytics/views/StockAnalyticsView.vue'),

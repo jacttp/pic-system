@@ -18,9 +18,11 @@ import type {
     CpfrSkuOverride,
     CpfrSkuUnit,
     CpfrSkuUnitPayload,
+    CpfrInventoryHistoryRecord,
+    CpfrYoySalesPoint,
 } from '../types/cpfrTypes'
 
-import type {CpfrDashZ8Response } from '../types/cpfrZ8Types'
+import type { CpfrDashZ8Response } from '../types/cpfrZ8Types'
 // ── Body para dash-orders ────────────────────────────────────────────────────
 interface DashOrdersBody {
     year: number
@@ -261,5 +263,48 @@ export const cpfrApi = {
         const { data } = await api.delete('/cpfr/z8/drafts', { data: body })
         return data
     },
-    
+
+    async getProductInventoryHistory(body: {
+        id_cliente: string
+        sku_muliix: string
+        year: number
+        week: number
+        weeks?: number
+    }): Promise<CpfrInventoryHistoryRecord[]> {
+        const { data } = await api.post('/cpfr/product-inventory-history', body)
+        return data.data ?? []
+    },
+
+    async getProductYoySales(body: {
+        matriz: string
+        sku: string
+        cadena?: string | null
+        year: number
+        month: number
+    }): Promise<CpfrYoySalesPoint[]> {
+        const yearKey = 'A\u00f1o'
+        const filters: Record<string, any> = {
+            TRANSACCION: ['Venta', 'Metas'],
+            Matriz: [body.matriz],
+            SKU: [body.sku],
+            [yearKey]: [String(body.year - 1), String(body.year)],
+            MesInicial: String(body.month),
+            MesFinal: String(body.month),
+        }
+
+        if (body.cadena) filters.Cadena = [body.cadena]
+
+        const { data } = await api.post('/query', {
+            dimensions: [yearKey, 'Mes'],
+            filters,
+        })
+
+        return (Array.isArray(data) ? data : []).map((row: any) => ({
+            anio: String(row[yearKey] ?? row.anio ?? row.Anio ?? ''),
+            mes: Number(row.Mes ?? 0),
+            total_venta_kg: Number(row.TotalVentaKG ?? 0),
+            total_metas_kg: Number(row.TotalMetasKG ?? 0),
+        }))
+    },
+
 }

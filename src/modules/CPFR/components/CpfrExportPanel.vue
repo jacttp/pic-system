@@ -127,8 +127,9 @@ function itemKey(i: ExportTiendaItem) {
     return `${i.id_cliente}|${i.num_pedido}`
 }
 
-function skuKey(i: ExportTiendaItem, row: { upc: string }) {
-    return `${itemKey(i)}|${row.upc}`
+function skuKey(i: ExportTiendaItem, row: { upc: string; num_pedido?: string }) {
+    const oc = row.num_pedido || i.num_pedido
+    return `${i.id_cliente}|${oc}|${row.upc}`
 }
 
 function toggleStore(id_cliente: string) {
@@ -209,6 +210,30 @@ const includedItems = computed(() => {
             rows: filteredRows
         }
     }).filter(i => i !== null) as ExportTiendaItem[]
+})
+
+const previewItems = computed(() => {
+    if (store.groupByOC) {
+        return includedItems.value
+    } else {
+        const map = new Map<string, ExportTiendaItem>()
+        for (const item of includedItems.value) {
+            if (!map.has(item.id_cliente)) {
+                map.set(item.id_cliente, {
+                    id_cliente: item.id_cliente,
+                    nombre_tienda: item.nombre_tienda,
+                    num_pedido: 'DESAGRUPADO',
+                    estado_oc: item.estado_oc,
+                    dayNum: item.dayNum,
+                    semana_ic: item.semana_ic,
+                    anio: item.anio,
+                    rows: []
+                })
+            }
+            map.get(item.id_cliente)!.rows.push(...item.rows)
+        }
+        return Array.from(map.values())
+    }
 })
 
 const totalRows     = computed(() => includedItems.value.reduce((a, i) => a + i.rows.length, 0))
@@ -303,8 +328,8 @@ async function updateStatusesSilently() {
       <!-- ═══ BODY (SplitContainer) ═══ -->
       <div class="flex-1 min-h-0 flex overflow-hidden">
         
-        <!-- ── COL IZQ: Preview (Narrower) ── -->
-        <div class="w-[320px] flex flex-col border-r border-slate-200 bg-slate-100/40 shrink-0">
+        <!-- ── COL IZQ: Preview (Wider) ── -->
+        <div class="flex-1 flex flex-col bg-slate-100/40">
             <div class="px-4 py-3 border-b border-slate-200 bg-white/80 backdrop-blur flex items-center justify-between shrink-0">
                 <h3 class="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
                     <i class="fa-solid fa-receipt text-brand-500"></i> Vista Previa | Template OV
@@ -322,8 +347,8 @@ async function updateStatusesSilently() {
 
                 <!-- Tickets list -->
                 <div
-                    v-for="item in includedItems"
-                    :key="itemKey(item)"
+                    v-for="item in previewItems"
+                    :key="item.id_cliente + '|' + item.num_pedido"
                     class="bg-white rounded-xl border border-sky-100 shadow-sm overflow-hidden"
                 >
                     <!-- Header -->
@@ -334,7 +359,7 @@ async function updateStatusesSilently() {
                         </div>
                         <div class="text-right shrink-0">
                             <p class="text-brand-200 text-[8px] font-bold uppercase tracking-widest">OC</p>
-                            <p class="font-black text-white text-[10px] font-mono tracking-widest">{{ item.num_pedido }}</p>
+                            <p class="font-black text-white text-[10px] font-mono tracking-widest">{{ store.groupByOC ? item.num_pedido : 'DESAGRUPADO' }}</p>
                         </div>
                     </div>
 
@@ -354,9 +379,17 @@ async function updateStatusesSilently() {
 
                     <!-- Filas SKU (Súper condensadas) -->
                     <div class="divide-y divide-slate-50">
-                        <div v-for="(row, idx) in item.rows" :key="idx" class="flex items-center justify-between px-4 py-1 text-[9px]" :class="idx % 2 === 1 ? 'bg-slate-50/30' : ''">
-                            <span class="text-slate-700 font-semibold truncate pr-2 uppercase flex-1">{{ row.desc }}</span>
-                            <span class="font-black text-brand-700 shrink-0">{{ row.cant_pedida }} pz</span>
+                        <div v-for="(row, idx) in item.rows" :key="idx" class="flex flex-col gap-0.5 px-4 py-1.5 text-[9px]" :class="idx % 2 === 1 ? 'bg-slate-50/30' : ''">
+                            <div class="flex items-center justify-between">
+                                <span class="text-slate-700 font-bold truncate pr-2 uppercase flex-1">{{ row.desc }}</span>
+                                <span class="font-black text-brand-700 shrink-0">{{ row.cant_pedida }} pz</span>
+                            </div>
+                            <!-- Badge OC (solo si está desagrupado) -->
+                            <div v-if="!store.groupByOC && row.num_pedido" class="flex items-center gap-1.5 mt-0.5">
+                                <span class="px-1 py-0.5 rounded text-[8px] font-mono font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                                    OC: {{ row.num_pedido }}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -364,7 +397,7 @@ async function updateStatusesSilently() {
         </div>
 
         <!-- ── COL DER: Config (Fixed Width) ── -->
-        <div class="flex-1 min-w-0 flex flex-col bg-white">
+        <div class="w-[350px] shrink-0 min-w-0 flex flex-col bg-white border-l border-slate-200">
             
             <!-- Filter Bar -->
             <div class="p-4 border-b border-slate-100 space-y-3 shrink-0">
@@ -452,53 +485,81 @@ async function updateStatusesSilently() {
                        
                        <!-- OCs list inside store -->
                        <div v-if="expandedStores.has(id_cliente)" class="ml-6 space-y-2 border-l border-slate-100 pl-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                           <div v-for="oc in group.items" :key="itemKey(oc)" class="space-y-1.5">
-                                <div class="flex items-center gap-2 group/oc cursor-pointer" @click.stop="toggleOC(oc)">
-                                    <button
-                                        class="w-3.5 h-3.5 rounded border flex items-center justify-center transition-all"
-                                        :class="!excludedOCs.has(itemKey(oc)) && !excludedStores.has(id_cliente)
-                                            ? 'bg-sky-100 border-sky-300 text-sky-700'
-                                            : 'bg-white border-slate-200 text-slate-300'"
-                                    >
-                                        <i v-if="!excludedOCs.has(itemKey(oc)) && !excludedStores.has(id_cliente)" class="fa-solid fa-check text-[8px]"></i>
-                                    </button>
-                                    <div class="flex-1 flex items-center justify-between gap-3 min-w-0">
-                                        <span class="text-[9px] font-mono font-bold truncate" :class="!excludedOCs.has(itemKey(oc)) ? 'text-slate-600' : 'text-slate-300'">
-                                            OC: {{ oc.num_pedido }}
-                                        </span>
-                                        <div class="flex items-center gap-1.5 shrink-0">
-                                            <span class="text-[8px] font-black text-sky-600/70">{{ oc.rows.reduce((a,r) => a+r.cant_pedida, 0) }} pz</span>
-                                            <button 
-                                                @click.stop="toggleExpandOC(oc)"
-                                                class="w-4 h-4 rounded-md flex items-center justify-center bg-slate-50 hover:bg-slate-200 text-slate-400 border border-slate-100 transition-colors shadow-sm"
-                                            >
-                                                <i class="fa-solid text-[7px]" :class="expandedOCs.has(itemKey(oc)) ? 'fa-minus' : 'fa-plus'"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- SKUs List (Nested) -->
-                                <div v-if="expandedOCs.has(itemKey(oc))" class="ml-5 space-y-1 border-l border-slate-100 pl-3 py-1 animate-in fade-in slide-in-from-top-1 duration-200">
-                                    <div v-for="sku in oc.rows" :key="skuKey(oc, sku)" 
-                                        class="flex items-center gap-2 group/sku cursor-pointer hover:bg-slate-50 rounded p-0.5 pr-2 transition-colors"
-                                        @click.stop="toggleSku(oc, sku)"
-                                    >
+                           <!-- Si está agrupado en OC, muestra la lista de OCs -->
+                           <template v-if="store.groupByOC">
+                               <div v-for="oc in group.items" :key="itemKey(oc)" class="space-y-1.5">
+                                    <div class="flex items-center gap-2 group/oc cursor-pointer" @click.stop="toggleOC(oc)">
                                         <button
-                                            class="w-3 h-3 rounded border flex items-center justify-center transition-all"
-                                            :class="!excludedSKUs.has(skuKey(oc, sku)) && !excludedOCs.has(itemKey(oc)) && !excludedStores.has(id_cliente)
-                                                ? 'bg-emerald-500 border-emerald-600 text-white'
+                                            class="w-3.5 h-3.5 rounded border flex items-center justify-center transition-all"
+                                            :class="!excludedOCs.has(itemKey(oc)) && !excludedStores.has(id_cliente)
+                                                ? 'bg-sky-100 border-sky-300 text-sky-700'
                                                 : 'bg-white border-slate-200 text-slate-300'"
                                         >
-                                            <i v-if="!excludedSKUs.has(skuKey(oc, sku)) && !excludedOCs.has(itemKey(oc)) && !excludedStores.has(id_cliente)" class="fa-solid fa-check text-[6px]"></i>
+                                            <i v-if="!excludedOCs.has(itemKey(oc)) && !excludedStores.has(id_cliente)" class="fa-solid fa-check text-[8px]"></i>
                                         </button>
-                                        <span class="text-[8px] font-medium truncate" :class="!excludedSKUs.has(skuKey(oc, sku)) ? 'text-slate-500' : 'text-slate-300'">
+                                        <div class="flex-1 flex items-center justify-between gap-3 min-w-0">
+                                            <span class="text-[9px] font-mono font-bold truncate" :class="!excludedOCs.has(itemKey(oc)) ? 'text-slate-600' : 'text-slate-300'">
+                                                OC: {{ oc.num_pedido }}
+                                            </span>
+                                            <div class="flex items-center gap-1.5 shrink-0">
+                                                <span class="text-[8px] font-black text-sky-600/70">{{ oc.rows.reduce((a,r) => a+r.cant_pedida, 0) }} pz</span>
+                                                <button 
+                                                    @click.stop="toggleExpandOC(oc)"
+                                                    class="w-4 h-4 rounded-md flex items-center justify-center bg-slate-50 hover:bg-slate-200 text-slate-400 border border-slate-100 transition-colors shadow-sm"
+                                                >
+                                                    <i class="fa-solid text-[7px]" :class="expandedOCs.has(itemKey(oc)) ? 'fa-minus' : 'fa-plus'"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- SKUs List (Nested) -->
+                                    <div v-if="expandedOCs.has(itemKey(oc))" class="ml-5 space-y-1 border-l border-slate-100 pl-3 py-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                                        <div v-for="sku in oc.rows" :key="skuKey(oc, sku)" 
+                                            class="flex items-center gap-2 group/sku cursor-pointer hover:bg-slate-50 rounded p-0.5 pr-2 transition-colors"
+                                            @click.stop="toggleSku(oc, sku)"
+                                        >
+                                            <button
+                                                class="w-3.5 h-3.5 rounded border flex items-center justify-center transition-all"
+                                                :class="!excludedSKUs.has(skuKey(oc, sku)) && !excludedOCs.has(itemKey(oc)) && !excludedStores.has(id_cliente)
+                                                    ? 'bg-emerald-500 border-emerald-600 text-white'
+                                                    : 'bg-white border-slate-200 text-slate-300'"
+                                            >
+                                                <i v-if="!excludedSKUs.has(skuKey(oc, sku)) && !excludedOCs.has(itemKey(oc)) && !excludedStores.has(id_cliente)" class="fa-solid fa-check text-[6px]"></i>
+                                            </button>
+                                            <span class="text-[8px] font-medium truncate" :class="!excludedSKUs.has(skuKey(oc, sku)) ? 'text-slate-500' : 'text-slate-300'">
+                                                {{ sku.desc }}
+                                            </span>
+                                            <span class="ml-auto text-[7px] font-bold text-brand-600/60">{{ sku.cant_pedida }} pz</span>
+                                        </div>
+                                    </div>
+                               </div>
+                           </template>
+                           <!-- Si está desagrupado, muestra los SKUs directamente bajo la tienda -->
+                           <template v-else>
+                               <div v-for="sku in group.items.flatMap(i => i.rows.map(r => ({ ...r, itemRef: i })))" :key="skuKey(sku.itemRef, sku)" 
+                                    class="flex items-center gap-2 group/sku cursor-pointer hover:bg-slate-50 rounded p-1 pr-2 transition-colors animate-in fade-in duration-200"
+                                    @click.stop="toggleSku(sku.itemRef, sku)"
+                               >
+                                    <button
+                                        class="w-3.5 h-3.5 rounded border flex items-center justify-center transition-all"
+                                        :class="!excludedSKUs.has(skuKey(sku.itemRef, sku)) && !excludedStores.has(id_cliente)
+                                            ? 'bg-emerald-500 border-emerald-600 text-white'
+                                            : 'bg-white border-slate-200 text-slate-300'"
+                                    >
+                                        <i v-if="!excludedSKUs.has(skuKey(sku.itemRef, sku)) && !excludedStores.has(id_cliente)" class="fa-solid fa-check text-[6px]"></i>
+                                    </button>
+                                    <div class="flex-1 flex items-center justify-between gap-2 min-w-0">
+                                        <span class="text-[9px] font-medium truncate" :class="!excludedSKUs.has(skuKey(sku.itemRef, sku)) ? 'text-slate-500' : 'text-slate-300'">
                                             {{ sku.desc }}
                                         </span>
-                                        <span class="ml-auto text-[7px] font-bold text-brand-600/60">{{ sku.cant_pedida }} pz</span>
+                                        <span class="px-1 py-0.5 rounded text-[7px] font-mono font-bold bg-slate-100 text-slate-500 border border-slate-200 shrink-0">
+                                            {{ sku.num_pedido || 'SIN FOLIO' }}
+                                        </span>
                                     </div>
-                                </div>
-                           </div>
+                                    <span class="ml-auto text-[7px] font-bold text-brand-600/60 shrink-0">{{ sku.cant_pedida }} pz</span>
+                               </div>
+                           </template>
                        </div>
                     </div>
                 </div>

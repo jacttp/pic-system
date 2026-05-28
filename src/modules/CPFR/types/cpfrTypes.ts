@@ -215,4 +215,20 @@ export interface CpfrSkuCadena {
     upc_cadena: string | null
     nom_cadena: string
 }
-
+
+export interface CpfrInventoryHistoryRecord {
+    fecha_snapshot: string
+    anio: number
+    semana: number
+    id_cliente: string
+    sku_real: string
+    existencia_kg: number
+}
+
+export interface CpfrYoySalesPoint {
+    anio: string
+    mes: number
+    total_venta_kg: number
+    total_metas_kg: number
+}
+

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // src/modules/CPFR/components/CpfrOrderTable.vue
-import { ref, computed, onMounted, onBeforeUnmount, defineOptions, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 
 defineOptions({
   inheritAttrs: false
@@ -9,8 +9,10 @@ import { useCpfrStore } from '../stores/cpfrStore'
 import { toast } from '@/components/ui/toast/use-toast'
 import type { CpfrSkuDash, CpfrStoreDash } from '../types/cpfrTypes'
 import CpfrZ8Panel from '../components/CpfrZ8Panel.vue'
+import CpfrProductBehaviorPanel from '../components/CpfrProductBehaviorPanel.vue'
 
 const showZ8Panel = ref(false)
+const selectedProductContext = ref<{ tienda: CpfrStoreDash; sku: CpfrSkuDash } | null>(null)
 
 const store = useCpfrStore()
 const showZeroZ8 = ref(false)
@@ -103,6 +105,19 @@ function closeAllPopovers() {
     openStatusOC.value  = null
 }
 
+function closeSellout() {
+    openSelloutId.value = null
+}
+
+function openProductPanel(tienda: CpfrStoreDash, sku: CpfrSkuDash) {
+    selectedProductContext.value = { tienda, sku }
+    closeAllPopovers()
+}
+
+function closeProductPanel() {
+    selectedProductContext.value = null
+}
+
 function toggleSellout(id: string) {
     if (openSelloutId.value === id) {
         openSelloutId.value = null
@@ -191,6 +206,15 @@ function groupOCs(skus: CpfrSkuDash[]): GroupedOC[] {
 
         return 0;
     })
+}
+
+const groupByOC = computed({
+    get: () => store.groupByOC,
+    set: (val) => store.setGroupByOC(val)
+})
+
+function getFlatVisibleSkus(skus: CpfrSkuDash[]): CpfrSkuDash[] {
+    return groupOCs(skus).flatMap(oc => oc.skus)
 }
 
 const expandedOCGroups = ref<Record<string, boolean>>({})
@@ -282,10 +306,22 @@ function instockBadge(pct: number | null): { label: string; cls: string } {
     return                    { label: 'CRÍTICO',  cls: 'bg-rose-100 text-rose-700' }
 }
 
-function escenarioCls(esc: 'A' | 'B' | null) {
+function escenarioCls(esc: 'A' | 'B' | null, numPedido?: string | null) {
+    if (numPedido && isZ8(numPedido)) {
+        return 'bg-purple-100 text-purple-700 border-purple-200 font-bold'
+    }
     if (esc === 'A') return 'bg-sky-100 text-sky-700 border-sky-200'
     if (esc === 'B') return 'bg-amber-100 text-amber-700 border-amber-200'
     return 'bg-slate-100 text-slate-500 border-slate-200'
+}
+
+function escenarioText(esc: 'A' | 'B' | null, numPedido?: string | null) {
+    if (numPedido && isZ8(numPedido)) {
+        const num = numPedido.toLowerCase()
+        if (num.includes('carne')) return 'Z8 Carnes'
+        return 'Z8'
+    }
+    return esc ?? '—'
 }
 
 function n(v: number | null | undefined, dec = 1): string {
@@ -614,6 +650,12 @@ const totalUniqueOCs = computed(() => {
           <i class="fa-solid fa-layer-group text-slate-400"></i>
           <span class="text-[11px] font-bold uppercase tracking-wider">Control de Vista</span>
           
+          <!-- Switch Agrupar por OC -->
+          <label class="ml-3 relative inline-flex items-center cursor-pointer select-none" title="Agrupar/Desagrupar por Orden de Compra">
+            <input type="checkbox" v-model="groupByOC" class="sr-only peer">
+            <div class="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-brand-500"></div>
+          </label>
+
           <!-- Contador de OCs -->
           <div v-if="totalUniqueOCs > 0" class="ml-4 flex items-center gap-2 px-2.5 py-1 bg-brand-50 border border-brand-200 rounded-lg text-brand-700 font-bold text-[10px]">
             <i class="fa-solid fa-file-circle-check"></i>
@@ -884,7 +926,7 @@ const totalUniqueOCs = computed(() => {
                     </tr>
 
                     <!-- OC Groups -->
-                    <template v-else v-for="ocGroup in groupOCs(tienda.skus)" :key="ocGroup.group_id">
+                    <template v-else-if="groupByOC" v-for="ocGroup in groupOCs(tienda.skus)" :key="ocGroup.group_id">
                       
                       <!-- NIVEL 4: OC — Indentado, gris muy sutil -->
                       <tr
@@ -1021,13 +1063,13 @@ const totalUniqueOCs = computed(() => {
                           ]"
                         >
                           <!-- Nombre SKU -->
-                          <td class="pl-24 pr-3 py-2 text-slate-700 font-medium" :title="sku.sku_nombre">
+                          <td class="pl-24 pr-3 py-2 text-slate-700 font-medium cursor-pointer hover:text-brand-700" :title="sku.sku_nombre" @click.stop="openProductPanel(tienda, sku)">
                             <div class="flex items-center gap-2 min-w-0">
                               <span
                                 class="shrink-0 inline-flex text-[9px] font-bold px-1.5 py-0.5 rounded-md border"
-                                :class="escenarioCls(sku.escenario)"
+                                :class="escenarioCls(sku.escenario, sku.num_pedido)"
                                 :title="sku.escenario === 'B' ? 'Pedido recalculado' : ''"
-                              >{{ sku.escenario ?? '—' }}</span>
+                              >{{ escenarioText(sku.escenario, sku.num_pedido) }}</span>
                               <span class="truncate">{{ sku.sku_nombre }}</span>
                             </div>
                           </td>
@@ -1174,6 +1216,193 @@ const totalUniqueOCs = computed(() => {
                       <!-- Margin Bottom para el grupo de OC -->
                       <tr class="bg-white border-none"><td colspan="13" class="py-2.5"></td></tr>
 
+                    </template>
+
+                    <!-- Desagrupado (Plano) -->
+                    <template v-else>
+                      <tr
+                        v-for="(sku, skuIdx) in getFlatVisibleSkus(tienda.skus)"
+                        :key="sku.sku_muliix ? sku.sku_muliix : (sku.oc_id + '_' + skuIdx)"
+                        class="transition-colors text-[11px] group/row border-l-[6px] border-l-slate-100 border-b border-b-slate-200"
+                        :class="[
+                          skuRowBgClass(sku),
+                          isZ8(sku.num_pedido) ? 'bg-purple-50/10' : ''
+                        ]"
+                      >
+                        <!-- Nombre SKU + OC Badges -->
+                          <td class="pl-6 pr-3 py-2 text-slate-700 font-medium cursor-pointer hover:text-brand-700" :title="sku.sku_nombre" @click.stop="openProductPanel(tienda, sku)">
+                          <div class="flex flex-col gap-1.5 min-w-0">
+                            <div class="flex items-center gap-2">
+                              <span
+                                class="shrink-0 inline-flex text-[9px] font-bold px-1.5 py-0.5 rounded-md border"
+                                :class="escenarioCls(sku.escenario, sku.num_pedido)"
+                                :title="sku.escenario === 'B' ? 'Pedido recalculado' : ''"
+                              >{{ escenarioText(sku.escenario, sku.num_pedido) }}</span>
+                              <span class="truncate">{{ sku.sku_nombre }}</span>
+                            </div>
+                            
+                            <!-- Badges OC -->
+                            <div class="flex items-center gap-1.5 pl-[28px] opacity-90">
+                              <span 
+                                class="flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-bold tracking-tight bg-slate-100 text-slate-600 border-slate-200"
+                              >
+                                <i class="fa-solid fa-file-invoice text-slate-400"></i>
+                                {{ sku.num_pedido || 'Sin número' }}
+                              </span>
+                              <span 
+                                v-if="sku.semana_ic" 
+                                class="px-1.5 py-0.5 text-[9px] font-bold rounded border bg-brand-50 text-brand-700 border-brand-200"
+                              >
+                                Sem. {{ sku.semana_ic }}
+                              </span>
+                              <span 
+                                v-if="sku.fec_pedido_cadena" 
+                                class="flex items-center gap-1 font-bold px-1.5 py-0.5 rounded-md text-[9px] border bg-slate-50 text-slate-500 border-slate-200"
+                              >
+                                <i class="fa-regular fa-calendar-check text-brand-300"></i>
+                                {{ sku.fec_pedido_cadena.slice(0, 10) }}
+                              </span>
+                              <span v-if="sku.estado_oc" class="font-bold px-1.5 py-0.5 rounded-md text-[8px] border uppercase" :class="estadoBadge(sku.estado_oc).cls">
+                                {{ estadoBadge(sku.estado_oc).label }}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+
+                        <!-- UPC -->
+                        <td class="px-3 py-2 text-slate-500 text-[10px] font-mono">{{ sku.upc_cadena ?? '—' }}</td>
+
+                        <!-- Inv. Actual (pz) -->
+                        <td class="px-3 py-2 text-right text-slate-700 cursor-help"
+                            :title="`${n(sku.inv_actual_kg, 2)} kg (Inv. uni. = ${sku.unidad_inventario} kg/pz)`">
+                          <span class="border-b border-dashed border-slate-300">{{ n(sku.inv_actual_pz, 2) }}</span>
+                        </td>
+
+                        <!-- Vta. Prom. Semanal (pz) -->
+                        <td class="px-3 py-2 text-right text-slate-700 relative cursor-pointer group/cell hover:bg-slate-100 transition-colors rounded-lg"
+                            @click.stop="toggleSellout(tienda.id_cliente + '_' + sku.sku_cadena)">
+                          
+                          <div class="cursor-help" :title="`${n(sku.promedio_sellout_kg, 2)} kg (Inv. uni. = ${sku.unidad_inventario} kg/pz)`">
+                            <span class="border-b border-dashed border-slate-300 group-hover/cell:text-brand-600 transition-colors">{{ n(sku.promedio_sellout_pz, 2) }}</span>
+                          </div>
+
+                          <!-- Popover Historial Sellout -->
+                          <div v-if="openSelloutId === (tienda.id_cliente + '_' + sku.sku_cadena)"
+                               class="absolute bottom-full right-0 mb-1.5 z-50 bg-white border border-slate-200 shadow-xl rounded-xl p-3 w-[240px] cursor-default"
+                               @click.stop>
+                              <div class="flex items-center justify-between mb-2 pb-2 border-b border-slate-100">
+                                  <span class="text-[10px] font-bold text-slate-600 uppercase tracking-widest flex items-center gap-1.5"><i class="fa-solid fa-chart-line text-brand-500"></i> Histórico Sellout</span>
+                                  <button @click.stop="closeSellout" class="text-slate-400 hover:text-rose-500 transition-colors p-1"><i class="fa-solid fa-xmark text-[11px]"></i></button>
+                              </div>
+                              <table class="w-full text-[10px] text-slate-600 leading-tight">
+                                  <thead>
+                                      <tr class="text-left text-slate-500 border-b border-slate-100">
+                                          <th class="py-1 font-semibold text-center">Semana</th>
+                                          <th class="py-1 text-right font-semibold">Peso (kg)</th>
+                                          <th class="py-1 text-right font-bold text-brand-700">Cant. (pz)</th>
+                                      </tr>
+                                  </thead>
+                                  <tbody>
+                                      <tr v-for="s in (sku.sellout_semanas || [])" :key="s.semana" class="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                                          <td class="py-1.5 font-semibold text-slate-700 text-center">S{{ s.semana }}</td>
+                                          <td class="py-1.5 text-right">{{ n(s.kg, 2) }}</td>
+                                          <td class="py-1.5 text-right text-brand-700 font-bold bg-brand-50/50">{{ n(s.kg / (sku.unidad_inventario || 1), 2) }}</td>
+                                      </tr>
+                                      <tr v-if="!(sku.sellout_semanas && sku.sellout_semanas.length)">
+                                          <td colspan="3" class="py-4 text-center text-slate-400">Sin ventas en histórico</td>
+                                      </tr>
+                                  </tbody>
+                                  <tfoot v-if="sku.sellout_semanas && sku.sellout_semanas.length">
+                                      <tr class="bg-slate-50 border-t-2 border-slate-200">
+                                          <td class="py-2 font-bold text-slate-800 text-center uppercase tracking-widest text-[9px]">Prom.</td>
+                                          <td class="py-2 text-right font-bold text-slate-800">{{ n(sku.promedio_sellout_kg, 2) }}</td>
+                                          <td class="py-2 text-right font-bold text-brand-700 bg-brand-100/50 rounded-br-lg">{{ n(sku.promedio_sellout_pz, 2) }}</td>
+                                      </tr>
+                                  </tfoot>
+                              </table>
+                          </div>
+                        </td>
+
+                        <!-- Criterio (sem. objetivo) -->
+                        <td class="px-3 py-2 text-right text-slate-500">
+                          {{ sku.semanas_objetivo }}
+                        </td>
+
+                        <!-- Semanas Actuales (cobertura dinamica) -->
+                        <td
+                          class="px-3 py-2 text-right font-bold relative"
+                          :class="cobClass(calcularCoberturaDinamica(sku))"
+                          :title="coberturaStatusTooltip(coberturaStatus(sku), calcularCoberturaDinamica(sku), sku.semanas_objetivo || store.criterio_global || 2.5)"
+                        >
+                          <span class="flex items-center justify-end gap-1.5">
+                            <i v-if="coberturaStatusIcon(coberturaStatus(sku))" :class="coberturaStatusIcon(coberturaStatus(sku))" class="text-[10px] flex-shrink-0"></i>
+                            {{ calcularCoberturaDinamica(sku) != null ? calcularCoberturaDinamica(sku)!.toFixed(2) : '—' }}
+                          </span>
+                        </td>
+
+                        <!-- Pedido Sugerido (editable Excel-style) -->
+                        <td class="px-2 py-2 align-middle bg-amber-50/50 border-x border-amber-100/50 relative group/cell">
+                          <div class="absolute inset-y-0 left-0 w-[2px] bg-amber-400/20"></div>
+                          
+                          <div v-if="editingId === sku.sku_muliix && sku.sku_muliix" class="flex items-center gap-1.5 justify-end h-full">
+                            <input
+                              v-model.number="editValue"
+                              type="number" min="0" :step="sku.pzas_bolsa || 1"
+                              class="w-full h-7 rounded-md border border-brand-300 px-2 text-xs text-right font-bold text-slate-800 shadow-inner focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all bg-white"
+                              autofocus
+                              @keyup.enter="confirmEdit(sku, tienda.id_cliente)"
+                              @keyup.escape="cancelEdit()"
+                            />
+                            <div class="flex flex-col gap-0.5">
+                              <button class="bg-emerald-500 text-white rounded-md w-6 h-6 flex items-center justify-center hover:bg-emerald-600 shadow-sm transition-colors" @click="confirmEdit(sku, tienda.id_cliente)">
+                                <i :class="saving ? 'fa-solid fa-circle-notch fa-spin text-[10px]' : 'fa-solid fa-check text-[11px]'"></i>
+                              </button>
+                            </div>
+                          </div>
+                          <button
+                            v-else
+                            class="w-full text-right bg-white border border-slate-200 hover:border-brand-400 hover:shadow-sm rounded-md px-2 py-1 flex items-center justify-between transition-all"
+                            :class="{ 'ring-2 ring-emerald-400 border-transparent bg-emerald-50': savedId === sku.sku_muliix }"
+                            :title="esSinSellout(sku)
+                              ? '⚠️ Sin sellout promedio — producto nuevo o sin histórico. Se usa el pedido cadena como referencia.'
+                              : 'Clic para editar cantidad'"
+                            @click="startEdit(sku)"
+                          >
+                            <span class="flex items-center gap-1">
+                              <i v-if="esSinSellout(sku)" class="fa-solid fa-seedling text-[10px] text-amber-500" title="Sin sellout promedio"></i>
+                              <i v-else class="fa-solid fa-pen text-[10px] text-slate-300 group-hover/cell:text-brand-500 transition-colors"></i>
+                            </span>
+                            <span class="text-[12px] font-bold text-slate-800" :class="{ 'text-brand-700': sku.pedido_sugerido_pz_red > 0 }">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
+                          </button>
+                        </td>
+
+                        <!-- Pedido Cadena (cant_pedida) -->
+                        <td class="px-3 py-2 text-right font-semibold text-slate-800">
+                          {{ n(sku.cant_pedida, 0) }}
+                        </td>
+
+                        <!-- Fill Rate -->
+                        <td
+                          class="px-3 py-2 text-right font-medium"
+                          :class="[fillRateBadge(calcularFillRateDinamico(sku)).bg, fillRateBadge(calcularFillRateDinamico(sku)).text]"
+                          :title="fillRateBadge(calcularFillRateDinamico(sku)).tip"
+                        >
+                          <span class="flex items-center justify-end gap-1.5">
+                            <i v-if="fillRateBadge(calcularFillRateDinamico(sku)).icon" :class="fillRateBadge(calcularFillRateDinamico(sku)).icon" class="text-[10px] flex-shrink-0"></i>
+                            {{ calcularFillRateDinamico(sku) != null ? (calcularFillRateDinamico(sku)! * 100).toFixed(1) + '%' : '—' }}
+                          </span>
+                        </td>
+
+                        <!-- INSTOCK per SKU -->
+                        <td class="px-3 py-2 text-center">
+                          <span
+                            class="inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-md border w-fit mx-auto"
+                            :class="instockBadge(sku.instock).cls"
+                          >
+                            {{ instockBadge(sku.instock).label }}
+                          </span>
+                        </td>
+                      </tr>
                     </template>
 
                   </template>
@@ -1337,7 +1566,7 @@ const totalUniqueOCs = computed(() => {
                                         <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-5">
                                             
                                             <!-- Info Principal SKU (Nombre y detalles debajo) -->
-                                            <div class="min-w-0 flex-1">
+                                            <div class="min-w-0 flex-1 cursor-pointer rounded-lg p-1 -m-1 transition-colors hover:bg-brand-50/60" @click.stop="openProductPanel(tienda, sku)">
                                                 <h4 class="text-[12px] font-black text-slate-800 leading-tight truncate mb-1" :title="sku.sku_nombre">{{ sku.sku_nombre }}</h4>
                                                 <div class="flex flex-wrap items-center gap-2.5">
                                                     <span class="text-[8px] font-black px-1 py-0.5 rounded border uppercase shadow-xs bg-white" :class="escenarioCls(sku.escenario)">
@@ -1509,6 +1738,18 @@ const totalUniqueOCs = computed(() => {
     <CpfrZ8Panel
         v-if="showZ8Panel"
         @close="showZ8Panel = false"
+    />
+  </Teleport>
+
+  <Teleport to="body">
+    <CpfrProductBehaviorPanel
+        v-if="selectedProductContext && store.currentWeek"
+        :tienda="selectedProductContext.tienda"
+        :sku="selectedProductContext.sku"
+        :year="store.currentWeek.anio"
+        :week="store.currentWeek.semana"
+        :cadena="store.nom_cadena"
+        @close="closeProductPanel"
     />
   </Teleport>
 </template>

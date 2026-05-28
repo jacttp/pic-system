@@ -1,22 +1,21 @@
 <script setup lang="ts">
 // src/modules/CPFR/views/CPFRView.vue
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useCpfrStore } from '../stores/cpfrStore'
 import CpfrFiltersPanel    from '../components/CpfrFiltersPanel.vue'
-import CpfrCriteriaPanel   from '../components/CpfrCriteriaPanel.vue'
 import CpfrOrderTable      from '../components/CpfrOrderTable.vue'
 import CpfrExportPanel     from '../components/CpfrExportPanel.vue'
 import CpfrStoreConfigModal from '../components/CpfrStoreConfigModal.vue'
 import CpfrInfoModal        from '../components/CpfrInfoModal.vue'
-import CpfrChainConfigModal from '../components/CpfrChainConfigModal.vue'
 import CpfrZ8ManagerPanel  from '../components/CpfrZ8ManagerPanel.vue'
 
 const store = useCpfrStore()
+const router = useRouter()
 
 // ── Panel state ───────────────────────────────────────────────────────────────
 const showExportPanel  = ref(false)
 const showInfoModal    = ref(false)
-const showChainConfig  = ref(false)
 const showZ8Manager    = ref(false)
 const configStore      = ref<{ id: string; nombre: string } | null>(null)
 
@@ -24,6 +23,10 @@ onMounted(() => store.init())
 
 function onOpenConfig(id_cliente: string, nombre_tienda: string) {
     configStore.value = { id: id_cliente, nombre: nombre_tienda }
+}
+
+function openChainConfig() {
+    router.push({ name: 'chain-config' })
 }
 </script>
 
@@ -97,7 +100,7 @@ function onOpenConfig(id_cliente: string, nombre_tienda: string) {
     <!-- ── Barra de Filtros (Colapsable) ────────────────────────────────────────── -->
     <CpfrFiltersPanel 
       @open-export="showExportPanel = true" 
-      @open-chain-config="showChainConfig = true"
+      @open-chain-config="openChainConfig"
       @open-z8-manager="showZ8Manager = true"
     />
 
@@ -159,11 +162,6 @@ function onOpenConfig(id_cliente: string, nombre_tienda: string) {
     <CpfrInfoModal
       v-if="showInfoModal"
       @close="showInfoModal = false"
-    />
-
-    <CpfrChainConfigModal
-      v-if="showChainConfig"
-      @close="showChainConfig = false"
     />
 
   </main>

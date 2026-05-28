@@ -21,23 +21,23 @@ export const useCpfrStore = defineStore('cpfr', () => {
 
     // ── State ─────────────────────────────────────────────────────────────────
 
-    const currentWeek   = ref<CpfrCurrentWeek | null>(null)
-    const context       = ref<CpfrContext | null>(null)
-    const dias          = ref<CpfrDiaDash[]>([])
-    const loading       = ref(false)
-    const preview       = ref(false)          // true cuando viene de /recalculate
-    const error         = ref<string | null>(null)
-    const z8Loading     = ref(false)
-    const z8Result      = ref<{ message: string; created: number } | null>(null)
-    const allCpfrWeeks  = ref<Array<{ anio: number; semana: number; semana_ic: string; key: string }>>([])
-    const weeksLoading  = ref(false)
+    const currentWeek = ref<CpfrCurrentWeek | null>(null)
+    const context = ref<CpfrContext | null>(null)
+    const dias = ref<CpfrDiaDash[]>([])
+    const loading = ref(false)
+    const preview = ref(false)          // true cuando viene de /recalculate
+    const error = ref<string | null>(null)
+    const z8Loading = ref(false)
+    const z8Result = ref<{ message: string; created: number } | null>(null)
+    const allCpfrWeeks = ref<Array<{ anio: number; semana: number; semana_ic: string; key: string }>>([])
+    const weeksLoading = ref(false)
 
     // Historial — datos cargados con estado='all' para mostrar OC de semanas pasadas sin importar estado
-    const historialDias   = ref<CpfrDiaDash[]>([])
+    const historialDias = ref<CpfrDiaDash[]>([])
     const historialLoading = ref(false)
 
     const criterio_global = ref<number>(2.5)
-    const nom_cadena      = ref<string>('soriana')
+    const nom_cadena = ref<string>('soriana')
 
     // Filtros activos — se incluyen en el body del POST
     const filters = reactive<CpfrFilters>({
@@ -65,8 +65,9 @@ export const useCpfrStore = defineStore('cpfr', () => {
     const expandedStores = reactive<Record<string, boolean>>({})
 
     // UI — vista actual (tabla o tarjetas) persistida
-    const viewMode  = ref<'table' | 'cards'>((localStorage.getItem('cpfr_view_mode') as any) || 'table')
+    const viewMode = ref<'table' | 'cards'>((localStorage.getItem('cpfr_view_mode') as any) || 'table')
     const activeTab = ref('centralizados')
+    const groupByOC = ref(false)
 
     function setViewMode(mode: 'table' | 'cards') {
         viewMode.value = mode
@@ -75,6 +76,10 @@ export const useCpfrStore = defineStore('cpfr', () => {
 
     function setActiveTab(tab: string) {
         activeTab.value = tab
+    }
+
+    function setGroupByOC(val: boolean) {
+        groupByOC.value = val
     }
 
     // ── Helpers internos ──────────────────────────────────────────────────────
@@ -91,7 +96,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
 
     function applyResponse(data: { context: CpfrContext; dias: CpfrDiaDash[]; preview?: boolean }) {
         context.value = data.context
-        dias.value    = data.dias
+        dias.value = data.dias
         preview.value = data.preview === true
         // Expand all stores by default
         expandAll()
@@ -176,7 +181,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
 
     // NOTA: patch ahora usa negocio (cliente, sku, sem, anio, num_pedido, fec_oc) para máxima robustez
     async function adjustSku(
-        id_cliente: string, sku_muliix: string, anio: number, semana_ic: string, 
+        id_cliente: string, sku_muliix: string, anio: number, semana_ic: string,
         num_pedido: string | null, fec_pedido_cadena: string | null,
         body: { cantidad_final_pz: number, fill_rate?: number | null, factor_ajuste?: number }
     ): Promise<boolean> {
@@ -186,9 +191,9 @@ export const useCpfrStore = defineStore('cpfr', () => {
             for (const dia of dias.value) {
                 const tiendaRow = dia.tiendas.find(t => t.id_cliente === id_cliente)
                 if (tiendaRow) {
-                    const sku = tiendaRow.skus.find(s => 
-                        s.sku_muliix === sku_muliix && 
-                        s.num_pedido === num_pedido && 
+                    const sku = tiendaRow.skus.find(s =>
+                        s.sku_muliix === sku_muliix &&
+                        s.num_pedido === num_pedido &&
                         s.fec_pedido_cadena === fec_pedido_cadena
                     )
                     if (sku) {
@@ -335,14 +340,14 @@ export const useCpfrStore = defineStore('cpfr', () => {
     function clearStatusFilters() {
         statusFilters.escenarioA = false
         statusFilters.escenarioB = false
-        statusFilters.sinSellout  = false
-        statusFilters.desabasto   = false
-        statusFilters.bajoStock   = false
-        statusFilters.sobrestock  = false
+        statusFilters.sinSellout = false
+        statusFilters.desabasto = false
+        statusFilters.bajoStock = false
+        statusFilters.sobrestock = false
         statusFilters.fillrateBajo = false
-        statusFilters.fillrate100  = false
+        statusFilters.fillrate100 = false
         statusFilters.sobrepedido = false
-        statusFilters.searchOC    = ''
+        statusFilters.searchOC = ''
     }
 
     // ── Computed ──────────────────────────────────────────────────────────────
@@ -376,16 +381,16 @@ export const useCpfrStore = defineStore('cpfr', () => {
         const skus = store.skus
         if (!skus.length) return
         store.resumen.pedido_sugerido_pz_red = skus.reduce((a, s) => a + s.pedido_sugerido_pz_red, 0)
-        store.resumen.cant_pedida_total  = skus.reduce((a, s) => a + (s.cant_pedida ?? 0), 0)
+        store.resumen.cant_pedida_total = skus.reduce((a, s) => a + (s.cant_pedida ?? 0), 0)
     }
 
     // ── Config de tienda — conservado para CpfrStoreConfigModal ─────────────
 
-    const storeConfig       = ref<CpfrStoreConfig | null>(null)
-    const configLoading     = ref(false)
-    const configSaving      = ref(false)
-    const configError       = ref<string | null>(null)
-    const skuOverrides      = ref<CpfrSkuOverride[]>([])
+    const storeConfig = ref<CpfrStoreConfig | null>(null)
+    const configLoading = ref(false)
+    const configSaving = ref(false)
+    const configError = ref<string | null>(null)
+    const skuOverrides = ref<CpfrSkuOverride[]>([])
     const skuOverridesLoading = ref(false)
 
     const allConfigs = ref<CpfrStoreConfig[]>([])
@@ -554,13 +559,13 @@ export const useCpfrStore = defineStore('cpfr', () => {
         z8Loading, z8Result, allCpfrWeeks, weeksLoading,
         historialDias, historialLoading,
         criterio_global, nom_cadena, filters, overrides, expandedStores,
-        statusFilters, viewMode, activeTab,
+        statusFilters, viewMode, activeTab, groupByOC,
         // Actions
         init, fetchCurrentWeek, fetchAllCpfrWeeks, loadDashboard, loadHistorial, recalculate, generateZ8,
         adjustSku, updateStatus,
         toggleStore, expandAll, collapseAll, expandAllOCs, collapseAllOCs,
         setFilter, clearFilters,
-        toggleStatusFilter, clearStatusFilters, setViewMode, setActiveTab,
+        toggleStatusFilter, clearStatusFilters, setViewMode, setActiveTab, setGroupByOC,
         // Computed
         diaOptions, jefaturaOptions, tiendaOptions,
         // Config de tienda (para CpfrStoreConfigModal)

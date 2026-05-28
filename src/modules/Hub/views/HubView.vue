@@ -37,6 +37,7 @@ const MODULE_STYLES: Record<string, { color: string, bg: string, desc?: string }
     'SEGMENT': {color: 'text-purple-600', bg: 'bg-purple-50', desc: 'Segmentación avanzada de clientes por volumen: cuartiles, quintiles, deciles y percentiles.'},
     'COM_STRUCT':    { color: 'text-teal-600',  bg: 'bg-teal-50',  desc: 'Gestión de la estructura territorial comercial: Gerencia, Zona, Jefatura y Ruta.' },
     'UPLOAD_METAS':  { color: 'text-teal-700',  bg: 'bg-teal-50',  desc: 'Importa archivos Excel con las metas de ventas y visualiza el histórico.' },
+    'CHAIN_CONFIG':  { color: 'text-sky-600',   bg: 'bg-sky-50',   desc: 'Asocia SKUs internos con cadenas, conversiones y parámetros operativos CPFR.' },
 
     'DEFAULT': { color: 'text-slate-500', bg: 'bg-slate-50', desc: 'Módulo del sistema.' }, 
 };
