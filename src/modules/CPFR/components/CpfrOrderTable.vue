@@ -26,6 +26,18 @@ const currentTab = computed({
   get: () => store.activeTab,
   set: (val) => store.setActiveTab(val)
 })
+
+const chainTabs = [
+    { id: 'SORIANA', label: 'Soriana', icon: 'fa-store' },
+    { id: 'SAMS', label: "Sam's", icon: 'fa-warehouse' },
+]
+
+const activeChain = computed(() => store.nom_cadena.toUpperCase())
+
+function setActiveChain(chain: string) {
+    store.setNomCadena(chain)
+}
+
 const tabs = [ 
     { id: 'centralizados', label: 'Centralizados' },
     { id: 'revision',       label: 'Revisión' },
@@ -340,6 +352,40 @@ function estadoBadge(estado: string | null): { label: string; cls: string; color
     return { label: estado || 'Desconocido', cls: 'bg-slate-100 text-slate-500 border-slate-200', color: '#94a3b8' }
 }
 
+function storeStatusKey(idCliente: string): string {
+    return `store:${idCliente}`
+}
+
+function getVisibleEditableOCNumbers(skus: CpfrSkuDash[]): string[] {
+    const nums = new Set<string>()
+    for (const sku of getFlatVisibleSkus(skus)) {
+        if (!sku.num_pedido) continue
+        if (sku.estado_oc && !['pendiente', 'borrador'].includes(sku.estado_oc)) continue
+        nums.add(sku.num_pedido)
+    }
+    return [...nums]
+}
+
+function storeVisibleStatusBadge(skus: CpfrSkuDash[]): { label: string; cls: string; color: string } | null {
+    const visibleSkus = getFlatVisibleSkus(skus).filter(s => s.num_pedido)
+    if (!visibleSkus.length) return null
+
+    const states = new Set(visibleSkus.map(s => s.estado_oc || 'pendiente'))
+    if (states.size === 1) return estadoBadge([...states][0])
+    if ([...states].every(s => s === 'pendiente' || s === 'borrador')) {
+        return {
+            label: 'Pendiente / Borrador',
+            cls: 'bg-amber-50 text-amber-700 border-amber-200',
+            color: '#fbbf24',
+        }
+    }
+    return {
+        label: 'Mixto',
+        cls: 'bg-slate-100 text-slate-600 border-slate-200',
+        color: '#94a3b8',
+    }
+}
+
 function calcularCoberturaDinamica(sku: any): number | null {
     if (!sku || !sku.promedio_sellout_kg || sku.promedio_sellout_kg <= 0) return null;
     const qtyPz = sku.pedido_sugerido_pz_red || 0;
@@ -385,6 +431,54 @@ async function changeOCStatus(num_pedido: string | null, estado: string) {
             toast({
                 title: '\u274c Error al enviar a revisión',
                 description: 'No se pudo crear la solicitud de aprobación. Intenta de nuevo.',
+                variant: 'destructive',
+                duration: 5000,
+            })
+        }
+    }
+}
+
+async function changeStoreVisibleOCStatus(tienda: CpfrStoreDash, estado: string) {
+    if (!store.currentWeek) return
+
+    const ocNumbers = getVisibleEditableOCNumbers(tienda.skus)
+    if (!ocNumbers.length) return
+
+    const submitKey = storeStatusKey(tienda.id_cliente)
+    openStatusOC.value = null
+    submittingOC.value = submitKey
+
+    let okCount = 0
+    let firstApprovalId: number | undefined
+
+    for (const num_pedido of ocNumbers) {
+        const result = await store.updateStatus({
+            num_pedido,
+            year: store.currentWeek.anio,
+            week: store.currentWeek.semana,
+            estado: estado as any,
+        })
+        if (result.ok) {
+            okCount += 1
+            firstApprovalId ??= result.approvalId
+        }
+    }
+
+    submittingOC.value = null
+
+    if (estado === 'revision') {
+        if (okCount === ocNumbers.length) {
+            toast({
+                title: '\u2705 OCs enviadas a revisi\u00f3n',
+                description: firstApprovalId
+                    ? `${okCount} OC enviadas. Primera solicitud de aprobaci\u00f3n #${firstApprovalId}.`
+                    : `${okCount} OC enviadas a revisi\u00f3n.`,
+                duration: 5000,
+            })
+        } else {
+            toast({
+                title: '\u274c Error parcial al enviar a revisi\u00f3n',
+                description: `Se actualizaron ${okCount} de ${ocNumbers.length} OC visibles.`,
                 variant: 'destructive',
                 duration: 5000,
             })
@@ -662,8 +756,23 @@ const totalUniqueOCs = computed(() => {
             <span>{{ totalUniqueOCs }} OC</span>
           </div>
 
+          <!-- Pestañas de cadena -->
+          <div class="ml-4 flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+            <button
+               v-for="chain in chainTabs"
+               :key="chain.id"
+               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all disabled:opacity-60 disabled:cursor-wait"
+               :class="activeChain === chain.id ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'"
+               :disabled="store.loading && activeChain !== chain.id"
+               @click="setActiveChain(chain.id)"
+            >
+              <i class="fa-solid text-[10px]" :class="chain.icon"></i>
+              <span>{{ chain.label }}</span>
+            </button>
+          </div>
+
           <!-- Pestañas (Tabs) -->
-          <div class="ml-4 flex items-center gap-1 bg-slate-100/50 p-1 rounded-xl border border-slate-200 shadow-inner">
+          <div class="ml-2 flex items-center gap-1 bg-slate-100/50 p-1 rounded-xl border border-slate-200 shadow-inner">
             <button
                v-for="t in tabs" :key="t.id"
                class="px-3 py-1.5 rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all"
@@ -851,7 +960,51 @@ const totalUniqueOCs = computed(() => {
                           :class="[store.expandedStores[tienda.id_cliente] ? 'rotate-90 text-brand-500' : 'group-hover:text-slate-400']"
                         ></i>
                         <div class="min-w-0">
-                          <p class="font-bold text-slate-800 truncate leading-tight">{{ tienda.nombre_tienda }}</p>
+                          <div class="flex items-center gap-2 min-w-0">
+                            <p class="font-bold text-slate-800 truncate leading-tight">{{ tienda.nombre_tienda }}</p>
+                            <div
+                              v-if="!groupByOC && currentTab === 'centralizados' && storeVisibleStatusBadge(tienda.skus) && getVisibleEditableOCNumbers(tienda.skus).length"
+                              class="relative shrink-0"
+                            >
+                              <button
+                                class="font-bold px-1.5 py-0.5 rounded-md text-[9px] border uppercase cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                :class="[
+                                  storeVisibleStatusBadge(tienda.skus)!.cls,
+                                  openStatusOC === storeStatusKey(tienda.id_cliente) ? 'ring-2 ring-brand-400 ring-offset-1' : ''
+                                ]"
+                                :disabled="submittingOC === storeStatusKey(tienda.id_cliente)"
+                                title="Cambiar estado de las OC visibles de esta tienda"
+                                @click.stop="toggleStatusOC(storeStatusKey(tienda.id_cliente))"
+                              >
+                                <i v-if="submittingOC === storeStatusKey(tienda.id_cliente)" class="fa-solid fa-circle-notch fa-spin mr-1"></i>
+                                {{ storeVisibleStatusBadge(tienda.skus)!.label }}
+                                <span class="ml-1 text-[8px] opacity-70">({{ getVisibleEditableOCNumbers(tienda.skus).length }} OC)</span>
+                                <i class="fa-solid fa-chevron-down ml-1 text-[8px] opacity-70"></i>
+                              </button>
+
+                              <div
+                                v-if="openStatusOC === storeStatusKey(tienda.id_cliente)"
+                                class="absolute left-0 top-full z-50 mt-1 flex min-w-[180px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white text-[10px] font-semibold shadow-lg"
+                                @click.stop
+                              >
+                                <button
+                                  class="px-3 py-2 text-left text-amber-700 transition-colors hover:bg-amber-50 border-b border-slate-50"
+                                  @click.stop="changeStoreVisibleOCStatus(tienda, 'borrador')"
+                                >
+                                  <i class="fa-solid fa-file-pen mr-2 opacity-70"></i>Marcar visibles como borrador
+                                </button>
+                                <button
+                                  class="flex items-center gap-1.5 px-3 py-2 text-left text-indigo-700 transition-colors hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  :disabled="submittingOC === storeStatusKey(tienda.id_cliente)"
+                                  @click.stop="changeStoreVisibleOCStatus(tienda, 'revision')"
+                                >
+                                  <i v-if="submittingOC === storeStatusKey(tienda.id_cliente)" class="fa-solid fa-circle-notch fa-spin text-[10px]"></i>
+                                  <i v-else class="fa-solid fa-paper-plane mr-1 opacity-70"></i>
+                                  Enviar visibles a revision
+                                </button>
+                              </div>
+                            </div>
+                          </div>
                           <p class="text-[10px] text-brand-600 mt-0.5 font-bold uppercase tracking-wider">
                             {{ tienda.jefatura }}
                           </p>
@@ -1261,9 +1414,6 @@ const totalUniqueOCs = computed(() => {
                               >
                                 <i class="fa-regular fa-calendar-check text-brand-300"></i>
                                 {{ sku.fec_pedido_cadena.slice(0, 10) }}
-                              </span>
-                              <span v-if="sku.estado_oc" class="font-bold px-1.5 py-0.5 rounded-md text-[8px] border uppercase" :class="estadoBadge(sku.estado_oc).cls">
-                                {{ estadoBadge(sku.estado_oc).label }}
                               </span>
                             </div>
                           </div>

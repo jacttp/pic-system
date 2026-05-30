@@ -41,6 +41,11 @@ export const approvalsApi = {
       return mapApproval(data.data);
    },
 
+   async getCpfrOrderDetail(id: number): Promise<any> {
+      const { data } = await api.get(`/v2/approvals/${id}/cpfr-order-detail`);
+      return data.data;
+   },
+
    async createApproval(payload: ApprovalCreatePayload): Promise<Approval> {
       const { data } = await api.post('/v2/approvals', payload);
       return mapApproval(data.data);

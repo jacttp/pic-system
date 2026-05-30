@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // src/modules/CPFR/views/CPFRView.vue
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCpfrStore } from '../stores/cpfrStore'
 import CpfrFiltersPanel    from '../components/CpfrFiltersPanel.vue'
@@ -18,6 +18,7 @@ const showExportPanel  = ref(false)
 const showInfoModal    = ref(false)
 const showZ8Manager    = ref(false)
 const configStore      = ref<{ id: string; nombre: string } | null>(null)
+const chainLabel = computed(() => store.nom_cadena === 'SAMS' ? "Sam's" : 'Soriana')
 
 onMounted(() => store.init())
 
@@ -70,9 +71,9 @@ function openChainConfig() {
           </div>
         </h1>
         <p class="text-[10px] xl:text-[11px] text-slate-400 mt-0.5 truncate">
-          Motor de reabastecimiento · Soriana
+          Motor de reabastecimiento - {{ chainLabel }}
           <span v-if="store.currentWeek" class="ml-2 text-slate-300">
-            · Año {{ store.currentWeek.anio }} · Sem. {{ store.currentWeek.semana_ic }}
+            - Anio {{ store.currentWeek.anio }} - Sem. {{ store.currentWeek.semana_ic }}
           </span>
         </p>
       </div>

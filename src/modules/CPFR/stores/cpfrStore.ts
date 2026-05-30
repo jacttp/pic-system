@@ -37,7 +37,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
     const historialLoading = ref(false)
 
     const criterio_global = ref<number>(2.5)
-    const nom_cadena = ref<string>('soriana')
+    const nom_cadena = ref<string>((localStorage.getItem('cpfr_nom_cadena') || 'SORIANA').toUpperCase())
 
     // Filtros activos — se incluyen en el body del POST
     const filters = reactive<CpfrFilters>({
@@ -82,13 +82,24 @@ export const useCpfrStore = defineStore('cpfr', () => {
         groupByOC.value = val
     }
 
+    function setNomCadena(value: string) {
+        const normalized = String(value || 'SORIANA').trim().toUpperCase()
+        if (nom_cadena.value === normalized) return
+
+        nom_cadena.value = normalized
+        localStorage.setItem('cpfr_nom_cadena', normalized)
+        historialDias.value = []
+        activeTab.value = 'centralizados'
+        loadDashboard()
+    }
+
     // ── Helpers internos ──────────────────────────────────────────────────────
 
     function buildDashBody() {
         return {
             year: currentWeek.value!.anio,
             week: currentWeek.value!.semana,
-            nom_cadena: nom_cadena.value,
+            nom_cadena: nom_cadena.value.toUpperCase(),
             criterio_global: criterio_global.value,
             ...(Object.keys(filters).length > 0 ? { filters: { ...filters } } : {}),
         }
@@ -127,7 +138,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
             const body = {
                 year: currentWeek.value!.anio,
                 week: currentWeek.value!.semana,
-                nom_cadena: nom_cadena.value,
+                nom_cadena: nom_cadena.value.toUpperCase(),
                 criterio_global: criterio_global.value,
                 filters: {
                     ...filters,
@@ -565,7 +576,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         adjustSku, updateStatus,
         toggleStore, expandAll, collapseAll, expandAllOCs, collapseAllOCs,
         setFilter, clearFilters,
-        toggleStatusFilter, clearStatusFilters, setViewMode, setActiveTab, setGroupByOC,
+        toggleStatusFilter, clearStatusFilters, setViewMode, setActiveTab, setGroupByOC, setNomCadena,
         // Computed
         diaOptions, jefaturaOptions, tiendaOptions,
         // Config de tienda (para CpfrStoreConfigModal)
