@@ -44,6 +44,10 @@ const toggleSidebar = () => {
     isCollapsed.value = !isCollapsed.value;
 };
 
+const toggleNotifications = () => {
+    showNotifDropdown.value = !showNotifDropdown.value;
+};
+
 const goToProfile = () => {
     router.push({ name: 'user-profile' });
 };
@@ -75,8 +79,9 @@ const goToProfile = () => {
                     <!-- Notification bell -->
                     <div class="relative">
                         <button 
-                            @click="showNotifDropdown = !showNotifDropdown"
+                            @click="toggleNotifications"
                             class="text-slate-400 hover:text-brand-600 p-2 rounded-lg hover:bg-slate-50 transition-all focus:outline-none relative"
+                            :class="showNotifDropdown ? 'bg-brand-50 text-brand-700' : ''"
                             title="Notificaciones"
                         >
                             <i class="fa-solid fa-bell text-lg"></i>
@@ -87,17 +92,6 @@ const goToProfile = () => {
                                 {{ profileStore.unreadCount > 9 ? '9+' : profileStore.unreadCount }}
                             </span>
                         </button>
-
-                        <!-- Dropdown -->
-                        <transition name="dropdown-anim">
-                            <div 
-                                v-if="showNotifDropdown"
-                                class="absolute left-full top-0 ml-2 w-80 z-[100] shadow-xl rounded-xl"
-                            >
-                                <NotificationCenter mode="dropdown" :max-items="8" />
-                            </div>
-                        </transition>
-                        <div v-if="showNotifDropdown" @click="showNotifDropdown = false" class="fixed inset-0 z-[90]"></div>
                     </div>
 
                     <button 
@@ -111,6 +105,25 @@ const goToProfile = () => {
                 </div>
 
             </div>
+
+            <!-- Notifications popover -->
+            <transition name="notification-popover">
+                <div
+                    v-if="showNotifDropdown"
+                    class="absolute left-full top-2 z-[110] ml-0 w-[420px]"
+                >
+                    <NotificationCenter
+                        mode="dropdown"
+                        :max-items="8"
+                        @navigate="showNotifDropdown = false"
+                    />
+                </div>
+            </transition>
+            <div
+                v-if="showNotifDropdown"
+                @click="showNotifDropdown = false"
+                class="fixed inset-0 z-[100]"
+            ></div>
 
             <!-- Collapsed: toggle btn at top of nav -->
             <button 
@@ -244,14 +257,19 @@ const goToProfile = () => {
     opacity: 1;
 }
 
-/* Notification dropdown animation */
-.dropdown-anim-enter-active,
-.dropdown-anim-leave-active {
-    transition: all 0.15s ease;
+/* Notification popover animation */
+.notification-popover-enter-active,
+.notification-popover-leave-active {
+    transition: opacity 0.16s ease, transform 0.16s ease;
 }
-.dropdown-anim-enter-from,
-.dropdown-anim-leave-to {
+.notification-popover-enter-from,
+.notification-popover-leave-to {
     opacity: 0;
-    transform: translateX(-8px);
+    transform: translateX(-6px);
+}
+.notification-popover-enter-to,
+.notification-popover-leave-from {
+    opacity: 1;
+    transform: translateX(0);
 }
 </style>

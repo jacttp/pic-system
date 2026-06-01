@@ -1,6 +1,7 @@
 <!-- src/modules/Approvals/views/ApprovalsView.vue -->
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue';
+import { onMounted, ref, computed, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { useApprovalsStore } from '../stores/approvalsStore';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import type { Approval, ApprovalFilters } from '../types/approval.types';
@@ -10,6 +11,7 @@ import ApprovalDetailModal from '../components/ApprovalDetailModal.vue';
 
 const approvalsStore = useApprovalsStore();
 const authStore      = useAuthStore();
+const route          = useRoute();
 
 // ── Tabs ─────────────────────────────────────────────────────────
 type Tab = 'assigned' | 'mine'
@@ -50,6 +52,8 @@ onMounted(async () => {
       approvalsStore.fetchAssignedApprovals(),
       approvalsStore.fetchApprovals(),
    ]);
+
+   await openApprovalFromRoute(route.query.approvalId);
 });
 
 // ── Handlers ──────────────────────────────────────────────────────
@@ -75,6 +79,39 @@ const handleResolved = () => {
    approvalsStore.fetchAssignedApprovals();
    approvalsStore.fetchApprovals();
 };
+
+const openApprovalFromRoute = async (approvalId: unknown) => {
+   const id = Number(Array.isArray(approvalId) ? approvalId[0] : approvalId);
+   if (!Number.isInteger(id) || id <= 0) return;
+
+   let approval = approvalsStore.assignedApprovals.find(a => a.id === id) || null;
+   if (approval) {
+      activeTab.value = 'assigned';
+   } else {
+      approval = approvalsStore.approvals.find(a => a.id === id) || null;
+      if (approval) {
+         activeTab.value = 'mine';
+      }
+   }
+
+   if (!approval) {
+      await approvalsStore.fetchApprovalById(id);
+      approval = approvalsStore.selectedApproval;
+      activeTab.value = 'assigned';
+   }
+
+   if (approval) {
+      selectedApproval.value = approval;
+      showDetailModal.value = true;
+   }
+};
+
+watch(
+   () => route.query.approvalId,
+   (approvalId) => {
+      openApprovalFromRoute(approvalId);
+   }
+);
 
 const handleCancel = async (id: number) => {
    if (!confirm('¿Cancelar esta solicitud?')) return;
