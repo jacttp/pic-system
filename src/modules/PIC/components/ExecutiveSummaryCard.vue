@@ -35,7 +35,7 @@ const generateSummary = async () => {
         <div class="p-4 bg-gradient-to-r from-slate-800 to-slate-900 text-white flex justify-between items-center">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center backdrop-blur-sm">
-                    <i class="fa-solid fa-user-tie text-xl text-brand-300"></i>
+                    <i class="fa-solid fa-user-tie text-xl text-rose-300"></i>
                 </div>
                 <div>
                     <h3 class="font-bold text-sm md:text-base">Resumen Ejecutivo IA</h3>
@@ -62,14 +62,14 @@ const generateSummary = async () => {
                 </p>
                 <button 
                     @click="generateSummary"
-                    class="bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-md shadow-brand-500/20 transition-all hover:-translate-y-0.5 flex items-center gap-2 mx-auto"
+                    class="bg-rose-600 hover:bg-rose-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-md shadow-rose-500/20 transition-all hover:-translate-y-0.5 flex items-center gap-2 mx-auto"
                 >
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Generar Análisis
                 </button>
             </div>
 
             <div v-if="isLoading" class="p-12 flex flex-col items-center justify-center text-slate-400">
-                <i class="fa-solid fa-circle-notch fa-spin text-3xl text-brand-500 mb-3"></i>
+                <i class="fa-solid fa-circle-notch fa-spin text-3xl text-rose-500 mb-3"></i>
                 <span class="text-xs font-medium animate-pulse">El CFO Virtual está analizando los datos...</span>
             </div>
 
@@ -80,7 +80,7 @@ const generateSummary = async () => {
                 
                 <div class="mt-6 pt-4 border-t border-slate-100 flex justify-between items-center">
                     <span class="text-[10px] text-slate-400">Generado con IA • Revisar antes de compartir</span>
-                    <button @click="generateSummary" class="text-xs text-brand-600 hover:text-brand-800 font-medium flex items-center gap-1">
+                    <button @click="generateSummary" class="text-xs text-rose-600 hover:text-rose-800 font-medium flex items-center gap-1">
                         <i class="fa-solid fa-rotate-right"></i> Regenerar
                     </button>
                 </div>

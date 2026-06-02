@@ -46,7 +46,7 @@ const handleSelect = async (status: PresenceStatus) => {
          
          <!-- Sliding Indicator -->
          <div 
-            class="absolute top-1 bottom-1 left-1 rounded-full bg-white shadow-md transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] z-0"
+            class="absolute top-1 bottom-1 left-1 rounded-full bg-white shadow-md transition-all duration-300 ease-&lsqb;cubic-bezier(0.34,1.56,0.64,1)&rsqb; z-0"
             :style="{ 
                width: `calc((100% - 8px) / 3)`, 
                transform: `translateX(calc(${currentIndex} * 100%))` 

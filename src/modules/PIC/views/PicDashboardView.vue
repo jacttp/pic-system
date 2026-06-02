@@ -147,7 +147,7 @@ const handleExportConfirm = async (config: any) => {
                 class="absolute inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex flex-col items-center justify-center transition-all duration-300"
             >
                 <div class="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center max-w-sm text-center">
-                    <i class="fa-solid fa-circle-notch fa-spin text-5xl text-brand-500 mb-4"></i>
+                    <i class="fa-solid fa-circle-notch fa-spin text-5xl text-rose-500 mb-4"></i>
                     <h3 class="text-xl font-bold text-slate-800 mb-2">Generando Análisis...</h3>
                     <p class="text-sm text-slate-500">Procesando los datos, esto puede tomar unos segundos dependiendo de la carga.</p>
                 </div>
@@ -165,7 +165,7 @@ const handleExportConfirm = async (config: any) => {
                 <div v-if="!isReportActive" class="flex h-full items-center justify-center">
                     <div class="text-center max-w-lg">
                         <div class="w-20 h-20 bg-white rounded-3xl shadow-sm border border-slate-100 flex items-center justify-center mx-auto mb-6">
-                            <i class="fa-solid fa-chart-pie text-4xl text-brand-500"></i>
+                            <i class="fa-solid fa-chart-pie text-4xl text-rose-500"></i>
                         </div>
                         <h2 class="text-2xl font-bold text-slate-800 mb-2">Generador de Reportes</h2>
                         <p class="text-slate-500 mb-8">
@@ -175,7 +175,7 @@ const handleExportConfirm = async (config: any) => {
                         <button 
                             @click="handleGenerate"
                             :disabled="store.isGenerating"
-                            class="bg-brand-600 hover:bg-brand-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-brand-500/20 transition-transform active:scale-95 flex items-center gap-2 mx-auto disabled:opacity-70 disabled:cursor-not-allowed disabled:scale-100"
+                            class="bg-rose-600 hover:bg-rose-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-rose-500/20 transition-transform active:scale-95 flex items-center gap-2 mx-auto disabled:opacity-70 disabled:cursor-not-allowed disabled:scale-100"
                         >
                             <i v-if="store.isGenerating" class="fa-solid fa-circle-notch fa-spin"></i>
                             <i v-else class="fa-solid fa-bolt"></i>
@@ -187,7 +187,7 @@ const handleExportConfirm = async (config: any) => {
                 <div v-else class="pb-20">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-                            <i class="fa-solid fa-chart-pie text-brand-500"></i>
+                            <i class="fa-solid fa-chart-pie text-rose-500"></i>
                             Resultados del Reporte
                         </h2>
                         <CacheProgress />

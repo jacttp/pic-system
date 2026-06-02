@@ -113,6 +113,12 @@ const handleDelete = (notif: Notification, event: Event) => {
    event.stopPropagation();
    profileStore.deleteNotification(notif.id);
 };
+
+const handleRowKeydown = (notif: Notification, event: KeyboardEvent) => {
+   if (event.key !== 'Enter' && event.key !== ' ') return;
+   event.preventDefault();
+   handleClick(notif);
+};
 </script>
 
 <template>
@@ -146,10 +152,13 @@ const handleDelete = (notif: Notification, event: Event) => {
       </div>
 
       <div v-else class="min-h-0 flex-1 overflow-y-auto">
-         <button
+         <div
             v-for="notif in displayedNotifications"
             :key="notif.id"
+            role="button"
+            tabindex="0"
             @click="handleClick(notif)"
+            @keydown="handleRowKeydown(notif, $event)"
             class="group flex w-full items-start gap-3 border-b border-slate-100 px-5 py-4 text-left transition-colors last:border-b-0 hover:bg-slate-50"
             :class="!notif.read ? 'bg-slate-50/70' : 'bg-white'"
          >
@@ -193,7 +202,7 @@ const handleDelete = (notif: Notification, event: Event) => {
             >
                <i class="fa-solid fa-xmark text-xs"></i>
             </button>
-         </button>
+         </div>
       </div>
 
       <div class="border-t border-slate-200 bg-white px-4 py-3">
