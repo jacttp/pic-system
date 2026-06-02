@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import { useSetupStore } from '@/modules/Setup/stores/setupStores';
 import { useProfileStore } from '@/modules/UserProfile/stores/profileStore';
 import { useRouter, useRoute } from 'vue-router';
 import NotificationCenter from '@/modules/UserProfile/components/NotificationCenter.vue';
+import coronaLogo from '@/assets/logo.png';
 
 const auth = useAuthStore();
 const setupStore = useSetupStore();
@@ -51,6 +52,11 @@ const toggleNotifications = () => {
 const goToProfile = () => {
     router.push({ name: 'user-profile' });
 };
+
+const userInitials = computed(() => {
+    const username = auth.user?.username || 'SU';
+    return username.substring(0, 2).toUpperCase();
+});
 </script>
 
 <template>
@@ -76,24 +82,6 @@ const goToProfile = () => {
                 </router-link>
 
                 <div class="flex items-center gap-1">
-                    <!-- Notification bell -->
-                    <div class="relative">
-                        <button 
-                            @click="toggleNotifications"
-                            class="text-slate-400 hover:text-brand-600 p-2 rounded-lg hover:bg-slate-50 transition-all focus:outline-none relative"
-                            :class="showNotifDropdown ? 'bg-brand-50 text-brand-700' : ''"
-                            title="Notificaciones"
-                        >
-                            <i class="fa-solid fa-bell text-lg"></i>
-                            <span 
-                                v-if="profileStore.unreadCount > 0"
-                                class="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-bold min-w-[16px] h-4 flex items-center justify-center rounded-full px-1 shadow-sm"
-                            >
-                                {{ profileStore.unreadCount > 9 ? '9+' : profileStore.unreadCount }}
-                            </span>
-                        </button>
-                    </div>
-
                     <button 
                         @click="toggleSidebar"
                         v-show="!isCollapsed"
@@ -110,7 +98,7 @@ const goToProfile = () => {
             <transition name="notification-popover">
                 <div
                     v-if="showNotifDropdown"
-                    class="absolute left-full top-2 z-[110] ml-0 w-[420px]"
+                    class="fixed right-5 top-16 z-[110] w-[min(420px,calc(100vw-2rem))]"
                 >
                     <NotificationCenter
                         mode="dropdown"
@@ -176,15 +164,15 @@ const goToProfile = () => {
             </nav>
 
             <!-- Footer: User info + Profile link -->
-            <div class="p-3 border-t border-slate-100 bg-slate-50/50">
+            <div class="p-3 border-t border-slate-100 bg-white">
                 <div 
                     @click="goToProfile"
-                    class="flex items-center gap-3 p-2 rounded-lg hover:bg-white transition-all group relative cursor-pointer"
+                    class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-all group relative cursor-pointer"
                     :class="isCollapsed ? 'justify-center' : ''"
                     title="Ver mi perfil"
                 >
                     <div class="w-9 h-9 rounded-full bg-brand-600 text-white flex items-center justify-center font-bold text-sm shadow-md shrink-0 relative">
-                        {{ auth.user?.username.substring(0,2).toUpperCase() }}
+                        {{ userInitials }}
                         <!-- Presence dot -->
                         <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white"
                               :class="{
@@ -211,8 +199,76 @@ const goToProfile = () => {
             </div>
         </aside>
 
-        <main class="flex-1 flex flex-col min-w-0 overflow-y-auto relative">
-            <router-view></router-view>
+        <main class="flex-1 flex flex-col min-w-0 relative">
+            <header class="h-20 shrink-0 bg-white/95 backdrop-blur border-b border-slate-200 px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4 z-40">
+                <div class="hidden lg:flex flex-1 justify-center">
+                    <label class="relative w-full max-w-xl">
+                        <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <input
+                            type="search"
+                            aria-label="Buscar en PIC System"
+                            placeholder="Buscar modulos, reportes o datos..."
+                            class="w-full h-11 rounded-lg border border-slate-200 bg-white pl-11 pr-20 text-sm text-slate-700 shadow-sm outline-none transition focus:border-brand-300 focus:ring-4 focus:ring-brand-50"
+                        />
+                        <span class="absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-400">Ctrl + K</span>
+                    </label>
+                </div>
+
+                <div class="flex flex-1 lg:flex-none items-center justify-end gap-2 sm:gap-4">
+                    <img
+                        :src="coronaLogo"
+                        alt="Corona"
+                        class="hidden sm:block h-11 w-auto object-contain"
+                    />
+
+                    <button
+                        @click="toggleNotifications"
+                        class="relative flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-brand-600 focus:outline-none"
+                        :class="showNotifDropdown ? 'bg-brand-50 text-brand-700' : ''"
+                        title="Notificaciones"
+                    >
+                        <i class="fa-regular fa-bell text-lg"></i>
+                        <span
+                            v-if="profileStore.unreadCount > 0"
+                            class="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-600 px-1 text-[10px] font-bold text-white shadow-sm"
+                        >
+                            {{ profileStore.unreadCount > 9 ? '9+' : profileStore.unreadCount }}
+                        </span>
+                    </button>
+
+                    <button
+                        class="hidden sm:flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-brand-600"
+                        title="Ayuda"
+                    >
+                        <i class="fa-regular fa-circle-question text-lg"></i>
+                    </button>
+
+                    <button
+                        @click="goToProfile"
+                        class="flex items-center gap-3 rounded-lg border border-transparent px-1.5 py-1.5 transition hover:border-slate-200 hover:bg-slate-50"
+                        title="Ver mi perfil"
+                    >
+                        <span class="hidden xl:block text-right">
+                            <span class="block text-xs font-bold text-slate-700 leading-tight">{{ auth.user?.username }}</span>
+                            <span class="block text-[10px] uppercase font-bold tracking-wide text-slate-400">{{ auth.user?.role }}</span>
+                        </span>
+                        <span class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-700 text-sm font-bold text-white shadow-md shadow-brand-900/10">
+                            {{ userInitials }}
+                            <span class="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white"
+                                :class="{
+                                    'bg-emerald-500': profileStore.profile?.presenceStatus === 'online',
+                                    'bg-amber-500': profileStore.profile?.presenceStatus === 'busy',
+                                    'bg-slate-400': !profileStore.profile || profileStore.profile?.presenceStatus === 'offline'
+                                }"
+                            ></span>
+                        </span>
+                    </button>
+                </div>
+            </header>
+
+            <section class="flex-1 min-h-0 overflow-y-auto">
+                <router-view></router-view>
+            </section>
         </main>
     </div>
 </template>
