@@ -67,9 +67,9 @@ const goToProfile = () => {
                 <router-link 
                     to="/" 
                     v-show="!isCollapsed"
-                    class="flex items-center gap-3 text-rose-800 font-bold text-lg group overflow-hidden whitespace-nowrap transition-opacity duration-200"
+                    class="flex items-center gap-3 text-brand-800 font-bold text-lg group overflow-hidden whitespace-nowrap transition-opacity duration-200"
                 >
-                    <div class="w-8 h-8 bg-rose-600 rounded-lg flex items-center justify-center text-white shadow-sm">
+                    <div class="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white shadow-sm">
                         <i class="fa-solid fa-layer-group"></i>
                     </div>
                     <span>PIC System</span>
@@ -80,8 +80,8 @@ const goToProfile = () => {
                     <div class="relative">
                         <button 
                             @click="toggleNotifications"
-                            class="text-slate-400 hover:text-rose-600 p-2 rounded-lg hover:bg-slate-50 transition-all focus:outline-none relative"
-                            :class="showNotifDropdown ? 'bg-rose-50 text-rose-700' : ''"
+                            class="text-slate-400 hover:text-brand-600 p-2 rounded-lg hover:bg-slate-50 transition-all focus:outline-none relative"
+                            :class="showNotifDropdown ? 'bg-brand-50 text-brand-700' : ''"
                             title="Notificaciones"
                         >
                             <i class="fa-solid fa-bell text-lg"></i>
@@ -97,7 +97,7 @@ const goToProfile = () => {
                     <button 
                         @click="toggleSidebar"
                         v-show="!isCollapsed"
-                        class="text-slate-400 hover:text-rose-600 p-2 rounded-lg hover:bg-slate-50 transition-all focus:outline-none"
+                        class="text-slate-400 hover:text-brand-600 p-2 rounded-lg hover:bg-slate-50 transition-all focus:outline-none"
                         :title="isCollapsed ? 'Expandir menú' : 'Colapsar menú'"
                     >
                         <i class="fa-solid text-lg" :class="isCollapsed ? 'fa-bars' : 'fa-indent'"></i>
@@ -129,7 +129,7 @@ const goToProfile = () => {
             <button 
                 v-if="isCollapsed"
                 @click="toggleSidebar"
-                class="mx-3 mt-3 mb-1 text-slate-400 hover:text-rose-600 p-2 rounded-lg hover:bg-slate-50 transition-all focus:outline-none"
+                class="mx-3 mt-3 mb-1 text-slate-400 hover:text-brand-600 p-2 rounded-lg hover:bg-slate-50 transition-all focus:outline-none"
                 title="Expandir menú"
             >
                 <i class="fa-solid fa-bars text-lg"></i>
@@ -162,7 +162,7 @@ const goToProfile = () => {
                        :to="mod.Route" 
                        class="flex items-center gap-3 py-2.5 rounded-lg transition-all font-medium group relative"
                        :class="[
-                           isActive(mod.Route) ? 'bg-rose-50 text-rose-700' : 'text-slate-600 hover:bg-slate-50 hover:text-rose-600',
+                           isActive(mod.Route) ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-brand-600',
                            isCollapsed ? 'justify-center px-0' : 'px-4'
                        ]"
                    >
@@ -183,7 +183,7 @@ const goToProfile = () => {
                     :class="isCollapsed ? 'justify-center' : ''"
                     title="Ver mi perfil"
                 >
-                    <div class="w-9 h-9 rounded-full bg-rose-600 text-white flex items-center justify-center font-bold text-sm shadow-md shrink-0 relative">
+                    <div class="w-9 h-9 rounded-full bg-brand-600 text-white flex items-center justify-center font-bold text-sm shadow-md shrink-0 relative">
                         {{ auth.user?.username.substring(0,2).toUpperCase() }}
                         <!-- Presence dot -->
                         <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white"

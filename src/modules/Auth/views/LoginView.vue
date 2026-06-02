@@ -19,6 +19,7 @@ const handleLogin = async () => {
         router.push('/'); // Ir al Hub
     }
 };
+
 </script>
 
 <template>

@@ -27,11 +27,11 @@ const MODULE_STYLES: Record<string, { color: string, bg: string, desc?: string }
     'CLI': { color: 'text-emerald-500', bg: 'bg-emerald-50', desc: 'Directorio comercial, segmentación y datos de contacto.' },
     
     'USERS': { color: 'text-purple-500', bg: 'bg-purple-50', desc: 'Control de accesos, roles y administración de personal del sistema.' },
-    'SETUP': { color: 'text-rose-800', bg: 'bg-fuchsia-50', desc: 'Dashboard analítico de ventas, cumplimiento de metas y análisis por zona.' },
+    'SETUP': { color: 'text-brand-800', bg: 'bg-fuchsia-50', desc: 'Dashboard analítico de ventas, cumplimiento de metas y análisis por zona.' },
     'AUDIT': { color: 'text-indigo-500', bg: 'bg-slate-100', desc: 'Historial de movimientos y seguridad del sistema.' },
     'LOGISTICS': { color: 'text-lime-600', bg: 'bg-lime-50', desc: 'Gestion, Edición, Alta y Publicación de Rutas e Itinerarios.' },
     
-    'FORECAST': { color: 'text-violet-500', bg: 'bg-rose-50', desc: 'Dashboard analítico de Forecast, análisis y edición de metas y proyecciones.' },
+    'FORECAST': { color: 'text-violet-500', bg: 'bg-brand-50', desc: 'Dashboard analítico de Forecast, análisis y edición de metas y proyecciones.' },
     'VAL_CLI': { color: 'text-pink-500', bg: 'bg-pink-50', desc: 'Validación y aprobación de nuevos clientes.' },
     'CANNIB': {color: 'text-purple-600', bg: 'bg-purple-50', desc: 'Segmentación avanzada de clientes por volumen: cuartiles, quintiles, deciles y percentiles.'},
     'SEGMENT': {color: 'text-purple-600', bg: 'bg-purple-50', desc: 'Segmentación avanzada de clientes por volumen: cuartiles, quintiles, deciles y percentiles.'},
