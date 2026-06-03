@@ -21,7 +21,8 @@ const form = ref<CommercialStructure>({
     RutaM: '',
     Jefatura: '',
     Cedis: '',
-    CanalC: ''
+    CanalC: '',
+    nivel_ruta: 1
 });
 
 const originalRuta = ref('');

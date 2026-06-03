@@ -182,12 +182,12 @@ const router = createRouter({
             {
                path: 'commercial-structure/new',
                name: 'commercial-structure-new',
-               component: () => import('@/modules/CommercialStructure/views/CommercialStructureEditView.vue')
+               component: () => import('@/modules/CommercialStructure/views/CommercialStructureList.vue')
             },
             {
                path: 'commercial-structure/:ruta',
                name: 'commercial-structure-edit',
-               component: () => import('@/modules/CommercialStructure/views/CommercialStructureEditView.vue')
+               component: () => import('@/modules/CommercialStructure/views/CommercialStructureList.vue')
             },
             {
                path: 'callbook',

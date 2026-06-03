@@ -8,6 +8,7 @@ export interface CommercialStructure {
    Jefatura: string;
    Cedis: string;
    CanalC: string;
+   nivel_ruta: number;
 }
 
 export interface CommercialStructureResponse {
