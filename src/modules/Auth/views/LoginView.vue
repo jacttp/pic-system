@@ -4,6 +4,7 @@ import { ref } from 'vue';
 // import { useAuthStore } from '../stores/authStore';
 import { useAuthStore } from './stores/authStore';
 import { useRouter } from 'vue-router';
+import coronaLogo from '@/assets/logo.png';
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -28,10 +29,13 @@ const handleLogin = async () => {
             
             <!-- Logo / Header -->
             <div class="text-center mb-8">
-                <div class="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center text-white text-3xl mx-auto mb-4 shadow-lg">
-                    <i class="fa-solid fa-layer-group"></i>
+                <div class="mx-auto mb-5 flex h-20 items-center justify-center">
+                    <img :src="coronaLogo" alt="Corona" class="h-16 w-auto object-contain" />
                 </div>
-                <h1 class="text-2xl font-bold text-slate-800">Bienvenido a PIC</h1>
+                <div class="mb-2 flex items-center justify-center gap-3">
+                    
+                    <h1 class="text-2xl font-bold text-slate-800">Bienvenido a System PIC</h1>
+                </div>
                 <p class="text-slate-500 text-sm">Ingresa tus credenciales para continuar</p>
             </div>
 
@@ -86,7 +90,7 @@ const handleLogin = async () => {
             </form>
 
             <div class="mt-6 text-center text-xs text-slate-400">
-                &copy; 2026 System PIC v2.35
+                &copy; 2026 System PIC v2.40
             </div>
         </div>
     </div>

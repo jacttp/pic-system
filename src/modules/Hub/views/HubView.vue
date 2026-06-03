@@ -12,6 +12,7 @@ onMounted(async () => {
     if (setupStore.modules.length === 0) {
         await setupStore.fetchModules();
     }
+    await setupStore.fetchHubConfig();
 });
 
 const dashboardModules = computed(() => {
@@ -136,9 +137,15 @@ const getStyle = (mod: any) => {
                 </div>
             </header>
 
-            <div class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div
+                class="grid grid-cols-1 gap-6"
+                :class="setupStore.hubFeatureVisibility['hub.activity_panel'] ? 'xl:grid-cols-[minmax(0,1fr)_320px]' : ''"
+            >
                 <section class="min-w-0 space-y-6">
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-4">
+                    <div
+                        v-if="setupStore.hubFeatureVisibility['hub.kpi_cards']"
+                        class="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-4"
+                    >
                         <article
                             v-for="kpi in kpiCards"
                             :key="kpi.label"
@@ -239,7 +246,7 @@ const getStyle = (mod: any) => {
                     </section>
                 </section>
 
-                <aside class="space-y-6">
+                <aside v-if="setupStore.hubFeatureVisibility['hub.activity_panel']" class="space-y-6">
                     <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                         <div class="mb-5 flex items-center justify-between">
                             <h2 class="text-base font-extrabold text-slate-900">Actividad reciente</h2>

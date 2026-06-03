@@ -3,6 +3,7 @@
 import { ref, reactive, watch, computed, onMounted } from 'vue';
 import { useUserStore } from '../stores/userStore';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
+import { useSetupStore } from '@/modules/Setup/stores/setupStores';
 import ModalDialog from '@/modules/Shared/components/ModalDialog.vue';
 import FormInput from '@/modules/Shared/components/FormInput.vue';
 import FormSelect from '@/modules/Shared/components/FormSelect.vue';
@@ -21,12 +22,28 @@ const emit = defineEmits(['update:modelValue', 'saved', 'cancel']);
 
 const userStore = useUserStore();
 const authStore = useAuthStore();
+const setupStore = useSetupStore();
 
 const isEditMode = computed(() => !!props.userToEdit);
 const modalTitle = computed(() => isEditMode.value ? `Editar Usuario` : 'Nuevo Usuario');
 
 // Permisos para cambio de password
 const canChangePasswords = computed(() => (authStore.user?.accessLevel ?? 0) >= 4);
+const canManageFeatureOverrides = computed(() => (authStore.user?.accessLevel ?? 0) >= 4 && isEditMode.value && !!props.userToEdit);
+const currentFeatureOverrides = computed(() => props.userToEdit ? userStore.featureOverrides[props.userToEdit.IdUser] || [] : []);
+const getOverrideValue = (featureKey: string) => {
+    const override = currentFeatureOverrides.value.find(item => item.FeatureKey === featureKey);
+    if (!override) return 'inherit';
+    return override.IsEnabled ? 'enabled' : 'disabled';
+};
+const setFeatureOverride = async (featureKey: any, value: string) => {
+    if (!props.userToEdit) return;
+    const nextValue = value === 'inherit' ? null : value === 'enabled';
+    await userStore.updateFeatureOverride(props.userToEdit.IdUser, featureKey, nextValue);
+};
+const handleFeatureOverrideChange = (featureKey: any, event: Event) => {
+    setFeatureOverride(featureKey, (event.target as HTMLSelectElement).value);
+};
 
 // Estado del formulario
 const form = reactive({
@@ -51,6 +68,7 @@ const loadingJefaturas = ref(false);
 // Cargar jefaturas al montar
 onMounted(async () => {
     await userStore.fetchGerencias();
+    setupStore.fetchFeatureFlags();
     // Cargamos jefaturas basadas en la gerencia inicial (si existe)
     userStore.fetchJefaturas(form.gerencia);
 });
@@ -109,6 +127,9 @@ const loadUserData = (u: UserFull | null) => {
 
 watch(() => props.userToEdit, (u) => {
     loadUserData(u || null);
+    if (u && canChangePasswords.value) {
+        userStore.fetchFeatureOverrides(u.IdUser);
+    }
 }, { immediate: true });
 
 // Nueva lógica: Limpiar formulario al abrir para un usuario nuevo
@@ -349,6 +370,40 @@ const handleSubmit = async () => {
                         >
                             Confirmar
                         </Button>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="canManageFeatureOverrides" class="p-6 bg-slate-50/80 rounded-3xl border border-slate-200/60 shadow-sm space-y-4">
+                <div class="flex items-start gap-3">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
+                        <i class="fa-solid fa-toggle-on"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Permisos especiales del Hub</h4>
+                        <p class="mt-1 text-xs font-medium text-slate-500">Solo SuperAdmin puede forzar visibilidad por usuario. Heredar usa la configuracion global.</p>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <div
+                        v-for="feature in setupStore.normalizedFeatureFlags"
+                        :key="feature.FeatureKey"
+                        class="rounded-2xl border border-slate-200 bg-white p-4"
+                    >
+                        <div class="mb-3">
+                            <p class="text-sm font-black text-slate-800">{{ feature.FeatureName }}</p>
+                            <p class="text-xs text-slate-500">{{ feature.Description }}</p>
+                        </div>
+                        <select
+                            :value="getOverrideValue(feature.FeatureKey)"
+                            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 outline-none focus:ring-2 focus:ring-brand-500"
+                            @change="handleFeatureOverrideChange(feature.FeatureKey, $event)"
+                        >
+                            <option value="inherit">Heredar configuracion global</option>
+                            <option value="enabled">Forzar visible</option>
+                            <option value="disabled">Forzar oculto</option>
+                        </select>
                     </div>
                 </div>
             </div>

@@ -1,6 +1,6 @@
 /* src/modules/Setup/services/setupApi.ts */
 import api from '@/api/axios';
-import type { SystemModule } from '../types/setupTypes';
+import type { HubConfigResponse, HubFeatureKey, SystemFeatureFlag, SystemModule } from '../types/setupTypes';
 
 const V2 = import.meta.env.VITE_API_V2_PATH;
 
@@ -36,5 +36,19 @@ export default {
     */
    async updateModule(moduleId: number, payload: Partial<SystemModule>): Promise<void> {
       await api.patch(`${V2}/setup/modules/${moduleId}`, payload);
+   },
+
+   async getHubConfig(): Promise<HubConfigResponse> {
+      const { data } = await api.get<{ success: boolean; data: HubConfigResponse }>(`${V2}/setup/hub-config`);
+      return data.data;
+   },
+
+   async getFeatureFlags(): Promise<SystemFeatureFlag[]> {
+      const { data } = await api.get<{ success: boolean; data: SystemFeatureFlag[] }>(`${V2}/setup/feature-flags`);
+      return data.data;
+   },
+
+   async updateFeatureFlag(featureKey: HubFeatureKey, payload: Partial<SystemFeatureFlag>): Promise<void> {
+      await api.patch(`${V2}/setup/feature-flags/${encodeURIComponent(featureKey)}`, payload);
    }
 };

@@ -5,6 +5,8 @@ import type { AxiosResponse } from 'axios'
 import type {
     UploadOcBatchRequest,
     UploadOcBatchResponse,
+    UploadOcGatewayBatchRequest,
+    UploadOcGatewayBatchResponse,
     UploadOcListRequest,
     UploadOcListResponse
 } from '../types/uploadOc'
@@ -21,6 +23,11 @@ export const uploadOcApi = {
      */
     async uploadBatch(data: UploadOcBatchRequest): Promise<UploadOcBatchResponse> {
         const response = await api.post(`${BASE_PATH}/batch`, data)
+        return response.data
+    },
+
+    async uploadGatewayBatch(data: UploadOcGatewayBatchRequest): Promise<UploadOcGatewayBatchResponse> {
+        const response = await api.post(`${BASE_PATH}/gateway-batch`, data)
         return response.data
     },
 

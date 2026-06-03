@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useSetupStore } from '../stores/setupStores';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import type { SystemModule, DevStatus } from '../types/setupTypes';
@@ -17,6 +17,10 @@ const editingModule = ref<SystemModule | null>(null);
 const form = ref<Partial<SystemModule>>({});
 
 const showNewModal = ref(false);
+
+onMounted(() => {
+    setupStore.fetchFeatureFlags();
+});
 
 const handleCreateModule = async (payload: Omit<SystemModule, 'ModuleId'>) => {
     await setupStore.createModule(payload);
@@ -61,6 +65,40 @@ const isCritical = (mod: SystemModule) => {
 const handleToggle = (mod: SystemModule) => {
     if (isCritical(mod)) return;
     setupStore.toggleModuleStatus(mod.ModuleId, !!mod.IsActive);
+};
+
+const hubVisibilityControls = computed(() => [
+    {
+        featureKey: 'hub.kpi_cards' as const,
+        settingKey: 'showKpiCards' as const,
+        icon: 'fa-solid fa-chart-line',
+    },
+    {
+        featureKey: 'hub.activity_panel' as const,
+        settingKey: 'showInfoPanel' as const,
+        icon: 'fa-solid fa-table-columns',
+    },
+].map(control => {
+    const feature = setupStore.normalizedFeatureFlags.find(item => item.FeatureKey === control.featureKey);
+    return {
+        ...control,
+        feature,
+        title: feature?.FeatureName || control.featureKey,
+        description: feature?.Description || 'Bloque informativo del Hub Central.',
+        enabled: !!feature?.IsEnabled,
+        minAccessLevel: feature?.MinAccessLevel || 4,
+        requiresDataScope: feature?.RequiresDataScope ?? true,
+    };
+}));
+
+const handleHubVisibilityToggle = (setting: 'showKpiCards' | 'showInfoPanel', value: boolean) => {
+    if (!isAdmin.value) return;
+    setupStore.updateHubDisplaySetting(setting, value);
+};
+
+const handleHubMinLevelChange = (featureKey: 'hub.kpi_cards' | 'hub.activity_panel', event: Event) => {
+    const value = Number((event.target as HTMLSelectElement).value);
+    setupStore.updateFeatureFlag(featureKey, { MinAccessLevel: value });
 };
 
 // Custom Dropdown Logic
@@ -111,6 +149,83 @@ const PRESET_BG_COLORS = [
              </button>
         </div>
     </div>
+
+    <!-- HUB DISPLAY SETTINGS -->
+    <section class="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-[0.18em] text-brand-600">Hub Central</p>
+                <h2 class="mt-1 text-lg font-bold text-slate-800">Visibilidad de bloques informativos</h2>
+                <p class="mt-1 text-sm text-slate-500">
+                    Controla los bloques placeholder del Hub mientras se liberan versiones completas o se restringe informacion por usuario.
+                </p>
+            </div>
+            <span class="inline-flex w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">
+                Backend + overrides
+            </span>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <article
+                v-for="control in hubVisibilityControls"
+                :key="control.featureKey"
+                class="rounded-lg border border-slate-200 bg-slate-50/60 p-4"
+            >
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
+                            <i :class="control.icon"></i>
+                        </span>
+                        <div class="min-w-0">
+                            <h3 class="font-bold text-slate-800">{{ control.title }}</h3>
+                            <p class="mt-1 text-sm leading-5 text-slate-500">{{ control.description }}</p>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        :disabled="!isAdmin"
+                        class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+                        :class="[
+                            control.enabled ? 'bg-brand-600' : 'bg-slate-300',
+                            isAdmin ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'
+                        ]"
+                        :aria-pressed="control.enabled"
+                        :title="isAdmin ? 'Alternar visibilidad global' : 'Solo administradores'"
+                        @click="handleHubVisibilityToggle(control.settingKey, !control.enabled)"
+                    >
+                        <span
+                            class="inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform"
+                            :class="control.enabled ? 'translate-x-6' : 'translate-x-1'"
+                        />
+                    </button>
+                </div>
+
+                <div class="mt-4 grid grid-cols-1 gap-3 border-t border-slate-200 pt-4 sm:grid-cols-2">
+                    <label class="block">
+                        <span class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Nivel minimo</span>
+                        <select
+                            :value="control.minAccessLevel"
+                            :disabled="!isAdmin"
+                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-60"
+                            @change="handleHubMinLevelChange(control.featureKey, $event)"
+                        >
+                            <option :value="1">1 - Jefe</option>
+                            <option :value="2">2 - Gerente</option>
+                            <option :value="3">3 - Administrador</option>
+                            <option :value="4">4 - SuperAdmin</option>
+                        </select>
+                    </label>
+                    <div>
+                        <span class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Alcance de datos</span>
+                        <div class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600">
+                            {{ control.requiresDataScope ? 'Gerencia / Jefatura' : 'Global' }}
+                        </div>
+                    </div>
+                </div>
+            </article>
+        </div>
+    </section>
 
     <!-- MODULES TABLE -->
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">

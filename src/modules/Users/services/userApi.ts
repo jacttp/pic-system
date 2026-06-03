@@ -1,6 +1,7 @@
 /* src/modules/Users/services/userApi.ts */
 import api from '@/api/axios';
 import type { UserFull, UserCreatePayload, UserUpdatePayload, MessagePayload } from '../types/user.types';
+import type { HubFeatureKey, UserFeatureOverride } from '@/modules/Setup/types/setupTypes';
 
 const V2 = import.meta.env.VITE_API_V2_PATH;
 
@@ -54,5 +55,18 @@ export const userApi = {
    async getGerencias(): Promise<string[]> {
       const { data } = await api.get<string[]>(`/filters/gerencias`);
       return data;
+   },
+
+   async getFeatureOverrides(id: number): Promise<UserFeatureOverride[]> {
+      const { data } = await api.get<{ success: boolean; data: UserFeatureOverride[] }>(`${V2}/users/${id}/feature-overrides`);
+      return data.data;
+   },
+
+   async updateFeatureOverride(id: number, featureKey: HubFeatureKey, isEnabled: boolean | null): Promise<boolean> {
+      const { data } = await api.patch<{ success: boolean }>(
+         `${V2}/users/${id}/feature-overrides/${encodeURIComponent(featureKey)}`,
+         { IsEnabled: isEnabled }
+      );
+      return data.success;
    }
 };

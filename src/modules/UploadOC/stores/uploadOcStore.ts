@@ -5,6 +5,7 @@ import { ref, reactive } from 'vue'
 import * as xlsx from 'xlsx'
 import { uploadOcApi } from '../services/uploadOcApi'
 import type {
+    UploadOcGatewayRecord,
     UploadOcRecord,
     UploadOcListFilters,
     UploadOcListPagination
@@ -26,6 +27,50 @@ const excelDateToYYYYMMDD = (excelDate: number | string): string => {
     // Corrección de zona horaria simple
     d.setMinutes(d.getMinutes() + d.getTimezoneOffset())
     return d.toISOString().split('T')[0] as string
+}
+
+const GW_COLUMNS: Array<keyof UploadOcGatewayRecord> = [
+    'OrdenCompra',
+    'Formato',
+    'Inicio',
+    'Fin',
+    'Determinante',
+    'EAN',
+    'skuInterno',
+    'UPC',
+    'ID1',
+    'Medida',
+    'PedidoCantidad',
+    'CostoUnitario',
+    'Punto',
+    'EA',
+    'ID2',
+    'fechaOrden',
+    'ID3',
+    'ID4',
+    'Picking',
+    'ID5'
+]
+
+const GW_NUMERIC_COLUMNS = new Set<keyof UploadOcGatewayRecord>([
+    'Formato',
+    'PedidoCantidad',
+    'CostoUnitario',
+    'ID3',
+    'Picking',
+    'ID5'
+])
+
+const nullableText = (value: unknown): string | null => {
+    const text = String(value ?? '').trim()
+    return text === '' ? null : text
+}
+
+const nullableNumber = (value: unknown): number | null => {
+    const text = nullableText(value)
+    if (text === null) return null
+    const n = Number(text)
+    return Number.isFinite(n) ? n : null
 }
 
 export const useUploadOcStore = defineStore('uploadOc', () => {
@@ -57,8 +102,16 @@ export const useUploadOcStore = defineStore('uploadOc', () => {
 
     // Resultados de la última carga (para UI alerts)
     const uploadStats = reactive({
+        status: '' as 'success' | 'warning' | 'error' | '',
+        chain: '',
+        files: 0,
+        totalSent: 0,
         inserted: 0,
         omitted: 0,
+        duplicated: 0,
+        invalid: 0,
+        cpfrInserted: 0,
+        reasons: [] as string[],
         message: ''
     })
 
@@ -129,12 +182,86 @@ export const useUploadOcStore = defineStore('uploadOc', () => {
         return allRecords
     }
 
+    const processGatewayFiles = async (files: File[]): Promise<UploadOcGatewayRecord[]> => {
+        const allRecords: UploadOcGatewayRecord[] = []
+
+        for (const file of files) {
+            const text = await file.text()
+            const lines = text
+                .split(/\r?\n/)
+                .slice(1)
+                .map(line => line.trim())
+                .filter(Boolean)
+
+            for (const line of lines) {
+                const rawValues = line.split(',').map(value => value.trim())
+                if (rawValues.length !== 19 && rawValues.length !== 20) continue
+
+                const values = rawValues.length === 19 ? [...rawValues, ''] : rawValues
+                const formato = nullableNumber(values[1])
+                if (formato !== 64 && formato !== 97) continue
+
+                const record = {} as UploadOcGatewayRecord
+                GW_COLUMNS.forEach((column, index) => {
+                    ;(record as any)[column] = GW_NUMERIC_COLUMNS.has(column)
+                        ? nullableNumber(values[index])
+                        : nullableText(values[index])
+                })
+
+                allRecords.push(record)
+            }
+        }
+
+        return allRecords
+    }
+
     /**
      * Envía los archivos procesados al Backend.
      */
     const uploadBatch = async (files: File[], chain: string) => {
         isUploading.value = true
+        uploadStats.status = ''
+        uploadStats.chain = chain
+        uploadStats.files = files.length
+        uploadStats.totalSent = 0
+        uploadStats.inserted = 0
+        uploadStats.omitted = 0
+        uploadStats.duplicated = 0
+        uploadStats.invalid = 0
+        uploadStats.cpfrInserted = 0
+        uploadStats.reasons = []
+        uploadStats.message = ''
         try {
+            const normalizedChain = chain.toUpperCase()
+
+            if (normalizedChain === 'GW' || normalizedChain === 'SAMS' || normalizedChain === 'WALMART') {
+                const payload = await processGatewayFiles(files)
+
+                if (payload.length === 0) {
+                    throw new Error('No se encontraron registros .INF validos para Walmart o Sam\'s.')
+                }
+
+                const response = await uploadOcApi.uploadGatewayBatch({ payload })
+                const data = response.data
+
+                uploadStats.chain = 'Walmart / Sam\'s'
+                uploadStats.totalSent = data?.totalEnviados || payload.length
+                uploadStats.inserted = data?.registrosInsertados || 0
+                uploadStats.duplicated = data?.registrosDuplicadosOmitidos || 0
+                uploadStats.invalid = data?.registrosInvalidosOmitidos || 0
+                uploadStats.omitted = uploadStats.duplicated + uploadStats.invalid
+                uploadStats.cpfrInserted = data?.registrosCpfrInsertados || 0
+                uploadStats.status = uploadStats.inserted > 0 ? 'success' : 'warning'
+                uploadStats.reasons = [
+                    uploadStats.duplicated > 0 ? `${uploadStats.duplicated} duplicados omitidos` : '',
+                    uploadStats.invalid > 0 ? `${uploadStats.invalid} registros invalidos omitidos` : '',
+                    uploadStats.cpfrInserted > 0 ? `${uploadStats.cpfrInserted} registros sincronizados a CPFR` : ''
+                ].filter(Boolean)
+                uploadStats.message = response.message || `${uploadStats.inserted} insertados, ${uploadStats.omitted} omitidos.`
+                await fetchOrders()
+                return
+            }
+
             const payload = await processExcelFiles(files, chain)
 
             if (payload.length === 0) {
@@ -144,15 +271,26 @@ export const useUploadOcStore = defineStore('uploadOc', () => {
             const response = await uploadOcApi.uploadBatch({ payload })
 
             // Actualizamos estado de stats para que la UI lo consuma
+            uploadStats.chain = chain
+            uploadStats.totalSent = response.data?.totalEnviados || payload.length
             uploadStats.inserted = response.data?.registrosInsertados || 0
-            uploadStats.omitted = response.data?.registrosDuplicadosOmitidos || 0
-            uploadStats.message = response.message || `Se insertaron ${uploadStats.inserted} registros, se omitieron ${uploadStats.omitted} duplicados.`
+            uploadStats.duplicated = response.data?.registrosDuplicadosOmitidos || 0
+            uploadStats.omitted = uploadStats.duplicated
+            uploadStats.status = uploadStats.inserted > 0 ? 'success' : 'warning'
+            uploadStats.reasons = [
+                uploadStats.duplicated > 0 ? `${uploadStats.duplicated} duplicados omitidos` : '',
+                uploadStats.inserted === 0 && uploadStats.duplicated > 0 ? 'Todos los registros ya existian para la misma cadena, pedido y SKU' : ''
+            ].filter(Boolean)
+            uploadStats.message = response.message || `${uploadStats.inserted} insertados, ${uploadStats.omitted} omitidos.`
 
             // Refrescamos la tabla tras una carga exitosa
             await fetchOrders()
 
         } catch (error: any) {
             console.error('[uploadOcStore] Error en carga batch:', error)
+            uploadStats.status = 'error'
+            uploadStats.message = error.message || 'Error al procesar los archivos.'
+            uploadStats.reasons = [uploadStats.message]
             throw error // Lanzar error para que la UI muestre el Toast rojo
         } finally {
             isUploading.value = false

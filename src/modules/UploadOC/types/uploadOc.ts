@@ -81,3 +81,42 @@ export interface UploadOcListResponse {
     total: number
     data: UploadOcRecord[]
 }
+
+export interface UploadOcGatewayRecord {
+    OrdenCompra: string | null
+    Formato: number | null
+    Inicio: string | null
+    Fin: string | null
+    Determinante: string | null
+    EAN: string | null
+    skuInterno: string | null
+    UPC: string | null
+    ID1: string | null
+    Medida: string | null
+    PedidoCantidad: number | null
+    CostoUnitario: number | null
+    Punto: string | null
+    EA: string | null
+    ID2: string | null
+    fechaOrden: string | null
+    ID3: number | null
+    ID4: string | null
+    Picking: number | null
+    ID5: number | null
+}
+
+export interface UploadOcGatewayBatchRequest {
+    payload: UploadOcGatewayRecord[]
+}
+
+export interface UploadOcGatewayBatchResponse {
+    success: boolean
+    message?: string
+    data?: {
+        totalEnviados: number
+        registrosInsertados: number
+        registrosCpfrInsertados: number
+        registrosDuplicadosOmitidos: number
+        registrosInvalidosOmitidos: number
+    }
+}

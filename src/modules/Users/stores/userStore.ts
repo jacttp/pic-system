@@ -3,6 +3,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { userApi } from '../services/userApi';
 import type { UserFull, UserCreatePayload, UserUpdatePayload, MessagePayload } from '../types/user.types';
+import type { HubFeatureKey, UserFeatureOverride } from '@/modules/Setup/types/setupTypes';
 
 export const useUserStore = defineStore('users', () => {
    const users = ref<UserFull[]>([]);
@@ -11,6 +12,7 @@ export const useUserStore = defineStore('users', () => {
    const gerencias = ref<string[]>([]);
    const loading = ref(false);
    const error = ref<string | null>(null);
+   const featureOverrides = ref<Record<number, UserFeatureOverride[]>>({});
 
    // --- Acciones ---
 
@@ -169,6 +171,21 @@ export const useUserStore = defineStore('users', () => {
       }
    }
 
+   async function fetchFeatureOverrides(id: number) {
+      try {
+         featureOverrides.value[id] = await userApi.getFeatureOverrides(id);
+      } catch (e: any) {
+         console.error('Error al cargar permisos especiales del usuario:', e);
+         featureOverrides.value[id] = [];
+      }
+   }
+
+   async function updateFeatureOverride(id: number, featureKey: HubFeatureKey, value: boolean | null) {
+      const success = await userApi.updateFeatureOverride(id, featureKey, value);
+      if (success) await fetchFeatureOverrides(id);
+      return success;
+   }
+
    // Obtener usuario por ID (desde la lista ya cargada)
    function getUserById(id: number): UserFull | undefined {
       return users.value.find(u => u.IdUser === id);
@@ -181,6 +198,7 @@ export const useUserStore = defineStore('users', () => {
       gerencias,
       loading,
       error,
+      featureOverrides,
       fetchUsers,
       fetchActiveUsers,
       fetchJefaturas,
@@ -191,6 +209,8 @@ export const useUserStore = defineStore('users', () => {
       toggleBlock,
       sendMessage,
       changePassword,
+      fetchFeatureOverrides,
+      updateFeatureOverride,
       getUserById
    };
 });

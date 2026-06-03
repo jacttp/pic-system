@@ -20,6 +20,7 @@ let notifPoll: ReturnType<typeof setInterval> | null = null;
 
 onMounted(async () => {
    await setupStore.fetchModules();
+   setupStore.fetchHubConfig();
    // Cargar perfil (presencia) y notificaciones
    profileStore.fetchProfile();
    profileStore.fetchNotifications();

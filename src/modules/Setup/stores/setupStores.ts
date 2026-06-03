@@ -2,13 +2,55 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import setupApi from '../services/setupApi';
-import type { SystemModule } from '../types/setupTypes';
+import type { HubConfigResponse, HubFeatureKey, SystemFeatureFlag, SystemModule } from '../types/setupTypes';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import { ROLE_LEVELS } from '../types/setupTypes';
 
 export const useSetupStore = defineStore('setup', () => {
    const modules = ref<SystemModule[]>([]);
    const isLoading = ref(false);
+   const featureFlags = ref<SystemFeatureFlag[]>([]);
+   const hubConfig = ref<HubConfigResponse | null>(null);
+   const isFeatureConfigLoading = ref(false);
+   const HUB_DISPLAY_SETTINGS_KEY = 'pic-system:hub-display-settings';
+   const DEFAULT_HUB_DISPLAY_SETTINGS = {
+      showKpiCards: true,
+      showInfoPanel: true,
+   };
+   const DEFAULT_HUB_FEATURE_FLAGS: SystemFeatureFlag[] = [
+      {
+         FeatureKey: 'hub.kpi_cards',
+         FeatureName: 'Tarjetas KPI horizontales',
+         Area: 'HUB',
+         IsEnabled: false,
+         MinAccessLevel: 4,
+         RequiresDataScope: true,
+         Description: 'Indicadores superiores del Hub Central.',
+      },
+      {
+         FeatureKey: 'hub.activity_panel',
+         FeatureName: 'Panel lateral de actividad',
+         Area: 'HUB',
+         IsEnabled: false,
+         MinAccessLevel: 4,
+         RequiresDataScope: true,
+         Description: 'Actividad reciente y acciones rapidas del Hub Central.',
+      },
+   ];
+   const getInitialHubDisplaySettings = () => {
+      try {
+         const storedSettings = window.localStorage.getItem(HUB_DISPLAY_SETTINGS_KEY);
+         if (!storedSettings) return DEFAULT_HUB_DISPLAY_SETTINGS;
+
+         return {
+            ...DEFAULT_HUB_DISPLAY_SETTINGS,
+            ...JSON.parse(storedSettings),
+         };
+      } catch {
+         return DEFAULT_HUB_DISPLAY_SETTINGS;
+      }
+   };
+   const hubDisplaySettings = ref(getInitialHubDisplaySettings());
    // const authStore = useAuthStore(); // Movido a las computadas para evitar ciclos síncronos
 
    // Datos Mock para desarrollo (Fallback)
@@ -86,6 +128,45 @@ export const useSetupStore = defineStore('setup', () => {
       return orderedGroups;
    });
 
+   const hubFeatureVisibility = computed<Record<HubFeatureKey, boolean>>(() => {
+      const authStore = useAuthStore();
+      const apiVisibility = hubConfig.value?.visibility;
+
+      return {
+         'hub.kpi_cards': apiVisibility?.['hub.kpi_cards'] ?? (hubDisplaySettings.value.showKpiCards && authStore.userLevel >= 4),
+         'hub.activity_panel': apiVisibility?.['hub.activity_panel'] ?? (hubDisplaySettings.value.showInfoPanel && authStore.userLevel >= 4),
+      };
+   });
+
+   const normalizedFeatureFlags = computed(() => {
+      const byKey = new Map<HubFeatureKey, SystemFeatureFlag>();
+      DEFAULT_HUB_FEATURE_FLAGS.forEach(feature => byKey.set(feature.FeatureKey, feature));
+      featureFlags.value.forEach(feature => byKey.set(feature.FeatureKey, { ...byKey.get(feature.FeatureKey), ...feature }));
+      return Array.from(byKey.values());
+   });
+
+   async function fetchHubConfig() {
+      try {
+         hubConfig.value = await setupApi.getHubConfig();
+         featureFlags.value = hubConfig.value.features;
+      } catch (error) {
+         console.warn('[setupStore] No se pudo cargar configuracion del Hub. Usando fallback local.', error);
+         featureFlags.value = DEFAULT_HUB_FEATURE_FLAGS;
+      }
+   }
+
+   async function fetchFeatureFlags() {
+      isFeatureConfigLoading.value = true;
+      try {
+         featureFlags.value = await setupApi.getFeatureFlags();
+      } catch (error) {
+         console.warn('[setupStore] No se pudieron cargar feature flags. Usando defaults.', error);
+         featureFlags.value = DEFAULT_HUB_FEATURE_FLAGS;
+      } finally {
+         isFeatureConfigLoading.value = false;
+      }
+   }
+
    // 4. Acción Admin: Cambiar estado (Toggle)
    async function toggleModuleStatus(moduleId: number, currentStatus: boolean) {
       const originalState = modules.value.find(m => m.ModuleId === moduleId)?.IsActive;
@@ -144,14 +225,72 @@ export const useSetupStore = defineStore('setup', () => {
       }
    }
 
+   function persistHubDisplaySettings() {
+      window.localStorage.setItem(HUB_DISPLAY_SETTINGS_KEY, JSON.stringify(hubDisplaySettings.value));
+   }
+
+   async function updateHubDisplaySetting(setting: keyof typeof DEFAULT_HUB_DISPLAY_SETTINGS, value: boolean) {
+      hubDisplaySettings.value = {
+         ...hubDisplaySettings.value,
+         [setting]: value,
+      };
+      persistHubDisplaySettings();
+
+      const featureKey: HubFeatureKey = setting === 'showKpiCards' ? 'hub.kpi_cards' : 'hub.activity_panel';
+      const feature = normalizedFeatureFlags.value.find(item => item.FeatureKey === featureKey);
+      const nextFeature: SystemFeatureFlag = {
+         ...(feature || DEFAULT_HUB_FEATURE_FLAGS.find(item => item.FeatureKey === featureKey)!),
+         IsEnabled: value,
+      };
+
+      featureFlags.value = normalizedFeatureFlags.value.map(item => item.FeatureKey === featureKey ? nextFeature : item);
+
+      try {
+         await setupApi.updateFeatureFlag(featureKey, nextFeature);
+         await fetchHubConfig();
+      } catch (error) {
+         console.warn('[setupStore] No se pudo persistir feature flag en backend. Se conserva fallback local.', error);
+      }
+   }
+
+   async function updateFeatureFlag(featureKey: HubFeatureKey, changes: Partial<SystemFeatureFlag>) {
+      const current = normalizedFeatureFlags.value.find(feature => feature.FeatureKey === featureKey)
+         || DEFAULT_HUB_FEATURE_FLAGS.find(feature => feature.FeatureKey === featureKey);
+
+      if (!current) return false;
+
+      const nextFeature = { ...current, ...changes };
+      featureFlags.value = normalizedFeatureFlags.value.map(feature => feature.FeatureKey === featureKey ? nextFeature : feature);
+
+      try {
+         await setupApi.updateFeatureFlag(featureKey, nextFeature);
+         await fetchHubConfig();
+         return true;
+      } catch (error) {
+         console.error('[setupStore] Error actualizando feature flag:', error);
+         await fetchFeatureFlags();
+         return false;
+      }
+   }
+
    return {
       modules,
       isLoading,
+      featureFlags,
+      normalizedFeatureFlags,
+      hubConfig,
+      hubFeatureVisibility,
+      isFeatureConfigLoading,
+      hubDisplaySettings,
       userMenu,
       groupedMenu,
       fetchModules,
+      fetchHubConfig,
+      fetchFeatureFlags,
       toggleModuleStatus,
       updateModule,
-      createModule
+      createModule,
+      updateHubDisplaySetting,
+      updateFeatureFlag
    };
 });

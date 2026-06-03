@@ -18,6 +18,43 @@ export interface SystemModule {
 
 export type DevStatus = 'Finished' | 'Maintaining' | 'Development';
 
+export type HubFeatureKey = 'hub.kpi_cards' | 'hub.activity_panel';
+
+export interface SystemFeatureFlag {
+   FeatureKey: HubFeatureKey;
+   FeatureName: string;
+   Area: 'HUB' | string;
+   IsEnabled: boolean;
+   MinAccessLevel: number;
+   RequiresDataScope: boolean;
+   Description?: string | null;
+   UpdatedAt?: string | null;
+   UpdatedBy?: number | null;
+}
+
+export interface UserFeatureOverride {
+   IdUser: number;
+   FeatureKey: HubFeatureKey;
+   IsEnabled: boolean;
+   Reason?: string | null;
+   UpdatedAt?: string | null;
+   UpdatedBy?: number | null;
+}
+
+export interface HubConfigResponse {
+   features: SystemFeatureFlag[];
+   visibility: Record<HubFeatureKey, boolean>;
+   scope: {
+      id?: number;
+      username?: string;
+      role?: string;
+      accessLevel: number;
+      gerencia: string | null;
+      jefatura: string | null;
+   };
+   fallback?: boolean;
+}
+
 //Mapeo para traducir roles de string a número (expandido a 4 niveles)
 
 export const ROLE_LEVELS: Record<string, number> = {

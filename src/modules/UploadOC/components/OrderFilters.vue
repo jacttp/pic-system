@@ -1,36 +1,34 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useUploadOcStore } from '../stores/uploadOcStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useUploadOcStore } from '../stores/uploadOcStore'
 
 const store = useUploadOcStore()
 
 const activeDateType = ref<'pedido' | 'embarque' | 'captura' | 'none'>('none')
 
+const estadoLocal = computed(() => store.filters.estado || 'todos')
+
 const setDateType = (type: 'pedido' | 'embarque' | 'captura' | 'none') => {
   activeDateType.value = type
-  
   store.filters.fecPedidoInicio = ''
   store.filters.fecPedidoFin = ''
   store.filters.fecEmbarqueInicio = ''
   store.filters.fecEmbarqueFin = ''
   store.filters.fecCapturaInicio = ''
   store.filters.fecCapturaFin = ''
-  
+
   if (type === 'none') {
     applyFilters()
   }
 }
-
-const estadoLocal = computed(() => store.filters.estado || 'todos')
 
 const setEstado = (val: string) => {
   store.filters.estado = val === 'todos' ? '' : val as any
   applyFilters()
 }
 
-// Mapeos bidireccionales
 const dateStart = computed({
   get() {
     if (activeDateType.value === 'pedido') return store.filters.fecPedidoInicio || ''
@@ -67,67 +65,116 @@ const applyFilters = async () => {
 const clearFilters = async () => {
   store.filters.numPedido = ''
   store.filters.estado = ''
-  setDateType('none')
+  store.filters.fecPedidoInicio = ''
+  store.filters.fecPedidoFin = ''
+  store.filters.fecEmbarqueInicio = ''
+  store.filters.fecEmbarqueFin = ''
+  store.filters.fecCapturaInicio = ''
+  store.filters.fecCapturaFin = ''
+  activeDateType.value = 'none'
   store.pagination.page = 1
   await store.fetchOrders()
 }
 </script>
 
 <template>
-  <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-4">
-    
-    <!-- Row 1: Search & Status Tags -->
-    <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-      <div class="relative w-full md:w-72 shadow-sm rounded-full">
-        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-2.5 text-slate-400"></i>
-        <Input 
-          v-model="store.filters.numPedido" 
-          placeholder="No. Pedido..." 
-          class="pl-10 h-9 border-slate-200 bg-slate-50/80 rounded-full focus-visible:ring-blue-500 text-sm font-medium" 
-          @keyup.enter="applyFilters" 
+  <section class="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_14px_35px_rgba(15,23,42,0.04)]">
+    <div class="flex flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+      <div class="relative w-full lg:w-[300px]">
+        <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+        <Input
+          v-model="store.filters.numPedido"
+          placeholder="Buscar por N° de pedido..."
+          class="h-12 rounded-lg border-slate-200 bg-white pl-12 text-sm font-semibold text-slate-700 shadow-sm placeholder:text-slate-400 focus-visible:ring-brand-100"
+          @keyup.enter="applyFilters"
         />
       </div>
 
-      <div class="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 w-full md:w-auto">
-        <span class="text-[10px] font-bold text-slate-400 tracking-wider uppercase mr-2"><i class="fa-solid fa-eye mr-1"></i> MOSTRAR ESTATUS:</span>
-        <button @click="setEstado('todos')" :class="estadoLocal === 'todos' ? 'bg-slate-800 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'" class="px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200">Todos</button>
-        <button @click="setEstado('pendiente')" :class="estadoLocal === 'pendiente' ? 'bg-amber-100 text-amber-700 border-amber-200 border shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'" class="px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200">Pendiente</button>
-        <button @click="setEstado('procesado')" :class="estadoLocal === 'procesado' ? 'bg-emerald-100 text-emerald-700 border-emerald-200 border shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'" class="px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200">Procesado</button>
-        <button @click="setEstado('invalido')" :class="estadoLocal === 'invalido' ? 'bg-rose-100 text-rose-700 border-rose-200 border shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'" class="px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200">Inválido</button>
+      <div class="flex w-full flex-wrap items-center gap-2 lg:w-auto">
+        <span class="mr-2 text-sm font-black text-slate-700">Mostrar estado:</span>
+        <button
+          class="h-9 rounded-lg border px-4 text-sm font-black transition-all"
+          :class="estadoLocal === 'todos' ? 'border-brand-200 bg-brand-50 text-brand-600' : 'border-transparent bg-slate-100 text-slate-600 hover:bg-slate-200'"
+          @click="setEstado('todos')"
+        >
+          Todos
+        </button>
+        <button
+          class="h-9 rounded-lg border px-4 text-sm font-black transition-all"
+          :class="estadoLocal === 'pendiente' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-transparent bg-amber-50/70 text-amber-700 hover:bg-amber-100'"
+          @click="setEstado('pendiente')"
+        >
+          Pendiente
+        </button>
+        <button
+          class="h-9 rounded-lg border px-4 text-sm font-black transition-all"
+          :class="estadoLocal === 'procesado' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-transparent bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100'"
+          @click="setEstado('procesado')"
+        >
+          Procesado
+        </button>
+        <button
+          class="h-9 rounded-lg border px-4 text-sm font-black transition-all"
+          :class="estadoLocal === 'invalido' ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-transparent bg-rose-50/70 text-rose-700 hover:bg-rose-100'"
+          @click="setEstado('invalido')"
+        >
+          Inválido
+        </button>
       </div>
     </div>
 
-    <!-- Separator -->
-    <div class="h-px w-full bg-slate-100"></div>
+    <div class="border-t border-slate-100 px-6 py-5">
+      <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <span class="text-sm font-black text-slate-700">Tipo de fecha:</span>
+          <div class="flex w-fit rounded-lg bg-slate-100 p-1 shadow-inner">
+            <button
+              class="h-9 rounded-md px-4 text-sm font-black transition"
+              :class="activeDateType === 'none' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+              @click="setDateType('none')"
+            >
+              Ninguna
+            </button>
+            <button
+              class="h-9 rounded-md px-4 text-sm font-bold transition"
+              :class="activeDateType === 'pedido' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+              @click="setDateType('pedido')"
+            >
+              Pedido Cadena
+            </button>
+            <button
+              class="h-9 rounded-md px-4 text-sm font-bold transition"
+              :class="activeDateType === 'embarque' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+              @click="setDateType('embarque')"
+            >
+              Fin Embarque
+            </button>
+          </div>
 
-    <!-- Row 2: Date Filters & Actions -->
-    <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-      
-      <div class="flex flex-col md:flex-row items-start md:items-center gap-4 w-full md:w-auto">
-        <div class="flex items-center gap-3">
-          <span class="text-[10px] font-bold text-slate-400 tracking-wider uppercase"><i class="fa-regular fa-calendar-days text-sm mr-1"></i> TIPO FECHA:</span>
-          
-          <div class="flex items-center bg-slate-100/80 rounded-lg p-1 border border-slate-200/60 shadow-inner">
-             <button @click="setDateType('none')" :class="activeDateType === 'none' ? 'bg-white shadow-[0_1px_3px_rgba(0,0,0,0.1)] text-slate-800 font-bold' : 'text-slate-500 hover:text-slate-700 font-medium'" class="px-3 py-1 rounded-md text-xs transition-all">Ninguna</button>
-             <button @click="setDateType('pedido')" :class="activeDateType === 'pedido' ? 'bg-white shadow-[0_1px_3px_rgba(0,0,0,0.1)] text-blue-700 font-bold' : 'text-slate-500 hover:text-slate-700 font-medium'" class="px-3 py-1 rounded-md text-xs transition-all">Pedido Cadena</button>
-             <button @click="setDateType('embarque')" :class="activeDateType === 'embarque' ? 'bg-white shadow-[0_1px_3px_rgba(0,0,0,0.1)] text-indigo-700 font-bold' : 'text-slate-500 hover:text-slate-700 font-medium'" class="px-3 py-1 rounded-md text-xs transition-all">Fin Embarque</button>
+          <div v-show="activeDateType !== 'none'" class="flex items-center gap-2">
+            <Input v-model="dateStart" type="date" class="h-9 w-[145px] rounded-lg border-slate-200 text-xs font-semibold" />
+            <span class="text-xs font-bold text-slate-400">a</span>
+            <Input v-model="dateEnd" type="date" class="h-9 w-[145px] rounded-lg border-slate-200 text-xs font-semibold" />
           </div>
         </div>
 
-        <div v-show="activeDateType !== 'none'" class="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-300 ml-2">
-          <Input type="date" v-model="dateStart" class="h-8 text-xs w-[125px] border-slate-200 bg-white font-medium shadow-sm" />
-          <span class="text-xs text-slate-400 font-bold font-mono">...</span>
-          <Input type="date" v-model="dateEnd" class="h-8 text-xs w-[125px] border-slate-200 bg-white font-medium shadow-sm" />
+        <div class="flex items-center justify-end gap-5">
+          <button
+            class="inline-flex items-center gap-2 text-sm font-bold text-slate-500 transition-colors hover:text-slate-800"
+            @click="clearFilters"
+          >
+            <i class="fa-regular fa-trash-can text-sm"></i>
+            Limpiar filtros
+          </button>
+          <Button
+            class="h-11 rounded-lg bg-brand-500 px-6 text-sm font-black text-white shadow-[0_12px_22px_rgba(217,31,38,0.22)] hover:bg-brand-600"
+            @click="applyFilters"
+          >
+            <i class="fa-solid fa-filter mr-2 text-xs"></i>
+            Filtrar
+          </Button>
         </div>
       </div>
-
-      <div class="flex items-center gap-3 w-full md:w-auto justify-end">
-        <button class="text-[11px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-wider transition-colors" @click="clearFilters">Limpiar Todo</button>
-        <Button size="sm" class="h-9 bg-slate-800 hover:bg-slate-900 border border-slate-700 shadow-md font-bold px-5 rounded-full transition-all" @click="applyFilters">
-           FILTRAR <i class="fa-solid fa-arrow-right ml-2 text-[10px]"></i>
-        </Button>
-      </div>
-
     </div>
-  </div>
+  </section>
 </template>
