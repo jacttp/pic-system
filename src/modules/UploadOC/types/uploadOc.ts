@@ -10,6 +10,7 @@ export interface UploadOcRecord {
     id?: number // Opcional, devuelto por el servidor al listar
     num_pedido: string
     id_cliente: string
+    nombre_tienda?: string | null
     sku_cadena: string
     upc_cadena: string
     nom_cadena: string

@@ -61,6 +61,10 @@ const chainName = (name?: string) => {
 
 const chainLogo = (name?: string) => chainLogos[(name || '').toUpperCase()] || sorianaLogo
 const fileExtension = (name?: string) => ((name || '').toUpperCase() === 'SORIANA' ? '.xlsx' : '.inf')
+const storeName = (order?: { nombre_tienda?: string | null; id_cliente?: string }) => {
+  const name = order?.nombre_tienda?.trim()
+  return name || 'Tienda sin nombre'
+}
 
 const statusClasses = (status?: string) => {
   if (status === 'procesado') return 'bg-emerald-50 text-emerald-700 border-emerald-100'
@@ -86,10 +90,11 @@ const statusClasses = (status?: string) => {
 
     <template v-else>
       <div class="min-h-0 flex-1 overflow-auto">
-        <table class="w-full min-w-[940px] border-separate border-spacing-0 text-left">
+        <table class="w-full min-w-[1080px] border-separate border-spacing-0 text-left">
           <thead class="sticky top-0 z-10 bg-white">
             <tr class="text-[11px] font-black uppercase text-slate-500">
               <th class="border-b border-slate-100 px-6 py-4">N° Pedido</th>
+              <th class="border-b border-slate-100 px-4 py-4">Tienda</th>
               <th class="border-b border-slate-100 px-4 py-4">Cadena</th>
               <th class="border-b border-slate-100 px-4 py-4">Fecha Pedido</th>
               <th class="border-b border-slate-100 px-4 py-4">Fin Embarque</th>
@@ -108,6 +113,16 @@ const statusClasses = (status?: string) => {
                     <span class="rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-black text-emerald-700">
                       {{ fileExtension(group.records[0]?.nom_cadena) }}
                     </span>
+                  </div>
+                </td>
+                <td class="border-b border-slate-100 px-4 py-4">
+                  <div class="min-w-0">
+                    <p class="max-w-[260px] truncate text-sm font-black text-slate-800">
+                      {{ storeName(group.records[0]) }}
+                    </p>
+                    <p class="mt-0.5 font-mono text-[11px] font-semibold uppercase text-slate-400">
+                      {{ group.records[0]?.id_cliente }}
+                    </p>
                   </div>
                 </td>
                 <td class="border-b border-slate-100 px-4 py-4">
@@ -149,7 +164,7 @@ const statusClasses = (status?: string) => {
               </tr>
 
               <tr v-show="isExpanded(group.key)">
-                <td colspan="7" class="border-b border-slate-100 bg-slate-50/70 px-6 py-5">
+                <td colspan="8" class="border-b border-slate-100 bg-slate-50/70 px-6 py-5">
                   <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                     <table class="w-full text-left text-sm">
                       <thead class="bg-slate-900 text-[11px] font-black uppercase text-white">
