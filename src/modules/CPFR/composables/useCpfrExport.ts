@@ -96,11 +96,12 @@ export function useCpfrExport() {
         const allRows: (string | number)[][] = []
 
         // Headers
-        allRows.push(['cliente', 'nombre', 'sucursal', 'fec_fin_embarque', 'num_pedido', 'cant. pedida', 'upc', 'desc'])
+        allRows.push(['jefatura', 'cliente', 'nombre', 'sucursal', 'fec_fin_embarque', 'num_pedido', 'cant. pedida', 'upc', 'desc'])
 
         for (const item of selectedItems) {
             for (const row of item.rows) {
                 allRows.push([
+                    'PIC',
                     row.cliente,
                     row.nombre,
                     row.sucursal,
@@ -117,6 +118,7 @@ export function useCpfrExport() {
         const ws = XLSX.utils.aoa_to_sheet(allRows)
 
         ws['!cols'] = [
+            { wch: 10 },
             { wch: 10 },
             { wch: 30 },
             { wch: 10 },

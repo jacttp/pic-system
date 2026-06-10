@@ -64,7 +64,7 @@ const applyFilters = async () => {
 
 const clearFilters = async () => {
   store.filters.numPedido = ''
-  store.filters.estado = ''
+  store.filters.estado = 'pendiente'
   store.filters.fecPedidoInicio = ''
   store.filters.fecPedidoFin = ''
   store.filters.fecEmbarqueInicio = ''
