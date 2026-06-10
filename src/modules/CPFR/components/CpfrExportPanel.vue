@@ -3,7 +3,7 @@
 import { ref, computed, watch } from 'vue'
 import { useCpfrStore } from '../stores/cpfrStore'
 import { useCpfrExport, buildExportItems } from '../composables/useCpfrExport'
-import type { ExportTiendaItem } from '../composables/useCpfrExport'
+import type { ExportRow, ExportTiendaItem } from '../composables/useCpfrExport'
 import type { CpfrDiaDash, CpfrSkuDash } from '../types/cpfrTypes'
 import { toast } from '@/components/ui/toast/use-toast'
 
@@ -12,7 +12,7 @@ const emit = defineEmits<{
 }>()
 
 const store = useCpfrStore()
-const { generateExcel } = useCpfrExport()
+const { generateExcel, generateStorePdfs } = useCpfrExport()
 
 // ── Day Labels ────────────────────────────────────────────────────────────────
 const DAY_LABELS: Record<number, string> = { 1: 'L', 2: 'M', 3: 'X', 4: 'J', 5: 'V', 6: 'S', 7: 'D' }
@@ -36,6 +36,11 @@ function getInitialSelectedDays(): number[] {
 }
 
 const selectedDays = ref<Set<number>>(new Set(getInitialSelectedDays()))
+
+const groupByOC = computed({
+    get: () => store.groupByOC,
+    set: (val) => store.setGroupByOC(val)
+})
 
 watch(availableDays, days => {
     const nums = days.map(d => d.num)
@@ -226,9 +231,9 @@ function itemKey(i: ExportTiendaItem) {
     return `${i.id_cliente}|${i.num_pedido}`
 }
 
-function skuKey(i: ExportTiendaItem, row: { upc: string; num_pedido?: string }) {
+function skuKey(i: ExportTiendaItem, row: { sku_key?: string; upc: string; num_pedido?: string }) {
     const oc = row.num_pedido || i.num_pedido
-    return `${i.id_cliente}|${oc}|${row.upc}`
+    return `${i.id_cliente}|${oc}|${row.sku_key || row.upc}`
 }
 
 function toggleStore(id_cliente: string) {
@@ -263,7 +268,7 @@ function toggleOC(i: ExportTiendaItem) {
     excludedSKUs.value    = new Set(excludedSKUs.value)
 }
 
-function toggleSku(i: ExportTiendaItem, row: { upc: string }) {
+function toggleSku(i: ExportTiendaItem, row: { sku_key?: string; upc: string }) {
     const k = skuKey(i, row)
     if (excludedSKUs.value.has(k)) {
         excludedSKUs.value.delete(k)
@@ -321,6 +326,7 @@ const previewItems = computed(() => {
                 map.set(item.id_cliente, {
                     id_cliente: item.id_cliente,
                     nombre_tienda: item.nombre_tienda,
+                    jefatura: item.jefatura,
                     num_pedido: 'DESAGRUPADO',
                     estado_oc: item.estado_oc,
                     dayNum: item.dayNum,
@@ -337,6 +343,15 @@ const previewItems = computed(() => {
 
 const totalRows     = computed(() => includedItems.value.reduce((a, i) => a + i.rows.length, 0))
 const totalCantidad = computed(() => includedItems.value.reduce((a, i) => a + i.rows.reduce((b, r) => b + r.cant_pedida, 0), 0))
+const totalKg       = computed(() => includedItems.value.reduce((a, i) => a + sumKg(i.rows), 0))
+
+function sumPz(rows: ExportRow[]): number {
+    return rows.reduce((total, row) => total + row.cant_pedida, 0)
+}
+
+function sumKg(rows: ExportRow[]): number {
+    return rows.reduce((total, row) => total + row.pedido_kg, 0)
+}
 
 // ── Right Sidebar Hierarchical List ───────────────────────────────────────────
 const storesMap = computed(() => {
@@ -352,6 +367,30 @@ const storesMap = computed(() => {
 
 // ── Main Combined Action ──────────────────────────────────────────────────────
 const processing = ref(false)
+const pdfProcessing = ref(false)
+
+async function handlePdfExport() {
+    if (includedItems.value.length === 0) {
+        toast({ title: 'Atencion', description: 'No hay pedidos incluidos para generar PDF.', variant: 'destructive' })
+        return
+    }
+
+    pdfProcessing.value = true
+    try {
+        const result = await generateStorePdfs(includedItems.value, Array.from(selectedDays.value))
+        toast({
+            title: result.zipped ? 'ZIP generado' : 'PDF generado',
+            description: result.zipped
+                ? `${result.filename} contiene ${result.fileCount} PDF(s), uno por tienda.`
+                : `${result.filename} descargado.`
+        })
+    } catch (e) {
+        console.error('[CpfrExportPanel.PDF]', e)
+        toast({ title: 'Error', description: 'No se pudieron generar los PDFs.', variant: 'destructive' })
+    } finally {
+        pdfProcessing.value = false
+    }
+}
 
 async function handleAprobarExportar() {
     if (includedItems.value.length === 0) {
@@ -435,6 +474,10 @@ async function updateStatusesSilently() {
                 </h3>
                 <div class="text-[9px] font-bold text-slate-400">
                     <span class="text-brand-700">{{ includedItems.length }}</span> OCs
+                    <span class="mx-1 text-slate-300">|</span>
+                    <span class="text-brand-700">{{ totalRows }}</span> SKUs
+                    <span class="mx-1 text-slate-300">|</span>
+                    <span class="text-brand-700">{{ totalKg.toLocaleString('es-MX', { maximumFractionDigits: 1 }) }}</span> KG
                 </div>
             </div>
 
@@ -457,7 +500,9 @@ async function updateStatusesSilently() {
                             <p class="text-brand-200 text-[8px] font-mono mt-0.5 truncate">{{ item.id_cliente }} · {{ item.nombre_tienda }}</p>
                         </div>
                         <div class="text-right shrink-0">
-                            <p class="text-brand-200 text-[8px] font-bold uppercase tracking-widest">OC</p>
+                            <p class="text-brand-200 text-[8px] font-bold uppercase tracking-widest">
+                                {{ item.rows.length }} SKU | {{ sumPz(item.rows).toLocaleString('es-MX') }} PZ | {{ sumKg(item.rows).toLocaleString('es-MX', { maximumFractionDigits: 1 }) }} KG
+                            </p>
                             <p class="font-black text-white text-[10px] font-mono tracking-widest">{{ store.groupByOC ? item.num_pedido : 'DESAGRUPADO' }}</p>
                         </div>
                     </div>
@@ -504,6 +549,20 @@ async function updateStatusesSilently() {
                     <h3 class="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
                         <i class="fa-solid fa-sliders text-brand-500"></i> Filtros
                     </h3>
+                </div>
+
+                <div class="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                    <div class="flex items-center gap-2 text-slate-500 min-w-0">
+                        <i class="fa-solid fa-layer-group text-slate-400 text-[11px]"></i>
+                        <div class="min-w-0">
+                            <p class="text-[10px] font-black uppercase tracking-wider text-slate-600">Control de Vista</p>
+                            <p class="text-[8px] font-bold text-slate-400 truncate">{{ groupByOC ? 'Agrupado por OC' : 'Desagrupado por tienda' }}</p>
+                        </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer select-none shrink-0" title="Agrupar/Desagrupar por Orden de Compra">
+                        <input type="checkbox" v-model="groupByOC" class="sr-only peer">
+                        <div class="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-brand-500"></div>
+                    </label>
                 </div>
 
                 <div class="flex items-center gap-2">
@@ -669,7 +728,11 @@ async function updateStatusesSilently() {
                 <div class="space-y-1">
                     <div class="flex items-center justify-between text-[11px]">
                          <span class="font-black text-slate-700 uppercase tracking-tighter">{{ includedItems.length }} PEDIDOS</span>
-                         <span class="font-black text-brand-700">{{ totalCantidad.toLocaleString('es-MX') }} <small class="text-brand-500 font-bold">PZ</small></span>
+                         <span class="font-black text-brand-700">
+                            {{ totalCantidad.toLocaleString('es-MX') }} <small class="text-brand-500 font-bold">PZ</small>
+                            <span class="mx-1 text-slate-300">|</span>
+                            {{ totalKg.toLocaleString('es-MX', { maximumFractionDigits: 1 }) }} <small class="text-brand-500 font-bold">KG</small>
+                         </span>
                     </div>
                     <p class="text-[9px] font-mono text-brand-600 font-bold truncate p-1.5 bg-brand-50 rounded-lg border border-brand-100 text-center">
                         {{ selectedDays.size > 1 ? 'MIX' : DAY_CODES[Array.from(selectedDays)[0]] }}_{{ new Date().toISOString().slice(0,10).replace(/-/g,'') }}.xlsx
@@ -683,18 +746,28 @@ async function updateStatusesSilently() {
                             const filename = generateExcel(includedItems, Array.from(selectedDays))
                             toast({ title: '✅ Documento generado', description: filename })
                         }"
-                        :disabled="processing || includedItems.length === 0"
+                        :disabled="processing || pdfProcessing || includedItems.length === 0"
                         class="w-full h-9 border-2 border-brand-600 text-brand-700 hover:bg-brand-50 disabled:bg-slate-50 disabled:text-slate-300 disabled:border-slate-200 rounded-xl font-black text-[11px] transition-all flex items-center justify-center gap-2 group"
                     >
                         <i class="fa-solid fa-file-excel transition-transform group-hover:scale-110"></i>
                         DESCARGAR EXCEL
                     </button>
 
+                    <button
+                        @click="handlePdfExport"
+                        :disabled="processing || pdfProcessing || includedItems.length === 0"
+                        class="w-full h-9 border-2 border-rose-600 text-rose-700 hover:bg-rose-50 disabled:bg-slate-50 disabled:text-slate-300 disabled:border-slate-200 rounded-xl font-black text-[11px] transition-all flex items-center justify-center gap-2 group"
+                    >
+                        <i v-if="pdfProcessing" class="fa-solid fa-circle-notch fa-spin"></i>
+                        <i v-else class="fa-solid fa-file-pdf transition-transform group-hover:scale-110"></i>
+                        DESCARGAR PDFS POR TIENDA
+                    </button>
+
                     <!-- Botón 2: Descargar & Aprobar (Solo en tabs de gestión actual) -->
                     <button
                         v-if="store.activeTab !== 'sin_embarcar' && store.activeTab !== 'historial'"
                         @click="handleAprobarExportar"
-                        :disabled="processing || includedItems.length === 0"
+                        :disabled="processing || pdfProcessing || includedItems.length === 0"
                         class="w-full h-11 bg-brand-600 hover:bg-brand-700 disabled:bg-slate-300 text-white rounded-xl shadow-lg shadow-brand-900/10 transition-all flex flex-col items-center justify-center group"
                     >
                         <div class="flex items-center gap-2 font-black text-[11px] tracking-tight">
