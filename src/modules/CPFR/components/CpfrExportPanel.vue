@@ -368,6 +368,8 @@ const storesMap = computed(() => {
 // ── Main Combined Action ──────────────────────────────────────────────────────
 const processing = ref(false)
 const pdfProcessing = ref(false)
+const pdfOnlyTabs = computed(() => store.activeTab === 'sin_embarcar' || store.activeTab === 'historial')
+const canApproveExport = computed(() => store.activeTab !== 'aprobada' && !pdfOnlyTabs.value)
 
 async function handlePdfExport() {
     if (includedItems.value.length === 0) {
@@ -742,6 +744,7 @@ async function updateStatusesSilently() {
                 <div class="space-y-2">
                     <!-- Botón 1: Solo descargar -->
                     <button
+                        v-if="!pdfOnlyTabs"
                         @click="() => {
                             const filename = generateExcel(includedItems, Array.from(selectedDays))
                             toast({ title: '✅ Documento generado', description: filename })
@@ -765,7 +768,7 @@ async function updateStatusesSilently() {
 
                     <!-- Botón 2: Descargar & Aprobar (Solo en tabs de gestión actual) -->
                     <button
-                        v-if="store.activeTab !== 'sin_embarcar' && store.activeTab !== 'historial'"
+                        v-if="canApproveExport"
                         @click="handleAprobarExportar"
                         :disabled="processing || pdfProcessing || includedItems.length === 0"
                         class="w-full h-11 bg-brand-600 hover:bg-brand-700 disabled:bg-slate-300 text-white rounded-xl shadow-lg shadow-brand-900/10 transition-all flex flex-col items-center justify-center group"

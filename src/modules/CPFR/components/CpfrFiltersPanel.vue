@@ -1,10 +1,12 @@
 <script setup lang="ts">
 // src/modules/CPFR/components/CpfrFiltersPanel.vue
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useCpfrStore } from '../stores/cpfrStore'
 import CpfrCriteriaPanel from './CpfrCriteriaPanel.vue'
 
 const store = useCpfrStore()
+
+const canRunCentralizedActions = computed(() => store.activeTab === 'centralizados')
 
 const emit = defineEmits<{
     (e: 'open-export'): void
@@ -101,12 +103,14 @@ function clearAll() {
 }
 
 function confirmRecalculate() {
+    if (!canRunCentralizedActions.value) return
     if (confirm('Atencion: Recalcular la matematica sobrescribira todos los cambios manuales que hayas guardado hoy en el borrador.\n\nEstas seguro de que deseas forzar un recalculo desde cero con el inventario mas reciente?')) {
         store.recalculate()
     }
 }
 
 async function triggerGenerateZ8() {
+    if (!canRunCentralizedActions.value) return
     await store.generateZ8()
 }
 </script>
@@ -197,8 +201,8 @@ async function triggerGenerateZ8() {
                   ? 'bg-violet-100 text-violet-600 cursor-wait'
                   : 'bg-violet-50 text-violet-700 hover:bg-violet-100'"
                 @click.stop="triggerGenerateZ8"
-                :disabled="store.z8Loading"
-                title="Genera los cascarones Z8 para la semana activa"
+                :disabled="store.z8Loading || !canRunCentralizedActions"
+                :title="canRunCentralizedActions ? 'Genera los cascarones Z8 para la semana activa' : 'Disponible solo en la vista Centralizados'"
               >
                 <i class="fa-solid text-[10px]" :class="store.z8Loading ? 'fa-circle-notch fa-spin' : 'fa-bolt'"></i>
                 <span class="cpfr-wide-label">{{ store.z8Loading ? 'Generando...' : 'Generar Z8' }}</span>
@@ -212,9 +216,10 @@ async function triggerGenerateZ8() {
             </div>
 
             <button
-              class="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 h-8 rounded-md bg-brand-50 text-brand-700 hover:bg-brand-100 transition-all"
+              class="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 h-8 rounded-md bg-brand-50 text-brand-700 hover:bg-brand-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               @click.stop="confirmRecalculate"
-              title="Fuerza un recalculo basado en inventario"
+              :disabled="!canRunCentralizedActions"
+              :title="canRunCentralizedActions ? 'Fuerza un recalculo basado en inventario' : 'Disponible solo en la vista Centralizados'"
             >
               <i class="fa-solid fa-rotate text-[10px]"></i>
               <span class="cpfr-wide-label">Recalcular</span>
