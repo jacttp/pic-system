@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { useCpfrStore } from '../stores/cpfrStore'
 import CpfrFiltersPanel    from '../components/CpfrFiltersPanel.vue'
 import CpfrOrderTable      from '../components/CpfrOrderTable.vue'
+import CpfrChainTabs       from '../components/CpfrChainTabs.vue'
 import CpfrExportPanel     from '../components/CpfrExportPanel.vue'
 import CpfrStoreConfigModal from '../components/CpfrStoreConfigModal.vue'
 import CpfrInfoModal        from '../components/CpfrInfoModal.vue'
@@ -35,13 +36,13 @@ function openChainConfig() {
   <main class="flex flex-col h-full min-h-0 bg-slate-50">
 
     <!-- ── Header ─────────────────────────────────────────────────────────── -->
-    <header class="px-4 xl:px-6 py-3 bg-white border-b border-slate-200 flex items-center justify-between flex-wrap lg:flex-nowrap gap-4 shrink-0">
+    <header class="px-4 xl:px-6 py-3 bg-white border-b border-slate-200 flex items-center justify-between flex-wrap xl:flex-nowrap gap-4 shrink-0">
 
       <!-- Título -->
       <div class="min-w-0">
         <h1 class="text-sm xl:text-base font-bold text-slate-800 flex items-center gap-2 truncate">
           <i class="fa-solid fa-truck-ramp-box text-brand-500 shrink-0"></i>
-          <span class="truncate">CPFR — Propuesta de Pedido</span>
+          <span class="truncate">Modelo CPFR</span>
           <button 
             @click="showInfoModal = true"
             class="w-5 h-5 shrink-0 rounded-full border border-slate-200 text-slate-400 hover:text-brand-500 hover:border-brand-200 hover:bg-brand-50 transition-all flex items-center justify-center text-[10px] ml-1"
@@ -71,12 +72,14 @@ function openChainConfig() {
           </div>
         </h1>
         <p class="text-[10px] xl:text-[11px] text-slate-400 mt-0.5 truncate">
-          Motor de reabastecimiento - {{ chainLabel }}
+          Reabastecimiento - {{ chainLabel }}
           <span v-if="store.currentWeek" class="ml-2 text-slate-300">
             - Anio {{ store.currentWeek.anio }} - Sem. {{ store.currentWeek.semana_ic }}
           </span>
         </p>
       </div>
+
+      <CpfrChainTabs class="order-3 w-full xl:order-none xl:w-auto" />
 
       <!-- KPIs del contexto -->
       <div v-if="store.context" class="flex items-center gap-3 xl:gap-5 shrink-0">

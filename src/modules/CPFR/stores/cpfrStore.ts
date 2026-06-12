@@ -59,6 +59,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         sobrepedido: false,
         desabasto: false,
         searchOC: '',
+        searchSku: '',
     })
 
     // UI — expand state local (no viene del backend)
@@ -341,6 +342,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         delete filters.dia
         delete filters.jefatura
         delete filters.id_cliente
+        delete filters.nombre_tienda
         filters.semanas_sellout = 6
     }
 
@@ -359,6 +361,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         statusFilters.fillrate100 = false
         statusFilters.sobrepedido = false
         statusFilters.searchOC = ''
+        statusFilters.searchSku = ''
     }
 
     // ── Computed ──────────────────────────────────────────────────────────────

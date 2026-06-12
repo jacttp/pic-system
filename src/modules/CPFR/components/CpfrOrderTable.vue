@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 // src/modules/CPFR/components/CpfrOrderTable.vue
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 
@@ -26,17 +26,6 @@ const currentTab = computed({
   get: () => store.activeTab,
   set: (val) => store.setActiveTab(val)
 })
-
-const chainTabs = [
-    { id: 'SORIANA', label: 'Soriana', icon: 'fa-store' },
-    { id: 'SAMS', label: "Sam's", icon: 'fa-warehouse' },
-]
-
-const activeChain = computed(() => store.nom_cadena.toUpperCase())
-
-function setActiveChain(chain: string) {
-    store.setNomCadena(chain)
-}
 
 const tabs = [ 
     { id: 'centralizados', label: 'Centralizados' },
@@ -255,16 +244,6 @@ function toggleDay(dia_num: number) {
 }
 
 // ── Motor de Cálculo y Generación ─────────────────────────────────────────────
-function confirmRecalculate() {
-    if (confirm('Atención: Recalcular la matemática sobrescribirá todos los cambios manuales que hayas guardado hoy en el borrador.\n\n¿Estás seguro de que deseas forzar un recálculo desde cero con el inventario más reciente?')) {
-        store.recalculate()
-    }
-}
-
-async function triggerGenerateZ8() {
-    await store.generateZ8()
-}
-
 // ── Utilities de estilo ───────────────────────────────────────────────────────
 
 function cobClass(cob: number | null) {
@@ -665,6 +644,18 @@ const filteredDias = computed(() => {
                     if (!num.includes(term)) return false;
                 }
 
+                if (sf.searchSku) {
+                    const term = sf.searchSku.toLowerCase();
+                    const searchableSku = [
+                        sku.sku_nombre,
+                        sku.sku_muliix,
+                        sku.sku_cadena,
+                        sku.upc_cadena,
+                        sku.desc_art,
+                    ].filter(Boolean).join(' ').toLowerCase();
+                    if (!searchableSku.includes(term)) return false;
+                }
+
                 // 3. Filtros de Estado dinámicos (OR)
                 if (!hasStatusFilter) return true;
 
@@ -739,53 +730,51 @@ const totalUniqueOCs = computed(() => {
     <template v-else-if="store.dias.length || currentTab === 'historial'">
       
       <!-- ── Toolbar de Control de Vistas ── -->
-      <div class="shrink-0 px-5 py-3 border-b border-slate-200 bg-white flex items-center justify-between">
-        <div class="flex items-center gap-2 text-slate-500">
-          <i class="fa-solid fa-layer-group text-slate-400"></i>
-          <span class="text-[11px] font-bold uppercase tracking-wider">Control de Vista</span>
-          
+      <div class="shrink-0 px-4 py-2 border-b border-slate-200 bg-white/95 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex min-w-0 flex-wrap items-center gap-2 text-slate-500">
+          <!-- Visibilidad de Z8 en cero -->
+          <div class="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm p-0.5">
+            <button
+              class="inline-flex items-center justify-center w-8 h-8 rounded-md transition-all"
+              :class="showZeroZ8 
+                ? 'bg-violet-600 text-white' 
+                : 'bg-white text-slate-400 hover:text-slate-600 hover:bg-slate-50'"
+              @click.stop="showZeroZ8 = !showZeroZ8"
+              :title="showZeroZ8 ? 'Ocultar sugeridos en 0 (Z8)' : 'Mostrar sugeridos en 0 (Z8)'"
+            >
+              <i class="fa-solid text-[11px]" :class="showZeroZ8 ? 'fa-eye' : 'fa-eye-slash'"></i>
+            </button>
+          </div>
           <!-- Switch Agrupar por OC -->
-          <label class="ml-3 relative inline-flex items-center cursor-pointer select-none" title="Agrupar/Desagrupar por Orden de Compra">
-            <input type="checkbox" v-model="groupByOC" class="sr-only peer">
-            <div class="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-brand-500"></div>
+          <label class="relative h-8 inline-flex items-center gap-2 px-2.5 rounded-lg border border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500 cursor-pointer select-none" title="Agrupar/Desagrupar por Orden de Compra">
+            <span>OC</span>
+            <span class="relative inline-flex items-center">
+              <input type="checkbox" v-model="groupByOC" class="sr-only peer">
+              <span class="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-brand-500"></span>
+            </span>
           </label>
 
           <!-- Contador de OCs -->
-          <div v-if="totalUniqueOCs > 0" class="ml-4 flex items-center gap-2 px-2.5 py-1 bg-brand-50 border border-brand-200 rounded-lg text-brand-700 font-bold text-[10px]">
+          <div v-if="totalUniqueOCs > 0" class="flex items-center gap-1.5 px-2.5 h-8 bg-brand-50 border border-brand-200 rounded-lg text-brand-700 font-bold text-[10px]">
             <i class="fa-solid fa-file-circle-check"></i>
             <span>{{ totalUniqueOCs }} OC</span>
           </div>
 
-          <!-- Pestañas de cadena -->
-          <div class="ml-4 flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
-            <button
-               v-for="chain in chainTabs"
-               :key="chain.id"
-               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all disabled:opacity-60 disabled:cursor-wait"
-               :class="activeChain === chain.id ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'"
-               :disabled="store.loading && activeChain !== chain.id"
-               @click="setActiveChain(chain.id)"
-            >
-              <i class="fa-solid text-[10px]" :class="chain.icon"></i>
-              <span>{{ chain.label }}</span>
-            </button>
-          </div>
-
           <!-- Pestañas (Tabs) -->
-          <div class="ml-2 flex items-center gap-1 bg-slate-100/50 p-1 rounded-xl border border-slate-200 shadow-inner">
+          <div class="flex min-w-0 items-center gap-1 bg-slate-100/50 p-0.5 rounded-lg border border-slate-200 shadow-inner">
             <button
                v-for="t in tabs" :key="t.id"
-               class="px-3 py-1.5 rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all"
+               class="px-2.5 h-7 rounded-md font-bold text-[10px] uppercase tracking-wider transition-all whitespace-nowrap"
                :class="currentTab === t.id ? 'bg-brand-600 text-white shadow-sm shadow-brand-200' : 'text-slate-500 hover:bg-white hover:text-slate-700'"
                @click="currentTab = t.id"
             >{{ t.label }}</button>
           </div>
 
           <!-- Selector de semanas anteriores (discreto y elegante, aparece solo si es sin_embarcar o historial) -->
-          <div v-if="currentTab === 'sin_embarcar' || currentTab === 'historial'" class="ml-2 flex items-center animate-in fade-in slide-in-from-left-2 duration-200">
+          <div v-if="currentTab === 'sin_embarcar' || currentTab === 'historial'" class="flex items-center animate-in fade-in slide-in-from-left-2 duration-200">
             <select
               v-model="selectedFilterWeek"
-              class="bg-white border border-slate-200 text-slate-700 text-[10px] font-bold uppercase tracking-wider rounded-lg px-2.5 py-1.5 shadow-sm focus:outline-none focus:ring-1 focus:ring-brand-500 cursor-pointer hover:border-slate-300 transition-colors"
+              class="h-8 bg-white border border-slate-200 text-slate-700 text-[10px] font-bold uppercase tracking-wider rounded-lg px-2.5 shadow-sm focus:outline-none focus:ring-1 focus:ring-brand-500 cursor-pointer hover:border-slate-300 transition-colors"
             >
               <option value="TODAS">Semana: Todas</option>
               <option v-for="w in availableWeeks" :key="w.key" :value="w.key">
@@ -795,80 +784,30 @@ const totalUniqueOCs = computed(() => {
           </div>
         </div>
         
-        <div class="flex items-center gap-4">
-          <!-- Motor de Cálculo y Generación -->
-          <div class="flex items-center gap-2 mr-2">
-            <!-- Generar Z8 -->
-            <div class="flex flex-col items-end gap-0.5 relative group/z8info">
-              <button
-                class="inline-flex items-center gap-2 text-[10px] font-bold px-3 h-[32px] rounded-lg border transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                :class="store.z8Loading
-                  ? 'border-violet-300 bg-violet-100 text-violet-600 cursor-wait'
-                  : 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100'"
-                @click.stop="triggerGenerateZ8"
-                :disabled="store.z8Loading"
-                title="Genera los cascarones Z8 para la semana activa"
-              >
-                <i
-                  class="fa-solid text-[10px]"
-                  :class="store.z8Loading ? 'fa-circle-notch fa-spin' : 'fa-bolt'"
-                ></i>
-                <span class="hidden xl:inline">{{ store.z8Loading ? 'Generando…' : 'Generar Z8' }}</span>
-              </button>
-              <span
-                v-if="store.z8Result"
-                class="absolute top-full mt-0.5 right-0 text-[8px] font-black px-1 truncate max-w-[100px] whitespace-nowrap bg-white/80 rounded"
-                :class="store.z8Result.created > 0 ? 'text-violet-600' : 'text-slate-400'"
-                :title="store.z8Result.message"
-              >{{ store.z8Result.created > 0 ? `+${store.z8Result.created} Z8` : 'Sin cambios' }}</span>
-            </div>
-
-            <!-- Toggle Visibilidad 0s en Z8 -->
-            <button
-              class="inline-flex items-center justify-center w-[32px] h-[32px] rounded-lg border transition-all shadow-sm"
-              :class="showZeroZ8 
-                ? 'bg-violet-600 text-white border-violet-700' 
-                : 'bg-white text-slate-400 border-slate-200 hover:text-slate-600 hover:border-slate-300'"
-              @click.stop="showZeroZ8 = !showZeroZ8"
-              :title="showZeroZ8 ? 'Ocultar sugeridos en 0 (Z8)' : 'Mostrar sugeridos en 0 (Z8)'"
-            >
-              <i class="fa-solid" :class="showZeroZ8 ? 'fa-eye' : 'fa-eye-slash'"></i>
-            </button>
-
-            <!-- Recalcular -->
-            <button
-              class="inline-flex items-center gap-2 text-[10px] font-bold px-3 h-[32px] rounded-lg border border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 transition-all shadow-sm"
-              @click.stop="confirmRecalculate"
-              title="Fuerza un recálculo basado en inventario"
-            >
-              <i class="fa-solid fa-rotate text-[10px]"></i>
-              <span class="hidden xl:inline">Recalcular</span>
-            </button>
-          </div>
-
+        <div class="flex flex-wrap items-center justify-end gap-2">
           <!-- Controles Tiendas -->
-          <div class="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm text-[11px] font-semibold overflow-hidden">
-              <span class="px-3 py-1.5 bg-slate-50 text-slate-500 border-r border-slate-200 flex items-center gap-1.5">
+          <div class="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm text-[10px] font-bold overflow-hidden">
+              <span class="px-2.5 h-8 bg-slate-50 text-slate-500 border-r border-slate-200 flex items-center gap-1.5">
                   <i class="fa-solid fa-store text-slate-400"></i> Tiendas
               </span>
-              <button @click="store.expandAll()" class="px-3 py-1.5 text-slate-500 hover:bg-brand-50 hover:text-brand-600 transition-colors border-r border-slate-200" title="Expandir todas las tiendas">
+              <button @click="store.expandAll()" class="w-8 h-8 text-slate-500 hover:bg-brand-50 hover:text-brand-600 transition-colors border-r border-slate-200" title="Expandir todas las tiendas">
                   <i class="fa-solid fa-chevron-down"></i>
               </button>
-              <button @click="store.collapseAll()" class="px-3 py-1.5 text-slate-500 hover:bg-slate-50 hover:text-rose-600 transition-colors" title="Contraer todas las tiendas">
+              <button @click="store.collapseAll()" class="w-8 h-8 text-slate-500 hover:bg-slate-50 hover:text-rose-600 transition-colors" title="Contraer todas las tiendas">
                   <i class="fa-solid fa-chevron-up"></i>
               </button>
               
           </div>
 
           <!-- Controles OCs -->
-          <div class="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm text-[11px] font-semibold overflow-hidden">
-              <span class="px-3 py-1.5 bg-slate-50 text-slate-500 border-r border-slate-200 flex items-center gap-1.5">
+          <div class="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm text-[10px] font-bold overflow-hidden">
+              <span class="px-2.5 h-8 bg-slate-50 text-slate-500 border-r border-slate-200 flex items-center gap-1.5">
                   <i class="fa-solid fa-file-invoice text-slate-400"></i> OCs
               </span>
-              <button @click="expandAllOCsLocal" class="px-3 py-1.5 text-slate-500 hover:bg-brand-50 hover:text-brand-600 transition-colors border-r border-slate-200" title="Expandir todas las OCs">
+              <button @click="expandAllOCsLocal" class="w-8 h-8 text-slate-500 hover:bg-brand-50 hover:text-brand-600 transition-colors border-r border-slate-200" title="Expandir todas las OCs">
                   <i class="fa-solid fa-chevron-down"></i>
               </button>
-              <button @click="collapseAllOCsLocal" class="px-3 py-1.5 text-slate-500 hover:bg-slate-50 hover:text-rose-600 transition-colors" title="Contraer todas las OCs">
+              <button @click="collapseAllOCsLocal" class="w-8 h-8 text-slate-500 hover:bg-slate-50 hover:text-rose-600 transition-colors" title="Contraer todas las OCs">
                   <i class="fa-solid fa-chevron-up"></i>
               </button>
           </div>
@@ -898,21 +837,33 @@ const totalUniqueOCs = computed(() => {
         </div>
         
         <!-- ── Vista de Tabla ── -->
-        <table v-else-if="store.viewMode === 'table'" class="w-full min-w-[1400px] text-left border-collapse table-fixed transition-all duration-300">
+        <table v-else-if="store.viewMode === 'table'" class="w-full min-w-[1180px] text-left border-collapse table-fixed transition-all duration-300">
+          <colgroup>
+            <col style="width: 26%" />
+            <col style="width: 8%" />
+            <col style="width: 8%" />
+            <col style="width: 9%" />
+            <col style="width: 5%" />
+            <col style="width: 6.5%" />
+            <col style="width: 9%" />
+            <col style="width: 8%" />
+            <col style="width: 8.5%" />
+            <col style="width: 12%" />
+          </colgroup>
 
           <!-- Cabecera fija: NIVEL 1 -->
           <thead class="sticky top-0 z-20 shadow-sm ring-1 ring-slate-200">
             <tr class="text-[9px] xl:text-[10px] uppercase tracking-wider text-slate-500 bg-slate-100/80 backdrop-blur-sm border-b border-slate-200 border-l-[6px] border-l-transparent">
-              <th class="px-4 py-3 font-bold w-full min-w-[250px]">Tienda / SKU</th>
-              <th class="px-3 py-3 font-bold w-28 whitespace-nowrap">UPC</th>
-              <th class="px-3 py-3 font-bold text-right w-24 whitespace-nowrap">Inv.<br>Act. (pz)</th>
-              <th class="px-3 py-3 font-bold text-right w-28 whitespace-nowrap">Sellout Prom.<br>(pz)</th>
-              <th class="px-3 py-3 font-bold text-right w-16 whitespace-nowrap">Crit.<br>(S.)</th>
-              <th class="px-3 py-3 font-bold text-right w-20 whitespace-nowrap">Cob.<br>(S.)</th>
-              <th class="px-3 py-3 font-bold text-right text-amber-700 bg-amber-50 border-x border-amber-100 w-28 whitespace-nowrap">Pedido<br>Sugerido</th>
-              <th class="px-3 py-3 font-bold text-right w-24 whitespace-nowrap">Centralizado</th>
-              <th class="px-3 py-3 font-bold text-right w-28 whitespace-nowrap">Fill Rate</th>
-              <th class="px-3 py-3 font-bold text-center w-20 whitespace-nowrap">INSTOCK</th>
+              <th class="px-4 py-3 font-bold">Tienda / SKU</th>
+              <th class="px-2.5 py-3 font-bold whitespace-nowrap">UPC</th>
+              <th class="px-2.5 py-3 font-bold text-right whitespace-nowrap">Inv.<br>Act. (pz)</th>
+              <th class="px-2.5 py-3 font-bold text-right whitespace-nowrap">Sellout Prom.<br>(pz)</th>
+              <th class="px-2 py-3 font-bold text-right whitespace-nowrap">Crit.<br>(S.)</th>
+              <th class="px-2 py-3 font-bold text-right whitespace-nowrap">Cob.<br>(S.)</th>
+              <th class="px-2.5 py-3 font-bold text-right text-amber-700 bg-amber-50 border-x border-amber-100 whitespace-nowrap">Pedido<br>Sugerido</th>
+              <th class="px-2.5 py-3 font-bold text-right whitespace-nowrap">Centralizado</th>
+              <th class="px-2.5 py-3 font-bold text-right whitespace-nowrap">Fill Rate</th>
+              <th class="px-2.5 py-3 font-bold text-center whitespace-nowrap">INSTOCK</th>
             </tr>
           </thead>
 
@@ -926,7 +877,7 @@ const totalUniqueOCs = computed(() => {
                 class="cursor-pointer select-none group bg-slate-100/70 border-y border-slate-200 hover:bg-slate-200/50 transition-colors"
                 @click="toggleDay(dia.dia_num)"
               >
-                <td colspan="13" class="px-4 py-2.5">
+                <td colspan="10" class="px-4 py-2.5">
                   <div class="flex items-center gap-3">
                     <i
                       class="fa-solid text-slate-400 text-[11px] transition-transform duration-200 group-hover:text-slate-600"
@@ -1014,49 +965,49 @@ const totalUniqueOCs = computed(() => {
 
 
                     <!-- Inv. Actual (pz) -->
-                    <td class="px-3 py-3 text-right text-slate-700 text-[11px] cursor-help"
+                    <td class="px-2.5 py-3 text-right text-slate-700 text-[11px] cursor-help"
                         :title="n(tienda.resumen.inv_actual_kg, 2) + ' kg totales'">
                       <span class="border-b border-dashed border-slate-300 hover:border-slate-500 transition-colors">{{ n(tienda.resumen.inv_actual_pz, 2) }}</span>
                     </td>
 
                     <!-- Vta. Prom. Semanal (pz) -->
-                    <td class="px-3 py-3 text-right text-slate-700 text-[11px] cursor-help"
+                    <td class="px-2.5 py-3 text-right text-slate-700 text-[11px] cursor-help"
                         :title="n(tienda.resumen.promedio_sellout_kg, 2) + ' kg totales'">
                       <span class="border-b border-dashed border-slate-300 hover:border-slate-500 transition-colors">{{ n(tienda.resumen.promedio_sellout_pz, 2) }}</span>
                     </td>
 
                     <!-- Criterio (sem. objetivo) -->
-                    <td class="px-3 py-3 text-right text-slate-500 text-[11px]">
+                    <td class="px-2 py-3 text-right text-slate-500 text-[11px]">
                       {{ n(tienda.resumen.semanas_objetivo, 1) }}
                     </td>
 
                     <!-- Semanas Actuales (cobertura_actual) -->
                     <td
-                      class="px-3 py-3 text-right font-bold"
+                      class="px-2 py-3 text-right font-bold"
                       :class="cobClass(tienda.resumen.cobertura_actual)"
                     >
                       {{ n(tienda.resumen.cobertura_actual, 2) }}
                     </td>
 
                     <!-- Pedido Sugerido -->
-                    <td class="px-3 py-3 text-right font-black text-amber-700 bg-amber-50/50 border-x border-amber-100 text-sm tracking-tight relative">
+                    <td class="px-2.5 py-3 text-right font-black text-amber-700 bg-amber-50/50 border-x border-amber-100 text-sm tracking-tight relative">
                       <div class="absolute inset-y-0 left-0 w-[4px] bg-amber-400/30"></div>
                       {{ tienda.resumen.pedido_sugerido_pz_red.toLocaleString('es-MX') }}
                     </td>
 
                     <!-- Pedido Cadena (cant_pedida de la OC) -->
-                    <td class="px-3 py-2.5 text-right font-semibold text-slate-700">
+                    <td class="px-2.5 py-2.5 text-right font-semibold text-slate-700">
                       {{ tienda.resumen.cant_pedida_total.toLocaleString('es-MX') }}
                     </td>
 
 
                     <!-- Fill Rate -->
-                    <td class="px-3 py-2.5 text-right font-semibold" :class="fillClass(tienda.resumen.fill_rate)">
+                    <td class="px-2.5 py-2.5 text-right font-semibold" :class="fillClass(tienda.resumen.fill_rate)">
                       {{ tienda.resumen.fill_rate != null ? (tienda.resumen.fill_rate * 100).toFixed(1) + '%' : '—' }}
                     </td>
 
                     <!-- INSTOCK -->
-                    <td class="px-3 py-3 text-center">
+                    <td class="px-2.5 py-3 text-center">
                       <span
                         class="inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-md"
                         :class="instockBadge(tienda.resumen.instock).cls"
@@ -1073,7 +1024,7 @@ const totalUniqueOCs = computed(() => {
 
                     <!-- Empty -->
                     <tr v-if="!tienda.skus.length">
-                      <td colspan="13" class="px-8 py-6 bg-slate-50/50 text-slate-500 text-sm text-center border-b border-slate-100">
+                      <td colspan="10" class="px-8 py-6 bg-slate-50/50 text-slate-500 text-sm text-center border-b border-slate-100">
                         Sin SKUs registrados para esta tienda.
                       </td>
                     </tr>
@@ -1091,7 +1042,7 @@ const totalUniqueOCs = computed(() => {
                         @click="toggleOCGroup(tienda.id_cliente, ocGroup.group_id)"
                       >
                         <!-- Etiqueta OC -->
-                        <td colspan="6" class="pl-16 pr-3 py-2 text-slate-700 font-semibold border-l-[6px] border-t-[12px] border-t-white"
+                        <td colspan="6" class="pl-12 pr-2.5 py-2 text-slate-700 font-semibold border-l-[6px] border-t-[12px] border-t-white"
                             :class="isZ8(ocGroup.num_pedido) ? 'border-l-purple-500 bg-purple-50/20' : 'border-l-brand-300'">
                           <div class="flex items-center flex-wrap gap-2 min-w-0 max-w-4xl">
                             <i
@@ -1189,16 +1140,16 @@ const totalUniqueOCs = computed(() => {
                         </td>
 
                           <!-- Pedido Sugerido SUM -->
-                        <td class="px-3 py-2 text-right font-bold text-amber-700 bg-amber-50/50 border-x border-amber-100/70 border-t-[12px] border-t-white text-sm tracking-tight">
+                        <td class="px-2.5 py-2 text-right font-bold text-amber-700 bg-amber-50/50 border-x border-amber-100/70 border-t-[12px] border-t-white text-sm tracking-tight">
                           {{ n(ocGroup.pedido_sugerido_pz_red_total, 0) }}
                         </td>
 
                         <!-- Pedido Cadena SUM -->
-                        <td class="px-3 py-2 text-right font-bold text-slate-800 border-t-[12px] border-t-white">
+                        <td class="px-2.5 py-2 text-right font-bold text-slate-800 border-t-[12px] border-t-white">
                           {{ n(ocGroup.cant_pedida_total, 0) }}
                         </td>
 
-                        <td class="px-3 py-2 text-center text-slate-400 border-t-[12px] border-t-white" colspan="2">
+                        <td class="px-2.5 py-2 text-center text-slate-400 border-t-[12px] border-t-white" colspan="2">
                           <span class="text-[10px] italic">Detalle en fila inferior</span>
                         </td>
                       </tr>
@@ -1216,7 +1167,7 @@ const totalUniqueOCs = computed(() => {
                           ]"
                         >
                           <!-- Nombre SKU -->
-                          <td class="pl-24 pr-3 py-2 text-slate-700 font-medium cursor-pointer hover:text-brand-700" :title="sku.sku_nombre" @click.stop="openProductPanel(tienda, sku)">
+                          <td class="pl-14 pr-2.5 py-2 text-slate-700 font-medium cursor-pointer hover:text-brand-700" :title="sku.sku_nombre" @click.stop="openProductPanel(tienda, sku)">
                             <div class="flex items-center gap-2 min-w-0">
                               <span
                                 class="shrink-0 inline-flex text-[9px] font-bold px-1.5 py-0.5 rounded-md border"
@@ -1228,16 +1179,16 @@ const totalUniqueOCs = computed(() => {
                           </td>
 
                           <!-- UPC -->
-                          <td class="px-3 py-2 text-slate-500 text-[10px] font-mono">{{ sku.upc_cadena ?? '—' }}</td>
+                          <td class="px-2.5 py-2 text-slate-500 text-[10px] font-mono truncate">{{ sku.upc_cadena ?? '—' }}</td>
 
                           <!-- Inv. Actual (pz) -->
-                          <td class="px-3 py-2 text-right text-slate-700 cursor-help"
+                          <td class="px-2.5 py-2 text-right text-slate-700 cursor-help"
                               :title="`${n(sku.inv_actual_kg, 2)} kg (Inv. uni. = ${sku.unidad_inventario} kg/pz)`">
                             <span class="border-b border-dashed border-slate-300">{{ n(sku.inv_actual_pz, 2) }}</span>
                           </td>
 
                           <!-- Vta. Prom. Semanal (pz) -->
-                          <td class="px-3 py-2 text-right text-slate-700 relative cursor-pointer group/cell hover:bg-slate-100 transition-colors rounded-lg"
+                          <td class="px-2.5 py-2 text-right text-slate-700 relative cursor-pointer group/cell hover:bg-slate-100 transition-colors rounded-lg"
                               @click.stop="toggleSellout(tienda.id_cliente + '_' + sku.sku_cadena)">
                             
                             <div class="cursor-help" :title="`${n(sku.promedio_sellout_kg, 2)} kg (Inv. uni. = ${sku.unidad_inventario} kg/pz)`">
@@ -1282,13 +1233,13 @@ const totalUniqueOCs = computed(() => {
                           </td>
 
                           <!-- Criterio (sem. objetivo) -->
-                          <td class="px-3 py-2 text-right text-slate-500">
+                          <td class="px-2 py-2 text-right text-slate-500">
                             {{ sku.semanas_objetivo }}
                           </td>
 
                           <!-- Semanas Actuales (cobertura dinamica) -->
                           <td
-                            class="px-3 py-2 text-right font-bold relative"
+                            class="px-2 py-2 text-right font-bold relative"
                             :class="cobClass(calcularCoberturaDinamica(sku))"
                             :title="coberturaStatusTooltip(coberturaStatus(sku), calcularCoberturaDinamica(sku), sku.semanas_objetivo || store.criterio_global || 2.5)"
                           >
@@ -1335,14 +1286,14 @@ const totalUniqueOCs = computed(() => {
                           </td>
 
                           <!-- Pedido Cadena (cant_pedida) -->
-                          <td class="px-3 py-2 text-right font-semibold text-slate-800">
+                          <td class="px-2.5 py-2 text-right font-semibold text-slate-800">
                             {{ n(sku.cant_pedida, 0) }}
                           </td>
 
 
                           <!-- Fill Rate -->
                           <td
-                            class="px-3 py-2 text-right font-medium"
+                            class="px-2.5 py-2 text-right font-medium"
                             :class="[fillRateBadge(calcularFillRateDinamico(sku)).bg, fillRateBadge(calcularFillRateDinamico(sku)).text]"
                             :title="fillRateBadge(calcularFillRateDinamico(sku)).tip"
                           >
@@ -1353,7 +1304,7 @@ const totalUniqueOCs = computed(() => {
                           </td>
 
                           <!-- INSTOCK per SKU -->
-                          <td class="px-3 py-2 text-center">
+                          <td class="px-2.5 py-2 text-center">
                             <span
                               class="inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-md border w-fit mx-auto"
                               :class="instockBadge(sku.instock).cls"
@@ -1367,7 +1318,7 @@ const totalUniqueOCs = computed(() => {
                       </template>
 
                       <!-- Margin Bottom para el grupo de OC -->
-                      <tr class="bg-white border-none"><td colspan="13" class="py-2.5"></td></tr>
+                      <tr class="bg-white border-none"><td colspan="10" class="py-2.5"></td></tr>
 
                     </template>
 
@@ -1383,7 +1334,7 @@ const totalUniqueOCs = computed(() => {
                         ]"
                       >
                         <!-- Nombre SKU + OC Badges -->
-                          <td class="pl-6 pr-3 py-2 text-slate-700 font-medium cursor-pointer hover:text-brand-700" :title="sku.sku_nombre" @click.stop="openProductPanel(tienda, sku)">
+                          <td class="pl-5 pr-2.5 py-2 text-slate-700 font-medium cursor-pointer hover:text-brand-700" :title="sku.sku_nombre" @click.stop="openProductPanel(tienda, sku)">
                           <div class="flex flex-col gap-1.5 min-w-0">
                             <div class="flex items-center gap-2">
                               <span
@@ -1395,7 +1346,7 @@ const totalUniqueOCs = computed(() => {
                             </div>
                             
                             <!-- Badges OC -->
-                            <div class="flex items-center gap-1.5 pl-[28px] opacity-90">
+                            <div class="flex items-center gap-1.5 pl-7 opacity-90">
                               <span 
                                 class="flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-bold tracking-tight bg-slate-100 text-slate-600 border-slate-200"
                               >
@@ -1420,16 +1371,16 @@ const totalUniqueOCs = computed(() => {
                         </td>
 
                         <!-- UPC -->
-                        <td class="px-3 py-2 text-slate-500 text-[10px] font-mono">{{ sku.upc_cadena ?? '—' }}</td>
+                        <td class="px-2.5 py-2 text-slate-500 text-[10px] font-mono truncate">{{ sku.upc_cadena ?? '—' }}</td>
 
                         <!-- Inv. Actual (pz) -->
-                        <td class="px-3 py-2 text-right text-slate-700 cursor-help"
+                        <td class="px-2.5 py-2 text-right text-slate-700 cursor-help"
                             :title="`${n(sku.inv_actual_kg, 2)} kg (Inv. uni. = ${sku.unidad_inventario} kg/pz)`">
                           <span class="border-b border-dashed border-slate-300">{{ n(sku.inv_actual_pz, 2) }}</span>
                         </td>
 
                         <!-- Vta. Prom. Semanal (pz) -->
-                        <td class="px-3 py-2 text-right text-slate-700 relative cursor-pointer group/cell hover:bg-slate-100 transition-colors rounded-lg"
+                        <td class="px-2.5 py-2 text-right text-slate-700 relative cursor-pointer group/cell hover:bg-slate-100 transition-colors rounded-lg"
                             @click.stop="toggleSellout(tienda.id_cliente + '_' + sku.sku_cadena)">
                           
                           <div class="cursor-help" :title="`${n(sku.promedio_sellout_kg, 2)} kg (Inv. uni. = ${sku.unidad_inventario} kg/pz)`">
@@ -1474,13 +1425,13 @@ const totalUniqueOCs = computed(() => {
                         </td>
 
                         <!-- Criterio (sem. objetivo) -->
-                        <td class="px-3 py-2 text-right text-slate-500">
+                        <td class="px-2 py-2 text-right text-slate-500">
                           {{ sku.semanas_objetivo }}
                         </td>
 
                         <!-- Semanas Actuales (cobertura dinamica) -->
                         <td
-                          class="px-3 py-2 text-right font-bold relative"
+                          class="px-2 py-2 text-right font-bold relative"
                           :class="cobClass(calcularCoberturaDinamica(sku))"
                           :title="coberturaStatusTooltip(coberturaStatus(sku), calcularCoberturaDinamica(sku), sku.semanas_objetivo || store.criterio_global || 2.5)"
                         >
@@ -1527,13 +1478,13 @@ const totalUniqueOCs = computed(() => {
                         </td>
 
                         <!-- Pedido Cadena (cant_pedida) -->
-                        <td class="px-3 py-2 text-right font-semibold text-slate-800">
+                        <td class="px-2.5 py-2 text-right font-semibold text-slate-800">
                           {{ n(sku.cant_pedida, 0) }}
                         </td>
 
                         <!-- Fill Rate -->
                         <td
-                          class="px-3 py-2 text-right font-medium"
+                          class="px-2.5 py-2 text-right font-medium"
                           :class="[fillRateBadge(calcularFillRateDinamico(sku)).bg, fillRateBadge(calcularFillRateDinamico(sku)).text]"
                           :title="fillRateBadge(calcularFillRateDinamico(sku)).tip"
                         >
@@ -1544,7 +1495,7 @@ const totalUniqueOCs = computed(() => {
                         </td>
 
                         <!-- INSTOCK per SKU -->
-                        <td class="px-3 py-2 text-center">
+                        <td class="px-2.5 py-2 text-center">
                           <span
                             class="inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-md border w-fit mx-auto"
                             :class="instockBadge(sku.instock).cls"
@@ -1903,3 +1854,4 @@ const totalUniqueOCs = computed(() => {
     />
   </Teleport>
 </template>
+
