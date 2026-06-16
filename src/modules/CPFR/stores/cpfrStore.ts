@@ -77,6 +77,10 @@ export const useCpfrStore = defineStore('cpfr', () => {
 
     function setActiveTab(tab: string) {
         activeTab.value = tab
+        if (!currentWeek.value || tab === 'historial') return
+        if (['centralizados', 'revision', 'aprobada'].includes(tab)) {
+            loadDashboard()
+        }
     }
 
     function setGroupByOC(val: boolean) {
@@ -97,12 +101,17 @@ export const useCpfrStore = defineStore('cpfr', () => {
     // ── Helpers internos ──────────────────────────────────────────────────────
 
     function buildDashBody() {
+        const estadoPedido =
+            activeTab.value === 'revision' ? 'revision'
+            : activeTab.value === 'aprobada' ? 'aprobado'
+            : 'pendiente'
+
         return {
             year: currentWeek.value!.anio,
             week: currentWeek.value!.semana,
             nom_cadena: nom_cadena.value.toUpperCase(),
             criterio_global: criterio_global.value,
-            ...(Object.keys(filters).length > 0 ? { filters: { ...filters } } : {}),
+            filters: { ...filters, estado_pedido: estadoPedido },
         }
     }
 

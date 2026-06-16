@@ -327,7 +327,6 @@ function estadoBadge(estado: string | null): { label: string; cls: string; color
     if (estado === 'aprobado')  return { label: 'Aprobado',  cls: 'bg-emerald-100 text-emerald-700 border-emerald-200', color: '#34d399' }
     if (estado === 'enviado')   return { label: 'Enviado',   cls: 'bg-blue-100 text-blue-700 border-blue-200', color: '#60a5fa' }
     if (estado === 'cerrado')   return { label: 'Cerrado',   cls: 'bg-slate-100 text-slate-400 border-slate-200', color: '#cbd5e1' }
-    if (estado === 'procesado') return { label: 'Procesado', cls: 'bg-sky-100 text-sky-700 border-sky-200', color: '#38bdf8' }
     return { label: estado || 'Desconocido', cls: 'bg-slate-100 text-slate-500 border-slate-200', color: '#94a3b8' }
 }
 

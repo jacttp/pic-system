@@ -93,7 +93,7 @@ export interface CpfrStoreDash {
     nombre_tienda: string
     jefatura: string
     fec_envio: string | null
-    estado_pedido: 'pendiente' | 'procesado' | 'cerrado'
+    estado_pedido: 'pendiente' | 'borrador' | 'revision' | 'aprobado' | 'cerrado'
     resumen: CpfrStoreResumen
     total_skus: number
     skus: CpfrSkuDash[]
@@ -122,6 +122,7 @@ export interface CpfrFilters {
     id_cliente?: string
     nombre_tienda?: string
     semanas_sellout?: number
+    estado_pedido?: 'pendiente' | 'borrador' | 'revision' | 'aprobado' | 'cerrado' | 'all'
 }
 
 // ─── Override de criterio por tienda (para /recalculate) ────────────────────
@@ -148,7 +149,7 @@ export interface CpfrUpdateStatusBody {
     num_pedido: string
     year: number
     week: number
-    estado: 'pendiente' | 'borrador' | 'revision' | 'aprobado' | 'procesado' | 'cerrado' | 'reemplazado' | 'enviado'
+    estado: 'pendiente' | 'borrador' | 'revision' | 'aprobado' | 'cerrado' | 'reemplazado' | 'enviado'
 }
 
 // ─── Config de tienda — GET|PUT /api/v2/cpfr/config/:id_cliente ─────────────

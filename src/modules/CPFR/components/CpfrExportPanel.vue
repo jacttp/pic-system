@@ -411,9 +411,8 @@ async function handleAprobarExportar() {
         
         toast({ title: 'Proceso completado', description: 'Excel descargado y estados actualizados.' })
         
-        // 3. Close and refresh dashboard
+        // 3. Close panel. The store was already updated locally by updateStatus.
         emit('close')
-        store.loadDashboard()
 
     } catch (e) {
         console.error('[CpfrExportPanel]', e)
