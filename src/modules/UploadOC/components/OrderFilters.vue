@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useUploadOcStore } from '../stores/uploadOcStore'
+import type { EstadoOC } from '../types/uploadOc'
 
 const store = useUploadOcStore()
 
@@ -24,8 +25,8 @@ const setDateType = (type: 'pedido' | 'embarque' | 'captura' | 'none') => {
   }
 }
 
-const setEstado = (val: string) => {
-  store.filters.estado = val === 'todos' ? '' : val as any
+const setEstado = (val: EstadoOC | 'todos') => {
+  store.filters.estado = val === 'todos' ? '' : val
   applyFilters()
 }
 
@@ -108,17 +109,10 @@ const clearFilters = async () => {
         </button>
         <button
           class="h-9 rounded-lg border px-4 text-sm font-black transition-all"
-          :class="estadoLocal === 'procesado' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-transparent bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100'"
-          @click="setEstado('procesado')"
+          :class="estadoLocal === 'aprobado' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-transparent bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100'"
+          @click="setEstado('aprobado')"
         >
-          Procesado
-        </button>
-        <button
-          class="h-9 rounded-lg border px-4 text-sm font-black transition-all"
-          :class="estadoLocal === 'invalido' ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-transparent bg-rose-50/70 text-rose-700 hover:bg-rose-100'"
-          @click="setEstado('invalido')"
-        >
-          Inválido
+          Aprobado
         </button>
       </div>
     </div>

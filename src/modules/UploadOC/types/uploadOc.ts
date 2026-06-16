@@ -1,6 +1,6 @@
 // src/modules/UploadOC/types/uploadOc.ts
 
-export type EstadoOC = 'pendiente' | 'procesado' | 'caducado' | 'invalido'
+export type EstadoOC = 'pendiente' | 'aprobado'
 
 /**
  * Representa un registro individual extraído del Excel y normalizado.
