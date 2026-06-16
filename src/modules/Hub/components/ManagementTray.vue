@@ -1,0 +1,76 @@
+<script setup lang="ts">
+interface TrayMetric {
+    label: string;
+    value: string;
+    caption: string;
+    route?: string;
+    icon: string;
+    emphasis?: boolean;
+}
+
+const props = withDefaults(defineProps<{
+    title?: string;
+    subtitle?: string;
+    fullPanelRoute?: string;
+    metrics?: TrayMetric[];
+}>(), {
+    title: 'Aprobaciones CPFR y solicitudes internas',
+    subtitle: 'Accesos directos al panel de aprobaciones para revisar pendientes, seguimiento e historial.',
+    fullPanelRoute: '/admin/approvals',
+    metrics: () => [
+        { label: 'Por resolver', value: '66', caption: 'Asignadas', route: '/admin/approvals', icon: 'fa-solid fa-inbox', emphasis: true },
+        { label: 'Mis solicitudes', value: '66', caption: 'Pendientes', route: '/admin/approvals', icon: 'fa-solid fa-paper-plane' },
+        { label: 'Resueltas recientes', value: '4', caption: 'Historial', route: '/admin/approvals', icon: 'fa-solid fa-clock-rotate-left' },
+    ],
+});
+</script>
+
+<template>
+    <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div class="p-4 sm:p-5">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-brand-100">
+                        <i class="fa-solid fa-clipboard-check text-sm"></i>
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[10px] font-black uppercase tracking-[0.2em] text-brand-500">Bandeja de gestion</p>
+                        <h2 class="mt-0.5 text-base font-extrabold leading-tight text-slate-900 sm:text-lg">
+                            {{ title }}
+                        </h2>
+                        <p class="mt-1 max-w-3xl text-sm leading-5 text-slate-500">
+                            {{ subtitle }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <router-link
+                    v-for="metric in metrics"
+                    :key="metric.label"
+                    :to="metric.route || fullPanelRoute"
+                    class="group rounded-lg border px-4 py-3 transition hover:-translate-y-0.5 hover:shadow-sm"
+                    :class="metric.emphasis
+                        ? 'border-brand-200 bg-brand-50/40 hover:border-brand-300'
+                        : 'border-slate-200 bg-white hover:border-brand-200 hover:bg-brand-50/20'"
+                >
+                    <div class="mb-3 flex items-center justify-between gap-3">
+                        <span
+                            class="flex h-8 w-8 items-center justify-center rounded-lg text-sm"
+                            :class="metric.emphasis ? 'bg-white text-brand-600 ring-1 ring-brand-100' : 'bg-brand-50 text-brand-600'"
+                        >
+                            <i :class="metric.icon"></i>
+                        </span>
+                        <i class="fa-solid fa-arrow-right text-xs text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500"></i>
+                    </div>
+                    <p class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{{ metric.label }}</p>
+                    <div class="mt-1 flex items-end justify-between gap-3">
+                        <p class="text-2xl font-black leading-none text-slate-950">{{ metric.value }}</p>
+                        <p class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{{ metric.caption }}</p>
+                    </div>
+                </router-link>
+            </div>
+        </div>
+    </section>
+</template>

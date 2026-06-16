@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useSetupStore } from '../stores/setupStores';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
-import type { SystemModule, DevStatus } from '../types/setupTypes';
+import type { SystemModule, DevStatus, HubFeatureKey, HubMainBlockKey, HubSidebarBlockKey } from '../types/setupTypes';
 import NewModuleModal from '../components/NewModuleModal.vue';
 
 const setupStore = useSetupStore();
@@ -74,6 +74,16 @@ const hubVisibilityControls = computed(() => [
         icon: 'fa-solid fa-chart-line',
     },
     {
+        featureKey: 'hub.management_tray' as const,
+        settingKey: 'showManagementTray' as const,
+        icon: 'fa-solid fa-clipboard-check',
+    },
+    {
+        featureKey: 'hub.notices_panel' as const,
+        settingKey: 'showNoticesPanel' as const,
+        icon: 'fa-solid fa-bell',
+    },
+    {
         featureKey: 'hub.activity_panel' as const,
         settingKey: 'showInfoPanel' as const,
         icon: 'fa-solid fa-table-columns',
@@ -91,14 +101,83 @@ const hubVisibilityControls = computed(() => [
     };
 }));
 
-const handleHubVisibilityToggle = (setting: 'showKpiCards' | 'showInfoPanel', value: boolean) => {
+const handleHubVisibilityToggle = (setting: 'showKpiCards' | 'showManagementTray' | 'showNoticesPanel' | 'showInfoPanel', value: boolean) => {
     if (!isAdmin.value) return;
     setupStore.updateHubDisplaySetting(setting, value);
 };
 
-const handleHubMinLevelChange = (featureKey: 'hub.kpi_cards' | 'hub.activity_panel', event: Event) => {
+const handleHubMinLevelChange = (featureKey: HubFeatureKey, event: Event) => {
     const value = Number((event.target as HTMLSelectElement).value);
     setupStore.updateFeatureFlag(featureKey, { MinAccessLevel: value });
+};
+
+type HubLayoutArea = 'main' | 'sidebar';
+
+const mainLayoutControls: Record<HubMainBlockKey, { label: string; icon: string }> = {
+    kpi_cards: { label: 'KPIs', icon: 'fa-solid fa-chart-line' },
+    management_tray: { label: 'Bandeja', icon: 'fa-solid fa-clipboard-check' },
+};
+
+const sidebarLayoutControls: Record<HubSidebarBlockKey, { label: string; icon: string }> = {
+    notices_panel: { label: 'Avisos', icon: 'fa-solid fa-bell' },
+    activity_panel: { label: 'Actividad', icon: 'fa-regular fa-clock' },
+    quick_actions: { label: 'Acciones', icon: 'fa-solid fa-bolt' },
+};
+
+const draggedLayoutItem = ref<{ area: HubLayoutArea; key: HubMainBlockKey | HubSidebarBlockKey } | null>(null);
+
+const mainLayoutItems = computed(() => setupStore.hubDisplaySettings.mainBlockOrder.map(key => ({
+    key,
+    ...mainLayoutControls[key],
+})));
+
+const sidebarLayoutItems = computed(() => setupStore.hubDisplaySettings.sidebarBlockOrder.map(key => ({
+    key,
+    ...sidebarLayoutControls[key],
+})));
+
+const getLayoutOrder = (area: HubLayoutArea) => area === 'main'
+    ? [...setupStore.hubDisplaySettings.mainBlockOrder]
+    : [...setupStore.hubDisplaySettings.sidebarBlockOrder];
+
+const handleLayoutDragStart = (area: HubLayoutArea, key: HubMainBlockKey | HubSidebarBlockKey, event: DragEvent) => {
+    if (!isAdmin.value) return;
+    draggedLayoutItem.value = { area, key };
+    if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', key);
+    }
+};
+
+const handleLayoutDrop = (area: HubLayoutArea, targetKey: HubMainBlockKey | HubSidebarBlockKey) => {
+    if (!isAdmin.value || !draggedLayoutItem.value || draggedLayoutItem.value.area !== area) return;
+
+    const nextOrder = getLayoutOrder(area);
+    const fromIndex = nextOrder.indexOf(draggedLayoutItem.value.key as never);
+    const toIndex = nextOrder.indexOf(targetKey as never);
+
+    if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) {
+        draggedLayoutItem.value = null;
+        return;
+    }
+
+    const [movedItem] = nextOrder.splice(fromIndex, 1);
+    if (!movedItem) return;
+    nextOrder.splice(toIndex, 0, movedItem);
+    setupStore.setHubLayoutOrder(area, nextOrder);
+    draggedLayoutItem.value = null;
+};
+
+const handleLayoutDragEnd = () => {
+    draggedLayoutItem.value = null;
+};
+
+const moveLayoutItem = (area: HubLayoutArea, key: HubMainBlockKey | HubSidebarBlockKey, direction: -1 | 1) => {
+    if (!isAdmin.value) return;
+    const currentOrder = getLayoutOrder(area);
+    const currentIndex = currentOrder.indexOf(key as never);
+    if (currentIndex === -1) return;
+    setupStore.updateHubLayoutOrder(area, key, currentIndex + direction);
 };
 
 // Custom Dropdown Logic
@@ -163,6 +242,101 @@ const PRESET_BG_COLORS = [
             <span class="inline-flex w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">
                 Backend + overrides
             </span>
+        </div>
+
+        <div class="mb-5 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-3">
+            <div class="mb-3 flex items-center justify-between gap-3">
+                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Orden del Hub</p>
+                <span class="text-[11px] font-semibold text-slate-400">Preferencia local</span>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                <div class="min-w-0">
+                    <p class="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Centro</p>
+                    <div class="flex flex-wrap gap-2">
+                        <div
+                            v-for="(item, index) in mainLayoutItems"
+                            :key="item.key"
+                            :draggable="isAdmin"
+                            class="group flex h-9 min-w-[132px] items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-700 shadow-sm transition"
+                            :class="draggedLayoutItem?.key === item.key ? 'opacity-50 ring-2 ring-brand-200' : 'hover:border-brand-200 hover:shadow'"
+                            @dragstart="handleLayoutDragStart('main', item.key, $event)"
+                            @dragover.prevent
+                            @drop.prevent="handleLayoutDrop('main', item.key)"
+                            @dragend="handleLayoutDragEnd"
+                        >
+                            <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-slate-100 text-[10px] text-slate-400 group-hover:text-brand-600">
+                                <i class="fa-solid fa-grip-vertical"></i>
+                            </span>
+                            <span class="flex min-w-0 flex-1 items-center gap-1.5">
+                                <i :class="[item.icon, 'text-brand-600']"></i>
+                                <span class="truncate">{{ item.label }}</span>
+                            </span>
+                            <button
+                                type="button"
+                                :disabled="!isAdmin || index === 0"
+                                class="flex h-6 w-6 shrink-0 items-center justify-center rounded text-slate-400 transition hover:bg-slate-100 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-30"
+                                title="Subir"
+                                @click="moveLayoutItem('main', item.key, -1)"
+                            >
+                                <i class="fa-solid fa-chevron-left text-[10px]"></i>
+                            </button>
+                            <button
+                                type="button"
+                                :disabled="!isAdmin || index === mainLayoutItems.length - 1"
+                                class="flex h-6 w-6 shrink-0 items-center justify-center rounded text-slate-400 transition hover:bg-slate-100 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-30"
+                                title="Bajar"
+                                @click="moveLayoutItem('main', item.key, 1)"
+                            >
+                                <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="min-w-0">
+                    <p class="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Lateral</p>
+                    <div class="flex flex-wrap gap-2">
+                        <div
+                            v-for="(item, index) in sidebarLayoutItems"
+                            :key="item.key"
+                            :draggable="isAdmin"
+                            class="group flex h-9 min-w-[132px] items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-700 shadow-sm transition"
+                            :class="draggedLayoutItem?.key === item.key ? 'opacity-50 ring-2 ring-brand-200' : 'hover:border-brand-200 hover:shadow'"
+                            @dragstart="handleLayoutDragStart('sidebar', item.key, $event)"
+                            @dragover.prevent
+                            @drop.prevent="handleLayoutDrop('sidebar', item.key)"
+                            @dragend="handleLayoutDragEnd"
+                        >
+                            <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-slate-100 text-[10px] text-slate-400 group-hover:text-brand-600">
+                                <i class="fa-solid fa-grip-vertical"></i>
+                            </span>
+                            <span class="flex min-w-0 flex-1 items-center gap-1.5">
+                                <i :class="[item.icon, 'text-brand-600']"></i>
+                                <span class="truncate">{{ item.label }}</span>
+                            </span>
+                            <button
+                                type="button"
+                                :disabled="!isAdmin || index === 0"
+                                class="flex h-6 w-6 shrink-0 items-center justify-center rounded text-slate-400 transition hover:bg-slate-100 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-30"
+                                title="Subir"
+                                @click="moveLayoutItem('sidebar', item.key, -1)"
+                            >
+                                <i class="fa-solid fa-chevron-left text-[10px]"></i>
+                            </button>
+                            <button
+                                type="button"
+                                :disabled="!isAdmin || index === sidebarLayoutItems.length - 1"
+                                class="flex h-6 w-6 shrink-0 items-center justify-center rounded text-slate-400 transition hover:bg-slate-100 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-30"
+                                title="Bajar"
+                                @click="moveLayoutItem('sidebar', item.key, 1)"
+                            >
+                                <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">

@@ -3,7 +3,10 @@
 import { onMounted, computed } from 'vue';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import { useSetupStore } from '@/modules/Setup/stores/setupStores';
+import type { HubMainBlockKey, HubSidebarBlockKey } from '@/modules/Setup/types/setupTypes';
 import CacheProgress from '@/modules/Shared/components/CacheProgress.vue';
+import ManagementTray from '../components/ManagementTray.vue';
+import NoticesPanel from '../components/NoticesPanel.vue';
 
 const auth = useAuthStore();
 const setupStore = useSetupStore();
@@ -20,6 +23,27 @@ const dashboardModules = computed(() => {
 });
 
 const displayName = computed(() => auth.user?.username || 'Usuario');
+const showManagementTray = computed(() => setupStore.hubFeatureVisibility['hub.management_tray']);
+const showNoticesPanel = computed(() => setupStore.hubFeatureVisibility['hub.notices_panel']);
+const showActivityPanel = computed(() => setupStore.hubFeatureVisibility['hub.activity_panel']);
+const showHubSidebar = computed(() => showNoticesPanel.value || showActivityPanel.value);
+const visibleMainBlocks = computed(() => {
+    const visibility: Record<HubMainBlockKey, boolean> = {
+        kpi_cards: setupStore.hubFeatureVisibility['hub.kpi_cards'],
+        management_tray: showManagementTray.value,
+    };
+
+    return setupStore.hubDisplaySettings.mainBlockOrder.filter(block => visibility[block]);
+});
+const visibleSidebarBlocks = computed(() => {
+    const visibility: Record<HubSidebarBlockKey, boolean> = {
+        notices_panel: showNoticesPanel.value,
+        activity_panel: showActivityPanel.value,
+        quick_actions: showActivityPanel.value,
+    };
+
+    return setupStore.hubDisplaySettings.sidebarBlockOrder.filter(block => visibility[block]);
+});
 
 const kpiCards = [
     {
@@ -139,63 +163,67 @@ const getStyle = (mod: any) => {
 
             <div
                 class="grid grid-cols-1 gap-6"
-                :class="setupStore.hubFeatureVisibility['hub.activity_panel'] ? 'xl:grid-cols-[minmax(0,1fr)_320px]' : ''"
+                :class="showHubSidebar ? 'xl:grid-cols-[minmax(0,1fr)_320px]' : ''"
             >
                 <section class="min-w-0 space-y-6">
-                    <div
-                        v-if="setupStore.hubFeatureVisibility['hub.kpi_cards']"
-                        class="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-4"
-                    >
-                        <article
-                            v-for="kpi in kpiCards"
-                            :key="kpi.label"
-                            class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                    <template v-for="block in visibleMainBlocks" :key="block">
+                        <div
+                            v-if="block === 'kpi_cards'"
+                            class="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-4"
                         >
-                            <div class="flex items-start gap-4">
-                                <div
-                                    class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-xl"
-                                    :class="{
-                                        'bg-rose-50 text-brand-600': kpi.tone === 'rose',
-                                        'bg-blue-50 text-blue-600': kpi.tone === 'blue',
-                                        'bg-amber-50 text-amber-600': kpi.tone === 'amber',
-                                        'bg-emerald-50 text-emerald-600': kpi.tone === 'emerald'
-                                    }"
-                                >
-                                    <i :class="kpi.icon"></i>
+                            <article
+                                v-for="kpi in kpiCards"
+                                :key="kpi.label"
+                                class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                            >
+                                <div class="flex items-start gap-4">
+                                    <div
+                                        class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-xl"
+                                        :class="{
+                                            'bg-rose-50 text-brand-600': kpi.tone === 'rose',
+                                            'bg-blue-50 text-blue-600': kpi.tone === 'blue',
+                                            'bg-amber-50 text-amber-600': kpi.tone === 'amber',
+                                            'bg-emerald-50 text-emerald-600': kpi.tone === 'emerald'
+                                        }"
+                                    >
+                                        <i :class="kpi.icon"></i>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-medium text-slate-500">{{ kpi.label }}</p>
+                                        <p class="mt-1 text-2xl font-extrabold tracking-tight text-slate-900">{{ kpi.value }}</p>
+                                        <p
+                                            class="mt-2 text-xs font-semibold"
+                                            :class="{
+                                                'text-brand-500': kpi.tone === 'rose',
+                                                'text-blue-500': kpi.tone === 'blue',
+                                                'text-emerald-500': kpi.tone === 'emerald',
+                                                'text-amber-500': kpi.tone === 'amber'
+                                            }"
+                                        >
+                                            <i class="fa-solid fa-arrow-trend-up mr-1"></i>{{ kpi.delta }}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div class="min-w-0">
-                                    <p class="text-sm font-medium text-slate-500">{{ kpi.label }}</p>
-                                    <p class="mt-1 text-2xl font-extrabold tracking-tight text-slate-900">{{ kpi.value }}</p>
-                                    <p
-                                        class="mt-2 text-xs font-semibold"
+                                <svg class="mt-4 h-12 w-full overflow-visible" viewBox="0 0 166 42" fill="none" aria-hidden="true">
+                                    <path
+                                        :d="kpi.path"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
                                         :class="{
                                             'text-brand-500': kpi.tone === 'rose',
                                             'text-blue-500': kpi.tone === 'blue',
-                                            'text-emerald-500': kpi.tone === 'emerald',
-                                            'text-amber-500': kpi.tone === 'amber'
+                                            'text-amber-500': kpi.tone === 'amber',
+                                            'text-emerald-500': kpi.tone === 'emerald'
                                         }"
-                                    >
-                                        <i class="fa-solid fa-arrow-trend-up mr-1"></i>{{ kpi.delta }}
-                                    </p>
-                                </div>
-                            </div>
-                            <svg class="mt-4 h-12 w-full overflow-visible" viewBox="0 0 166 42" fill="none" aria-hidden="true">
-                                <path
-                                    :d="kpi.path"
-                                    stroke="currentColor"
-                                    stroke-width="2"
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    :class="{
-                                        'text-brand-500': kpi.tone === 'rose',
-                                        'text-blue-500': kpi.tone === 'blue',
-                                        'text-amber-500': kpi.tone === 'amber',
-                                        'text-emerald-500': kpi.tone === 'emerald'
-                                    }"
-                                />
-                            </svg>
-                        </article>
-                    </div>
+                                    />
+                                </svg>
+                            </article>
+                        </div>
+
+                        <ManagementTray v-else-if="block === 'management_tray'" />
+                    </template>
 
                     <section>
                         <div class="mb-4 flex items-center justify-between gap-3">
@@ -246,53 +274,57 @@ const getStyle = (mod: any) => {
                     </section>
                 </section>
 
-                <aside v-if="setupStore.hubFeatureVisibility['hub.activity_panel']" class="space-y-6">
-                    <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                        <div class="mb-5 flex items-center justify-between">
-                            <h2 class="text-base font-extrabold text-slate-900">Actividad reciente</h2>
-                            <i class="fa-regular fa-clock text-slate-300"></i>
-                        </div>
-                        <div class="space-y-5">
-                            <article v-for="item in recentActivity" :key="item.title" class="flex gap-3">
-                                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-                                    <i :class="item.icon" class="text-sm"></i>
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                    <p class="text-sm font-bold text-slate-700">{{ item.title }}</p>
-                                    <p class="mt-0.5 truncate text-xs text-slate-500">{{ item.detail }}</p>
-                                    <p class="mt-1 text-right text-[11px] font-semibold text-slate-400">{{ item.time }}</p>
-                                </div>
-                            </article>
-                        </div>
-                        <button class="mt-6 flex w-full items-center justify-between rounded-lg px-1 py-2 text-sm font-bold text-brand-600 transition hover:bg-brand-50 hover:px-3">
-                            Ver historial completo
-                            <i class="fa-solid fa-arrow-right"></i>
-                        </button>
-                    </section>
+                <aside v-if="showHubSidebar" class="space-y-6">
+                    <template v-for="block in visibleSidebarBlocks" :key="block">
+                        <NoticesPanel v-if="block === 'notices_panel'" />
 
-                    <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                        <h2 class="mb-5 text-base font-extrabold text-slate-900">Acciones rapidas</h2>
-                        <div class="space-y-3">
-                            <button
-                                v-for="action in quickActions"
-                                :key="action.label"
-                                class="flex w-full items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 text-left text-sm font-bold text-slate-700 shadow-sm transition hover:border-brand-100 hover:bg-slate-50"
-                            >
-                                <span
-                                    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-                                    :class="{
-                                        'bg-rose-50 text-brand-600': action.tone === 'rose',
-                                        'bg-blue-50 text-blue-600': action.tone === 'blue',
-                                        'bg-emerald-50 text-emerald-600': action.tone === 'emerald',
-                                        'bg-amber-50 text-amber-600': action.tone === 'amber'
-                                    }"
-                                >
-                                    <i :class="action.icon" class="text-sm"></i>
-                                </span>
-                                <span class="min-w-0 flex-1">{{ action.label }}</span>
+                        <section v-else-if="block === 'activity_panel'" class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                            <div class="mb-5 flex items-center justify-between">
+                                <h2 class="text-base font-extrabold text-slate-900">Actividad reciente</h2>
+                                <i class="fa-regular fa-clock text-slate-300"></i>
+                            </div>
+                            <div class="space-y-5">
+                                <article v-for="item in recentActivity" :key="item.title" class="flex gap-3">
+                                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                                        <i :class="item.icon" class="text-sm"></i>
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-sm font-bold text-slate-700">{{ item.title }}</p>
+                                        <p class="mt-0.5 truncate text-xs text-slate-500">{{ item.detail }}</p>
+                                        <p class="mt-1 text-right text-[11px] font-semibold text-slate-400">{{ item.time }}</p>
+                                    </div>
+                                </article>
+                            </div>
+                            <button class="mt-6 flex w-full items-center justify-between rounded-lg px-1 py-2 text-sm font-bold text-brand-600 transition hover:bg-brand-50 hover:px-3">
+                                Ver historial completo
+                                <i class="fa-solid fa-arrow-right"></i>
                             </button>
-                        </div>
-                    </section>
+                        </section>
+
+                        <section v-else-if="block === 'quick_actions'" class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                            <h2 class="mb-5 text-base font-extrabold text-slate-900">Acciones rapidas</h2>
+                            <div class="space-y-3">
+                                <button
+                                    v-for="action in quickActions"
+                                    :key="action.label"
+                                    class="flex w-full items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 text-left text-sm font-bold text-slate-700 shadow-sm transition hover:border-brand-100 hover:bg-slate-50"
+                                >
+                                    <span
+                                        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                                        :class="{
+                                            'bg-rose-50 text-brand-600': action.tone === 'rose',
+                                            'bg-blue-50 text-blue-600': action.tone === 'blue',
+                                            'bg-emerald-50 text-emerald-600': action.tone === 'emerald',
+                                            'bg-amber-50 text-amber-600': action.tone === 'amber'
+                                        }"
+                                    >
+                                        <i :class="action.icon" class="text-sm"></i>
+                                    </span>
+                                    <span class="min-w-0 flex-1">{{ action.label }}</span>
+                                </button>
+                            </div>
+                        </section>
+                    </template>
                 </aside>
             </div>
         </div>

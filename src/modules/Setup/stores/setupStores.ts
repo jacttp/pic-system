@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import setupApi from '../services/setupApi';
-import type { HubConfigResponse, HubFeatureKey, SystemFeatureFlag, SystemModule } from '../types/setupTypes';
+import type { HubConfigResponse, HubFeatureKey, HubMainBlockKey, HubSidebarBlockKey, SystemFeatureFlag, SystemModule } from '../types/setupTypes';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import { ROLE_LEVELS } from '../types/setupTypes';
 
@@ -13,9 +13,15 @@ export const useSetupStore = defineStore('setup', () => {
    const hubConfig = ref<HubConfigResponse | null>(null);
    const isFeatureConfigLoading = ref(false);
    const HUB_DISPLAY_SETTINGS_KEY = 'pic-system:hub-display-settings';
+   type HubVisibilitySettingKey = 'showKpiCards' | 'showManagementTray' | 'showNoticesPanel' | 'showInfoPanel';
+   type HubLayoutArea = 'main' | 'sidebar';
    const DEFAULT_HUB_DISPLAY_SETTINGS = {
       showKpiCards: true,
+      showManagementTray: true,
+      showNoticesPanel: true,
       showInfoPanel: true,
+      mainBlockOrder: ['kpi_cards', 'management_tray'] as HubMainBlockKey[],
+      sidebarBlockOrder: ['notices_panel', 'activity_panel', 'quick_actions'] as HubSidebarBlockKey[],
    };
    const DEFAULT_HUB_FEATURE_FLAGS: SystemFeatureFlag[] = [
       {
@@ -36,20 +42,57 @@ export const useSetupStore = defineStore('setup', () => {
          RequiresDataScope: true,
          Description: 'Actividad reciente y acciones rapidas del Hub Central.',
       },
+      {
+         FeatureKey: 'hub.management_tray',
+         FeatureName: 'Bandeja de gestion',
+         Area: 'HUB',
+         IsEnabled: false,
+         MinAccessLevel: 4,
+         RequiresDataScope: true,
+         Description: 'Solicitudes y aprobaciones prioritarias dentro del Hub Central.',
+      },
+      {
+         FeatureKey: 'hub.notices_panel',
+         FeatureName: 'Panel de avisos',
+         Area: 'HUB',
+         IsEnabled: false,
+         MinAccessLevel: 4,
+         RequiresDataScope: true,
+         Description: 'Avisos recientes y senales relevantes del usuario.',
+      },
    ];
    const getInitialHubDisplaySettings = () => {
       try {
          const storedSettings = window.localStorage.getItem(HUB_DISPLAY_SETTINGS_KEY);
          if (!storedSettings) return DEFAULT_HUB_DISPLAY_SETTINGS;
 
+         const parsedSettings = JSON.parse(storedSettings);
          return {
             ...DEFAULT_HUB_DISPLAY_SETTINGS,
-            ...JSON.parse(storedSettings),
+            ...parsedSettings,
+            mainBlockOrder: normalizeOrder<HubMainBlockKey>(
+               parsedSettings.mainBlockOrder,
+               DEFAULT_HUB_DISPLAY_SETTINGS.mainBlockOrder
+            ),
+            sidebarBlockOrder: normalizeOrder<HubSidebarBlockKey>(
+               parsedSettings.sidebarBlockOrder,
+               DEFAULT_HUB_DISPLAY_SETTINGS.sidebarBlockOrder
+            ),
          };
       } catch {
          return DEFAULT_HUB_DISPLAY_SETTINGS;
       }
    };
+
+   function normalizeOrder<T extends string>(storedOrder: unknown, defaultOrder: T[]) {
+      if (!Array.isArray(storedOrder)) return defaultOrder;
+
+      const knownItems = new Set(defaultOrder);
+      const sanitizedOrder = storedOrder.filter((item): item is T => knownItems.has(item));
+      const missingItems = defaultOrder.filter(item => !sanitizedOrder.includes(item));
+      return [...sanitizedOrder, ...missingItems];
+   }
+
    const hubDisplaySettings = ref(getInitialHubDisplaySettings());
    // const authStore = useAuthStore(); // Movido a las computadas para evitar ciclos síncronos
 
@@ -134,6 +177,8 @@ export const useSetupStore = defineStore('setup', () => {
 
       return {
          'hub.kpi_cards': apiVisibility?.['hub.kpi_cards'] ?? (hubDisplaySettings.value.showKpiCards && authStore.userLevel >= 4),
+         'hub.management_tray': apiVisibility?.['hub.management_tray'] ?? (hubDisplaySettings.value.showManagementTray && authStore.userLevel >= 4),
+         'hub.notices_panel': apiVisibility?.['hub.notices_panel'] ?? (hubDisplaySettings.value.showNoticesPanel && authStore.userLevel >= 4),
          'hub.activity_panel': apiVisibility?.['hub.activity_panel'] ?? (hubDisplaySettings.value.showInfoPanel && authStore.userLevel >= 4),
       };
    });
@@ -229,14 +274,20 @@ export const useSetupStore = defineStore('setup', () => {
       window.localStorage.setItem(HUB_DISPLAY_SETTINGS_KEY, JSON.stringify(hubDisplaySettings.value));
    }
 
-   async function updateHubDisplaySetting(setting: keyof typeof DEFAULT_HUB_DISPLAY_SETTINGS, value: boolean) {
+   async function updateHubDisplaySetting(setting: HubVisibilitySettingKey, value: boolean) {
       hubDisplaySettings.value = {
          ...hubDisplaySettings.value,
          [setting]: value,
       };
       persistHubDisplaySettings();
 
-      const featureKey: HubFeatureKey = setting === 'showKpiCards' ? 'hub.kpi_cards' : 'hub.activity_panel';
+      const featureKeyBySetting: Record<HubVisibilitySettingKey, HubFeatureKey> = {
+         showKpiCards: 'hub.kpi_cards',
+         showManagementTray: 'hub.management_tray',
+         showNoticesPanel: 'hub.notices_panel',
+         showInfoPanel: 'hub.activity_panel',
+      };
+      const featureKey = featureKeyBySetting[setting];
       const feature = normalizedFeatureFlags.value.find(item => item.FeatureKey === featureKey);
       const nextFeature: SystemFeatureFlag = {
          ...(feature || DEFAULT_HUB_FEATURE_FLAGS.find(item => item.FeatureKey === featureKey)!),
@@ -251,6 +302,39 @@ export const useSetupStore = defineStore('setup', () => {
       } catch (error) {
          console.warn('[setupStore] No se pudo persistir feature flag en backend. Se conserva fallback local.', error);
       }
+   }
+
+   function updateHubLayoutOrder(area: HubLayoutArea, key: HubMainBlockKey | HubSidebarBlockKey, position: number) {
+      const orderKey = area === 'main' ? 'mainBlockOrder' : 'sidebarBlockOrder';
+      const currentOrder = [...hubDisplaySettings.value[orderKey]];
+      const currentIndex = currentOrder.indexOf(key as never);
+
+      if (currentIndex === -1) return;
+
+      const nextIndex = Math.max(0, Math.min(position, currentOrder.length - 1));
+      const [movedItem] = currentOrder.splice(currentIndex, 1);
+      if (!movedItem) return;
+
+      currentOrder.splice(nextIndex, 0, movedItem);
+      hubDisplaySettings.value = {
+         ...hubDisplaySettings.value,
+         [orderKey]: currentOrder,
+      };
+      persistHubDisplaySettings();
+   }
+
+   function setHubLayoutOrder(area: HubLayoutArea, order: Array<HubMainBlockKey | HubSidebarBlockKey>) {
+      const orderKey = area === 'main' ? 'mainBlockOrder' : 'sidebarBlockOrder';
+      const defaultOrder = area === 'main'
+         ? DEFAULT_HUB_DISPLAY_SETTINGS.mainBlockOrder
+         : DEFAULT_HUB_DISPLAY_SETTINGS.sidebarBlockOrder;
+      const normalizedOrder = normalizeOrder(order, defaultOrder);
+
+      hubDisplaySettings.value = {
+         ...hubDisplaySettings.value,
+         [orderKey]: normalizedOrder,
+      };
+      persistHubDisplaySettings();
    }
 
    async function updateFeatureFlag(featureKey: HubFeatureKey, changes: Partial<SystemFeatureFlag>) {
@@ -291,6 +375,8 @@ export const useSetupStore = defineStore('setup', () => {
       updateModule,
       createModule,
       updateHubDisplaySetting,
+      updateHubLayoutOrder,
+      setHubLayoutOrder,
       updateFeatureFlag
    };
 });

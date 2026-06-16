@@ -18,7 +18,9 @@ export interface SystemModule {
 
 export type DevStatus = 'Finished' | 'Maintaining' | 'Development';
 
-export type HubFeatureKey = 'hub.kpi_cards' | 'hub.activity_panel';
+export type HubFeatureKey = 'hub.kpi_cards' | 'hub.management_tray' | 'hub.notices_panel' | 'hub.activity_panel';
+export type HubMainBlockKey = 'kpi_cards' | 'management_tray';
+export type HubSidebarBlockKey = 'notices_panel' | 'activity_panel' | 'quick_actions';
 
 export interface SystemFeatureFlag {
    FeatureKey: HubFeatureKey;
