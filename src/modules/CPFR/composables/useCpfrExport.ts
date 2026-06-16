@@ -517,7 +517,7 @@ export function useCpfrExport() {
             })
 
             addFooter()
-            const filename = `CPFR_${safeFilenamePart(storeItem.id_cliente)}_${safeFilenamePart(storeItem.nombre_tienda)}_${dayCode}_${dateStr}.pdf`
+            const filename = `CPFR_${safeFilenamePart(storeItem.id_cliente)}_${safeFilenamePart(storeItem.nombre_tienda)}_${dayCode}_${dateStr}_${safeFilenamePart(jefatura)}.pdf`
             const blob = pdf.output('blob') as Blob
             pdfFiles.push({
                 name: filename,
