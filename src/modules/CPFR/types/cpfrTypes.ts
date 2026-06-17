@@ -152,6 +152,13 @@ export interface CpfrUpdateStatusBody {
     estado: 'pendiente' | 'borrador' | 'revision' | 'aprobado' | 'cerrado' | 'reemplazado' | 'enviado'
 }
 
+export interface CpfrBulkUpdateStatusBody {
+    num_pedidos: string[]
+    year: number
+    week: number
+    estado: CpfrUpdateStatusBody['estado']
+}
+
 // ─── Config de tienda — GET|PUT /api/v2/cpfr/config/:id_cliente ─────────────
 // (usado por CpfrStoreConfigModal)
 

@@ -11,6 +11,7 @@ import type {
     CpfrOverride,
     CpfrAdjustSkuBody,
     CpfrUpdateStatusBody,
+    CpfrBulkUpdateStatusBody,
     CpfrStoreConfig,
     CpfrSkuOverride,
     CpfrSkuUnit,
@@ -373,6 +374,26 @@ export const useCpfrStore = defineStore('cpfr', () => {
         statusFilters.searchSku = ''
     }
 
+    async function updateStatusBulk(body: CpfrBulkUpdateStatusBody): Promise<{ ok: boolean; approvalId?: number; updatedOrders?: number }> {
+        try {
+            const res = await cpfrApi.updateStatusBulk(body)
+            const nums = new Set(body.num_pedidos)
+            for (const dia of dias.value) {
+                for (const store of dia.tiendas) {
+                    for (const sku of store.skus) {
+                        if (sku.num_pedido && nums.has(sku.num_pedido)) {
+                            sku.estado_oc = body.estado
+                        }
+                    }
+                }
+            }
+            return { ok: true, approvalId: res.approval_id ?? undefined, updatedOrders: res.updated_orders ?? body.num_pedidos.length }
+        } catch (e: any) {
+            console.error('[cpfrStore.updateStatusBulk]', e)
+            return { ok: false }
+        }
+    }
+
     // ── Computed ──────────────────────────────────────────────────────────────
 
     /** Opciones de día derivadas de los dias cargados */
@@ -585,7 +606,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         statusFilters, viewMode, activeTab, groupByOC,
         // Actions
         init, fetchCurrentWeek, fetchAllCpfrWeeks, loadDashboard, loadHistorial, recalculate, generateZ8,
-        adjustSku, updateStatus,
+        adjustSku, updateStatus, updateStatusBulk,
         toggleStore, expandAll, collapseAll, expandAllOCs, collapseAllOCs,
         setFilter, clearFilters,
         toggleStatusFilter, clearStatusFilters, setViewMode, setActiveTab, setGroupByOC, setNomCadena,

@@ -49,6 +49,7 @@ const filters = reactive<FilterState>({
 
 const showDetailModal = ref(false);
 const selectedApproval = ref<Approval | null>(null);
+const isDetailOpen = computed(() => showDetailModal.value && selectedApproval.value !== null);
 
 const statusOptions: { value: ApprovalStatus | ''; label: string }[] = [
    { value: '', label: 'Todos los estados' },
@@ -230,6 +231,8 @@ const handleView = (id: number) => {
 };
 
 const handleResolved = () => {
+   showDetailModal.value = false;
+   selectedApproval.value = null;
    approvalsStore.fetchAssignedApprovals();
    approvalsStore.fetchApprovals();
 };
@@ -320,9 +323,11 @@ function toApprovalRow(approval: Approval): ApprovalRow {
 function buildMeta(approval: Approval) {
    const payload = approval.payload || {};
    const week = readPayloadValue(payload, ['semana_ic', 'semana', 'week']);
-   const order = readPayloadValue(payload, ['num_pedido', 'pedido', 'orderId', 'id']);
-   const skuCount = readPayloadValue(payload, ['sku_count', 'skus', 'totalSkus']);
-   const pieces = readPayloadValue(payload, ['piezas', 'totalPzas', 'pieces']);
+   const order = Array.isArray(payload.num_pedidos)
+      ? payload.num_pedidos.map(item => String(item)).join(', ')
+      : readPayloadValue(payload, ['num_pedido', 'pedido', 'orderId', 'id']);
+   const skuCount = readPayloadValue(payload, ['sku_count', 'skus', 'totalSkus', 'total_skus']);
+   const pieces = readPayloadValue(payload, ['piezas', 'totalPzas', 'pieces', 'total_pzas_sugeridas']);
    const segments = [
       week ? `Sem. ${week}` : '',
       order ? `Pedido #${order}` : '',
@@ -467,7 +472,7 @@ function formatTimeAgo(date: Date) {
             </div>
          </section>
 
-         <section class="grid gap-3 md:grid-cols-[minmax(170px,1fr)_minmax(170px,1fr)_auto] xl:grid-cols-[190px_190px_auto_1fr]">
+         <section v-if="!isDetailOpen" class="grid gap-3 md:grid-cols-[minmax(170px,1fr)_minmax(170px,1fr)_auto] xl:grid-cols-[190px_190px_auto_1fr]">
             <select
                v-model="filters.status"
                class="h-11 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm outline-none transition focus:border-brand-300 focus:ring-4 focus:ring-brand-50"
@@ -498,7 +503,7 @@ function formatTimeAgo(date: Date) {
             </button>
          </section>
 
-         <section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+         <section v-if="!isDetailOpen" class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
                <button
                   v-for="card in statCards"
@@ -525,7 +530,7 @@ function formatTimeAgo(date: Date) {
             </div>
          </section>
 
-         <section class="space-y-4">
+         <section v-if="!isDetailOpen" class="space-y-4">
             <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                <h2 class="text-base font-extrabold text-slate-900">
                   {{ listTitle }}
@@ -785,12 +790,14 @@ function formatTimeAgo(date: Date) {
             </template>
          </section>
 
-         <ApprovalDetailModal
-            v-model="showDetailModal"
-            :approval="selectedApproval"
-            :can-resolve="canResolveInTab && selectedApproval?.status === 'PENDING'"
-            @resolved="handleResolved"
-         />
+         <section v-if="isDetailOpen" class="-mx-3 bg-white px-3 py-4 sm:mx-0 sm:rounded-lg sm:p-5 sm:shadow-sm">
+            <ApprovalDetailModal
+               v-model="showDetailModal"
+               :approval="selectedApproval"
+               :can-resolve="canResolveInTab && selectedApproval?.status === 'PENDING'"
+               @resolved="handleResolved"
+            />
+         </section>
       </div>
    </div>
 </template>

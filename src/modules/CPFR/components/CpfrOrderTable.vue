@@ -426,37 +426,28 @@ async function changeStoreVisibleOCStatus(tienda: CpfrStoreDash, estado: string)
     openStatusOC.value = null
     submittingOC.value = submitKey
 
-    let okCount = 0
-    let firstApprovalId: number | undefined
-
-    for (const num_pedido of ocNumbers) {
-        const result = await store.updateStatus({
-            num_pedido,
-            year: store.currentWeek.anio,
-            week: store.currentWeek.semana,
-            estado: estado as any,
-        })
-        if (result.ok) {
-            okCount += 1
-            firstApprovalId ??= result.approvalId
-        }
-    }
+    const result = await store.updateStatusBulk({
+        num_pedidos: ocNumbers,
+        year: store.currentWeek.anio,
+        week: store.currentWeek.semana,
+        estado: estado as any,
+    })
 
     submittingOC.value = null
 
     if (estado === 'revision') {
-        if (okCount === ocNumbers.length) {
+        if (result.ok) {
             toast({
                 title: '\u2705 OCs enviadas a revisi\u00f3n',
-                description: firstApprovalId
-                    ? `${okCount} OC enviadas. Primera solicitud de aprobaci\u00f3n #${firstApprovalId}.`
-                    : `${okCount} OC enviadas a revisi\u00f3n.`,
+                description: result.approvalId
+                    ? `${ocNumbers.length} OC visibles enviadas en la solicitud de aprobaci\u00f3n #${result.approvalId}.`
+                    : `${ocNumbers.length} OC visibles enviadas a revisi\u00f3n.`,
                 duration: 5000,
             })
         } else {
             toast({
-                title: '\u274c Error parcial al enviar a revisi\u00f3n',
-                description: `Se actualizaron ${okCount} de ${ocNumbers.length} OC visibles.`,
+                title: '\u274c Error al enviar a revisi\u00f3n',
+                description: `No se pudieron actualizar las ${ocNumbers.length} OC visibles.`,
                 variant: 'destructive',
                 duration: 5000,
             })

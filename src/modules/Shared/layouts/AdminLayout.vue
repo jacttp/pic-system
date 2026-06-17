@@ -48,6 +48,9 @@ const toggleSidebar = () => {
 
 const toggleNotifications = () => {
     showNotifDropdown.value = !showNotifDropdown.value;
+    if (showNotifDropdown.value) {
+        profileStore.fetchNotifications();
+    }
 };
 
 const goToProfile = () => {

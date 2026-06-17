@@ -6,7 +6,6 @@ import { APPROVAL_TYPE_CONFIG } from '../types/approval.types';
 import { useApprovalsStore } from '../stores/approvalsStore';
 import { approvalsApi } from '../services/approvalsApi';
 import ApprovalStatusBadge from './ApprovalStatusBadge.vue';
-import ModalDialog from '@/modules/Shared/components/ModalDialog.vue';
 
 const props = defineProps<{
    modelValue: boolean
@@ -14,11 +13,64 @@ const props = defineProps<{
    canResolve: boolean
 }>();
 
+interface CpfrPreviewRow {
+   id_cliente: string
+   cliente: string
+   nombre: string
+   sucursal: string
+   jefatura: string
+   semana_ic: string
+   anio: string
+   fec_pedido_cadena: string
+   fec_fin_embarque: string
+   num_pedido: string
+   cant_pedida: number
+   cantidad_oc: number
+   pedido_kg: number
+   inv_actual_pz: number
+   promedio_sellout_pz: number
+   cobertura_calculada: number | null
+   sku_muliix: string
+   sku_cadena: string
+   upc: string
+   desc: string
+   estado: string
+   escenario: string
+   fill_rate: number | null
+}
+
+interface CpfrOrderGroup {
+   key: string
+   num_pedido: string
+   semana_ic: string
+   anio: string
+   fec_pedido_cadena: string
+   fec_fin_embarque: string
+   rows: CpfrPreviewRow[]
+   totalPz: number
+   totalKg: number
+}
+
+interface CpfrStoreGroup {
+   key: string
+   id_cliente: string
+   nombre_tienda: string
+   cliente: string
+   sucursal: string
+   jefatura: string
+   nom_cadena: string
+   orders: CpfrOrderGroup[]
+   totalOrders: number
+   totalSkus: number
+   totalPz: number
+   totalKg: number
+}
+
 const emit = defineEmits(['update:modelValue', 'resolved']);
 
 const approvalsStore = useApprovalsStore();
 
-const rejectionReason = ref('');
+const resolutionComment = ref('');
 const isSubmitting = ref(false);
 const errorMessage = ref('');
 const isLoadingCpfrDetail = ref(false);
@@ -28,7 +80,7 @@ const cpfrDetail = ref<any | null>(null);
 // Reset al abrir
 watch(() => props.modelValue, (open) => {
    if (open) {
-      rejectionReason.value = '';
+      resolutionComment.value = '';
       errorMessage.value = '';
       cpfrDetailError.value = '';
    }
@@ -69,6 +121,9 @@ const cpfrSource = computed<Record<string, any>>(() => cpfrDetail.value || cpfrP
 
 const cpfrNumPedido = computed(() => {
    const p = cpfrSource.value;
+   if (Array.isArray(p.num_pedidos) && p.num_pedidos.length) {
+      return p.num_pedidos.map((item: unknown) => String(item)).join(', ');
+   }
    return String(p.num_pedido ?? p.num_pedido_ref ?? 'SIN FOLIO');
 });
 
@@ -110,14 +165,26 @@ const cpfrPreviewRows = computed(() => {
    const idParts = splitClientId(cpfrStoreId.value);
 
    if (rawRows.length) {
-      return rawRows.map((row: any) => ({
-         cliente: String(row.cliente ?? idParts.cliente),
-         nombre: String(row.nombre ?? cpfrStoreName.value),
-         sucursal: String(row.sucursal ?? idParts.sucursal),
+      return rawRows.map((row: any): CpfrPreviewRow => {
+         const unidad = Number(row.unidad_inventario ?? 0);
+         const cantPedida = Number(row.cant_pedida ?? row.cantidad_final_uni ?? row.pedido_sugerido_pz_red ?? row.total_pzas_sugeridas ?? 0);
+         return {
+         id_cliente: String(row.id_cliente ?? cpfrStoreId.value),
+         cliente: String(row.cliente ?? splitClientId(String(row.id_cliente ?? cpfrStoreId.value)).cliente ?? idParts.cliente),
+         nombre: String(row.nombre ?? row.nombre_tienda ?? cpfrStoreName.value),
+         sucursal: String(row.sucursal ?? splitClientId(String(row.id_cliente ?? cpfrStoreId.value)).sucursal ?? idParts.sucursal),
+         jefatura: String(row.jefatura ?? p.jefatura ?? ''),
+         semana_ic: String(row.semana_ic ?? p.semana_ic ?? cpfrWeek.value ?? '').padStart(2, '0'),
+         anio: String(row.anio ?? p.anio ?? p.year ?? cpfrYear.value ?? ''),
+         fec_pedido_cadena: formatTemplateDate(row.fec_pedido_cadena ?? p.fec_pedido_cadena),
          fec_fin_embarque: formatTemplateDate(row.fec_fin_embarque ?? p.fec_fin_embarque),
          num_pedido: String(row.num_pedido ?? cpfrNumPedido.value),
-         cant_pedida: Number(row.cant_pedida ?? row.cantidad_final_uni ?? row.total_pzas_sugeridas ?? 0),
+         cant_pedida: cantPedida,
          cantidad_oc: Number(row.cantidad_oc ?? row.cant_pedida_oc ?? 0),
+         pedido_kg: Number(row.pedido_kg ?? (cantPedida * unidad) ?? 0),
+         inv_actual_pz: Number(row.inv_actual_pz ?? row.inv_actual_uni ?? 0),
+         promedio_sellout_pz: Number(row.promedio_sellout_pz ?? row.venta_prom_uni ?? 0),
+         cobertura_calculada: row.cobertura_calculada == null ? null : Number(row.cobertura_calculada),
          sku_muliix: String(row.sku_muliix ?? ''),
          sku_cadena: String(row.sku_cadena ?? ''),
          upc: String(row.upc ?? row.upc_cadena ?? ''),
@@ -125,17 +192,27 @@ const cpfrPreviewRows = computed(() => {
          estado: String(row.estado ?? ''),
          escenario: String(row.escenario ?? ''),
          fill_rate: row.fill_rate == null ? null : Number(row.fill_rate),
-      }));
+         };
+      });
    }
 
    return [{
       cliente: idParts.cliente,
+      id_cliente: cpfrStoreId.value,
       nombre: cpfrStoreName.value,
       sucursal: idParts.sucursal,
+      jefatura: String(cpfrSource.value.jefatura ?? ''),
+      semana_ic: cpfrWeek.value,
+      anio: cpfrYear.value,
+      fec_pedido_cadena: formatTemplateDate(p.fec_pedido_cadena),
       fec_fin_embarque: formatTemplateDate(p.fec_fin_embarque),
       num_pedido: cpfrNumPedido.value,
       cant_pedida: Number(p.total_pzas_sugeridas ?? 0),
       cantidad_oc: Number(p.total_pzas_cadena ?? 0),
+      pedido_kg: 0,
+      inv_actual_pz: 0,
+      promedio_sellout_pz: 0,
+      cobertura_calculada: null,
       sku_muliix: '',
       sku_cadena: '',
       upc: '',
@@ -143,7 +220,62 @@ const cpfrPreviewRows = computed(() => {
       estado: '',
       escenario: '',
       fill_rate: null,
-   }];
+   } satisfies CpfrPreviewRow];
+});
+
+const cpfrStoreGroups = computed<CpfrStoreGroup[]>(() => {
+   const storeMap = new Map<string, CpfrStoreGroup>();
+
+   for (const row of cpfrPreviewRows.value) {
+      const storeKey = row.id_cliente || (row.cliente && row.sucursal ? `${row.cliente}s${row.sucursal}` : row.nombre);
+      const idCliente = row.id_cliente || storeKey;
+
+      if (!storeMap.has(storeKey)) {
+         storeMap.set(storeKey, {
+            key: storeKey,
+            id_cliente: idCliente,
+            nombre_tienda: row.nombre || cpfrStoreName.value,
+            cliente: row.cliente,
+            sucursal: row.sucursal,
+            jefatura: row.jefatura || String(cpfrSource.value.jefatura ?? ''),
+            nom_cadena: cpfrChain.value,
+            orders: [],
+            totalOrders: 0,
+            totalSkus: 0,
+            totalPz: 0,
+            totalKg: 0,
+         });
+      }
+
+      const storeGroup = storeMap.get(storeKey)!;
+      let orderGroup = storeGroup.orders.find(order => order.num_pedido === row.num_pedido);
+      if (!orderGroup) {
+         orderGroup = {
+            key: `${storeKey}|${row.num_pedido}`,
+            num_pedido: row.num_pedido,
+            semana_ic: row.semana_ic || cpfrWeek.value,
+            anio: row.anio || cpfrYear.value,
+            fec_pedido_cadena: row.fec_pedido_cadena,
+            fec_fin_embarque: row.fec_fin_embarque,
+            rows: [],
+            totalPz: 0,
+            totalKg: 0,
+         };
+         storeGroup.orders.push(orderGroup);
+      }
+
+      orderGroup.rows.push(row);
+      orderGroup.totalPz += row.cant_pedida;
+      orderGroup.totalKg += row.pedido_kg;
+      storeGroup.totalSkus += 1;
+      storeGroup.totalPz += row.cant_pedida;
+      storeGroup.totalKg += row.pedido_kg;
+   }
+
+   return Array.from(storeMap.values()).map(group => ({
+      ...group,
+      totalOrders: group.orders.length,
+   }));
 });
 
 const formatDate = (dateStr?: string) => {
@@ -154,25 +286,40 @@ const formatDate = (dateStr?: string) => {
    });
 };
 
+const formatNumber = (value: number | null | undefined, decimals = 0) => {
+   if (value === null || value === undefined || Number.isNaN(value)) return '-';
+   return value.toLocaleString('es-MX', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+   });
+};
+
+const getGeneratedLabel = (storeGroup: CpfrStoreGroup) => {
+   const date = new Date(props.approval?.requestedAt || Date.now());
+   const formatted = date.toLocaleDateString('es-MX', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+   });
+   const week = storeGroup.orders[0]?.semana_ic ? `SEM ${storeGroup.orders[0].semana_ic}` : 'SEM -';
+   const sucursal = storeGroup.sucursal ? `Sucursal ${storeGroup.sucursal}` : 'Sucursal -';
+   return `Generado ${formatted} | ${week} | ${sucursal}`;
+};
+
 const closeModal = () => {
    emit('update:modelValue', false);
 };
 
-const handleResolve = async (status: 'APPROVED' | 'REJECTED') => {
+const handleConfirm = async () => {
    if (!props.approval) return;
-
-   if (status === 'REJECTED' && !rejectionReason.value.trim()) {
-      errorMessage.value = 'Debes proporcionar un motivo de rechazo.';
-      return;
-   }
 
    isSubmitting.value = true;
    errorMessage.value = '';
 
    try {
       await approvalsStore.resolveApproval(props.approval.id, {
-         status,
-         rejectionReason: status === 'REJECTED' ? rejectionReason.value : undefined,
+         status: 'APPROVED',
+         rejectionReason: resolutionComment.value.trim() || undefined,
       });
       emit('resolved');
       closeModal();
@@ -185,16 +332,11 @@ const handleResolve = async (status: 'APPROVED' | 'REJECTED') => {
 </script>
 
 <template>
-   <ModalDialog
-      :model-value="modelValue"
-      title="Detalle de Solicitud"
-      size="4xl"
-      @close="closeModal"
-   >
-      <div v-if="approval" class="space-y-5">
+   <section v-if="modelValue && approval" class="space-y-4">
+      <div class="space-y-4">
 
          <!-- Header visual -->
-         <div class="flex items-start justify-between gap-4">
+         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div class="flex items-center gap-3">
                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-50" :class="typeConfig.color">
                   <i :class="typeConfig.icon" class="text-sm"></i>
@@ -204,7 +346,17 @@ const handleResolve = async (status: 'APPROVED' | 'REJECTED') => {
                   <h3 class="truncate text-base font-bold text-slate-800">{{ approval.type === 'CPFR_ORDER' ? `OV ${cpfrNumPedido}` : approval.title }}</h3>
                </div>
             </div>
-            <ApprovalStatusBadge :status="approval.status" />
+            <div class="flex items-center justify-between gap-3 sm:justify-end">
+               <button
+                  type="button"
+                  class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm transition hover:border-brand-200 hover:bg-brand-50/20 hover:text-brand-700"
+                  @click="closeModal"
+               >
+                  <i class="fa-solid fa-arrow-left text-[10px]"></i>
+                  Volver
+               </button>
+               <ApprovalStatusBadge :status="approval.status" />
+            </div>
          </div>
 
          <!-- Descripción -->
@@ -237,15 +389,131 @@ const handleResolve = async (status: 'APPROVED' | 'REJECTED') => {
             </div>
          </div>
 
-         <!-- Motivo de rechazo (si aplica) -->
-         <div v-if="approval.rejectionReason" class="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p class="text-xs font-medium text-red-600 mb-1"><i class="fa-solid fa-circle-xmark mr-1"></i> Motivo de rechazo</p>
-            <p class="text-sm text-red-700">{{ approval.rejectionReason }}</p>
+         <!-- Comentarios de resolucion -->
+         <div v-if="approval.rejectionReason" class="bg-slate-50 border border-slate-200 rounded-lg p-4">
+            <p class="text-xs font-medium text-slate-600 mb-1"><i class="fa-regular fa-comment-dots mr-1"></i> Comentarios</p>
+            <p class="text-sm text-slate-700">{{ approval.rejectionReason }}</p>
          </div>
 
          <!-- Payload CPFR_ORDER: pedido + template OV -->
          <div v-if="approval.type === 'CPFR_ORDER' && approval.payload" class="space-y-4">
-            <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <section class="space-y-3">
+               <div class="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white px-3 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-4">
+                  <h4 class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-600">
+                     <i class="fa-solid fa-receipt text-brand-500"></i>
+                     Vista Previa | Template OV
+                  </h4>
+                  <div class="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-wide text-slate-500">
+                     <span><b class="text-brand-700">{{ cpfrStoreGroups.length }}</b> tienda{{ cpfrStoreGroups.length === 1 ? '' : 's' }}</span>
+                     <span class="text-slate-300">|</span>
+                     <span><b class="text-brand-700">{{ cpfrPreviewRows.length }}</b> SKU</span>
+                     <span class="text-slate-300">|</span>
+                     <span><b class="text-brand-700">{{ formatNumber(cpfrStoreGroups.reduce((sum, store) => sum + store.totalKg, 0), 1) }}</b> KG</span>
+                  </div>
+               </div>
+
+               <div v-if="isLoadingCpfrDetail" class="flex items-center gap-2 px-4 py-3 text-xs font-semibold text-slate-500">
+                  <i class="fa-solid fa-circle-notch fa-spin text-brand-500"></i>
+                  Cargando detalle de SKUs...
+               </div>
+               <div v-else-if="cpfrDetailError" class="border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700">
+                  <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+                  {{ cpfrDetailError }} Se muestra la informacion disponible en la solicitud.
+               </div>
+
+               <div class="space-y-4">
+                  <article
+                     v-for="storeGroup in cpfrStoreGroups"
+                     :key="storeGroup.key"
+                     class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+                  >
+                     <div class="grid gap-3 bg-white px-3 py-3 sm:px-4 lg:grid-cols-[112px_minmax(0,1fr)]">
+                        <div class="hidden items-center justify-center lg:flex">
+                           <div class="flex h-16 w-24 items-center justify-center rounded-md border border-red-100 bg-red-50 text-xl font-black italic text-brand-700 shadow-inner">
+                              Corona
+                           </div>
+                        </div>
+
+                        <div class="rounded-lg bg-brand-600 px-4 py-4 text-white sm:px-5">
+                           <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div class="min-w-0">
+                                 <p class="truncate text-base font-black uppercase tracking-tight">
+                                    {{ storeGroup.nom_cadena }} {{ storeGroup.nombre_tienda }}
+                                 </p>
+                                 <p class="mt-2 text-[10px] font-semibold text-brand-100">
+                                    Cliente {{ storeGroup.id_cliente }} | Jefatura {{ storeGroup.jefatura || 'N/D' }}
+                                 </p>
+                              </div>
+                              <div class="shrink-0 text-left sm:text-right">
+                                 <p class="text-[10px] font-black uppercase tracking-widest text-white">{{ storeGroup.totalOrders }} OC</p>
+                                 <p class="mt-2 text-[10px] font-black text-white">
+                                    {{ storeGroup.totalSkus }} SKU | {{ formatNumber(storeGroup.totalPz, 0) }} pz | {{ formatNumber(storeGroup.totalKg, 1) }} kg
+                                 </p>
+                              </div>
+                           </div>
+                        </div>
+                     </div>
+
+                     <div class="mx-3 mb-3 flex items-center gap-3 rounded-md bg-slate-100 px-3 py-2 text-[10px] font-bold text-slate-600 sm:mx-4 sm:px-4 sm:py-3">
+                        <i class="fa-regular fa-calendar-days text-brand-500"></i>
+                        <span>{{ getGeneratedLabel(storeGroup) }}</span>
+                     </div>
+
+                     <div class="space-y-3 px-3 pb-4 sm:px-4 sm:pb-5">
+                        <section v-for="order in storeGroup.orders" :key="order.key" class="overflow-hidden rounded-lg border border-slate-100 bg-white">
+                           <div class="relative overflow-hidden rounded-t-lg bg-brand-600 px-4 py-3 text-white">
+                              <div class="absolute inset-y-0 right-0 w-[128px] skew-x-[-18deg] bg-amber-500 origin-bottom"></div>
+                              <div class="relative flex items-center justify-between gap-4">
+                                 <div class="min-w-0">
+                                    <p class="truncate text-[11px] font-black uppercase tracking-wide">OC {{ order.num_pedido }}</p>
+                                    <p class="mt-1 truncate text-[9px] font-black text-white">
+                                       SEM {{ order.semana_ic || '-' }} | Pedido {{ order.fec_pedido_cadena || '-' }} | Fin emb. {{ order.fec_fin_embarque || '-' }} | {{ order.rows.length }} SKU
+                                    </p>
+                                 </div>
+                                 <p class="shrink-0 text-right text-[10px] font-black text-white">
+                                    {{ formatNumber(order.totalPz, 0) }} pz | {{ formatNumber(order.totalKg, 1) }} kg
+                                 </p>
+                              </div>
+                           </div>
+
+                           <div class="overflow-x-auto">
+                              <table class="w-full min-w-[640px] table-fixed border-collapse text-[10px]">
+                                 <thead>
+                                    <tr class="border-b border-slate-200 bg-white text-[9px] font-black uppercase tracking-wide text-slate-600">
+                                       <th class="w-[44%] px-3 py-2 text-left">SKU</th>
+                                       <th class="w-[14%] px-3 py-2 text-right">Inv. Act.</th>
+                                       <th class="w-[14%] px-3 py-2 text-right">Sell Prom.</th>
+                                       <th class="w-[14%] px-3 py-2 text-right">Cob. S.</th>
+                                       <th class="w-[14%] px-3 py-2 text-right">Pedido</th>
+                                    </tr>
+                                 </thead>
+                                 <tbody class="divide-y divide-dashed divide-slate-200">
+                                    <tr
+                                       v-for="(row, idx) in order.rows"
+                                       :key="`${order.key}|${row.sku_muliix || row.sku_cadena || row.upc}|${idx}`"
+                                       :class="idx % 2 === 1 ? 'bg-slate-50/40' : 'bg-white'"
+                                    >
+                                       <td class="px-3 py-2">
+                                          <p class="truncate font-black uppercase text-slate-700" :title="row.desc">{{ row.desc }}</p>
+                                          <p class="mt-0.5 truncate font-mono text-[8px] font-bold text-slate-400">
+                                             {{ row.sku_muliix || row.sku_cadena || row.upc || '-' }}
+                                          </p>
+                                       </td>
+                                       <td class="px-3 py-2 text-right font-black text-brand-700">{{ formatNumber(row.inv_actual_pz, 2) }}</td>
+                                       <td class="px-3 py-2 text-right font-black text-brand-700">{{ formatNumber(row.promedio_sellout_pz, 2) }}</td>
+                                       <td class="px-3 py-2 text-right font-black text-brand-700">{{ formatNumber(row.cobertura_calculada, 2) }}</td>
+                                       <td class="px-3 py-2 text-right font-black text-brand-700">{{ formatNumber(row.cant_pedida, 0) }} pz</td>
+                                    </tr>
+                                 </tbody>
+                              </table>
+                           </div>
+                        </section>
+                     </div>
+                  </article>
+               </div>
+            </section>
+
+            <section v-if="false" class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                <div class="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2">
                   <h4 class="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-slate-500">
                      <i class="fa-solid fa-receipt text-brand-500"></i>
@@ -465,35 +733,27 @@ const handleResolve = async (status: 'APPROVED' | 'REJECTED') => {
             <p class="text-sm font-semibold text-slate-700">Resolver solicitud</p>
 
             <div>
-               <label class="block text-xs font-medium text-slate-600 mb-1">Motivo de rechazo <span class="text-slate-400">(requerido si rechazas)</span></label>
+               <label class="block text-xs font-medium text-slate-600 mb-1">Comentarios <span class="text-slate-400">(opcional)</span></label>
                <textarea 
-                  v-model="rejectionReason"
+                  v-model="resolutionComment"
                   rows="2"
                   class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none resize-none text-sm"
-                  placeholder="Explica el motivo del rechazo..."
+                  placeholder="Agrega comentarios para esta aprobacion..."
                ></textarea>
             </div>
 
-            <div class="flex gap-3">
+            <div class="flex justify-end">
                <button
-                  @click="handleResolve('APPROVED')"
+                  @click="handleConfirm"
                   :disabled="isSubmitting"
-                  class="flex-1 py-2.5 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-70 flex items-center justify-center gap-2"
+                  class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-70 sm:w-auto"
                >
                   <i :class="isSubmitting ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-check'" class="text-xs"></i>
-                  Aprobar
-               </button>
-               <button
-                  @click="handleResolve('REJECTED')"
-                  :disabled="isSubmitting"
-                  class="flex-1 py-2.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors shadow-sm disabled:opacity-70 flex items-center justify-center gap-2"
-               >
-                  <i :class="isSubmitting ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-xmark'" class="text-xs"></i>
-                  Rechazar
+                  Confirmar
                </button>
             </div>
          </div>
 
       </div>
-   </ModalDialog>
+   </section>
 </template>
