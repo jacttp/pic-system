@@ -9,6 +9,7 @@ export interface UserFull {
    TipoUser: UserRole
    jefatura: string
    Gerencia: string
+   Zona?: string
    AccessLevel: number
    ServerUser: string | null
    Status: UserStatus
@@ -24,6 +25,7 @@ export interface UserCreatePayload {
    role: UserRole
    jefatura: string
    gerencia: string
+   zona: string
    serverUser?: string
    accessLevel?: number
    nombre: string
@@ -34,6 +36,7 @@ export interface UserUpdatePayload {
    role?: UserRole
    jefatura?: string
    gerencia?: string
+   zona?: string
    status?: UserStatus
    serverUser?: string
    accessLevel?: number

@@ -52,6 +52,13 @@ export const userApi = {
       return data;
    },
 
+   async getZonas(gerencia?: string, jefatura?: string): Promise<string[]> {
+      if (!gerencia || !jefatura || gerencia === 'Corporativo' || jefatura === 'Corporativo') return ['Corporativo'];
+
+      const { data } = await api.post<string[]>(`/filters/zonas`, { Gerencia: [gerencia], Jefatura: [jefatura] });
+      return data;
+   },
+
    async getGerencias(): Promise<string[]> {
       const { data } = await api.get<string[]>(`/filters/gerencias`);
       return data;

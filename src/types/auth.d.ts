@@ -8,6 +8,7 @@ export interface User {
    role: UserRole;
    jefatura: string;
    Gerencia: string;
+   Zona?: string;
    accessLevel: number;
    serverUser?: string | null;
 }

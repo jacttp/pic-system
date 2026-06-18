@@ -71,6 +71,23 @@ const formatRelative = (dateStr: string | null) => {
                 <span v-if="user.no_emp" class="text-[10px] font-black text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 italic">#{{ user.no_emp }}</span>
             </div>
             <p class="text-[9px] text-slate-300 font-mono font-bold uppercase tracking-wider mb-4">{{ user.ServerUser || 'Sin ID Servidor' }}</p>
+
+            <div class="grid w-full grid-cols-1 gap-2 text-left mb-4">
+              <div class="rounded-2xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Gerencia</p>
+                <p class="truncate text-xs font-extrabold text-slate-700 uppercase">{{ user.Gerencia || 'Corporativo' }}</p>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div class="rounded-2xl border border-slate-100 bg-white px-3 py-2 shadow-sm">
+                  <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Zona</p>
+                  <p class="truncate text-xs font-extrabold text-slate-700 uppercase">{{ user.Zona || 'Corporativo' }}</p>
+                </div>
+                <div class="rounded-2xl border border-slate-100 bg-white px-3 py-2 shadow-sm">
+                  <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Jefatura</p>
+                  <p class="truncate text-xs font-extrabold text-slate-700 uppercase">{{ user.jefatura || 'Corporativo' }}</p>
+                </div>
+              </div>
+            </div>
             
             <div class="flex items-center justify-center gap-2 flex-wrap mb-4">
               <UserStatusBadge :status="user.Status || 'active'" />

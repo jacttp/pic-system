@@ -52,6 +52,7 @@ const form = reactive({
     role: 'Jefe' as UserRole,
     jefatura: 'Corporativo', // Default según requerimiento
     gerencia: 'Corporativo',
+    zona: 'Corporativo',
     serverUser: '',
     accessLevel: 1,
     nombre: '',
@@ -63,6 +64,7 @@ const isChangingPassword = ref(false);
 const newPassword = ref('');
 const errorMessage = ref('');
 const isServerUserEdited = ref(false);
+const loadingZonas = ref(false);
 const loadingJefaturas = ref(false);
 
 // Cargar jefaturas al montar
@@ -70,7 +72,8 @@ onMounted(async () => {
     await userStore.fetchGerencias();
     setupStore.fetchFeatureFlags();
     // Cargamos jefaturas basadas en la gerencia inicial (si existe)
-    userStore.fetchJefaturas(form.gerencia);
+    await userStore.fetchJefaturas(form.gerencia);
+    await userStore.fetchZonas(form.gerencia, form.jefatura);
 });
 
 const jefaturaOptions = computed(() => {
@@ -80,6 +83,12 @@ const jefaturaOptions = computed(() => {
 const gerenciaOptions = computed(() => {
     return userStore.gerencias.map(g => ({ value: g, label: g }));
 });
+
+const zonaOptions = computed(() => {
+    return userStore.zonas.map(z => ({ value: z, label: z }));
+});
+
+const canLoadZonas = computed(() => form.gerencia !== 'Corporativo' && form.jefatura !== 'Corporativo');
 
 // Helper para obtener el label del rol basado en el nivel
 const currentRoleLabel = computed(() => {
@@ -104,6 +113,7 @@ const loadUserData = (u: UserFull | null) => {
         form.role = u.TipoUser as UserRole;
         form.jefatura = u.jefatura || 'Corporativo';
         form.gerencia = u.Gerencia || 'Corporativo';
+        form.zona = u.Zona || 'Corporativo';
         form.serverUser = u.ServerUser || '';
         form.accessLevel = u.AccessLevel || 1;
         form.nombre = u.nombre || '';
@@ -114,6 +124,7 @@ const loadUserData = (u: UserFull | null) => {
         form.role = 'Jefe';
         form.jefatura = 'Corporativo';
         form.gerencia = 'Corporativo';
+        form.zona = 'Corporativo';
         form.serverUser = 'EMBUTIDOSCORONA\\';
         form.accessLevel = 1;
         form.nombre = '';
@@ -146,17 +157,52 @@ watch(() => form.username, (newVal) => {
     }
 });
 
-// Cascada: Cuando cambia Gerencia, recargar Jefaturas
+// Cascada: Cuando cambia Gerencia, recargar Jefaturas y limpiar Zona
 watch(() => form.gerencia, async (newGerencia) => {
+    loadingZonas.value = true;
     loadingJefaturas.value = true;
     try {
         await userStore.fetchJefaturas(newGerencia);
+
+        if (newGerencia === 'Corporativo') {
+            form.zona = 'Corporativo';
+            form.jefatura = 'Corporativo';
+            await userStore.fetchZonas();
+            return;
+        }
+
         // Si la jefatura actual no es Corporativo y no está en la nueva lista, resetearla
         if (form.jefatura !== 'Corporativo' && !userStore.jefaturas.includes(form.jefatura)) {
             form.jefatura = 'Corporativo';
         }
+
+        await userStore.fetchZonas(newGerencia, form.jefatura);
+
+        if (form.zona !== 'Corporativo' && !userStore.zonas.includes(form.zona)) {
+            form.zona = 'Corporativo';
+        }
     } finally {
+        loadingZonas.value = false;
         loadingJefaturas.value = false;
+    }
+});
+
+watch(() => form.jefatura, async (newJefatura) => {
+    if (!canLoadZonas.value) {
+        form.zona = 'Corporativo';
+        await userStore.fetchZonas();
+        return;
+    }
+
+    loadingZonas.value = true;
+    try {
+        await userStore.fetchZonas(form.gerencia, newJefatura);
+
+        if (form.zona !== 'Corporativo' && !userStore.zonas.includes(form.zona)) {
+            form.zona = 'Corporativo';
+        }
+    } finally {
+        loadingZonas.value = false;
     }
 });
 
@@ -212,6 +258,7 @@ const handleSubmit = async () => {
                 role: form.role,
                 jefatura: form.jefatura,
                 gerencia: form.gerencia,
+                zona: form.zona,
                 serverUser: form.serverUser || undefined,
                 accessLevel: form.accessLevel,
                 nombre: form.nombre,
@@ -224,6 +271,7 @@ const handleSubmit = async () => {
                 role: form.role,
                 jefatura: form.jefatura,
                 gerencia: form.gerencia,
+                zona: form.zona,
                 serverUser: form.serverUser || undefined,
                 accessLevel: form.accessLevel,
                 nombre: form.nombre,
@@ -294,6 +342,12 @@ const handleSubmit = async () => {
                     label="Jefatura" 
                     :options="jefaturaOptions"
                     :disabled="loadingJefaturas"
+                />
+                <FormSelect 
+                    v-model="form.zona" 
+                    label="Zona" 
+                    :options="zonaOptions"
+                    :disabled="loadingZonas || !canLoadZonas"
                 />
                 <p class="text-[10px] text-slate-400 font-medium px-1">Se utiliza "Corporativo" para personal administrativo no operativo.</p>
             </div>
@@ -497,7 +551,7 @@ const handleSubmit = async () => {
                     />
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
                     <FormSelect 
                         v-model="form.gerencia" 
                         label="Gerencia" 
@@ -508,6 +562,12 @@ const handleSubmit = async () => {
                         label="Jefatura" 
                         :options="jefaturaOptions"
                         :disabled="loadingJefaturas"
+                    />
+                    <FormSelect 
+                        v-model="form.zona" 
+                        label="Zona" 
+                        :options="zonaOptions"
+                        :disabled="loadingZonas || !canLoadZonas"
                     />
                 </div>
                 

@@ -97,7 +97,7 @@ const formatActivity = (dateStr: string | null) => {
         <TableRow class="hover:bg-transparent">
           <TableHead class="w-[300px] font-bold text-slate-500 uppercase text-[10px] tracking-widest pl-6">Usuario & Nombre</TableHead>
           <TableHead class="font-bold text-slate-500 uppercase text-[10px] tracking-widest">No. Emp / Rol</TableHead>
-          <TableHead class="font-bold text-slate-500 uppercase text-[10px] tracking-widest">Jefatura</TableHead>
+          <TableHead class="font-bold text-slate-500 uppercase text-[10px] tracking-widest">Zona / Jefatura</TableHead>
           <TableHead class="text-right font-bold text-slate-500 uppercase text-[10px] tracking-widest pr-6">Estado</TableHead>
         </TableRow>
       </TableHeader>
@@ -170,9 +170,12 @@ const formatActivity = (dateStr: string | null) => {
           </TableCell>
 
           <TableCell>
-            <div class="flex items-center gap-2">
-              <div class="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-blue-400 transition-colors"></div>
-              <span class="text-xs font-bold text-slate-500 uppercase tracking-tighter">{{ user.jefatura }}</span>
+            <div class="flex items-start gap-2">
+              <div class="mt-1.5 w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-blue-400 transition-colors"></div>
+              <div class="min-w-0">
+                <span class="block text-xs font-bold text-slate-600 uppercase tracking-tighter truncate max-w-[180px]">{{ user.Zona || 'Corporativo' }}</span>
+                <span class="block text-[10px] font-semibold text-slate-400 uppercase tracking-tighter truncate max-w-[180px]">{{ user.jefatura }}</span>
+              </div>
             </div>
           </TableCell>
 

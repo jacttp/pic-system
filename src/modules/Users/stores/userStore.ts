@@ -10,6 +10,7 @@ export const useUserStore = defineStore('users', () => {
    const activeUsers = ref<UserFull[]>([]);
    const jefaturas = ref<string[]>([]);
    const gerencias = ref<string[]>([]);
+   const zonas = ref<string[]>([]);
    const loading = ref(false);
    const error = ref<string | null>(null);
    const featureOverrides = ref<Record<number, UserFeatureOverride[]>>({});
@@ -64,6 +65,21 @@ export const useUserStore = defineStore('users', () => {
       } catch (e: any) {
          console.error('Error al cargar gerencias:', e);
          gerencias.value = ['Corporativo'];
+      }
+   }
+
+   async function fetchZonas(gerencia?: string, jefatura?: string) {
+      try {
+         const data = await userApi.getZonas(gerencia, jefatura);
+         const unique = new Set([...data, 'Corporativo']);
+         zonas.value = Array.from(unique).sort((a, b) => {
+            if (a === 'Corporativo') return -1;
+            if (b === 'Corporativo') return 1;
+            return a.localeCompare(b);
+         });
+      } catch (e: any) {
+         console.error('Error al cargar zonas:', e);
+         zonas.value = ['Corporativo'];
       }
    }
 
@@ -196,6 +212,7 @@ export const useUserStore = defineStore('users', () => {
       activeUsers,
       jefaturas,
       gerencias,
+      zonas,
       loading,
       error,
       featureOverrides,
@@ -203,6 +220,7 @@ export const useUserStore = defineStore('users', () => {
       fetchActiveUsers,
       fetchJefaturas,
       fetchGerencias,
+      fetchZonas,
       createUser,
       updateUser,
       deleteUser,
