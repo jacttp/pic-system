@@ -1,6 +1,6 @@
 /* src/modules/Users/services/userApi.ts */
 import api from '@/api/axios';
-import type { UserFull, UserCreatePayload, UserUpdatePayload, MessagePayload } from '../types/user.types';
+import type { UserFull, UserCreatePayload, UserUpdatePayload, MessagePayload, AssignedStoreDetail } from '../types/user.types';
 import type { HubFeatureKey, UserFeatureOverride } from '@/modules/Setup/types/setupTypes';
 
 const V2 = import.meta.env.VITE_API_V2_PATH;
@@ -66,6 +66,14 @@ export const userApi = {
 
    async getFeatureOverrides(id: number): Promise<UserFeatureOverride[]> {
       const { data } = await api.get<{ success: boolean; data: UserFeatureOverride[] }>(`${V2}/users/${id}/feature-overrides`);
+      return data.data;
+   },
+
+   async getAssignedStoreDetails(filters: Record<string, string[]>): Promise<AssignedStoreDetail[]> {
+      const { data } = await api.post<{ success: boolean; data: AssignedStoreDetail[] }>(
+         `/filters/assigned-store-details`,
+         { filters }
+      );
       return data.data;
    },
 

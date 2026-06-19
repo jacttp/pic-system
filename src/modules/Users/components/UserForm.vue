@@ -8,7 +8,7 @@ import ModalDialog from '@/modules/Shared/components/ModalDialog.vue';
 import FormInput from '@/modules/Shared/components/FormInput.vue';
 import FormSelect from '@/modules/Shared/components/FormSelect.vue';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
+import type { HubFeatureKey } from '@/modules/Setup/types/setupTypes';
 import type { UserFull, UserRole } from '../types/user.types';
 import { ROLE_OPTIONS } from '../types/user.types';
 
@@ -16,6 +16,9 @@ const props = defineProps<{
     modelValue?: boolean;
     userToEdit?: UserFull | null;
     isEmbedded?: boolean;
+    showFeatureOverrides?: boolean;
+    showAccessLevel?: boolean;
+    showPasswordChange?: boolean;
 }>();
 
 const emit = defineEmits(['update:modelValue', 'saved', 'cancel']);
@@ -25,32 +28,33 @@ const authStore = useAuthStore();
 const setupStore = useSetupStore();
 
 const isEditMode = computed(() => !!props.userToEdit);
-const modalTitle = computed(() => isEditMode.value ? `Editar Usuario` : 'Nuevo Usuario');
+const modalTitle = computed(() => isEditMode.value ? 'Editar Usuario' : 'Nuevo Usuario');
 
-// Permisos para cambio de password
-const canChangePasswords = computed(() => (authStore.user?.accessLevel ?? 0) >= 4);
-const canManageFeatureOverrides = computed(() => (authStore.user?.accessLevel ?? 0) >= 4 && isEditMode.value && !!props.userToEdit);
+const canChangePasswords = computed(() => props.showPasswordChange !== false && (authStore.user?.accessLevel ?? 0) >= 4);
+const canManageFeatureOverrides = computed(() => props.showFeatureOverrides !== false && (authStore.user?.accessLevel ?? 0) >= 4 && isEditMode.value && !!props.userToEdit);
 const currentFeatureOverrides = computed(() => props.userToEdit ? userStore.featureOverrides[props.userToEdit.IdUser] || [] : []);
-const getOverrideValue = (featureKey: string) => {
+
+const getOverrideValue = (featureKey: HubFeatureKey) => {
     const override = currentFeatureOverrides.value.find(item => item.FeatureKey === featureKey);
     if (!override) return 'inherit';
     return override.IsEnabled ? 'enabled' : 'disabled';
 };
-const setFeatureOverride = async (featureKey: any, value: string) => {
+
+const setFeatureOverride = async (featureKey: HubFeatureKey, value: string) => {
     if (!props.userToEdit) return;
     const nextValue = value === 'inherit' ? null : value === 'enabled';
     await userStore.updateFeatureOverride(props.userToEdit.IdUser, featureKey, nextValue);
 };
-const handleFeatureOverrideChange = (featureKey: any, event: Event) => {
+
+const handleFeatureOverrideChange = (featureKey: HubFeatureKey, event: Event) => {
     setFeatureOverride(featureKey, (event.target as HTMLSelectElement).value);
 };
 
-// Estado del formulario
 const form = reactive({
     username: '',
     password: '',
     role: 'Jefe' as UserRole,
-    jefatura: 'Corporativo', // Default según requerimiento
+    jefatura: 'Corporativo',
     gerencia: 'Corporativo',
     zona: 'Corporativo',
     serverUser: '',
@@ -67,45 +71,34 @@ const isServerUserEdited = ref(false);
 const loadingZonas = ref(false);
 const loadingJefaturas = ref(false);
 
-// Cargar jefaturas al montar
 onMounted(async () => {
     await userStore.fetchGerencias();
     setupStore.fetchFeatureFlags();
-    // Cargamos jefaturas basadas en la gerencia inicial (si existe)
     await userStore.fetchJefaturas(form.gerencia);
     await userStore.fetchZonas(form.gerencia, form.jefatura);
 });
 
-const jefaturaOptions = computed(() => {
-    return userStore.jefaturas.map(z => ({ value: z, label: z }));
-});
-
-const gerenciaOptions = computed(() => {
-    return userStore.gerencias.map(g => ({ value: g, label: g }));
-});
-
-const zonaOptions = computed(() => {
-    return userStore.zonas.map(z => ({ value: z, label: z }));
-});
-
+const jefaturaOptions = computed(() => userStore.jefaturas.map(z => ({ value: z, label: z })));
+const gerenciaOptions = computed(() => userStore.gerencias.map(g => ({ value: g, label: g })));
+const zonaOptions = computed(() => userStore.zonas.map(z => ({ value: z, label: z })));
 const canLoadZonas = computed(() => form.gerencia !== 'Corporativo' && form.jefatura !== 'Corporativo');
 
-// Helper para obtener el label del rol basado en el nivel
 const currentRoleLabel = computed(() => {
     const opt = ROLE_OPTIONS.find(r => r.level === form.accessLevel);
-    return opt ? opt.label : 'Sin Rol';
+    return opt ? opt.label : 'Sin rol';
 });
 
-// Función para cambiar nivel y actualizar rol automáticamente
+const accessLevelOptions = computed(() => ROLE_OPTIONS.map(item => ({
+    level: item.level,
+    label: item.label
+})));
+
 const setAccessLevel = (level: number) => {
     form.accessLevel = level;
     const opt = ROLE_OPTIONS.find(r => r.level === level);
-    if (opt) {
-        form.role = opt.value;
-    }
+    if (opt) form.role = opt.value;
 };
 
-// Cargar datos del usuario
 const loadUserData = (u: UserFull | null) => {
     if (u) {
         form.username = u.Usuario;
@@ -131,6 +124,7 @@ const loadUserData = (u: UserFull | null) => {
         form.no_emp = '';
         isServerUserEdited.value = false;
     }
+
     errorMessage.value = '';
     newPassword.value = '';
     isChangingPassword.value = false;
@@ -138,26 +132,19 @@ const loadUserData = (u: UserFull | null) => {
 
 watch(() => props.userToEdit, (u) => {
     loadUserData(u || null);
-    if (u && canChangePasswords.value) {
-        userStore.fetchFeatureOverrides(u.IdUser);
-    }
+    if (u && canChangePasswords.value) userStore.fetchFeatureOverrides(u.IdUser);
 }, { immediate: true });
 
-// Nueva lógica: Limpiar formulario al abrir para un usuario nuevo
 watch(() => props.modelValue, (isOpen) => {
-    if (isOpen && !props.userToEdit) {
-        loadUserData(null);
-    }
+    if (isOpen && !props.userToEdit) loadUserData(null);
 });
 
-// Autocompletado inteligente del Servidor / Dominio
 watch(() => form.username, (newVal) => {
     if (!isEditMode.value && !isServerUserEdited.value) {
         form.serverUser = `EMBUTIDOSCORONA\\${newVal}`;
     }
 });
 
-// Cascada: Cuando cambia Gerencia, recargar Jefaturas y limpiar Zona
 watch(() => form.gerencia, async (newGerencia) => {
     loadingZonas.value = true;
     loadingJefaturas.value = true;
@@ -171,7 +158,6 @@ watch(() => form.gerencia, async (newGerencia) => {
             return;
         }
 
-        // Si la jefatura actual no es Corporativo y no está en la nueva lista, resetearla
         if (form.jefatura !== 'Corporativo' && !userStore.jefaturas.includes(form.jefatura)) {
             form.jefatura = 'Corporativo';
         }
@@ -187,7 +173,7 @@ watch(() => form.gerencia, async (newGerencia) => {
     }
 });
 
-watch(() => form.jefatura, async (newJefatura) => {
+watch(() => form.jefatura, async () => {
     if (!canLoadZonas.value) {
         form.zona = 'Corporativo';
         await userStore.fetchZonas();
@@ -196,8 +182,7 @@ watch(() => form.jefatura, async (newJefatura) => {
 
     loadingZonas.value = true;
     try {
-        await userStore.fetchZonas(form.gerencia, newJefatura);
-
+        await userStore.fetchZonas(form.gerencia, form.jefatura);
         if (form.zona !== 'Corporativo' && !userStore.zonas.includes(form.zona)) {
             form.zona = 'Corporativo';
         }
@@ -206,7 +191,6 @@ watch(() => form.jefatura, async (newJefatura) => {
     }
 });
 
-// Detectar edición manual para detener el autocompletado
 const handleServerUserEdit = () => {
     isServerUserEdited.value = true;
 };
@@ -218,10 +202,10 @@ const closeModal = () => {
 
 const handlePasswordChange = async () => {
     if (!newPassword.value || newPassword.value.length < 4) {
-        errorMessage.value = 'La nueva contraseña debe tener al menos 4 caracteres.';
+        errorMessage.value = 'La nueva contrasena debe tener al menos 4 caracteres.';
         return;
     }
-    
+
     if (!props.userToEdit) return;
 
     isSubmitting.value = true;
@@ -230,9 +214,9 @@ const handlePasswordChange = async () => {
         await userStore.changePassword(props.userToEdit.IdUser, newPassword.value);
         newPassword.value = '';
         isChangingPassword.value = false;
-        alert('Contraseña actualizada con éxito');
+        alert('Contrasena actualizada con exito');
     } catch (e: any) {
-        errorMessage.value = e.response?.data?.message || 'Error al cambiar contraseña.';
+        errorMessage.value = e.response?.data?.message || 'Error al cambiar contrasena.';
     } finally {
         isSubmitting.value = false;
     }
@@ -278,6 +262,7 @@ const handleSubmit = async () => {
                 no_emp: form.no_emp
             });
         }
+
         emit('saved');
         if (!props.isEmbedded) closeModal();
     } catch (e: any) {
@@ -289,324 +274,266 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-    <!-- MODO EMBEBIDO (Panel Lateral) -->
-    <div v-if="isEmbedded" class="space-y-8 p-1">
-        <div v-if="errorMessage" class="p-4 bg-red-50 text-red-700 rounded-2xl text-sm flex items-center gap-3 border border-red-100 italic shadow-sm">
-            <i class="fa-solid fa-circle-exclamation text-lg"></i> 
-            <span class="font-medium">{{ errorMessage }}</span>
+    <div v-if="isEmbedded" class="user-form-surface space-y-4">
+        <div v-if="errorMessage" class="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+            <i class="fa-solid fa-circle-exclamation mr-2"></i>
+            {{ errorMessage }}
         </div>
 
-        <div class="grid grid-cols-1 gap-6">
-            <div class="grid grid-cols-2 gap-4">
-                <FormInput 
-                    v-model="form.nombre" 
-                    label="Nombre Completo" 
-                    placeholder="Nombre real"
-                    icon="fa-solid fa-id-card"
-                    required
-                />
-                <FormInput 
-                    v-model="form.no_emp" 
-                    label="No. Empleado" 
-                    placeholder="12345"
-                    icon="fa-solid fa-hashtag"
-                    required
-                />
+        <section class="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-100 transition hover:border-red-100 sm:p-5">
+            <div class="absolute inset-y-0 left-0 w-1 bg-red-600"></div>
+            <div class="mb-5 pl-1">
+                <p class="text-[10px] font-black uppercase text-red-600">Identidad de usuario</p>
+                <h4 class="mt-1 text-sm font-black text-slate-900">Datos personales</h4>
+                <p class="mt-1 text-xs font-semibold text-slate-500">Identidad y credenciales visibles del usuario.</p>
             </div>
-
-            <div class="grid grid-cols-2 gap-4">
-                <FormInput 
-                    v-model="form.username" 
-                    label="Nombre de Usuario" 
-                    placeholder="Nombre de acceso"
-                    icon="fa-solid fa-user-circle"
-                    disabled
-                    class="opacity-70"
-                />
-                <FormInput 
-                    v-model="form.serverUser"
-                    label="Server ID"
-                    placeholder="DOMAIN\user"
-                    icon="fa-solid fa-server"
-                />
-            </div>
-
-            <div class="space-y-4">
-                <FormSelect 
-                    v-model="form.gerencia" 
-                    label="Gerencia" 
-                    :options="gerenciaOptions" 
-                />
-                <FormSelect 
-                    v-model="form.jefatura" 
-                    label="Jefatura" 
-                    :options="jefaturaOptions"
-                    :disabled="loadingJefaturas"
-                />
-                <FormSelect 
-                    v-model="form.zona" 
-                    label="Zona" 
-                    :options="zonaOptions"
-                    :disabled="loadingZonas || !canLoadZonas"
-                />
-                <p class="text-[10px] text-slate-400 font-medium px-1">Se utiliza "Corporativo" para personal administrativo no operativo.</p>
-            </div>
-
-            <div class="p-6 bg-slate-50/80 rounded-3xl border border-slate-200/60 shadow-sm relative overflow-hidden group">
-                <div class="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl"></div>
-                
-                <div class="flex items-center justify-between mb-6">
-                    <div class="space-y-1">
-                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nivel de Acceso</h4>
-                        <p class="text-sm font-black text-blue-700 leading-none">{{ currentRoleLabel }}</p>
-                    </div>
-                    <div class="bg-blue-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-lg shadow-blue-100">
-                        NIVEL {{ form.accessLevel }}
-                    </div>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div class="editable-field">
+                    <FormInput v-model="form.nombre" label="Nombre Completo" placeholder="Nombre real" icon="fa-solid fa-id-card" required />
                 </div>
+                <div class="editable-field">
+                    <FormInput v-model="form.no_emp" label="No. Empleado" placeholder="12345" icon="fa-solid fa-hashtag" required />
+                </div>
+                <div class="editable-field is-disabled">
+                    <FormInput v-model="form.username" label="Nombre de Usuario" placeholder="Nombre de acceso" icon="fa-solid fa-user-circle" disabled />
+                </div>
+                <div class="editable-field">
+                    <FormInput v-model="form.serverUser" label="Server ID" placeholder="DOMAIN\user" icon="fa-solid fa-server" />
+                </div>
+            </div>
+        </section>
 
-                <div class="flex gap-2.5 h-12 items-end">
-                    <div 
-                        v-for="i in 4" 
-                        :key="i"
-                        @click="setAccessLevel(i)"
-                        class="flex-1 rounded-2xl transition-all duration-300 cursor-pointer flex items-center justify-center text-xs font-bold shadow-sm"
-                        :class="[
-                            i <= form.accessLevel 
-                                ? 'bg-blue-600 text-white shadow-blue-100 h-full' 
-                                : 'bg-slate-200/50 text-slate-400 h-10 hover:bg-blue-100 hover:text-blue-500'
-                        ]"
+        <section class="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-100 transition hover:border-red-100 sm:p-5">
+            <div class="absolute inset-y-0 left-0 w-1 bg-red-600"></div>
+            <div class="mb-5 pl-1">
+                <p class="text-[10px] font-black uppercase text-red-600">Alcance comercial</p>
+                <h4 class="mt-1 text-sm font-black text-slate-900">Organizacion</h4>
+                <p class="mt-1 text-xs font-semibold text-slate-500">Alcance operativo para reportes y permisos por zona.</p>
+            </div>
+            <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <div class="editable-field">
+                    <FormSelect v-model="form.gerencia" label="Gerencia" :options="gerenciaOptions" />
+                </div>
+                <div class="editable-field">
+                    <FormSelect v-model="form.jefatura" label="Jefatura" :options="jefaturaOptions" :disabled="loadingJefaturas" />
+                </div>
+                <div class="editable-field" :class="{ 'is-disabled': loadingZonas || !canLoadZonas }">
+                    <FormSelect v-model="form.zona" label="Zona" :options="zonaOptions" :disabled="loadingZonas || !canLoadZonas" />
+                </div>
+            </div>
+            <p class="mt-4 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs font-semibold text-slate-500">
+                Usa "Corporativo" cuando el usuario no pertenece a una estructura operativa.
+            </p>
+        </section>
+
+        <section v-if="props.showAccessLevel !== false" class="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-100 transition hover:border-red-100 sm:p-5">
+            <div class="absolute inset-y-0 left-0 w-1 bg-red-600"></div>
+            <div class="flex flex-col gap-3 pl-1 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <p class="text-[10px] font-black uppercase text-red-600">Control de permisos</p>
+                    <h4 class="mt-1 text-sm font-black text-slate-900">Nivel de acceso</h4>
+                    <p class="mt-1 text-xs font-semibold text-slate-500">{{ currentRoleLabel }}</p>
+                </div>
+                <span class="w-fit rounded-md border border-red-100 bg-red-50 px-2.5 py-1 text-[10px] font-black uppercase text-red-700">
+                    Nivel {{ form.accessLevel }}
+                </span>
+            </div>
+            <div class="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <button
+                    v-for="option in accessLevelOptions"
+                    :key="option.level"
+                    type="button"
+                    class="group min-h-14 rounded-lg border px-3 py-2 text-left transition"
+                    :class="option.level === form.accessLevel ? 'border-red-600 bg-red-600 text-white shadow-sm shadow-red-100' : 'border-slate-200 bg-white text-slate-600 hover:border-red-200 hover:bg-red-50/70 hover:text-red-700'"
+                    @click="setAccessLevel(option.level)"
+                >
+                    <span
+                        class="block text-[10px] font-black uppercase"
+                        :class="option.level === form.accessLevel ? 'text-red-50' : 'text-slate-400 group-hover:text-red-500'"
                     >
-                        {{ i }}
-                    </div>
-                </div>
+                        Nivel {{ option.level }}
+                    </span>
+                    <span class="mt-1 block truncate text-xs font-black">{{ option.label }}</span>
+                </button>
             </div>
+        </section>
 
-            <!-- Cambio de Password (Solo para SuperAdm nivel 4) -->
-            <div v-if="canChangePasswords && isEditMode" class="p-6 bg-amber-50/50 rounded-3xl border border-amber-100 shadow-sm space-y-4">
-                <div class="flex items-center gap-2">
-                    <i class="fa-solid fa-key text-amber-600"></i>
-                    <h4 class="text-[10px] font-black text-amber-700 uppercase tracking-widest">Seguridad</h4>
+        <section v-if="canChangePasswords && isEditMode" class="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-100 transition hover:border-red-100 sm:p-5">
+            <div class="absolute inset-y-0 left-0 w-1 bg-red-600"></div>
+            <div class="mb-5 flex items-start justify-between gap-3 pl-1">
+                <div>
+                    <p class="text-[10px] font-black uppercase text-red-600">Seguridad</p>
+                    <h4 class="mt-1 text-sm font-black text-slate-900">Cambio de contrasena</h4>
+                    <p class="mt-1 text-xs font-semibold text-slate-500">Cambio manual de contrasena.</p>
                 </div>
-                
-                <div v-if="!isChangingPassword">
-                    <Button 
-                        variant="outline" 
-                        size="sm"
-                        @click="isChangingPassword = true"
-                        class="w-full rounded-xl border-amber-200 text-amber-700 hover:bg-amber-100 text-xs font-bold"
-                    >
-                        Cambiar Contraseña
+                <span class="rounded-md border border-red-100 bg-red-50 px-2 py-1 text-[10px] font-black uppercase text-red-700">Permitido</span>
+            </div>
+            <Button v-if="!isChangingPassword" variant="outline" size="sm" class="h-10 w-full rounded-lg border-red-100 text-xs font-black text-red-700 hover:bg-red-50" @click="isChangingPassword = true">
+                Cambiar contrasena
+            </Button>
+            <div v-else class="space-y-3">
+                <div class="editable-field">
+                    <FormInput v-model="newPassword" type="password" label="Nueva contrasena" placeholder="Minimo 4 caracteres" />
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <Button variant="outline" size="sm" class="h-10 rounded-lg border-slate-200 text-xs font-black text-slate-600 hover:bg-slate-50" @click="isChangingPassword = false">
+                        Cancelar
+                    </Button>
+                    <Button size="sm" class="h-10 rounded-lg bg-red-600 text-xs font-black text-white hover:bg-red-700" :disabled="isSubmitting" @click="handlePasswordChange">
+                        Confirmar
                     </Button>
                 </div>
-                <div v-else class="space-y-3">
-                    <FormInput 
-                        v-model="newPassword" 
-                        type="password" 
-                        label="Nueva Contraseña"
-                        placeholder="••••••••"
-                        class="bg-white"
-                    />
-                    <div class="flex gap-2">
-                        <Button 
-                            variant="ghost" 
-                            size="sm"
-                            @click="isChangingPassword = false"
-                            class="flex-1 text-[10px] font-bold uppercase"
-                        >
-                            Cancelar
-                        </Button>
-                        <Button 
-                            size="sm"
-                            @click="handlePasswordChange"
-                            :disabled="isSubmitting"
-                            class="flex-1 bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold uppercase"
-                        >
-                            Confirmar
-                        </Button>
-                    </div>
-                </div>
             </div>
+        </section>
 
-            <div v-if="canManageFeatureOverrides" class="p-6 bg-slate-50/80 rounded-3xl border border-slate-200/60 shadow-sm space-y-4">
-                <div class="flex items-start gap-3">
-                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
-                        <i class="fa-solid fa-toggle-on"></i>
-                    </div>
-                    <div>
-                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Permisos especiales del Hub</h4>
-                        <p class="mt-1 text-xs font-medium text-slate-500">Solo SuperAdmin puede forzar visibilidad por usuario. Heredar usa la configuracion global.</p>
-                    </div>
-                </div>
-
-                <div class="space-y-3">
-                    <div
-                        v-for="feature in setupStore.normalizedFeatureFlags"
-                        :key="feature.FeatureKey"
-                        class="rounded-2xl border border-slate-200 bg-white p-4"
+        <section v-if="canManageFeatureOverrides" class="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-100 transition hover:border-red-100 sm:p-5">
+            <div class="absolute inset-y-0 left-0 w-1 bg-red-600"></div>
+            <div class="mb-5 pl-1">
+                <p class="text-[10px] font-black uppercase text-red-600">Visibilidad por usuario</p>
+                <h4 class="mt-1 text-sm font-black text-slate-900">Permisos especiales del Hub</h4>
+                <p class="mt-1 text-xs font-semibold text-slate-500">Heredar respeta la configuracion global.</p>
+            </div>
+            <div class="grid gap-3 lg:grid-cols-2">
+                <div v-for="feature in setupStore.normalizedFeatureFlags" :key="feature.FeatureKey" class="rounded-xl border border-slate-100 bg-slate-50/80 p-4 transition hover:border-red-100 hover:bg-red-50/20">
+                    <p class="text-sm font-black text-slate-800">{{ feature.FeatureName }}</p>
+                    <p class="mt-1 text-xs font-semibold text-slate-500">{{ feature.Description }}</p>
+                    <select
+                        :value="getOverrideValue(feature.FeatureKey)"
+                        class="mt-4 h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-black text-slate-700 outline-none transition hover:border-red-100 hover:bg-white focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                        @change="handleFeatureOverrideChange(feature.FeatureKey, $event)"
                     >
-                        <div class="mb-3">
-                            <p class="text-sm font-black text-slate-800">{{ feature.FeatureName }}</p>
-                            <p class="text-xs text-slate-500">{{ feature.Description }}</p>
-                        </div>
-                        <select
-                            :value="getOverrideValue(feature.FeatureKey)"
-                            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 outline-none focus:ring-2 focus:ring-brand-500"
-                            @change="handleFeatureOverrideChange(feature.FeatureKey, $event)"
-                        >
-                            <option value="inherit">Heredar configuracion global</option>
-                            <option value="enabled">Forzar visible</option>
-                            <option value="disabled">Forzar oculto</option>
-                        </select>
-                    </div>
+                        <option value="inherit">Heredar configuracion global</option>
+                        <option value="enabled">Forzar visible</option>
+                        <option value="disabled">Forzar oculto</option>
+                    </select>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <div class="flex justify-end gap-3 pt-6 border-t border-slate-100">
-            <Button 
-                variant="outline" 
-                @click="emit('cancel')"
-                class="rounded-2xl h-11 px-6 font-bold border-slate-200 text-slate-500 hover:bg-slate-50"
-            >
-                Cancelar
-            </Button>
-            <Button 
-                @click="handleSubmit" 
-                :disabled="isSubmitting"
-                class="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl h-11 px-8 shadow-xl shadow-blue-100 gap-2 font-black transition-all active:scale-95"
-            >
-                <i v-if="isSubmitting" class="fa-solid fa-circle-notch fa-spin"></i>
-                <i v-else class="fa-solid fa-floppy-disk"></i>
-                Guardar Cambios
-            </Button>
+        <div class="sticky bottom-0 -mx-4 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:pt-4">
+            <div class="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
+                <Button variant="outline" class="h-10 rounded-lg border-slate-200 text-xs font-black text-slate-600 hover:bg-slate-50" @click="emit('cancel')">
+                    Cancelar
+                </Button>
+                <Button class="h-10 rounded-lg bg-red-600 px-5 text-xs font-black text-white hover:bg-red-700" :disabled="isSubmitting" @click="handleSubmit">
+                    <i v-if="isSubmitting" class="fa-solid fa-circle-notch fa-spin mr-2"></i>
+                    <i v-else class="fa-solid fa-floppy-disk mr-2"></i>
+                    Guardar
+                </Button>
+            </div>
         </div>
     </div>
 
-    <!-- MODO MODAL (CREACIÓN) -->
-    <ModalDialog 
-        v-else
-        :model-value="!!modelValue" 
-        :title="modalTitle" 
-        size="lg"
-        @close="closeModal"
-    >
+    <ModalDialog v-else :model-value="!!modelValue" :title="modalTitle" size="2xl" @close="closeModal">
         <template #default>
-            <div class="space-y-6">
-                <div class="flex items-center gap-5 p-6 bg-blue-50/50 rounded-[2rem] border border-blue-100/50 relative overflow-hidden">
-                    <div class="absolute right-0 top-0 w-32 h-32 bg-blue-100/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-                    <div class="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-xl shadow-blue-200 relative z-10">
-                        <i class="fa-solid fa-user-plus text-2xl"></i>
-                    </div>
-                    <div class="relative z-10">
-                        <h4 class="text-lg font-black text-slate-900 leading-tight">Alta de Usuario</h4>
-                        <p class="text-xs text-slate-500 font-bold uppercase tracking-wider opacity-60">Complete los datos de la persona y acceso.</p>
-                    </div>
-                </div>
-
-                <div v-if="errorMessage" class="p-4 bg-red-50 text-red-700 rounded-2xl text-sm flex items-center gap-3 border border-red-100">
-                    <i class="fa-solid fa-circle-exclamation"></i> {{ errorMessage }}
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <FormInput 
-                        v-model="form.nombre" 
-                        label="Nombre Completo" 
-                        placeholder="Ej: Juan Pérez"
-                        icon="fa-solid fa-id-card"
-                        required
-                    />
-                    <FormInput 
-                        v-model="form.no_emp" 
-                        label="No. Empleado" 
-                        placeholder="Ej: 5432"
-                        icon="fa-solid fa-hashtag"
-                        required
-                    />
-                    <FormInput 
-                        v-model="form.username" 
-                        label="Usuario (Login)" 
-                        placeholder="Ej: jperez"
-                        icon="fa-solid fa-at"
-                        required
-                    />
-                    <FormInput 
-                        v-model="form.password" 
-                        label="Contraseña" 
-                        type="password"
-                        placeholder="••••••••"
-                        icon="fa-solid fa-key"
-                        required
-                    />
-                </div>
-
-                <div class="grid grid-cols-1 gap-6">
-                    <FormInput 
-                        v-model="form.serverUser"
-                        label="Servidor / Dominio"
-                        placeholder="Ej: EMBUTIDOSCORONA\usuario"
-                        icon="fa-solid fa-network-wired"
-                        class="w-full"
-                        @input="handleServerUserEdit"
-                    />
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                    <FormSelect 
-                        v-model="form.gerencia" 
-                        label="Gerencia" 
-                        :options="gerenciaOptions" 
-                    />
-                    <FormSelect 
-                        v-model="form.jefatura" 
-                        label="Jefatura" 
-                        :options="jefaturaOptions"
-                        :disabled="loadingJefaturas"
-                    />
-                    <FormSelect 
-                        v-model="form.zona" 
-                        label="Zona" 
-                        :options="zonaOptions"
-                        :disabled="loadingZonas || !canLoadZonas"
-                    />
-                </div>
-                
-                <div class="bg-slate-50/50 p-6 rounded-[2rem] border border-slate-200/50">
-                    <div class="flex items-center justify-between mb-5">
-                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nivel de Acceso</span>
-                        <div class="flex items-center gap-2">
-                            <span class="text-blue-600 text-xs font-black uppercase">{{ currentRoleLabel }}</span>
+            <div class="user-form-surface space-y-4">
+                <section class="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-100 sm:p-5">
+                    <div class="absolute inset-y-0 left-0 w-1 bg-red-600"></div>
+                    <div class="flex items-center gap-3 pl-1">
+                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-600 text-white shadow-sm shadow-red-100">
+                            <i class="fa-solid fa-user-plus text-sm"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-[10px] font-black uppercase text-red-600">Control de usuarios</p>
+                            <h4 class="mt-1 text-base font-black text-slate-900">Alta de Usuario</h4>
+                            <p class="mt-1 text-xs font-semibold text-slate-500">Datos personales, credenciales y alcance inicial.</p>
                         </div>
                     </div>
-                    <div class="flex gap-2">
-                        <div 
-                            v-for="i in 4" 
-                            :key="i"
-                            @click="setAccessLevel(i)"
-                            class="flex-1 h-3 rounded-full transition-all duration-300 cursor-pointer"
-                            :class="i <= form.accessLevel ? 'bg-blue-600 shadow-md shadow-blue-100' : 'bg-slate-200 hover:bg-blue-200'"
-                        ></div>
-                    </div>
-                    <div class="flex justify-between mt-3 px-1 text-[10px] font-black text-slate-300">
-                        <span v-for="i in 4" :key="i" :class="i === form.accessLevel ? 'text-blue-600' : ''">{{ i }}</span>
-                    </div>
+                </section>
+
+                <div v-if="errorMessage" class="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+                    <i class="fa-solid fa-circle-exclamation mr-2"></i>{{ errorMessage }}
                 </div>
+
+                <section class="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-100 transition hover:border-red-100 sm:p-5">
+                    <div class="absolute inset-y-0 left-0 w-1 bg-red-600"></div>
+                    <div class="mb-5 pl-1">
+                        <p class="text-[10px] font-black uppercase text-red-600">Identidad de usuario</p>
+                        <h4 class="mt-1 text-sm font-black text-slate-900">Datos personales</h4>
+                        <p class="mt-1 text-xs font-semibold text-slate-500">Captura el nombre, empleado y credenciales de acceso.</p>
+                    </div>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div class="editable-field">
+                            <FormInput v-model="form.nombre" label="Nombre Completo" placeholder="Ej: Juan Perez" icon="fa-solid fa-id-card" required />
+                        </div>
+                        <div class="editable-field">
+                            <FormInput v-model="form.no_emp" label="No. Empleado" placeholder="Ej: 5432" icon="fa-solid fa-hashtag" required />
+                        </div>
+                        <div class="editable-field">
+                            <FormInput v-model="form.username" label="Usuario (Login)" placeholder="Ej: jperez" icon="fa-solid fa-at" required />
+                        </div>
+                        <div class="editable-field">
+                            <FormInput v-model="form.password" label="Contrasena" type="password" placeholder="Minimo 4 caracteres" icon="fa-solid fa-key" required />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-100 transition hover:border-red-100 sm:p-5">
+                    <div class="absolute inset-y-0 left-0 w-1 bg-red-600"></div>
+                    <div class="mb-5 pl-1">
+                        <p class="text-[10px] font-black uppercase text-red-600">Alcance comercial</p>
+                        <h4 class="mt-1 text-sm font-black text-slate-900">Servidor y organizacion</h4>
+                        <p class="mt-1 text-xs font-semibold text-slate-500">Define dominio y estructura operativa inicial.</p>
+                    </div>
+                    <div class="editable-field">
+                        <FormInput v-model="form.serverUser" label="Servidor / Dominio" placeholder="Ej: EMBUTIDOSCORONA\usuario" icon="fa-solid fa-network-wired" @update:model-value="handleServerUserEdit" />
+                    </div>
+                    <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <div class="editable-field">
+                            <FormSelect v-model="form.gerencia" label="Gerencia" :options="gerenciaOptions" />
+                        </div>
+                        <div class="editable-field" :class="{ 'is-disabled': loadingJefaturas }">
+                            <FormSelect v-model="form.jefatura" label="Jefatura" :options="jefaturaOptions" :disabled="loadingJefaturas" />
+                        </div>
+                        <div class="editable-field" :class="{ 'is-disabled': loadingZonas || !canLoadZonas }">
+                            <FormSelect v-model="form.zona" label="Zona" :options="zonaOptions" :disabled="loadingZonas || !canLoadZonas" />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-100 transition hover:border-red-100 sm:p-5">
+                    <div class="absolute inset-y-0 left-0 w-1 bg-red-600"></div>
+                    <div class="flex flex-col gap-3 pl-1 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                            <p class="text-[10px] font-black uppercase text-red-600">Control de permisos</p>
+                            <h4 class="mt-1 text-sm font-black text-slate-900">Nivel de acceso</h4>
+                            <p class="mt-1 text-xs font-semibold text-slate-500">{{ currentRoleLabel }}</p>
+                        </div>
+                        <span class="w-fit rounded-md border border-red-100 bg-red-50 px-2.5 py-1 text-[10px] font-black uppercase text-red-700">
+                            Nivel {{ form.accessLevel }}
+                        </span>
+                    </div>
+                    <div class="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <button
+                            v-for="option in accessLevelOptions"
+                            :key="option.level"
+                            type="button"
+                            class="group min-h-14 rounded-lg border px-3 py-2 text-left transition"
+                            :class="option.level === form.accessLevel ? 'border-red-600 bg-red-600 text-white shadow-sm shadow-red-100' : 'border-slate-200 bg-white text-slate-600 hover:border-red-200 hover:bg-red-50/70 hover:text-red-700'"
+                            @click="setAccessLevel(option.level)"
+                        >
+                            <span
+                                class="block text-[10px] font-black uppercase"
+                                :class="option.level === form.accessLevel ? 'text-red-50' : 'text-slate-400 group-hover:text-red-500'"
+                            >
+                                Nivel {{ option.level }}
+                            </span>
+                            <span class="mt-1 block truncate text-xs font-black">{{ option.label }}</span>
+                        </button>
+                    </div>
+                </section>
             </div>
         </template>
 
         <template #footer>
-            <div class="flex w-full justify-between items-center">
-                <p class="text-[10px] text-slate-400 font-medium">* Nombre y No. Empleado son requeridos por RH.</p>
-                <div class="flex gap-3">
-                    <Button variant="ghost" @click="closeModal" class="text-slate-400 font-bold hover:bg-slate-100 rounded-xl px-4">
+            <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-xs font-semibold text-slate-500">Nombre y No. Empleado son obligatorios.</p>
+                <div class="grid grid-cols-2 gap-2 sm:flex">
+                    <Button variant="outline" class="h-10 rounded-lg border-slate-200 text-xs font-black text-slate-600 hover:bg-slate-50" @click="closeModal">
                         Cancelar
                     </Button>
-                    <Button 
-                        @click="handleSubmit" 
-                        :disabled="isSubmitting"
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-8 h-12 font-black rounded-2xl shadow-xl shadow-blue-100 gap-2 transition-all active:scale-95"
-                    >
-                        <i v-if="isSubmitting" class="fa-solid fa-circle-notch fa-spin"></i>
+                    <Button class="h-10 rounded-lg bg-red-600 px-5 text-xs font-black text-white hover:bg-red-700" :disabled="isSubmitting" @click="handleSubmit">
+                        <i v-if="isSubmitting" class="fa-solid fa-circle-notch fa-spin mr-2"></i>
                         Crear Usuario
                     </Button>
                 </div>
@@ -614,3 +541,67 @@ const handleSubmit = async () => {
         </template>
     </ModalDialog>
 </template>
+
+<style scoped>
+.user-form-surface :deep(label) {
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: rgb(71 85 105);
+}
+
+.editable-field {
+    border-radius: 0.75rem;
+    border: 1px solid rgb(241 245 249);
+    background: rgb(248 250 252 / 0.8);
+    padding: 0.875rem;
+    transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.editable-field:hover {
+    border-color: rgb(254 202 202);
+    background: rgb(254 242 242 / 0.35);
+}
+
+.editable-field:focus-within {
+    border-color: rgb(254 202 202);
+    background: rgb(255 255 255);
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+}
+
+.editable-field.is-disabled {
+    opacity: 0.78;
+}
+
+.user-form-surface :deep(input),
+.user-form-surface :deep(select) {
+    height: 2.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgb(226 232 240);
+    box-shadow: none !important;
+    outline: none !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.editable-field:hover :deep(input:not(:disabled)),
+.editable-field:hover :deep(select:not(:disabled)) {
+    border-color: rgb(254 202 202) !important;
+    background-color: rgb(255 255 255);
+}
+
+.user-form-surface :deep(select) {
+    background-color: rgb(248 250 252);
+}
+
+.user-form-surface :deep(input:focus),
+.user-form-surface :deep(select:focus) {
+    border-color: rgb(239 68 68) !important;
+    box-shadow: 0 0 0 2px rgb(254 226 226) !important;
+    --tw-ring-offset-shadow: 0 0 #0000 !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
+}
+
+.user-form-surface :deep(input:focus-visible),
+.user-form-surface :deep(select:focus-visible) {
+    outline: none !important;
+}
+</style>

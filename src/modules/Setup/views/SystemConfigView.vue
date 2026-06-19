@@ -126,12 +126,12 @@ const sidebarLayoutControls: Record<HubSidebarBlockKey, { label: string; icon: s
 
 const draggedLayoutItem = ref<{ area: HubLayoutArea; key: HubMainBlockKey | HubSidebarBlockKey } | null>(null);
 
-const mainLayoutItems = computed(() => setupStore.hubDisplaySettings.mainBlockOrder.map(key => ({
+const mainLayoutItems = computed(() => setupStore.hubDisplaySettings.mainBlockOrder.map((key: HubMainBlockKey) => ({
     key,
     ...mainLayoutControls[key],
 })));
 
-const sidebarLayoutItems = computed(() => setupStore.hubDisplaySettings.sidebarBlockOrder.map(key => ({
+const sidebarLayoutItems = computed(() => setupStore.hubDisplaySettings.sidebarBlockOrder.map((key: HubSidebarBlockKey) => ({
     key,
     ...sidebarLayoutControls[key],
 })));

@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { userApi } from '../services/userApi';
-import type { UserFull, UserCreatePayload, UserUpdatePayload, MessagePayload } from '../types/user.types';
+import type { UserFull, UserCreatePayload, UserUpdatePayload, MessagePayload, AssignedStoreDetail } from '../types/user.types';
 import type { HubFeatureKey, UserFeatureOverride } from '@/modules/Setup/types/setupTypes';
 
 export const useUserStore = defineStore('users', () => {
@@ -14,6 +14,9 @@ export const useUserStore = defineStore('users', () => {
    const loading = ref(false);
    const error = ref<string | null>(null);
    const featureOverrides = ref<Record<number, UserFeatureOverride[]>>({});
+   const assignedStores = ref<Record<number, AssignedStoreDetail[]>>({});
+   const assignedStoresLoading = ref<Record<number, boolean>>({});
+   const assignedStoresError = ref<Record<number, string | null>>({});
 
    // --- Acciones ---
 
@@ -202,6 +205,71 @@ export const useUserStore = defineStore('users', () => {
       return success;
    }
 
+   const isScopedValue = (value?: string | null) => {
+      if (!value) return false;
+      return value.trim() !== '' && value !== 'Corporativo';
+   };
+
+   function buildAssignedStoreFilters(user: UserFull) {
+      const filters: Record<string, string[]> = {};
+
+      if (user.TipoUser === 'SuperAdmin') return filters;
+
+      if (user.TipoUser === 'Gerente') {
+         if (isScopedValue(user.Gerencia)) filters.Gerencia = [user.Gerencia];
+         return filters;
+      }
+
+      if (user.TipoUser === 'Jefe') {
+         if (isScopedValue(user.jefatura)) filters.Jefatura = [user.jefatura];
+         return filters;
+      }
+
+      if (isScopedValue(user.Gerencia)) filters.Gerencia = [user.Gerencia];
+      if (isScopedValue(user.jefatura)) filters.Jefatura = [user.jefatura];
+      if (isScopedValue(user.Zona)) filters.Zona = [user.Zona!];
+
+      return filters;
+   }
+
+   function getAssignedStoreScopeError(user: UserFull, filters: Record<string, string[]>) {
+      if (user.TipoUser === 'SuperAdmin') return null;
+      if (user.TipoUser === 'Gerente' && !filters.Gerencia) {
+         return 'El gerente no tiene una gerencia asignada para resolver sus tiendas.';
+      }
+      if (user.TipoUser === 'Jefe' && !filters.Jefatura) {
+         return 'El jefe no tiene una jefatura asignada para resolver sus tiendas.';
+      }
+      if (Object.keys(filters).length === 0) {
+         return 'El usuario no tiene una estructura comercial asignada.';
+      }
+      return null;
+   }
+
+   async function fetchAssignedStores(user: UserFull) {
+      const filters = buildAssignedStoreFilters(user);
+      const scopeError = getAssignedStoreScopeError(user, filters);
+
+      if (scopeError) {
+         assignedStores.value[user.IdUser] = [];
+         assignedStoresError.value[user.IdUser] = scopeError;
+         return;
+      }
+
+      assignedStoresLoading.value[user.IdUser] = true;
+      assignedStoresError.value[user.IdUser] = null;
+
+      try {
+         assignedStores.value[user.IdUser] = await userApi.getAssignedStoreDetails(filters);
+      } catch (e: any) {
+         console.error('Error al cargar tiendas asignadas:', e);
+         assignedStores.value[user.IdUser] = [];
+         assignedStoresError.value[user.IdUser] = e.response?.data?.message || 'Error al cargar tiendas asignadas.';
+      } finally {
+         assignedStoresLoading.value[user.IdUser] = false;
+      }
+   }
+
    // Obtener usuario por ID (desde la lista ya cargada)
    function getUserById(id: number): UserFull | undefined {
       return users.value.find(u => u.IdUser === id);
@@ -216,6 +284,9 @@ export const useUserStore = defineStore('users', () => {
       loading,
       error,
       featureOverrides,
+      assignedStores,
+      assignedStoresLoading,
+      assignedStoresError,
       fetchUsers,
       fetchActiveUsers,
       fetchJefaturas,
@@ -229,6 +300,8 @@ export const useUserStore = defineStore('users', () => {
       changePassword,
       fetchFeatureOverrides,
       updateFeatureOverride,
+      fetchAssignedStores,
+      buildAssignedStoreFilters,
       getUserById
    };
 });

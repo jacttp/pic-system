@@ -3,6 +3,7 @@
 import { onMounted, computed } from 'vue';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import { useSetupStore } from '@/modules/Setup/stores/setupStores';
+import { useProfileStore } from '@/modules/UserProfile/stores/profileStore';
 import type { HubMainBlockKey, HubSidebarBlockKey } from '@/modules/Setup/types/setupTypes';
 import CacheProgress from '@/modules/Shared/components/CacheProgress.vue';
 import ManagementTray from '../components/ManagementTray.vue';
@@ -10,6 +11,7 @@ import NoticesPanel from '../components/NoticesPanel.vue';
 
 const auth = useAuthStore();
 const setupStore = useSetupStore();
+const profileStore = useProfileStore();
 
 onMounted(async () => {
     if (setupStore.modules.length === 0) {
@@ -22,7 +24,7 @@ const dashboardModules = computed(() => {
     return setupStore.userMenu.filter(m => m.ModuleKey !== 'HUB');
 });
 
-const displayName = computed(() => auth.user?.username || 'Usuario');
+const displayName = computed(() => profileStore.profile?.nombre || auth.user?.nombre || auth.user?.username || 'Usuario');
 const showManagementTray = computed(() => setupStore.hubFeatureVisibility['hub.management_tray']);
 const showNoticesPanel = computed(() => setupStore.hubFeatureVisibility['hub.notices_panel']);
 const showActivityPanel = computed(() => setupStore.hubFeatureVisibility['hub.activity_panel']);
@@ -33,7 +35,7 @@ const visibleMainBlocks = computed(() => {
         management_tray: showManagementTray.value,
     };
 
-    return setupStore.hubDisplaySettings.mainBlockOrder.filter(block => visibility[block]);
+    return setupStore.hubDisplaySettings.mainBlockOrder.filter((block: HubMainBlockKey) => visibility[block]);
 });
 const visibleSidebarBlocks = computed(() => {
     const visibility: Record<HubSidebarBlockKey, boolean> = {
@@ -42,7 +44,7 @@ const visibleSidebarBlocks = computed(() => {
         quick_actions: showActivityPanel.value,
     };
 
-    return setupStore.hubDisplaySettings.sidebarBlockOrder.filter(block => visibility[block]);
+    return setupStore.hubDisplaySettings.sidebarBlockOrder.filter((block: HubSidebarBlockKey) => visibility[block]);
 });
 
 const kpiCards = [

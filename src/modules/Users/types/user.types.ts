@@ -50,6 +50,18 @@ export interface MessagePayload {
    content: string
 }
 
+export interface AssignedStoreDetail {
+   matriz: string
+   Nombre: string
+   Ruta: string
+   Zona: string
+   Calle_numero?: string
+   colonia?: string
+   ciudad?: string
+   estado?: string
+   Geopos?: string
+}
+
 // Mapeo visual de roles para UI
 export const ROLE_OPTIONS: { value: UserRole; label: string; level: number }[] = [
    { value: 'Jefe', label: 'Jefe', level: 1 },

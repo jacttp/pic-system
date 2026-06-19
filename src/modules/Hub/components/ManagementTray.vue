@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { computed, onMounted } from 'vue';
+import { useApprovalsStore } from '@/modules/Approvals/stores/approvalsStore';
+import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
+
 interface TrayMetric {
     label: string;
     value: string;
@@ -17,11 +21,51 @@ const props = withDefaults(defineProps<{
     title: 'Aprobaciones CPFR y solicitudes internas',
     subtitle: 'Accesos directos al panel de aprobaciones para revisar pendientes, seguimiento e historial.',
     fullPanelRoute: '/admin/approvals',
-    metrics: () => [
-        { label: 'Por resolver', value: '66', caption: 'Asignadas', route: '/admin/approvals', icon: 'fa-solid fa-inbox', emphasis: true },
-        { label: 'Mis solicitudes', value: '66', caption: 'Pendientes', route: '/admin/approvals', icon: 'fa-solid fa-paper-plane' },
-        { label: 'Resueltas recientes', value: '4', caption: 'Historial', route: '/admin/approvals', icon: 'fa-solid fa-clock-rotate-left' },
-    ],
+});
+
+const approvalsStore = useApprovalsStore();
+const authStore = useAuthStore();
+
+const formatCount = (value: number) => new Intl.NumberFormat('es-MX').format(value);
+
+const myPendingCount = computed(() =>
+    approvalsStore.approvals.filter(approval =>
+        approval.status === 'PENDING' && approval.requestedById === authStore.user?.id
+    ).length
+);
+
+const resolvedRecentCount = computed(() =>
+    approvalsStore.assignedApprovals.filter(approval => approval.status !== 'PENDING').length
+);
+
+const trayMetrics = computed<TrayMetric[]>(() => props.metrics || [
+    {
+        label: 'Por resolver',
+        value: formatCount(approvalsStore.assignedPendingCount),
+        caption: approvalsStore.isLoadingAssigned ? 'Cargando' : 'Asignadas',
+        route: '/admin/approvals',
+        icon: 'fa-solid fa-inbox',
+        emphasis: true,
+    },
+    {
+        label: 'Mis solicitudes',
+        value: formatCount(myPendingCount.value),
+        caption: approvalsStore.isLoading ? 'Cargando' : 'Pendientes',
+        route: '/admin/approvals',
+        icon: 'fa-solid fa-paper-plane',
+    },
+    {
+        label: 'Resueltas recientes',
+        value: formatCount(resolvedRecentCount.value),
+        caption: 'Historial',
+        route: '/admin/approvals',
+        icon: 'fa-solid fa-clock-rotate-left',
+    },
+]);
+
+onMounted(() => {
+    approvalsStore.fetchAssignedApprovals();
+    approvalsStore.fetchApprovals();
 });
 </script>
 
@@ -47,7 +91,7 @@ const props = withDefaults(defineProps<{
 
             <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
                 <router-link
-                    v-for="metric in metrics"
+                    v-for="metric in trayMetrics"
                     :key="metric.label"
                     :to="metric.route || fullPanelRoute"
                     class="group rounded-lg border px-4 py-3 transition hover:-translate-y-0.5 hover:shadow-sm"

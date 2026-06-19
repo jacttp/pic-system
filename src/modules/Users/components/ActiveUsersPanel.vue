@@ -40,36 +40,64 @@ const formatLastSeen = (dateStr: string | null) => {
 </script>
 
 <template>
+  <div
+    v-if="props.isCompact"
+    class="flex min-h-[48px] items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm"
+  >
+    <div class="min-w-0">
+      <div class="flex items-center gap-2">
+        <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+        <p class="text-[10px] font-black uppercase text-slate-500">En linea</p>
+      </div>
+      <p class="mt-1 text-[11px] font-semibold text-slate-500">Usuarios online</p>
+    </div>
+
+    <div class="ml-3 flex items-center gap-3">
+      <div class="hidden -space-x-2 overflow-hidden sm:flex">
+        <template v-for="user in userStore.activeUsers.slice(0, 4)" :key="user.IdUser">
+          <div
+            class="flex h-6 w-6 items-center justify-center rounded-md border border-red-100 bg-red-600 text-[8px] font-black text-white ring-2 ring-white"
+            :title="`${user.Usuario} (${user.jefatura}) - ${formatLastSeen(user.LastActivity)}`"
+          >
+            {{ user.Usuario.substring(0, 2).toUpperCase() }}
+          </div>
+        </template>
+      </div>
+      <p class="text-xl font-black leading-none tabular-nums text-slate-900">{{ activeCount }}</p>
+    </div>
+  </div>
+
   <div 
+    v-else
     class="h-full bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-md relative group"
   >
     <!-- Live Pulse Indicator Background -->
     <div class="absolute top-0 right-0 p-4">
       <span class="flex h-3 w-3">
-        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-        <span class="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
       </span>
     </div>
 
     <div class="p-4 flex-1 flex flex-col justify-between">
       <div>
         <div class="flex items-center gap-2 mb-1">
-          <i class="fa-solid fa-satellite-dish text-blue-600 text-[10px]"></i>
-          <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Actividad en Vivo</span>
+          <i class="fa-solid fa-user-check text-emerald-600 text-[10px]"></i>
+          <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">En linea</span>
         </div>
         
         <div class="flex items-baseline gap-2">
           <p class="text-3xl font-black text-slate-900 tabular-nums leading-none">{{ activeCount }}</p>
-          <span class="text-xs font-bold text-blue-500 uppercase tracking-tight">Usuarios Online</span>
+          <span class="text-xs font-bold text-slate-500 uppercase tracking-tight">Usuarios online</span>
         </div>
       </div>
 
       <!-- Avatar Stack -->
       <div class="mt-4 flex items-center justify-between">
         <div class="flex -space-x-2.5 overflow-hidden">
-          <template v-for="(user, index) in userStore.activeUsers.slice(0, 5)" :key="user.IdUser">
+          <template v-for="user in userStore.activeUsers.slice(0, 5)" :key="user.IdUser">
             <div 
-              class="inline-block h-8 w-8 rounded-xl ring-2 ring-white bg-gradient-to-br from-slate-700 to-slate-900 border border-slate-100 flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-transform hover:scale-110 hover:z-10 cursor-help"
+              class="inline-block h-8 w-8 rounded-full ring-2 ring-white bg-red-600 border border-red-100 flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-transform hover:scale-110 hover:z-10 cursor-help"
               :title="`${user.Usuario} (${user.jefatura}) - ${formatLastSeen(user.LastActivity)}`"
             >
               {{ user.Usuario.substring(0, 2).toUpperCase() }}
@@ -77,7 +105,7 @@ const formatLastSeen = (dateStr: string | null) => {
           </template>
           <div 
             v-if="activeCount > 5"
-            class="inline-block h-8 w-8 rounded-xl ring-2 ring-white bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-500 border border-slate-200"
+            class="inline-block h-8 w-8 rounded-full ring-2 ring-white bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-500 border border-slate-200"
           >
             +{{ activeCount - 5 }}
           </div>
@@ -94,7 +122,7 @@ const formatLastSeen = (dateStr: string | null) => {
     </div>
     
     <!-- Bottom line indicator -->
-    <div class="h-1 w-full bg-gradient-to-r from-blue-500/20 via-blue-500 to-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+    <div class="h-1 w-full bg-gradient-to-r from-emerald-500/20 via-emerald-500 to-emerald-500/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
   </div>
 </template>
 

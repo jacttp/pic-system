@@ -4,7 +4,6 @@ import { ref, computed } from 'vue';
 import setupApi from '../services/setupApi';
 import type { HubConfigResponse, HubFeatureKey, HubMainBlockKey, HubSidebarBlockKey, SystemFeatureFlag, SystemModule } from '../types/setupTypes';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
-import { ROLE_LEVELS } from '../types/setupTypes';
 
 export const useSetupStore = defineStore('setup', () => {
    const modules = ref<SystemModule[]>([]);
@@ -174,12 +173,24 @@ export const useSetupStore = defineStore('setup', () => {
    const hubFeatureVisibility = computed<Record<HubFeatureKey, boolean>>(() => {
       const authStore = useAuthStore();
       const apiVisibility = hubConfig.value?.visibility;
+      const featureByKey = new Map(normalizedFeatureFlags.value.map(feature => [feature.FeatureKey, feature]));
+      const isFeatureVisible = (
+         featureKey: HubFeatureKey,
+         localSetting: boolean,
+         defaultMinAccessLevel = 4
+      ) => {
+         const feature = featureByKey.get(featureKey);
+         const isEnabled = feature?.IsEnabled ?? localSetting;
+         const minAccessLevel = Number(feature?.MinAccessLevel ?? defaultMinAccessLevel);
+
+         return Boolean(isEnabled) && authStore.userLevel >= minAccessLevel;
+      };
 
       return {
-         'hub.kpi_cards': apiVisibility?.['hub.kpi_cards'] ?? (hubDisplaySettings.value.showKpiCards && authStore.userLevel >= 4),
-         'hub.management_tray': apiVisibility?.['hub.management_tray'] ?? (hubDisplaySettings.value.showManagementTray && authStore.userLevel >= 4),
-         'hub.notices_panel': apiVisibility?.['hub.notices_panel'] ?? (hubDisplaySettings.value.showNoticesPanel && authStore.userLevel >= 4),
-         'hub.activity_panel': apiVisibility?.['hub.activity_panel'] ?? (hubDisplaySettings.value.showInfoPanel && authStore.userLevel >= 4),
+         'hub.kpi_cards': apiVisibility?.['hub.kpi_cards'] ?? isFeatureVisible('hub.kpi_cards', hubDisplaySettings.value.showKpiCards),
+         'hub.management_tray': apiVisibility?.['hub.management_tray'] ?? isFeatureVisible('hub.management_tray', hubDisplaySettings.value.showManagementTray),
+         'hub.notices_panel': apiVisibility?.['hub.notices_panel'] ?? isFeatureVisible('hub.notices_panel', hubDisplaySettings.value.showNoticesPanel),
+         'hub.activity_panel': apiVisibility?.['hub.activity_panel'] ?? isFeatureVisible('hub.activity_panel', hubDisplaySettings.value.showInfoPanel),
       };
    });
 

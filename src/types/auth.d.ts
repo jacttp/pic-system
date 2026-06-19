@@ -5,6 +5,7 @@ export type UserRole = 'SuperAdmin' | 'Admin' | 'Gerente' | 'Jefe'
 export interface User {
    id: number;
    username: string;
+   nombre?: string;
    role: UserRole;
    jefatura: string;
    Gerencia: string;

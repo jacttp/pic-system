@@ -24,8 +24,8 @@ const profileStore = useProfileStore();
 // Configuración por tipo
 const typeConfig: Record<NotificationType, { icon: string; color: string; label: string }> = {
    message: { icon: 'fa-solid fa-envelope', color: 'text-slate-500 bg-slate-100', label: 'Mensaje' },
-   approval_request: { icon: 'fa-solid fa-clipboard-question', color: 'text-amber-700 bg-amber-50', label: 'Solicitud' },
-   approval_resolved: { icon: 'fa-solid fa-clipboard-check', color: 'text-emerald-700 bg-emerald-50', label: 'Resuelta' },
+   approval_request: { icon: 'fa-solid fa-truck', color: 'text-red-700 bg-red-50', label: 'Solicitud' },
+   approval_resolved: { icon: 'fa-solid fa-circle-check', color: 'text-emerald-700 bg-emerald-50', label: 'Resuelta' },
    system: { icon: 'fa-solid fa-gear', color: 'text-slate-500 bg-slate-100', label: 'Sistema' }
 };
 
@@ -124,12 +124,14 @@ const handleRowKeydown = (notif: Notification, event: KeyboardEvent) => {
 <template>
    <div
       v-if="mode === 'dropdown'"
-      class="flex h-[min(640px,calc(100vh-1rem))] w-full flex-col overflow-hidden rounded-r-xl border border-l-0 border-slate-200 bg-white shadow-[12px_0_34px_rgba(15,23,42,0.10)]"
+      class="flex max-h-[min(560px,calc(100vh-5rem))] w-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm shadow-slate-100"
    >
-      <div class="flex min-h-16 items-center justify-between gap-3 border-b border-slate-200 px-5">
-         <div class="min-w-0">
-            <h3 class="text-base font-bold leading-5 text-slate-950">Notificaciones</h3>
-            <p class="mt-0.5 text-xs leading-4 text-slate-500">
+      <div class="relative flex min-h-16 items-center justify-between gap-3 border-b border-slate-100 px-5">
+         <div class="absolute inset-y-0 left-0 w-1 bg-red-600"></div>
+         <div class="min-w-0 pl-1">
+            <p class="text-[10px] font-black uppercase text-red-600">Avisos</p>
+            <h3 class="mt-1 text-sm font-black leading-5 text-slate-900">Notificaciones</h3>
+            <p class="mt-0.5 text-xs font-semibold leading-4 text-slate-500">
                {{ profileStore.unreadCount > 0 ? `${profileStore.unreadCount} sin leer` : 'Todo al dia' }}
             </p>
          </div>
@@ -137,7 +139,7 @@ const handleRowKeydown = (notif: Notification, event: KeyboardEvent) => {
          <button
             v-if="profileStore.unreadCount > 0"
             @click="handleMarkAllRead"
-            class="shrink-0 rounded-md px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-50"
+            class="shrink-0 rounded-md px-2.5 py-1.5 text-xs font-black text-red-700 transition-colors hover:bg-red-50/70"
          >
             Marcar leidas
          </button>
@@ -151,7 +153,7 @@ const handleRowKeydown = (notif: Notification, event: KeyboardEvent) => {
          <p class="mt-1 text-xs leading-5 text-slate-500">Las solicitudes y avisos apareceran aqui.</p>
       </div>
 
-      <div v-else class="min-h-0 flex-1 overflow-y-auto">
+      <div v-else class="min-h-0 flex-1 overflow-y-auto bg-slate-50/50 p-2.5">
          <div
             v-for="notif in displayedNotifications"
             :key="notif.id"
@@ -159,45 +161,52 @@ const handleRowKeydown = (notif: Notification, event: KeyboardEvent) => {
             tabindex="0"
             @click="handleClick(notif)"
             @keydown="handleRowKeydown(notif, $event)"
-            class="group flex w-full items-start gap-3 border-b border-slate-100 px-5 py-4 text-left transition-colors last:border-b-0 hover:bg-slate-50"
-            :class="!notif.read ? 'bg-slate-50/70' : 'bg-white'"
+            class="group relative mb-2.5 flex w-full items-start gap-3 rounded-lg border p-3.5 text-left transition last:mb-0 hover:border-red-100 hover:bg-red-50/20"
+            :class="!notif.read ? 'border-red-100 bg-white shadow-sm shadow-red-100/40' : 'border-slate-200 bg-white shadow-sm shadow-slate-100'"
          >
             <span
-               class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+               v-if="!notif.read"
+               class="absolute inset-y-3 left-0 w-1 rounded-r-full bg-red-600"
+               aria-hidden="true"
+            ></span>
+
+            <span
+               class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
                :class="typeConfig[notif.type]?.color || 'text-slate-500 bg-slate-100'"
             >
                <i :class="typeConfig[notif.type]?.icon || 'fa-solid fa-circle-info'" class="text-sm"></i>
             </span>
 
-            <span class="min-w-0 flex-1">
-               <span class="flex items-start gap-3">
-                  <span class="min-w-0 flex-1 text-sm font-semibold leading-5" :class="notif.read ? 'text-slate-700' : 'text-slate-950'">
+            <span class="min-w-0 flex-1 pr-7">
+               <span class="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                  <span class="min-w-0 text-[13px] font-black leading-5" :class="notif.read ? 'text-slate-700' : 'text-slate-950'">
                      {{ notif.title }}
                   </span>
-                  <span class="shrink-0 pt-0.5 text-xs font-medium leading-4 text-slate-400">
+                  <span class="shrink-0 text-[10px] font-black uppercase leading-4 text-slate-400">
                      {{ formatRelative(notif.createdAt) }}
                   </span>
                </span>
 
-               <span class="mt-1 block line-clamp-2 text-sm leading-5 text-slate-500">
+               <span class="mt-1.5 block line-clamp-3 whitespace-normal break-words text-xs font-semibold leading-5 text-slate-500">
                   {{ notif.body }}
                </span>
 
-               <span class="mt-2.5 flex items-center gap-2">
+               <span class="mt-3 flex flex-wrap items-center gap-2">
+                  <span class="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-black uppercase leading-none text-slate-500">
+                     {{ notif.sourceModule || typeConfig[notif.type]?.label }}
+                  </span>
                   <span
                      v-if="!notif.read"
-                     class="h-2 w-2 rounded-full bg-brand-600"
-                     aria-hidden="true"
-                  ></span>
-                  <span class="text-xs font-medium leading-4 text-slate-400">
-                     {{ notif.sourceModule || typeConfig[notif.type]?.label }}
+                     class="rounded-md border border-red-100 bg-red-50 px-2 py-1 text-[10px] font-black uppercase leading-none text-red-700"
+                  >
+                     Sin leer
                   </span>
                </span>
             </span>
 
             <button
                @click="handleDelete(notif, $event)"
-               class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+               class="absolute right-2.5 top-2.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-300 opacity-100 transition-all hover:bg-red-50 hover:text-red-600 sm:opacity-0 sm:group-hover:opacity-100"
                title="Eliminar notificacion"
             >
                <i class="fa-solid fa-xmark text-xs"></i>
@@ -205,11 +214,11 @@ const handleRowKeydown = (notif: Notification, event: KeyboardEvent) => {
          </div>
       </div>
 
-      <div class="border-t border-slate-200 bg-white px-4 py-3">
+      <div class="border-t border-slate-100 bg-white px-4 py-3">
          <router-link
             to="/admin/profile"
             @click="emit('navigate')"
-            class="flex items-center justify-between rounded-md px-2 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+            class="flex items-center justify-between rounded-md px-2 py-2 text-sm font-black text-slate-600 transition-colors hover:bg-red-50/30 hover:text-red-700"
          >
             <span>Ver todas las notificaciones</span>
             <i class="fa-solid fa-chevron-right text-[10px] text-slate-400"></i>
@@ -219,7 +228,7 @@ const handleRowKeydown = (notif: Notification, event: KeyboardEvent) => {
 
    <div
       v-if="mode === 'summary'"
-      class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm shadow-slate-100"
    >
       <div class="border-b border-slate-100 px-5 py-4">
          <div class="flex items-center justify-between gap-3">
@@ -228,13 +237,13 @@ const handleRowKeydown = (notif: Notification, event: KeyboardEvent) => {
                   <i class="fa-solid fa-bell text-sm"></i>
                   <span
                      v-if="profileStore.unreadCount > 0"
-                     class="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-sky-500 px-1 text-[9px] font-black text-white"
+                     class="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-red-600 px-1 text-[9px] font-black text-white"
                   >
                      {{ profileStore.unreadCount }}
                   </span>
                </div>
                <div>
-                  <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Avisos</p>
+                  <p class="text-[10px] font-black uppercase text-red-600">Avisos</p>
                   <h3 class="text-sm font-black text-slate-900">Senales recientes</h3>
                </div>
             </div>
@@ -242,7 +251,7 @@ const handleRowKeydown = (notif: Notification, event: KeyboardEvent) => {
             <button
                v-if="profileStore.unreadCount > 0"
                @click="handleMarkAllRead"
-               class="rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-widest text-sky-600 transition-colors hover:bg-sky-50"
+               class="rounded-lg px-2 py-1 text-[10px] font-black uppercase text-red-700 transition-colors hover:bg-red-50/70"
             >
                Leidas
             </button>
@@ -261,7 +270,7 @@ const handleRowKeydown = (notif: Notification, event: KeyboardEvent) => {
             v-for="notif in displayedNotifications"
             :key="notif.id"
             @click="handleClick(notif)"
-            class="flex w-full items-start gap-3 px-5 py-4 text-left transition-colors hover:bg-slate-50"
+            class="flex w-full items-start gap-3 px-5 py-4 text-left transition-colors hover:bg-red-50/20"
          >
             <span
                class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
@@ -271,14 +280,14 @@ const handleRowKeydown = (notif: Notification, event: KeyboardEvent) => {
             </span>
             <span class="min-w-0 flex-1">
                <span class="flex items-start justify-between gap-2">
-                  <span class="truncate text-sm font-black" :class="notif.read ? 'text-slate-600' : 'text-slate-900'">
+                  <span class="min-w-0 text-sm font-black leading-5" :class="notif.read ? 'text-slate-600' : 'text-slate-900'">
                      {{ notif.title }}
                   </span>
-                  <span class="shrink-0 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  <span class="shrink-0 text-[10px] font-black uppercase text-slate-400">
                      {{ formatRelative(notif.createdAt) }}
                   </span>
                </span>
-               <span class="mt-1 block line-clamp-2 text-xs font-medium leading-5 text-slate-500">
+               <span class="mt-1.5 block line-clamp-3 break-words text-xs font-semibold leading-5 text-slate-500">
                   {{ notif.body }}
                </span>
             </span>
@@ -288,7 +297,7 @@ const handleRowKeydown = (notif: Notification, event: KeyboardEvent) => {
       <div v-if="hasNotifications" class="border-t border-slate-100 bg-slate-50/60 px-5 py-3">
          <router-link
             to="/admin/profile"
-            class="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 transition-colors hover:text-slate-900"
+            class="flex items-center justify-center gap-2 text-[10px] font-black uppercase text-slate-500 transition-colors hover:text-red-700"
          >
             Ver historial
             <i class="fa-solid fa-chevron-right text-[8px]"></i>
@@ -298,60 +307,58 @@ const handleRowKeydown = (notif: Notification, event: KeyboardEvent) => {
 
    <div 
       v-else-if="mode === 'full'"
-      class="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full"
+      class="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm shadow-slate-100"
    >
       <!-- Header -->
-      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-blue-50/50 to-white">
+      <div class="relative flex items-center justify-between border-b border-slate-100 px-6 py-4">
+         <div class="absolute inset-y-0 left-0 w-1 bg-red-600"></div>
          <div class="flex items-center gap-3">
             <div class="relative">
-               <div class="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center">
-                  <i class="fa-solid fa-bell text-blue-600 text-xs"></i>
+               <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-700">
+                  <i class="fa-solid fa-bell text-xs"></i>
                </div>
                <span v-if="profileStore.unreadCount > 0" 
-                     class="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-black w-4.5 h-4.5 flex items-center justify-center rounded-lg shadow-lg border-2 border-white">
+                     class="absolute -right-1.5 -top-1.5 flex h-4.5 w-4.5 items-center justify-center rounded-lg border-2 border-white bg-red-600 text-[9px] font-black text-white shadow-sm">
                   {{ profileStore.unreadCount }}
                </span>
             </div>
-            <span class="text-sm font-black text-slate-800 uppercase tracking-widest">Notificaciones</span>
+            <span class="text-sm font-black text-slate-900">Notificaciones</span>
          </div>
          <button 
             v-if="profileStore.unreadCount > 0"
             @click="handleMarkAllRead"
-            class="text-[10px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-widest transition-colors"
+            class="rounded-lg px-2.5 py-1.5 text-[10px] font-black uppercase text-red-700 transition-colors hover:bg-red-50/70"
          >
             Limpiar todas
          </button>
       </div>
 
       <!-- Lista -->
-      <div 
-         class="flex-1 overflow-y-auto" 
-         :class="mode === 'dropdown' ? 'max-h-96' : ''"
-      >
+      <div class="flex-1 overflow-y-auto">
          <!-- Empty state -->
          <div v-if="!hasNotifications" class="flex flex-col items-center justify-center py-20 text-center">
-            <div class="w-16 h-16 rounded-[2rem] bg-slate-50 flex items-center justify-center mb-4 border border-slate-100/50">
+            <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-slate-100 bg-slate-50">
                <i class="fa-solid fa-bell-slash text-slate-200 text-2xl"></i>
             </div>
             <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Estás al día</p>
          </div>
 
-         <!-- Items con "Aire" y Resaltados -->
+          <!-- Items -->
          <div v-else class="p-5 space-y-4">
             <div
                v-for="notif in displayedNotifications"
                :key="notif.id"
                @click="handleClick(notif)"
-               class="p-4 rounded-2xl flex items-start gap-4 transition-all cursor-pointer group relative border"
+               class="group relative flex cursor-pointer items-start gap-4 rounded-lg border p-4 transition-all"
                :class="notif.read 
-                  ? 'bg-white border-transparent hover:bg-slate-50 hover:border-slate-100' 
-                  : 'bg-blue-50/30 border-blue-100/50 shadow-sm'"
+                  ? 'border-slate-100 bg-white hover:border-red-100 hover:bg-red-50/20' 
+                  : 'border-red-100 bg-white shadow-sm shadow-red-100/40'"
             >
                <!-- Indicador lateral de No Leído -->
-               <div v-if="!notif.read" class="absolute left-2 top-4 bottom-4 w-1 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+               <div v-if="!notif.read" class="absolute bottom-4 left-0 top-4 w-1 rounded-r-full bg-red-600"></div>
 
                <!-- Icono Tipo -->
-               <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-inner"
+               <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
                     :class="typeConfig[notif.type]?.color || 'text-slate-500 bg-slate-50'">
                   <i :class="typeConfig[notif.type]?.icon || 'fa-solid fa-circle-info'" class="text-sm"></i>
                </div>
@@ -359,25 +366,25 @@ const handleRowKeydown = (notif: Notification, event: KeyboardEvent) => {
                <!-- Content -->
                <div class="flex-1 min-w-0">
                   <div class="flex items-start justify-between gap-3 mb-1">
-                     <p class="text-[13px] leading-tight" :class="notif.read ? 'text-slate-600' : 'text-slate-900 font-bold'">
+                     <p class="text-[13px] font-black leading-5" :class="notif.read ? 'text-slate-600' : 'text-slate-900'">
                         {{ notif.title }}
                      </p>
-                     <span class="text-[9px] font-black text-slate-400 uppercase tracking-tighter whitespace-nowrap shrink-0 mt-0.5">
+                     <span class="mt-0.5 shrink-0 whitespace-nowrap text-[10px] font-black uppercase text-slate-400">
                         {{ formatRelative(notif.createdAt) }}
                      </span>
                   </div>
                   
-                  <p class="text-[11px] text-slate-500 leading-relaxed mb-3 line-clamp-2" :class="notif.read ? '' : 'font-medium'">
+                  <p class="mb-3 line-clamp-3 text-xs font-semibold leading-5 text-slate-500">
                      {{ notif.body }}
                   </p>
                   
                   <!-- Metadata Highlighting Concept -->
                   <div class="flex items-center gap-2">
                      <span v-if="notif.sourceModule" 
-                           class="px-2 py-0.5 rounded-md bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest shadow-lg shadow-slate-200">
+                           class="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-black uppercase leading-none text-slate-500">
                         @{{ notif.sourceModule }}
                      </span>
-                     <span class="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                     <span class="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-black uppercase leading-none text-slate-500">
                         {{ typeConfig[notif.type]?.label }}
                      </span>
                   </div>
@@ -386,7 +393,7 @@ const handleRowKeydown = (notif: Notification, event: KeyboardEvent) => {
                <!-- Delete btn -->
                <button 
                   @click="handleDelete(notif, $event)"
-                  class="p-2 rounded-xl text-slate-200 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all shrink-0 -mr-1"
+                  class="-mr-1 shrink-0 rounded-lg p-2 text-slate-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
                >
                   <i class="fa-solid fa-trash-can text-xs"></i>
                </button>
@@ -394,12 +401,5 @@ const handleRowKeydown = (notif: Notification, event: KeyboardEvent) => {
          </div>
       </div>
 
-      <!-- Footer (solo modo dropdown) -->
-      <div v-if="mode === 'dropdown' && hasNotifications" class="px-6 py-3 border-t border-slate-50 bg-slate-50/20 text-center">
-         <router-link to="/admin/profile" class="text-[10px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-[0.2em] transition-all group flex items-center justify-center gap-2">
-            Ver todas las notificaciones
-            <i class="fa-solid fa-chevron-right text-[8px] group-hover:translate-x-1 transition-transform"></i>
-         </router-link>
-      </div>
    </div>
 </template>
