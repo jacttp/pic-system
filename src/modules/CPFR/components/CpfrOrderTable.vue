@@ -965,7 +965,7 @@ const totalUniqueOCs = computed(() => {
                           <div class="flex items-center gap-2 min-w-0">
                             <p class="font-bold text-slate-800 truncate leading-tight">{{ tienda.nombre_tienda }}</p>
                             <div
-                              v-if="!groupByOC && currentTab === 'centralizados' && storeVisibleStatusBadge(tienda.skus) && getVisibleEditableOCNumbers(tienda.skus).length"
+                              v-if="currentTab === 'centralizados' && storeVisibleStatusBadge(tienda.skus) && getVisibleEditableOCNumbers(tienda.skus).length"
                               class="relative shrink-0"
                             >
                               <button
@@ -1149,43 +1149,6 @@ const totalUniqueOCs = computed(() => {
                               </span>
                             </div>
                             
-                            <div v-if="ocGroup.estado_oc" class="relative ml-1 flex">
-                              <span
-                                class="font-bold px-1.5 py-0.5 rounded-md text-[9px] border uppercase cursor-pointer transition-colors"
-                                :class="[
-                                  estadoBadge(ocGroup.estado_oc).cls,
-                                  openStatusOC === ocGroup.num_pedido ? 'ring-2 ring-brand-400 ring-offset-1' : ''
-                                ]"
-                                title="Cambiar estado"
-                                @click.stop="toggleStatusOC(ocGroup.num_pedido!)"
-                              >
-                                {{ estadoBadge(ocGroup.estado_oc).label }}
-                                <i class="fa-solid fa-chevron-down ml-1 text-[8px] opacity-70"></i>
-                              </span>
-                              <!-- Dropdown opciones -->
-                              <div
-                                v-if="openStatusOC === ocGroup.num_pedido"
-                                class="absolute left-0 top-full z-20 mt-1 flex flex-col bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden text-[10px] font-semibold min-w-[100px]"
-                              >
-                                <button
-                                  v-if="ocGroup.estado_oc === 'pendiente'"
-                                  class="px-3 py-2 text-left hover:bg-amber-50 text-amber-700 transition-colors border-b border-slate-50"
-                                  @click.stop="changeOCStatus(ocGroup.num_pedido, 'borrador')"
-                                >
-                                  <i class="fa-solid fa-file-pen mr-2 opacity-70"></i>Borrador
-                                </button>
-                                <button
-                                  v-if="['pendiente', 'borrador'].includes(ocGroup.estado_oc)"
-                                  class="px-3 py-2 text-left hover:bg-indigo-50 text-indigo-700 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                  :disabled="submittingOC === ocGroup.num_pedido"
-                                  @click.stop="changeOCStatus(ocGroup.num_pedido, 'revision')"
-                                >
-                                  <i v-if="submittingOC === ocGroup.num_pedido" class="fa-solid fa-circle-notch fa-spin text-[10px]"></i>
-                                  <i v-else class="fa-solid fa-paper-plane mr-1 opacity-70"></i>
-                                  {{ submittingOC === ocGroup.num_pedido ? 'Enviando...' : 'Revisión' }}
-                                </button>
-                              </div>
-                            </div>
                             <span class="bg-slate-100 text-slate-600 border border-slate-200 font-bold px-1.5 py-0.5 rounded-md text-[9px] ml-1">{{ ocGroup.skus.length }} SKUs</span>
                           </div>
                         </td>
