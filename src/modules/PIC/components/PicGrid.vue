@@ -145,11 +145,11 @@ const removeWidget = (id: string) => {
                 </button>
             </div>
 
-            <div class="grid grid-cols-1 @3xl:grid-cols-2 gap-6">
+            <div class="pic-chart-row grid grid-cols-1 @3xl:grid-cols-2 gap-6">
                 <div 
                     v-for="widget in store.dynamicWidgets" 
                     :key="widget.id" 
-                    class="relative group bg-white rounded-xl shadow-sm border border-slate-200 p-1 transition-all hover:shadow-md"
+                    class="pic-chart-cell relative group bg-white rounded-xl shadow-sm border border-slate-200 p-1 transition-all hover:shadow-md"
                 >
                     <div class="h-80 w-full overflow-hidden rounded-lg"> 
                         
@@ -182,14 +182,14 @@ const removeWidget = (id: string) => {
             </div>
         </div>
 
-       <div class="grid grid-cols-1 @split:grid-cols-3 gap-6">
-            <div class="@split:col-span-2">
+       <div class="pic-chart-row grid grid-cols-1 @split:grid-cols-2 gap-6">
+            <div class="pic-chart-cell min-w-0">
                 <PicEChart
                 :option="configPesosMensual"
                 title="Facturación Mensual ($)"
                 :enable-switch="true" />
             </div>
-            <div class="@split:col-span-1">
+            <div class="pic-chart-cell min-w-0">
                 <PicEChart :option="configPesosAnual" title="Facturación Anual ($)" />
             </div>
         </div>
@@ -197,14 +197,14 @@ const removeWidget = (id: string) => {
 
         <div class="border-t border-slate-200 my-8"></div>
 
-        <div class="grid grid-cols-1 @split:grid-cols-3 gap-6">
-            <div class="@split:col-span-2">
+        <div class="pic-chart-row grid grid-cols-1 @split:grid-cols-2 gap-6">
+            <div class="pic-chart-cell min-w-0">
                 <PicEChart
                 :option="configKilosMensual"
                 title="Venta vs Metas (KG)"
                 :enable-switch="true" />
             </div>
-            <div class="@split:col-span-1">
+            <div class="pic-chart-cell min-w-0">
                 <PicEChart :option="configKilosAnual" title="Facturación Anual (KG)" />
             </div>
         </div>
@@ -214,14 +214,14 @@ const removeWidget = (id: string) => {
 
         <div class="border-t border-slate-200 my-8"></div>
 
-        <div class="grid grid-cols-1 @4xl:grid-cols-3 gap-6">
-            <div class="@split:col-span-2">
+        <div class="pic-chart-row grid grid-cols-1 @split:grid-cols-2 gap-6">
+            <div class="pic-chart-cell min-w-0">
                 <PicEChart
                 :option="configPromedioMensual"
                 title="Precio Promedio Mensual ($/KG)"
                 :enable-switch="true" />
             </div>
-            <div class="@split:col-span-1">
+            <div class="pic-chart-cell min-w-0">
                 <PicEChart :option="configPromedioAnual" title="Precio Promedio Anual ($/KG)" />
             </div>
         </div>

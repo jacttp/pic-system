@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
 import { usePicFilterStore } from '../stores/picFilterStore';
 import PicChat from '../components/PicChat.vue';
 import PicFilters from '../components/PicFilters.vue';
@@ -29,6 +29,13 @@ const handleGenerate = async () => {
 const reportContent = ref<HTMLElement | null>(null);
 const isExporting = ref(false);
 const showExportModal = ref(false);
+const PDF_EXPORT_WIDTH = 1120;
+
+const waitForPdfLayout = async () => {
+    await nextTick();
+    window.dispatchEvent(new Event('resize'));
+    await new Promise(resolve => window.setTimeout(resolve, 250));
+};
 
 const openExportModal = () => {
     showExportModal.value = true;
@@ -39,6 +46,7 @@ const handleExportConfirm = async (config: any) => {
     
     try {
         isExporting.value = true;
+        await waitForPdfLayout();
         
         // Importación dinámica de librerías visuales pesadas (Evita errores de inicialización en build)
         const [html2canvas, { default: jsPDF }] = await Promise.all([
@@ -51,7 +59,20 @@ const handleExportConfirm = async (config: any) => {
             scale: 2,
             useCORS: true,
             logging: false,
-            windowWidth: (element.scrollWidth > 1200 ? element.scrollWidth : 1200)
+            width: PDF_EXPORT_WIDTH,
+            windowWidth: PDF_EXPORT_WIDTH,
+            scrollX: 0,
+            scrollY: 0,
+            backgroundColor: '#f1f5f9',
+            onclone: (clonedDocument: Document) => {
+                const clonedReport = clonedDocument.querySelector('[data-pic-report-content="true"]') as HTMLElement | null;
+                if (!clonedReport) return;
+
+                clonedReport.style.width = `${PDF_EXPORT_WIDTH}px`;
+                clonedReport.style.maxWidth = `${PDF_EXPORT_WIDTH}px`;
+                clonedReport.style.minWidth = `${PDF_EXPORT_WIDTH}px`;
+                clonedReport.style.overflow = 'hidden';
+            }
         });
 
         const imgData = canvas.toDataURL('image/jpeg', 0.98);
@@ -203,7 +224,12 @@ const handleExportConfirm = async (config: any) => {
                         </button>
                     </div>
 
-                    <div ref="reportContent" class="bg-slate-100 -mx-4 px-4 pb-4">
+                    <div 
+                        ref="reportContent" 
+                        data-pic-report-content="true"
+                        class="bg-slate-100 -mx-4 px-4 pb-4"
+                        :class="{ 'pic-pdf-export-mode': isExporting }"
+                    >
                         <ExecutiveSummaryCard />
                         
                         <PicGrid />
@@ -217,3 +243,58 @@ const handleExportConfirm = async (config: any) => {
 
     </div>
 </template>
+
+<style scoped>
+.pic-pdf-export-mode {
+    width: 1120px;
+    min-width: 1120px;
+    max-width: 1120px;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 16px;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.pic-pdf-export-mode :deep(.pic-chart-row) {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap: 24px !important;
+    width: 100% !important;
+}
+
+.pic-pdf-export-mode :deep(.pic-chart-cell),
+.pic-pdf-export-mode :deep(.pic-chart-card),
+.pic-pdf-export-mode :deep(.pic-chart-surface) {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    box-sizing: border-box;
+}
+
+.pic-pdf-export-mode :deep(.pic-report-table),
+.pic-pdf-export-mode :deep(.pic-report-table-scroll) {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+}
+
+.pic-pdf-export-mode :deep(.pic-report-table table) {
+    width: 100% !important;
+    table-layout: fixed;
+}
+
+.pic-pdf-export-mode :deep(.pic-report-table th),
+.pic-pdf-export-mode :deep(.pic-report-table td) {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+    font-size: 10px !important;
+    white-space: normal !important;
+    word-break: break-word;
+}
+
+.pic-pdf-export-mode :deep(button) {
+    display: none !important;
+}
+</style>

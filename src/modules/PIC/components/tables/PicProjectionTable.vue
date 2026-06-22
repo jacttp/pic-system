@@ -200,7 +200,7 @@ const colorClass = (val: number, isPercent = false) => {
 
 <template>
     <div 
-        class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full transition-all duration-300"
+        class="pic-report-table bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full transition-all duration-300"
         :data-html2canvas-ignore="tableData.length === 0 ? 'true' : undefined"
     >
         
@@ -232,7 +232,7 @@ const colorClass = (val: number, isPercent = false) => {
             </div>
         </div>
 
-        <div v-else-if="!isCollapsed" class="overflow-x-auto custom-scrollbar animate-fade-in">
+        <div v-else-if="!isCollapsed" class="pic-report-table-scroll overflow-x-auto custom-scrollbar animate-fade-in">
             <table class="w-full text-xs text-left border-collapse whitespace-nowrap">
                 <thead class="bg-slate-800 text-white font-semibold uppercase sticky top-0 z-10">
                     <tr>

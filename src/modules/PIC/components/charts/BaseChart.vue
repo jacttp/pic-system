@@ -78,7 +78,7 @@ const handleAnalyze = () => {
 </script>
 
 <template>
-    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 h-full flex flex-col relative group transition-shadow hover:shadow-md">
+    <div class="pic-chart-card bg-white p-4 rounded-xl shadow-sm border border-slate-200 h-full w-full min-w-0 overflow-hidden flex flex-col relative group transition-shadow hover:shadow-md">
         
         <div class="flex justify-between items-center mb-4">
             <div class="flex items-center gap-2">
@@ -118,7 +118,7 @@ const handleAnalyze = () => {
             </div>
         </div>
 
-        <div class="flex-1 relative min-h-[250px]">
+        <div class="pic-chart-surface flex-1 relative min-h-[250px] w-full min-w-0">
             <canvas ref="canvasRef"></canvas>
         </div>
     </div>

@@ -93,7 +93,7 @@ const handleAnalyze = () => {
 </script>
 
 <template>
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col group transition-shadow hover:shadow-md">
+    <div class="pic-report-table bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col group transition-shadow hover:shadow-md">
         
         <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
             <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2">
@@ -122,7 +122,7 @@ const handleAnalyze = () => {
             </div>
         </div>
 
-        <div class="overflow-x-auto custom-scrollbar">
+        <div class="pic-report-table-scroll overflow-x-auto custom-scrollbar">
             <table class="w-full text-sm text-left border-collapse">
                 <thead class="text-xs text-white uppercase bg-slate-800 font-semibold sticky top-0 z-10 shadow-sm">
                     <tr>

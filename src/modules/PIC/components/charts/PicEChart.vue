@@ -84,7 +84,7 @@ const handleAnalyze = () => {
 </script>
 
 <template>
-    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 h-full flex flex-col relative group transition-shadow hover:shadow-md">
+    <div class="pic-chart-card bg-white p-4 rounded-xl shadow-sm border border-slate-200 h-full w-full min-w-0 overflow-hidden flex flex-col relative group transition-shadow hover:shadow-md">
 
         <div class="flex justify-between items-center mb-3">
             <h3 v-if="title" class="text-sm font-bold text-slate-700 flex items-center gap-2">
@@ -123,6 +123,6 @@ const handleAnalyze = () => {
         </div>
 
         <!-- ECharts se monta aquí. flex-1 lo hace crecer para llenar el card -->
-        <div ref="chartRef" class="flex-1 min-h-[250px] w-full"></div>
+        <div ref="chartRef" class="pic-chart-surface flex-1 min-h-[250px] w-full min-w-0"></div>
     </div>
 </template>
