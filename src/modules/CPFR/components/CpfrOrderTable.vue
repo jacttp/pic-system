@@ -597,6 +597,15 @@ function isSameISOWeek(date: Date | null, context: { year: number; week: number 
     return dateContext.year === context.year && dateContext.week === context.week
 }
 
+function canStillShipByLeadTime(sku: any, leadTime: number | null | undefined, today = new Date()): boolean {
+    const finEmbarqueDate = parseLocalDate(sku.fec_fin_embarque)
+    if (!finEmbarqueDate) return true
+
+    const normalizedLeadTime = Math.max(0, Number(leadTime) || 0)
+    const earliestShipDate = addDays(startOfLocalDay(today), normalizedLeadTime)
+    return finEmbarqueDate.getTime() >= earliestShipDate.getTime()
+}
+
 const filteredDias = computed(() => {
     const sf = store.statusFilters;
     const hasStatusFilter = sf.escenarioA || sf.escenarioB || sf.sinSellout || sf.desabasto || 
@@ -631,20 +640,11 @@ const filteredDias = computed(() => {
         return (y < last.year) || (y === last.year && w < last.week);
     };
 
-    const canStillShipByLeadTime = (sku: any, leadTime: number | null | undefined) => {
-        const finEmbarqueDate = parseLocalDate(sku.fec_fin_embarque);
-        if (!finEmbarqueDate) return true;
-
-        const normalizedLeadTime = Math.max(0, Number(leadTime) || 0);
-        const earliestShipDate = addDays(startOfLocalDay(today), normalizedLeadTime);
-        return finEmbarqueDate.getTime() >= earliestShipDate.getTime();
-    };
-
     const isCentralizadosVisibleOC = (sku: any, leadTime: number | null | undefined) => {
         const state = sku.estado_oc;
         if (state === 'revision' || state === 'aprobado') return false;
         if (!(state === 'pendiente' || state === 'borrador' || !state)) return false;
-        if (!canStillShipByLeadTime(sku, leadTime)) return false;
+        if (!canStillShipByLeadTime(sku, leadTime, today)) return false;
 
         const pedidoDate = parseLocalDate(sku.fec_pedido_cadena);
         const finEmbarqueDate = parseLocalDate(sku.fec_fin_embarque);
@@ -751,6 +751,106 @@ const filteredDias = computed(() => {
     }).filter(dia => dia.tiendas.length > 0);
 });
 
+const expiredCentralizedOCs = computed(() => {
+    const today = new Date()
+    const curr = getISOContext(today)
+    const last = getISOContext(addDays(today, -7))
+    const currentWeekStart = startOfISOWeek(today)
+    const immediatePreviousSaturday = addDays(currentWeekStart, -2)
+    const immediatePreviousSunday = addDays(currentWeekStart, -1)
+    const rollingSevenDaysStart = addDays(startOfLocalDay(today), -7)
+    const map = new Map<string, {
+        id_cliente: string
+        nombre_tienda: string
+        num_pedido: string
+        fec_pedido_cadena: string | null
+        fec_fin_embarque: string | null
+        lead_time: number
+    }>()
+
+    const isCentralizadosDateEligible = (sku: any) => {
+        const pedidoDate = parseLocalDate(sku.fec_pedido_cadena)
+        const finEmbarqueDate = parseLocalDate(sku.fec_fin_embarque)
+
+        if (isSameISOWeek(pedidoDate, curr)) return true
+        if (sameLocalDay(pedidoDate, immediatePreviousSaturday) || sameLocalDay(pedidoDate, immediatePreviousSunday)) return true
+
+        return isSameISOWeek(pedidoDate, last)
+            && isSameISOWeek(finEmbarqueDate, curr)
+            && !!pedidoDate
+            && pedidoDate.getTime() >= rollingSevenDaysStart.getTime()
+    }
+
+    for (const dia of store.dias) {
+        for (const tienda of dia.tiendas) {
+            const leadTime = tienda.resumen?.lead_time ?? 0
+            for (const sku of tienda.skus) {
+                const state = sku.estado_oc
+                if (!sku.num_pedido) continue
+                if (state === 'revision' || state === 'aprobado' || state === 'cerrado') continue
+                if (!(state === 'pendiente' || state === 'borrador' || !state)) continue
+                if (!isCentralizadosDateEligible(sku)) continue
+                if (canStillShipByLeadTime(sku, leadTime, today)) continue
+
+                const key = `${tienda.id_cliente}|${sku.num_pedido}`
+                if (!map.has(key)) {
+                    map.set(key, {
+                        id_cliente: tienda.id_cliente,
+                        nombre_tienda: tienda.nombre_tienda,
+                        num_pedido: sku.num_pedido,
+                        fec_pedido_cadena: sku.fec_pedido_cadena,
+                        fec_fin_embarque: sku.fec_fin_embarque,
+                        lead_time: Number(leadTime) || 0,
+                    })
+                }
+            }
+        }
+    }
+
+    return [...map.values()]
+})
+
+async function closeExpiredCentralizedOCs() {
+    if (!store.currentWeek || submittingOC.value === 'expired-centralized') return
+
+    const expired = expiredCentralizedOCs.value
+    if (!expired.length) return
+
+    const sample = expired
+        .slice(0, 5)
+        .map(oc => `${oc.num_pedido} · ${oc.nombre_tienda}`)
+        .join('\n')
+    const extra = expired.length > 5 ? `\n... y ${expired.length - 5} OC más` : ''
+    const confirmed = window.confirm(
+        `Se cerrarán ${expired.length} OC caducada(s) por fecha fin embarque y lead time.\n\n${sample}${extra}\n\nEsta acción cambiará el estado a "cerrado".`
+    )
+    if (!confirmed) return
+
+    submittingOC.value = 'expired-centralized'
+    const result = await store.updateStatusBulk({
+        num_pedidos: expired.map(oc => oc.num_pedido),
+        year: store.currentWeek.anio,
+        week: store.currentWeek.semana,
+        estado: 'cerrado',
+    })
+    submittingOC.value = null
+
+    if (result.ok) {
+        toast({
+            title: 'OC caducadas cerradas',
+            description: `${expired.length} OC actualizada(s) a cerrado.`,
+            duration: 5000,
+        })
+    } else {
+        toast({
+            title: 'Error al cerrar OC',
+            description: 'No se pudieron cerrar las OC caducadas. Intenta de nuevo.',
+            variant: 'destructive',
+            duration: 5000,
+        })
+    }
+}
+
 const totalUniqueOCs = computed(() => {
     const ocSet = new Set<string>();
     filteredDias.value.forEach(dia => {
@@ -820,6 +920,19 @@ const totalUniqueOCs = computed(() => {
             <i class="fa-solid fa-file-circle-check"></i>
             <span>{{ totalUniqueOCs }} OC</span>
           </div>
+
+          <button
+            v-if="currentTab === 'centralizados' && expiredCentralizedOCs.length > 0"
+            class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 text-[10px] font-bold uppercase tracking-wider text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="submittingOC === 'expired-centralized'"
+            title="Cerrar OC que ya no pueden enviarse por fecha fin embarque y lead time"
+            @click.stop="closeExpiredCentralizedOCs"
+          >
+            <i v-if="submittingOC === 'expired-centralized'" class="fa-solid fa-circle-notch fa-spin"></i>
+            <i v-else class="fa-solid fa-lock"></i>
+            Cerrar caducadas
+            <span class="rounded bg-white/70 px-1.5 py-0.5 text-[9px]">{{ expiredCentralizedOCs.length }}</span>
+          </button>
 
           <!-- Pestañas (Tabs) -->
           <div class="flex min-w-0 items-center gap-1 bg-slate-100/50 p-0.5 rounded-lg border border-slate-200 shadow-inner">
