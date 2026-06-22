@@ -550,6 +550,53 @@ function fillRateStatusDot(sku: any): { cls: string; label: string } {
 
 // ── Lógica de Filtrado Local ──────────────────────────────────────────────────
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function parseLocalDate(value: string | null | undefined): Date | null {
+    if (!value) return null
+    const [year, month, day] = value.slice(0, 10).split('-').map(Number)
+    if (!year || !month || !day) return null
+    return new Date(year, month - 1, day)
+}
+
+function startOfLocalDay(date: Date): Date {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function addDays(date: Date, days: number): Date {
+    const next = new Date(date)
+    next.setDate(next.getDate() + days)
+    return next
+}
+
+function sameLocalDay(a: Date | null, b: Date | null): boolean {
+    if (!a || !b) return false
+    return a.getFullYear() === b.getFullYear()
+        && a.getMonth() === b.getMonth()
+        && a.getDate() === b.getDate()
+}
+
+function getISOContext(date: Date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+    const dayNum = d.getUTCDay() || 7
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+    const week = Math.ceil((((d.getTime() - yearStart.getTime()) / DAY_MS) + 1) / 7)
+    return { year: d.getUTCFullYear(), week }
+}
+
+function startOfISOWeek(date: Date): Date {
+    const d = startOfLocalDay(date)
+    const dayNum = d.getDay() || 7
+    return addDays(d, 1 - dayNum)
+}
+
+function isSameISOWeek(date: Date | null, context: { year: number; week: number }): boolean {
+    if (!date) return false
+    const dateContext = getISOContext(date)
+    return dateContext.year === context.year && dateContext.week === context.week
+}
+
 const filteredDias = computed(() => {
     const sf = store.statusFilters;
     const hasStatusFilter = sf.escenarioA || sf.escenarioB || sf.sinSellout || sf.desabasto || 
@@ -558,19 +605,13 @@ const filteredDias = computed(() => {
     
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // --- Cálculo de Semanas Calendario (ISO) ---
-    const getISOContext = (date: Date) => {
-        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-        const dayNum = d.getUTCDay() || 7;
-        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-        const week = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-        return { year: d.getUTCFullYear(), week };
-    };
-
     const today = new Date();
     const curr = getISOContext(today);
     const last = getISOContext(new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000));
+    const currentWeekStart = startOfISOWeek(today);
+    const immediatePreviousSaturday = addDays(currentWeekStart, -2);
+    const immediatePreviousSunday = addDays(currentWeekStart, -1);
+    const rollingSevenDaysStart = addDays(startOfLocalDay(today), -7);
 
     const isCurrentWeek = (sku: any) => {
         const y = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0;
@@ -590,15 +631,35 @@ const filteredDias = computed(() => {
         return (y < last.year) || (y === last.year && w < last.week);
     };
 
+    const isCentralizadosVisibleOC = (sku: any) => {
+        const state = sku.estado_oc;
+        if (state === 'revision' || state === 'aprobado') return false;
+        if (!(state === 'pendiente' || state === 'borrador' || !state)) return false;
+
+        const pedidoDate = parseLocalDate(sku.fec_pedido_cadena);
+        const finEmbarqueDate = parseLocalDate(sku.fec_fin_embarque);
+
+        if (isSameISOWeek(pedidoDate, curr)) return true;
+
+        const isImmediatePreviousWeekend =
+            sameLocalDay(pedidoDate, immediatePreviousSaturday)
+            || sameLocalDay(pedidoDate, immediatePreviousSunday);
+
+        if (isImmediatePreviousWeekend) return true;
+
+        return isSameISOWeek(pedidoDate, last)
+            && isSameISOWeek(finEmbarqueDate, curr)
+            && !!pedidoDate
+            && pedidoDate.getTime() >= rollingSevenDaysStart.getTime();
+    };
+
     return (currentTab.value === 'historial' ? store.historialDias : store.dias).map(dia => {
         const filteredTiendas = dia.tiendas.map(tienda => {
             const filteredSkus = tienda.skus.filter(sku => {
                 // 1. Filtro por Pestaña (Tab)
                 const state = sku.estado_oc;
                 if (currentTab.value === 'centralizados') {
-                    const isPending = (state === 'pendiente' || state === 'borrador' || !state);
-                    const isFocus = isCurrentWeek(sku) || (isPreviousWeek(sku) && isPending);
-                    if (!isFocus || state === 'revision' || state === 'aprobado') return false;
+                    if (!isCentralizadosVisibleOC(sku)) return false;
                 } else if (currentTab.value === 'revision') {
                     if ((!isCurrentWeek(sku) && !isPreviousWeek(sku)) || state !== 'revision') return false;
                 } else if (currentTab.value === 'aprobada') {
