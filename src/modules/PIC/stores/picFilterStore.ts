@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, reactive } from 'vue';
+import { ref, reactive, watch } from 'vue';
 import { picApi } from '../services/picApi';
 import type { PicFilterOptions } from '../types/picTypes';
 
@@ -65,6 +65,8 @@ export const usePicFilterStore = defineStore('picFilter', () => {
 
    const reportData = ref<any[]>([]); // Datos crudos de la API
    const isGenerating = ref(false);   // Loading específico del botón generar
+   const hasGeneratedReport = ref(false);
+   const filtersDirty = ref(false);
 
    const isComparisonFrozen = ref(true); //Candado de comparación - por defecto activado. 
    const selectedClients = reactive(new Map<string, string>());
@@ -82,6 +84,58 @@ export const usePicFilterStore = defineStore('picFilter', () => {
 
 
    // 3. ACCIONES
+   function clearProjectionData() {
+      Object.keys(projectionData).forEach(key => {
+         projectionData[key as keyof typeof projectionData] = [];
+      });
+   }
+
+   function markReportDirty() {
+      if (!hasGeneratedReport.value || isGenerating.value) return;
+      filtersDirty.value = true;
+      clearProjectionData();
+   }
+
+   function getYearsTarget() {
+      return selected.Anio.length > 0
+         ? [...selected.Anio].sort()
+         : (options.anios.length > 0 ? options.anios.slice(-3).sort() : [(new Date().getFullYear() - 2).toString(), (new Date().getFullYear() - 1).toString(), (new Date().getFullYear()).toString()]);
+   }
+
+   function buildApiFilters(includeAnio = true) {
+      const apiFilters: Record<string, any> = {};
+
+      const mappings: Record<string, string> = {
+         'Transaccion': 'TRANSACCION',
+         'FormatoCliente': 'formatocte',
+         'Anio': 'Año',
+         'grupo': 'grupo',
+         'Categorias': 'Categorias',
+         'SKU': 'SKU_NOMBRE'
+      };
+
+      for (const key in selected) {
+         const val = selected[key as keyof typeof selected];
+         if (Array.isArray(val) && val.length > 0) {
+            if (!includeAnio && key === 'Anio') continue;
+            const dbKey = mappings[key] || key;
+            if (key !== 'MesInicial' && key !== 'MesFinal') {
+               apiFilters[dbKey] = val;
+            }
+         }
+      }
+
+      apiFilters['MesInicial'] = selected.MesInicial;
+      apiFilters['MesFinal'] = selected.MesFinal;
+
+      if (selectedClients.size > 0) {
+         apiFilters['IDCLIENTE'] = Array.from(selectedClients.keys());
+      }
+
+      return apiFilters;
+   }
+
+   watch(selected, markReportDirty, { deep: true });
 
    // Carga inicial (al montar el componente)
    async function initFilters() {
@@ -337,45 +391,8 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       isGenerating.value = true;
       try {
          // 1. Limpiar proyecciones anteriores (CRÍTICO para consistencia)
-         Object.keys(projectionData).forEach(key => {
-            projectionData[key as keyof typeof projectionData] = [];
-         });
-
-         // 1. Construir filtros limpios para la API
-         const apiFilters: Record<string, any> = {};
-
-         // Mapeo de filtros UI -> API Columns
-         const mappings: Record<string, string> = {
-            'Transaccion': 'TRANSACCION',
-            'FormatoCliente': 'formatocte',
-            'grupo': 'grupo',
-            'Categorias': 'Categorias',
-            'SKU': 'SKU_NOMBRE'
-         };
-
-         // A. Agregar filtros estándar (Dropdowns)
-         for (const key in selected) {
-            const val = selected[key as keyof typeof selected];
-            // Si es un array y tiene valores
-            if (Array.isArray(val) && val.length > 0) {
-               const dbKey = mappings[key] || key;
-               // Excluimos mes/año aquí porque se tratan aparte o ya tienen su lógica
-               if (key !== 'MesInicial' && key !== 'MesFinal') {
-                  apiFilters[dbKey] = val;
-               }
-            }
-         }
-
-         // B. Agregar rango de meses
-         apiFilters['MesInicial'] = selected.MesInicial;
-         apiFilters['MesFinal'] = selected.MesFinal;
-
-         // C. AGREGRAR CLIENTES SELECCIONADOS (¡ESTO FALTABA!)
-         if (selectedClients.size > 0) {
-            // Convertimos las llaves del Map (IDs) a un Array simple
-            apiFilters['IDCLIENTE'] = Array.from(selectedClients.keys());
-            console.log("Filtro de clientes aplicado:", apiFilters['IDCLIENTE']);
-         }
+         clearProjectionData();
+         const apiFilters = buildApiFilters(true);
 
          // 2. Llamada a la API
          // Nota: El backend en 'picController.js' ya está programado para recibir 'IDCLIENTE'
@@ -383,6 +400,8 @@ export const usePicFilterStore = defineStore('picFilter', () => {
 
          const data = await picApi.getDashboardData(apiFilters, ['Año', 'Mes']);
          reportData.value = data;
+         hasGeneratedReport.value = true;
+         filtersDirty.value = false;
 
          return true; // Éxito
 
@@ -400,27 +419,13 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       loadingProjections[dimensionKey] = true;
 
       try {
-         // 1. Reconstruir filtros (Podríamos refactorizar esto a un getter para no repetir código, pero por ahora copiamos la lógica)
-         const apiFilters: Record<string, any> = {};
-         const mappings: Record<string, string> = {
-            'Transaccion': 'TRANSACCION', 'FormatoCliente': 'formatocte',
-            'grupo': 'grupo', 'Categorias': 'Categorias', 'SKU': 'SKU_NOMBRE'
-         };
-         for (const key in selected) {
-            const val = selected[key as keyof typeof selected];
-            if (Array.isArray(val) && val.length > 0) {
-               const dbKey = mappings[key] || key;
-               if (key !== 'MesInicial' && key !== 'MesFinal') apiFilters[dbKey] = val;
-            }
+         if (filtersDirty.value && hasGeneratedReport.value) {
+            const refreshed = await generateReport();
+            if (!refreshed) return;
          }
-         apiFilters['MesInicial'] = selected.MesInicial;
-         apiFilters['MesFinal'] = selected.MesFinal;
-         if (selectedClients.size > 0) apiFilters['IDCLIENTE'] = Array.from(selectedClients.keys());
 
-         // 2. Años objetivo
-         let yearsTarget = selected.Anio.length > 0
-            ? [...selected.Anio].sort()
-            : (options.anios.length > 0 ? options.anios.slice(-3).sort() : [(new Date().getFullYear() - 2).toString(), (new Date().getFullYear() - 1).toString(), (new Date().getFullYear()).toString()]);
+         const apiFilters = buildApiFilters(false);
+         let yearsTarget = getYearsTarget();
 
          // --- CAMBIO AQUÍ: Definir límite según la dimensión ---
          let limit: number | undefined = undefined;
@@ -457,10 +462,12 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       } else {
          selectedClients.set(id, name);
       }
+      markReportDirty();
    }
 
    function clearSelectedClients() {
       selectedClients.clear();
+      markReportDirty();
    }
 
    // Helper para formatear filtros para la API de Clientes
@@ -515,6 +522,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
 
       // 4. Limpiar Clientes
       selectedClients.clear();
+      markReportDirty();
 
       // 5. Limpiar opciones dependientes (Cascada)
       // Si Gerencia está bloqueada, conservar las jefaturas de su gerencia

@@ -58,10 +58,10 @@ export function processChartData(rawData: any[], years: string[], metricType: 'p
          const row = processed[mesIdx] as any;
 
          if (metricType === 'pesos') {
-            row[anio] = item.TotalVentaPesos || 0;
+            row[anio] += item.TotalVentaPesos || 0;
          } else if (metricType === 'kilos') {
-            row[anio] = item.TotalVentaKG || 0;
-            row[`meta_${anio}`] = item.TotalMetasKG || 0;
+            row[anio] += item.TotalVentaKG || 0;
+            row[`meta_${anio}`] += item.TotalMetasKG || 0;
          } else if (metricType === 'promedio') {
             // Cálculo seguro del promedio
             const venta = item.TotalVentaPesos || 0;
