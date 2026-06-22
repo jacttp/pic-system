@@ -631,10 +631,20 @@ const filteredDias = computed(() => {
         return (y < last.year) || (y === last.year && w < last.week);
     };
 
-    const isCentralizadosVisibleOC = (sku: any) => {
+    const canStillShipByLeadTime = (sku: any, leadTime: number | null | undefined) => {
+        const finEmbarqueDate = parseLocalDate(sku.fec_fin_embarque);
+        if (!finEmbarqueDate) return true;
+
+        const normalizedLeadTime = Math.max(0, Number(leadTime) || 0);
+        const earliestShipDate = addDays(startOfLocalDay(today), normalizedLeadTime);
+        return finEmbarqueDate.getTime() >= earliestShipDate.getTime();
+    };
+
+    const isCentralizadosVisibleOC = (sku: any, leadTime: number | null | undefined) => {
         const state = sku.estado_oc;
         if (state === 'revision' || state === 'aprobado') return false;
         if (!(state === 'pendiente' || state === 'borrador' || !state)) return false;
+        if (!canStillShipByLeadTime(sku, leadTime)) return false;
 
         const pedidoDate = parseLocalDate(sku.fec_pedido_cadena);
         const finEmbarqueDate = parseLocalDate(sku.fec_fin_embarque);
@@ -659,7 +669,7 @@ const filteredDias = computed(() => {
                 // 1. Filtro por Pestaña (Tab)
                 const state = sku.estado_oc;
                 if (currentTab.value === 'centralizados') {
-                    if (!isCentralizadosVisibleOC(sku)) return false;
+                    if (!isCentralizadosVisibleOC(sku, tienda.resumen?.lead_time)) return false;
                 } else if (currentTab.value === 'revision') {
                     if ((!isCurrentWeek(sku) && !isPreviousWeek(sku)) || state !== 'revision') return false;
                 } else if (currentTab.value === 'aprobada') {
