@@ -16,6 +16,7 @@ const selectedProductContext = ref<{ tienda: CpfrStoreDash; sku: CpfrSkuDash } |
 
 const store = useCpfrStore()
 const showZeroZ8 = ref(false)
+const showExpiredCloseModal = ref(false)
 
 const emit = defineEmits<{
     (e: 'open-config', id_cliente: string, nombre_tienda: string): void
@@ -766,6 +767,7 @@ const expiredCentralizedOCs = computed(() => {
         fec_pedido_cadena: string | null
         fec_fin_embarque: string | null
         lead_time: number
+        sku_count: number
     }>()
 
     const isCentralizadosDateEligible = (sku: any) => {
@@ -801,7 +803,10 @@ const expiredCentralizedOCs = computed(() => {
                         fec_pedido_cadena: sku.fec_pedido_cadena,
                         fec_fin_embarque: sku.fec_fin_embarque,
                         lead_time: Number(leadTime) || 0,
+                        sku_count: 1,
                     })
+                } else {
+                    map.get(key)!.sku_count += 1
                 }
             }
         }
@@ -810,21 +815,17 @@ const expiredCentralizedOCs = computed(() => {
     return [...map.values()]
 })
 
+const expiredCloseSummary = computed(() => ({
+    ocs: expiredCentralizedOCs.value.length,
+    stores: new Set(expiredCentralizedOCs.value.map(oc => oc.id_cliente)).size,
+    skus: expiredCentralizedOCs.value.reduce((acc, oc) => acc + oc.sku_count, 0),
+}))
+
 async function closeExpiredCentralizedOCs() {
     if (!store.currentWeek || submittingOC.value === 'expired-centralized') return
 
     const expired = expiredCentralizedOCs.value
     if (!expired.length) return
-
-    const sample = expired
-        .slice(0, 5)
-        .map(oc => `${oc.num_pedido} · ${oc.nombre_tienda}`)
-        .join('\n')
-    const extra = expired.length > 5 ? `\n... y ${expired.length - 5} OC más` : ''
-    const confirmed = window.confirm(
-        `Se cerrarán ${expired.length} OC caducada(s) por fecha fin embarque y lead time.\n\n${sample}${extra}\n\nEsta acción cambiará el estado a "cerrado".`
-    )
-    if (!confirmed) return
 
     submittingOC.value = 'expired-centralized'
     const result = await store.updateStatusBulk({
@@ -836,6 +837,7 @@ async function closeExpiredCentralizedOCs() {
     submittingOC.value = null
 
     if (result.ok) {
+        showExpiredCloseModal.value = false
         toast({
             title: 'OC caducadas cerradas',
             description: `${expired.length} OC actualizada(s) a cerrado.`,
@@ -849,6 +851,21 @@ async function closeExpiredCentralizedOCs() {
             duration: 5000,
         })
     }
+}
+
+function openExpiredCloseModal() {
+    if (!expiredCentralizedOCs.value.length) return
+    showExpiredCloseModal.value = true
+}
+
+function closeExpiredCloseModal() {
+    if (submittingOC.value === 'expired-centralized') return
+    showExpiredCloseModal.value = false
+}
+
+function formatShortDate(value: string | null | undefined): string {
+    if (!value) return '—'
+    return value.slice(0, 10)
 }
 
 const totalUniqueOCs = computed(() => {
@@ -926,7 +943,7 @@ const totalUniqueOCs = computed(() => {
             class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 text-[10px] font-bold uppercase tracking-wider text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="submittingOC === 'expired-centralized'"
             title="Cerrar OC que ya no pueden enviarse por fecha fin embarque y lead time"
-            @click.stop="closeExpiredCentralizedOCs"
+            @click.stop="openExpiredCloseModal"
           >
             <i v-if="submittingOC === 'expired-centralized'" class="fa-solid fa-circle-notch fa-spin"></i>
             <i v-else class="fa-solid fa-lock"></i>
@@ -1989,6 +2006,113 @@ const totalUniqueOCs = computed(() => {
         :cadena="store.nom_cadena"
         @close="closeProductPanel"
     />
+  </Teleport>
+
+  <Teleport to="body">
+    <div
+      v-if="showExpiredCloseModal"
+      class="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/35 px-4 py-6 backdrop-blur-[2px]"
+      @click.self="closeExpiredCloseModal"
+    >
+      <section class="flex max-h-[82vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-brand-200 bg-white shadow-2xl">
+        <header class="shrink-0 border-b border-brand-100 bg-brand-50 px-5 py-4">
+          <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+              <div class="mb-1 flex items-center gap-2">
+                <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-brand-600 text-white shadow-sm">
+                  <i class="fa-solid fa-lock text-[11px]"></i>
+                </span>
+                <h3 class="text-sm font-black uppercase tracking-wider text-slate-800">Cerrar OC caducadas</h3>
+              </div>
+              <p class="text-xs font-medium leading-relaxed text-slate-600">
+                Estas OC ya no alcanzan fecha fin embarque considerando el lead time de la tienda.
+              </p>
+            </div>
+            <button
+              class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand-100 bg-white text-slate-400 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-60"
+              :disabled="submittingOC === 'expired-centralized'"
+              title="Cerrar ventana"
+              @click="closeExpiredCloseModal"
+            >
+              <i class="fa-solid fa-xmark text-[12px]"></i>
+            </button>
+          </div>
+        </header>
+
+        <div class="shrink-0 border-b border-slate-100 bg-white px-5 py-3">
+          <div class="grid grid-cols-3 gap-2">
+            <div class="rounded-lg border border-brand-100 bg-brand-50 px-3 py-2">
+              <p class="text-[9px] font-black uppercase tracking-wider text-brand-600">OC</p>
+              <p class="mt-0.5 text-lg font-black text-brand-700">{{ expiredCloseSummary.ocs }}</p>
+            </div>
+            <div class="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+              <p class="text-[9px] font-black uppercase tracking-wider text-slate-500">Tiendas</p>
+              <p class="mt-0.5 text-lg font-black text-slate-800">{{ expiredCloseSummary.stores }}</p>
+            </div>
+            <div class="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
+              <p class="text-[9px] font-black uppercase tracking-wider text-amber-700">SKUs</p>
+              <p class="mt-0.5 text-lg font-black text-amber-800">{{ expiredCloseSummary.skus }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="min-h-0 flex-1 overflow-auto">
+          <table class="w-full text-left text-[11px]">
+            <thead class="sticky top-0 z-10 border-b border-slate-200 bg-slate-100 text-[9px] uppercase tracking-wider text-slate-500">
+              <tr>
+                <th class="px-4 py-2.5 font-black">OC</th>
+                <th class="px-3 py-2.5 font-black">Tienda</th>
+                <th class="px-3 py-2.5 text-center font-black">Pedido</th>
+                <th class="px-3 py-2.5 text-center font-black">Fin embarque</th>
+                <th class="px-3 py-2.5 text-center font-black">Lead</th>
+                <th class="px-3 py-2.5 text-right font-black">SKUs</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="oc in expiredCentralizedOCs" :key="oc.id_cliente + '_' + oc.num_pedido" class="hover:bg-brand-50/30">
+                <td class="px-4 py-3 font-black text-slate-800">{{ oc.num_pedido }}</td>
+                <td class="max-w-[240px] px-3 py-3">
+                  <p class="truncate font-bold text-slate-700" :title="oc.nombre_tienda">{{ oc.nombre_tienda }}</p>
+                  <p class="mt-0.5 font-mono text-[9px] font-bold text-slate-400">{{ oc.id_cliente }}</p>
+                </td>
+                <td class="px-3 py-3 text-center font-mono font-bold text-slate-600">{{ formatShortDate(oc.fec_pedido_cadena) }}</td>
+                <td class="px-3 py-3 text-center font-mono font-black text-rose-600">{{ formatShortDate(oc.fec_fin_embarque) }}</td>
+                <td class="px-3 py-3 text-center">
+                  <span class="inline-flex rounded-md bg-slate-100 px-2 py-0.5 font-black text-slate-600">{{ oc.lead_time }} d</span>
+                </td>
+                <td class="px-3 py-3 text-right font-black text-slate-700">{{ oc.sku_count }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <footer class="shrink-0 border-t border-slate-200 bg-slate-50 px-5 py-3">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-[11px] font-semibold text-slate-500">
+              Al confirmar, el estado se cambiará a cerrado en PedidoGenerado y OrdenCompra.
+            </p>
+            <div class="flex justify-end gap-2">
+              <button
+                class="h-9 rounded-lg border border-slate-200 bg-white px-4 text-[11px] font-black uppercase tracking-wider text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-60"
+                :disabled="submittingOC === 'expired-centralized'"
+                @click="closeExpiredCloseModal"
+              >
+                Cancelar
+              </button>
+              <button
+                class="inline-flex h-9 items-center gap-2 rounded-lg bg-brand-600 px-4 text-[11px] font-black uppercase tracking-wider text-white shadow-sm transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+                :disabled="submittingOC === 'expired-centralized'"
+                @click="closeExpiredCentralizedOCs"
+              >
+                <i v-if="submittingOC === 'expired-centralized'" class="fa-solid fa-circle-notch fa-spin"></i>
+                <i v-else class="fa-solid fa-lock"></i>
+                Cerrar OC
+              </button>
+            </div>
+          </div>
+        </footer>
+      </section>
+    </div>
   </Teleport>
 </template>
 
