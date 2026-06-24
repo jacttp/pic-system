@@ -21,6 +21,46 @@ const showZ8Manager    = ref(false)
 const configStore      = ref<{ id: string; nombre: string } | null>(null)
 const chainLabel = computed(() => store.nom_cadena === 'SAMS' ? "Sam's" : 'Soriana')
 
+function isSkuInCurrentTab(estado: string | null): boolean {
+    if (store.activeTab === 'centralizados') {
+        return !estado || estado === 'pendiente' || estado === 'borrador'
+    }
+
+    if (store.activeTab === 'revision') return estado === 'revision'
+    if (store.activeTab === 'aprobada') return estado === 'aprobado'
+
+    return true
+}
+
+const orderTotals = computed(() => {
+    let piezas = 0
+    let kg = 0
+    const tiendas = new Set<string>()
+
+    for (const dia of store.dias) {
+        for (const tienda of dia.tiendas) {
+            let hasMatchingSku = false
+
+            for (const sku of tienda.skus) {
+                if (!isSkuInCurrentTab(sku.estado_oc)) continue
+
+                const piezasSku = Number(sku.pedido_sugerido_pz_red ?? 0)
+                const kgPorPieza = Number(sku.unidad_inventario ?? 0)
+                piezas += piezasSku
+                kg += kgPorPieza > 0 ? piezasSku * kgPorPieza : Number(sku.pedido_sugerido_kg ?? 0)
+                hasMatchingSku = true
+            }
+
+            if (hasMatchingSku) tiendas.add(tienda.id_cliente)
+        }
+    }
+
+    return { tiendas: tiendas.size, piezas, kg }
+})
+
+const formatNumber = (value: number, maximumFractionDigits = 0) =>
+    value.toLocaleString('es-MX', { maximumFractionDigits })
+
 onMounted(() => store.init())
 
 function onOpenConfig(id_cliente: string, nombre_tienda: string) {
@@ -85,12 +125,17 @@ function openChainConfig() {
       <div v-if="store.context" class="flex items-center gap-3 xl:gap-5 shrink-0">
         <div class="text-center">
           <p class="text-[8px] xl:text-[10px] uppercase tracking-widest text-slate-400 font-bold">Tiendas</p>
-          <p class="text-lg xl:text-xl font-bold text-slate-700 leading-tight">{{ store.context.total_tiendas }}</p>
+          <p class="text-lg xl:text-xl font-bold text-slate-700 leading-tight">{{ orderTotals.tiendas }}</p>
         </div>
         <div class="w-px h-6 xl:h-8 bg-slate-200"></div>
         <div class="text-center">
-          <p class="text-[8px] xl:text-[10px] uppercase tracking-widest text-slate-400 font-bold">SKUs</p>
-          <p class="text-lg xl:text-xl font-bold text-slate-700 leading-tight">{{ store.context.total_skus.toLocaleString('es-MX') }}</p>
+          <p class="text-[8px] xl:text-[10px] uppercase tracking-widest text-slate-400 font-bold">Piezas</p>
+          <p class="text-lg xl:text-xl font-bold text-slate-700 leading-tight">{{ formatNumber(orderTotals.piezas) }}</p>
+        </div>
+        <div class="w-px h-6 xl:h-8 bg-slate-200"></div>
+        <div class="text-center">
+          <p class="text-[8px] xl:text-[10px] uppercase tracking-widest text-slate-400 font-bold">KG</p>
+          <p class="text-lg xl:text-xl font-bold text-slate-700 leading-tight">{{ formatNumber(orderTotals.kg, 1) }}</p>
         </div>
         <div class="w-px h-6 xl:h-8 bg-slate-200"></div>
         <div class="text-center">

@@ -238,12 +238,13 @@ export const useCpfrStore = defineStore('cpfr', () => {
     async function updateStatus(body: CpfrUpdateStatusBody): Promise<{ ok: boolean; approvalId?: number }> {
         try {
             const res = await cpfrApi.updateStatus(body)
+            const localEstado = body.estado === 'pendiente' ? 'borrador' : body.estado
             // Actualizar localmente sin re-fetch
             for (const dia of dias.value) {
                 for (const store of dia.tiendas) {
                     for (const sku of store.skus) {
                         if (sku.num_pedido === body.num_pedido) {
-                            sku.estado_oc = body.estado
+                            sku.estado_oc = localEstado
                         }
                     }
                 }
@@ -378,11 +379,12 @@ export const useCpfrStore = defineStore('cpfr', () => {
         try {
             const res = await cpfrApi.updateStatusBulk(body)
             const nums = new Set(body.num_pedidos)
+            const localEstado = body.estado === 'pendiente' ? 'borrador' : body.estado
             for (const dia of dias.value) {
                 for (const store of dia.tiendas) {
                     for (const sku of store.skus) {
                         if (sku.num_pedido && nums.has(sku.num_pedido)) {
-                            sku.estado_oc = body.estado
+                            sku.estado_oc = localEstado
                         }
                     }
                 }

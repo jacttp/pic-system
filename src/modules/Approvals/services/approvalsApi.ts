@@ -46,6 +46,19 @@ export const approvalsApi = {
       return data.data;
    },
 
+   async updateCpfrOrderAdjustment(id: number, payload: {
+      id_cliente: string
+      sku_muliix: string
+      num_pedido: string
+      anio: string
+      semana_ic: string
+      fec_pedido_cadena: string
+      ajuste: number
+   }): Promise<any> {
+      const { data } = await api.patch(`/v2/approvals/${id}/cpfr-order-adjustment`, payload);
+      return data.data;
+   },
+
    async createApproval(payload: ApprovalCreatePayload): Promise<Approval> {
       const { data } = await api.post('/v2/approvals', payload);
       return mapApproval(data.data);
@@ -59,5 +72,15 @@ export const approvalsApi = {
    async cancelApproval(id: number): Promise<boolean> {
       const { data } = await api.delete(`/v2/approvals/${id}`);
       return data.success;
+   },
+
+   async deleteCancelledApproval(id: number): Promise<boolean> {
+      const { data } = await api.delete(`/v2/approvals/${id}/cancelled`);
+      return data.success;
+   },
+
+   async deleteAllCancelledApprovals(): Promise<number> {
+      const { data } = await api.delete('/v2/approvals/cancelled');
+      return Number(data.deleted || 0);
    },
 };

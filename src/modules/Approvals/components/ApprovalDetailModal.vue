@@ -6,6 +6,7 @@ import { APPROVAL_TYPE_CONFIG } from '../types/approval.types';
 import { useApprovalsStore } from '../stores/approvalsStore';
 import { approvalsApi } from '../services/approvalsApi';
 import ApprovalStatusBadge from './ApprovalStatusBadge.vue';
+import logoUrl from '@/assets/logo.png';
 
 const props = defineProps<{
    modelValue: boolean
@@ -25,10 +26,17 @@ interface CpfrPreviewRow {
    fec_fin_embarque: string
    num_pedido: string
    cant_pedida: number
+   cantidad_base_uni: number
+   ajuste: number
+   pzas_caja: number
+   ajusteValido: boolean
    cantidad_oc: number
    pedido_kg: number
    inv_actual_pz: number
+   inv_actual_kg: number
    promedio_sellout_pz: number
+   promedio_sellout_kg: number
+   unidad_inventario: number
    cobertura_calculada: number | null
    sku_muliix: string
    sku_cadena: string
@@ -76,6 +84,7 @@ const errorMessage = ref('');
 const isLoadingCpfrDetail = ref(false);
 const cpfrDetailError = ref('');
 const cpfrDetail = ref<any | null>(null);
+const adjustingRows = ref<Set<string>>(new Set());
 
 // Reset al abrir
 watch(() => props.modelValue, (open) => {
@@ -83,6 +92,7 @@ watch(() => props.modelValue, (open) => {
       resolutionComment.value = '';
       errorMessage.value = '';
       cpfrDetailError.value = '';
+      adjustingRows.value = new Set();
    }
 });
 
@@ -135,6 +145,9 @@ const cpfrChain = computed(() => String(cpfrSource.value.nom_cadena ?? 'CPFR').t
 const cpfrTotalSkus = computed(() => Number(cpfrSource.value.total_skus ?? cpfrPreviewRows.value.length ?? 0));
 const cpfrTotalCadena = computed(() => Number(cpfrSource.value.total_pzas_cadena ?? 0));
 const cpfrTotalSugeridas = computed(() => Number(cpfrSource.value.total_pzas_sugeridas ?? 0));
+const canEditCpfrOrder = computed(() =>
+   props.approval?.type === 'CPFR_ORDER' && props.approval?.status === 'PENDING' && props.canResolve
+);
 
 const splitClientId = (idCliente: string) => {
    const idx = idCliente.toLowerCase().indexOf('s');
@@ -159,6 +172,16 @@ const formatTemplateDate = (value?: unknown) => {
    return raw.slice(0, 10).replace(/-/g, '');
 };
 
+const toNumericValue = (value: unknown, fallback = 0) => {
+   const numeric = Number(value);
+   return Number.isFinite(numeric) ? numeric : fallback;
+};
+
+const isAdjustmentMultiple = (adjustment: number, boxMultiple: number) => {
+   if (adjustment === 0 || boxMultiple <= 0) return true;
+   return Math.abs(adjustment % boxMultiple) < 0.0001;
+};
+
 const cpfrPreviewRows = computed(() => {
    const p = cpfrSource.value;
    const rawRows = Array.isArray(p.rows) ? p.rows : Array.isArray(p.sku_rows) ? p.sku_rows : [];
@@ -166,8 +189,15 @@ const cpfrPreviewRows = computed(() => {
 
    if (rawRows.length) {
       return rawRows.map((row: any): CpfrPreviewRow => {
-         const unidad = Number(row.unidad_inventario ?? 0);
-         const cantPedida = Number(row.cant_pedida ?? row.cantidad_final_uni ?? row.pedido_sugerido_pz_red ?? row.total_pzas_sugeridas ?? 0);
+         const unidad = toNumericValue(row.unidad_inventario);
+         const ajuste = toNumericValue(row.ajuste);
+         const pzasCaja = toNumericValue(row.pzas_caja);
+         const cantidadBase = toNumericValue(
+            row.cantidad_base_uni ?? row.cantidad_final_uni ?? row.pedido_sugerido_pz_red ?? row.cant_pedida ?? row.total_pzas_sugeridas
+         );
+         const cantPedida = row.ajuste === undefined || row.ajuste === null
+            ? toNumericValue(row.cant_pedida ?? row.cantidad_total_uni ?? row.pedido_sugerido_pz_red ?? cantidadBase)
+            : cantidadBase + ajuste;
          return {
          id_cliente: String(row.id_cliente ?? cpfrStoreId.value),
          cliente: String(row.cliente ?? splitClientId(String(row.id_cliente ?? cpfrStoreId.value)).cliente ?? idParts.cliente),
@@ -180,10 +210,17 @@ const cpfrPreviewRows = computed(() => {
          fec_fin_embarque: formatTemplateDate(row.fec_fin_embarque ?? p.fec_fin_embarque),
          num_pedido: String(row.num_pedido ?? cpfrNumPedido.value),
          cant_pedida: cantPedida,
+         cantidad_base_uni: cantidadBase,
+         ajuste,
+         pzas_caja: pzasCaja,
+         ajusteValido: isAdjustmentMultiple(ajuste, pzasCaja),
          cantidad_oc: Number(row.cantidad_oc ?? row.cant_pedida_oc ?? 0),
          pedido_kg: Number(row.pedido_kg ?? (cantPedida * unidad) ?? 0),
          inv_actual_pz: Number(row.inv_actual_pz ?? row.inv_actual_uni ?? 0),
+         inv_actual_kg: Number(row.inv_actual_kg ?? 0),
          promedio_sellout_pz: Number(row.promedio_sellout_pz ?? row.venta_prom_uni ?? 0),
+         promedio_sellout_kg: Number(row.promedio_sellout_kg ?? row.venta_prom_kg ?? 0),
+         unidad_inventario: unidad,
          cobertura_calculada: row.cobertura_calculada == null ? null : Number(row.cobertura_calculada),
          sku_muliix: String(row.sku_muliix ?? ''),
          sku_cadena: String(row.sku_cadena ?? ''),
@@ -208,10 +245,17 @@ const cpfrPreviewRows = computed(() => {
       fec_fin_embarque: formatTemplateDate(p.fec_fin_embarque),
       num_pedido: cpfrNumPedido.value,
       cant_pedida: Number(p.total_pzas_sugeridas ?? 0),
+      cantidad_base_uni: Number(p.total_pzas_sugeridas ?? 0),
+      ajuste: 0,
+      pzas_caja: 0,
+      ajusteValido: true,
       cantidad_oc: Number(p.total_pzas_cadena ?? 0),
       pedido_kg: 0,
       inv_actual_pz: 0,
+      inv_actual_kg: 0,
       promedio_sellout_pz: 0,
+      promedio_sellout_kg: 0,
+      unidad_inventario: 0,
       cobertura_calculada: null,
       sku_muliix: '',
       sku_cadena: '',
@@ -292,6 +336,112 @@ const formatNumber = (value: number | null | undefined, decimals = 0) => {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
    });
+};
+
+const calcularCoberturaDinamica = (row: CpfrPreviewRow): number | null => {
+   const totalPz = Number(row.cant_pedida || 0);
+   const invKg = Number(row.inv_actual_kg || 0);
+   const unidadInventario = Number(row.unidad_inventario || 0);
+   const promedioKg = Number(row.promedio_sellout_kg || 0);
+
+   if (promedioKg > 0 && unidadInventario > 0) {
+      return ((totalPz * unidadInventario) + invKg) / promedioKg;
+   }
+
+   const promedioPz = Number(row.promedio_sellout_pz || 0);
+   if (promedioPz > 0) {
+      return (totalPz + Number(row.inv_actual_pz || 0)) / promedioPz;
+   }
+
+   return null;
+};
+
+const coberturaStatus = (row: CpfrPreviewRow): 'ok' | 'bajo' | 'sobre' | 'sin_datos' => {
+   const cobertura = calcularCoberturaDinamica(row);
+   if (cobertura === null) return 'sin_datos';
+   if (cobertura < 2.5) return 'bajo';
+   if (cobertura > 3) return 'sobre';
+   return 'ok';
+};
+
+const coberturaClass = (row: CpfrPreviewRow) => {
+   const status = coberturaStatus(row);
+   if (status === 'bajo') return 'text-rose-600';
+   if (status === 'sobre') return 'text-orange-600';
+   if (status === 'sin_datos') return 'text-slate-400';
+   return 'text-emerald-600';
+};
+
+const coberturaIcon = (row: CpfrPreviewRow) => {
+   const status = coberturaStatus(row);
+   if (status === 'bajo') return 'fa-solid fa-triangle-exclamation text-rose-500';
+   if (status === 'sobre') return 'fa-solid fa-arrow-trend-up text-orange-500';
+   if (status === 'sin_datos') return 'fa-solid fa-circle-question text-slate-300';
+   return '';
+};
+
+const coberturaTooltip = (row: CpfrPreviewRow) => {
+   const cobertura = calcularCoberturaDinamica(row);
+   const status = coberturaStatus(row);
+   if (status === 'bajo') return `Bajo stock: cobertura ${cobertura?.toFixed(2)} sem.`;
+   if (status === 'sobre') return `Sobrestock: cobertura ${cobertura?.toFixed(2)} sem.`;
+   if (status === 'sin_datos') return 'Sin histórico de venta promedio';
+   return 'Cobertura sana: 2.5 a 3.0 sem.';
+};
+
+const getCpfrRowKey = (row: CpfrPreviewRow) =>
+   `${row.id_cliente}|${row.sku_muliix}|${row.num_pedido}|${row.anio}|${row.semana_ic}|${row.fec_pedido_cadena}`;
+
+const isRowAdjusting = (row: CpfrPreviewRow) => adjustingRows.value.has(getCpfrRowKey(row));
+
+const setRowAdjusting = (row: CpfrPreviewRow, isAdjusting: boolean) => {
+   const next = new Set(adjustingRows.value);
+   const key = getCpfrRowKey(row);
+   if (isAdjusting) {
+      next.add(key);
+   } else {
+      next.delete(key);
+   }
+   adjustingRows.value = next;
+};
+
+const refreshCpfrDetail = async () => {
+   if (!props.approval?.id) return;
+   cpfrDetail.value = await approvalsApi.getCpfrOrderDetail(props.approval.id);
+};
+
+const handleAdjustPedido = async (row: CpfrPreviewRow, direction: 1 | -1) => {
+   if (!props.approval || !canEditCpfrOrder.value || isRowAdjusting(row)) return;
+
+   const step = Number(row.pzas_caja || 0);
+   if (step <= 0) {
+      errorMessage.value = 'Este SKU no tiene pzas_caja configurado para ajustar.';
+      return;
+   }
+
+   const nextAdjustment = row.ajuste + (step * direction);
+   const nextTotal = row.cantidad_base_uni + nextAdjustment;
+   if (nextTotal < 0) return;
+
+   setRowAdjusting(row, true);
+   errorMessage.value = '';
+
+   try {
+      await approvalsApi.updateCpfrOrderAdjustment(props.approval.id, {
+         id_cliente: row.id_cliente,
+         sku_muliix: row.sku_muliix,
+         num_pedido: row.num_pedido,
+         anio: row.anio,
+         semana_ic: row.semana_ic,
+         fec_pedido_cadena: row.fec_pedido_cadena,
+         ajuste: nextAdjustment,
+      });
+      await refreshCpfrDetail();
+   } catch (e: any) {
+      errorMessage.value = e.response?.data?.message || 'No se pudo ajustar el pedido.';
+   } finally {
+      setRowAdjusting(row, false);
+   }
 };
 
 const getGeneratedLabel = (storeGroup: CpfrStoreGroup) => {
@@ -429,8 +579,12 @@ const handleConfirm = async () => {
                   >
                      <div class="grid gap-3 bg-white px-3 py-3 sm:px-4 lg:grid-cols-[112px_minmax(0,1fr)]">
                         <div class="hidden items-center justify-center lg:flex">
-                           <div class="flex h-16 w-24 items-center justify-center rounded-md border border-red-100 bg-red-50 text-xl font-black italic text-brand-700 shadow-inner">
-                              Corona
+                           <div class="flex h-16 w-24 items-center justify-center rounded-md border border-slate-100 bg-white p-2 shadow-inner">
+                              <img
+                                 :src="logoUrl"
+                                 alt="Logo"
+                                 class="max-h-12 max-w-[80px] object-contain"
+                              />
                            </div>
                         </div>
 
@@ -477,14 +631,16 @@ const handleConfirm = async () => {
                            </div>
 
                            <div class="overflow-x-auto">
-                              <table class="w-full min-w-[640px] table-fixed border-collapse text-[10px]">
+                              <table class="w-full min-w-[820px] table-fixed border-collapse text-[10px]">
                                  <thead>
                                     <tr class="border-b border-slate-200 bg-white text-[9px] font-black uppercase tracking-wide text-slate-600">
-                                       <th class="w-[44%] px-3 py-2 text-left">SKU</th>
-                                       <th class="w-[14%] px-3 py-2 text-right">Inv. Act.</th>
-                                       <th class="w-[14%] px-3 py-2 text-right">Sell Prom.</th>
-                                       <th class="w-[14%] px-3 py-2 text-right">Cob. S.</th>
-                                       <th class="w-[14%] px-3 py-2 text-right">Pedido</th>
+                                       <th class="w-[36%] px-3 py-2 text-left">SKU</th>
+                                       <th class="w-[11%] px-3 py-2 text-right">Inv. Act.</th>
+                                       <th class="w-[11%] px-3 py-2 text-right">Sell Prom.</th>
+                                       <th class="w-[10%] px-3 py-2 text-right">Cob. S.</th>
+                                       <th class="w-[10%] px-3 py-2 text-right">Base</th>
+                                       <th class="w-[10%] px-3 py-2 text-right">Ajuste</th>
+                                       <th class="w-[12%] px-3 py-2 text-right">Pedido</th>
                                     </tr>
                                  </thead>
                                  <tbody class="divide-y divide-dashed divide-slate-200">
@@ -501,8 +657,56 @@ const handleConfirm = async () => {
                                        </td>
                                        <td class="px-3 py-2 text-right font-black text-brand-700">{{ formatNumber(row.inv_actual_pz, 2) }}</td>
                                        <td class="px-3 py-2 text-right font-black text-brand-700">{{ formatNumber(row.promedio_sellout_pz, 2) }}</td>
-                                       <td class="px-3 py-2 text-right font-black text-brand-700">{{ formatNumber(row.cobertura_calculada, 2) }}</td>
-                                       <td class="px-3 py-2 text-right font-black text-brand-700">{{ formatNumber(row.cant_pedida, 0) }} pz</td>
+                                       <td
+                                          class="px-3 py-2 text-right font-black"
+                                          :class="coberturaClass(row)"
+                                          :title="coberturaTooltip(row)"
+                                       >
+                                          <span class="flex items-center justify-end gap-1.5">
+                                             <i v-if="coberturaIcon(row)" :class="coberturaIcon(row)" class="text-[10px]"></i>
+                                             {{ formatNumber(calcularCoberturaDinamica(row), 2) }}
+                                          </span>
+                                       </td>
+                                       <td class="px-3 py-2 text-right font-black text-slate-700">{{ formatNumber(row.cantidad_base_uni, 0) }}</td>
+                                       <td
+                                          class="px-3 py-2 text-right font-black"
+                                          :class="row.ajusteValido ? (row.ajuste === 0 ? 'text-slate-400' : 'text-amber-700') : 'text-red-700'"
+                                          :title="row.ajusteValido ? 'Ajuste sobre cantidad base' : 'El ajuste no respeta el multiplo pzas_caja'"
+                                       >
+                                          {{ row.ajuste > 0 ? '+' : '' }}{{ formatNumber(row.ajuste, 0) }}
+                                       </td>
+                                       <td class="px-3 py-2">
+                                          <div
+                                             v-if="canEditCpfrOrder"
+                                             class="ml-auto flex w-[116px] items-center justify-end overflow-hidden rounded-lg border border-slate-200 bg-white"
+                                          >
+                                             <button
+                                                type="button"
+                                                class="flex h-8 w-8 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
+                                                title="Disminuir pedido"
+                                                :disabled="isRowAdjusting(row) || !row.sku_muliix || row.pzas_caja <= 0 || row.cant_pedida - row.pzas_caja < 0"
+                                                @click="handleAdjustPedido(row, -1)"
+                                             >
+                                                <i class="fa-solid fa-minus text-[10px]"></i>
+                                             </button>
+                                             <span class="flex h-8 min-w-0 flex-1 items-center justify-center border-x border-slate-200 px-2 text-center font-black text-brand-700">
+                                                <i v-if="isRowAdjusting(row)" class="fa-solid fa-circle-notch fa-spin text-[10px]"></i>
+                                                <span v-else>{{ formatNumber(row.cant_pedida, 0) }}</span>
+                                             </span>
+                                             <button
+                                                type="button"
+                                                class="flex h-8 w-8 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
+                                                title="Incrementar pedido"
+                                                :disabled="isRowAdjusting(row) || !row.sku_muliix || row.pzas_caja <= 0"
+                                                @click="handleAdjustPedido(row, 1)"
+                                             >
+                                                <i class="fa-solid fa-plus text-[10px]"></i>
+                                             </button>
+                                          </div>
+                                          <p v-else class="text-right font-black text-brand-700">
+                                             {{ formatNumber(row.cant_pedida, 0) }} pz
+                                          </p>
+                                       </td>
                                     </tr>
                                  </tbody>
                               </table>

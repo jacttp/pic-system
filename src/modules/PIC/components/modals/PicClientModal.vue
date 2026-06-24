@@ -12,12 +12,17 @@ const emit = defineEmits(['update:modelValue']);
 
 const store = usePicFilterStore();
 
+type SortKey = 'Matriz' | 'Cadena' | 'NOM_CLIENTE';
+type SortDirection = 'asc' | 'desc';
+
 // Estado Local
 const searchTerm = ref('');
 const currentPage = ref(1);
 const totalPages = ref(1);
 const isLoading = ref(false);
 const clientsList = ref<any[]>([]);
+const sortKey = ref<SortKey | null>(null);
+const sortDirection = ref<SortDirection>('asc');
 let debounceTimeout: any = null;
 
 const close = () => {
@@ -70,16 +75,50 @@ const changePage = (newPage: number) => {
     }
 };
 
+const toggleSort = (key: SortKey) => {
+    if (sortKey.value === key) {
+        sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
+        return;
+    }
+
+    sortKey.value = key;
+    sortDirection.value = 'asc';
+};
+
+const sortIcon = (key: SortKey) => {
+    if (sortKey.value !== key) return 'fa-solid fa-sort text-slate-300';
+
+    return sortDirection.value === 'asc'
+        ? 'fa-solid fa-sort-up text-brand-500'
+        : 'fa-solid fa-sort-down text-brand-500';
+};
+
+const sortedClientsList = computed(() => {
+    const activeSortKey = sortKey.value;
+    if (!activeSortKey) return clientsList.value;
+
+    return [...clientsList.value].sort((a, b) => {
+        const av = String(a[activeSortKey] ?? '').trim();
+        const bv = String(b[activeSortKey] ?? '').trim();
+        const cmp = av.localeCompare(bv, 'es-MX', {
+            numeric: true,
+            sensitivity: 'base'
+        });
+
+        return sortDirection.value === 'asc' ? cmp : -cmp;
+    });
+});
+
 const toggleSelectAllPage = () => {
-    const allSelected = clientsList.value.every(c => store.selectedClients.has(c.IDCLIENTE));
-    clientsList.value.forEach(c => {
+    const allSelected = sortedClientsList.value.every(c => store.selectedClients.has(c.IDCLIENTE));
+    sortedClientsList.value.forEach(c => {
         if (allSelected) store.selectedClients.delete(c.IDCLIENTE);
         else store.selectedClients.set(c.IDCLIENTE, c.NOM_CLIENTE);
     });
 };
 
 const isPageFullySelected = computed(() => {
-    return clientsList.value.length > 0 && clientsList.value.every(c => store.selectedClients.has(c.IDCLIENTE));
+    return sortedClientsList.value.length > 0 && sortedClientsList.value.every(c => store.selectedClients.has(c.IDCLIENTE));
 });
 </script>
 
@@ -124,9 +163,34 @@ const isPageFullySelected = computed(() => {
                                 >
                             </th>
                             <th class="px-2 py-3 w-20">ID</th>
-                            <th class="px-2 py-3 w-24">Matriz</th>
-                            <th class="px-2 py-3 w-28">Cadena</th>
-                            <th class="px-2 py-3 w-64">Nombre</th> <th class="px-2 py-3 w-24">Formato</th>
+                            <th class="px-2 py-3 w-24">
+                                <button
+                                    type="button"
+                                    class="flex items-center gap-1.5 text-left hover:text-brand-700 transition-colors"
+                                    @click="toggleSort('Matriz')"
+                                >
+                                    Matriz <i :class="sortIcon('Matriz')"></i>
+                                </button>
+                            </th>
+                            <th class="px-2 py-3 w-28">
+                                <button
+                                    type="button"
+                                    class="flex items-center gap-1.5 text-left hover:text-brand-700 transition-colors"
+                                    @click="toggleSort('Cadena')"
+                                >
+                                    Cadena <i :class="sortIcon('Cadena')"></i>
+                                </button>
+                            </th>
+                            <th class="px-2 py-3 w-64">
+                                <button
+                                    type="button"
+                                    class="flex items-center gap-1.5 text-left hover:text-brand-700 transition-colors"
+                                    @click="toggleSort('NOM_CLIENTE')"
+                                >
+                                    Nombre <i :class="sortIcon('NOM_CLIENTE')"></i>
+                                </button>
+                            </th>
+                            <th class="px-2 py-3 w-24">Formato</th>
                             <th class="px-2 py-3 w-16">Tipo</th>
                             <th class="px-2 py-3 w-20">Estrategia</th>
                         </tr>
@@ -134,7 +198,7 @@ const isPageFullySelected = computed(() => {
                     
                     <tbody class="divide-y divide-slate-100">
                         <tr 
-                            v-for="client in clientsList" 
+                            v-for="client in sortedClientsList" 
                             :key="client.IDCLIENTE"
                             class="hover:bg-slate-50 transition-colors cursor-pointer group"
                             :class="{'bg-brand-50/40': store.selectedClients.has(client.IDCLIENTE)}"
@@ -174,7 +238,7 @@ const isPageFullySelected = computed(() => {
                             </td>
                         </tr>
                         
-                        <tr v-if="clientsList.length === 0 && !isLoading">
+                        <tr v-if="sortedClientsList.length === 0 && !isLoading">
                             <td colspan="8" class="px-4 py-12 text-center text-slate-400 flex flex-col items-center justify-center w-full">
                                 <i class="fa-regular fa-folder-open text-2xl mb-2 opacity-50"></i>
                                 <span>No se encontraron resultados.</span>

@@ -3,13 +3,14 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useApprovalsStore } from '../stores/approvalsStore';
+import { useProfileStore } from '@/modules/UserProfile/stores/profileStore';
+import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import type { Approval, ApprovalStatus, ApprovalType } from '../types/approval.types';
 import { APPROVAL_STATUS_CONFIG, APPROVAL_TYPE_CONFIG } from '../types/approval.types';
 import ApprovalDetailModal from '../components/ApprovalDetailModal.vue';
+import ManagementTray from '@/modules/Shared/components/ManagementTray.vue';
 
-type Tab = 'assigned' | 'mine';
 type SortKey = 'recent' | 'oldest' | 'status';
-type Density = 'table' | 'compact';
 
 interface FilterState {
    status?: ApprovalStatus
@@ -18,29 +19,41 @@ interface FilterState {
 
 interface ApprovalRow {
    approval: Approval
-   typeLabel: string
    typeIcon: string
    statusLabel: string
    statusIcon: string
-   statusBadgeClass: string
    requestedDate: string
    requestedTime: string
-   timeAgo: string
-   initials: string
-   priorityLabel: string
-   priorityClass: string
-   priorityDotClass: string
    meta: string
+   storeName: string
+   orderLabel: string
+   embarqueLabel: string
+   embarqueToneClass: string
+   embarqueStatusLabel: string
+   actionLabel: string
+   actionClass: string
+   canResolve: boolean
+}
+
+interface TrayMetric {
+   id?: string
+   label: string
+   value: string
+   caption: string
+   route?: string
+   icon: string
+   emphasis?: boolean
+   active?: boolean
 }
 
 const approvalsStore = useApprovalsStore();
+const profileStore = useProfileStore();
+const authStore = useAuthStore();
 const route = useRoute();
 
-const activeTab = ref<Tab>('assigned');
 const sortKey = ref<SortKey>('recent');
-const density = ref<Density>('table');
 const currentPage = ref(1);
-const pageSize = 10;
+const pageSize = 8;
 
 const filters = reactive<FilterState>({
    status: undefined,
@@ -73,82 +86,80 @@ const sortOptions: { value: SortKey; label: string }[] = [
    { value: 'status', label: 'Por estado' },
 ];
 
-const typeLabels: Record<ApprovalType, string> = {
-   CPFR_ORDER: 'Pedido CPFR',
-   PROMOTION: 'Promocion',
-   USER_ROLE_CHANGE: 'Cambio de rol',
-   REPORT_ACCESS: 'Acceso reporte',
-};
-
-const activeList = computed(() =>
-   activeTab.value === 'assigned'
-      ? approvalsStore.assignedApprovals
-      : approvalsStore.approvals
-);
+const assignedIds = computed(() => new Set(approvalsStore.assignedApprovals.map(approval => approval.id)));
 
 const isActiveLoading = computed(() =>
-   activeTab.value === 'assigned'
-      ? approvalsStore.isLoadingAssigned
-      : approvalsStore.isLoading
+   approvalsStore.isLoadingAssigned || approvalsStore.isLoading
 );
 
-const canResolveInTab = computed(() => activeTab.value === 'assigned');
+const isSuperAdmin = computed(() => authStore.userLevel >= 4);
+const canResolveSelected = computed(() => {
+   const approval = selectedApproval.value;
+   return Boolean(approval?.status === 'PENDING' && (isSuperAdmin.value || assignedIds.value.has(approval.id)));
+});
+
+const unifiedApprovals = computed(() => {
+   const byId = new Map<number, Approval>();
+
+   approvalsStore.assignedApprovals.forEach(approval => byId.set(approval.id, approval));
+   approvalsStore.approvals.forEach(approval => {
+      if (!byId.has(approval.id)) byId.set(approval.id, approval);
+   });
+
+   return Array.from(byId.values());
+});
 
 const statusCounts = computed<Record<ApprovalStatus, number>>(() => ({
-   PENDING: activeList.value.filter(approval => approval.status === 'PENDING').length,
-   APPROVED: activeList.value.filter(approval => approval.status === 'APPROVED').length,
-   REJECTED: activeList.value.filter(approval => approval.status === 'REJECTED').length,
-   CANCELLED: activeList.value.filter(approval => approval.status === 'CANCELLED').length,
+   PENDING: unifiedApprovals.value.filter(approval => approval.status === 'PENDING').length,
+   APPROVED: unifiedApprovals.value.filter(approval => approval.status === 'APPROVED').length,
+   REJECTED: unifiedApprovals.value.filter(approval => approval.status === 'REJECTED').length,
+   CANCELLED: unifiedApprovals.value.filter(approval => approval.status === 'CANCELLED').length,
 }));
+const allCancelledCount = computed(() =>
+   unifiedApprovals.value.filter(approval => approval.status === 'CANCELLED').length
+);
+const canBulkDeleteCancelled = computed(() => isSuperAdmin.value && allCancelledCount.value > 0);
 
-const statCards = computed(() => [
+const managementTrayMetrics = computed<TrayMetric[]>(() => [
    {
-      status: 'PENDING' as ApprovalStatus,
+      id: 'PENDING',
       label: 'Pendientes',
-      count: statusCounts.value.PENDING,
+      value: String(statusCounts.value.PENDING),
+      caption: 'Por atender',
       icon: 'fa-solid fa-truck-fast',
-      panelClass: 'border-slate-200 bg-white hover:border-brand-200 hover:bg-brand-50/20',
-      iconClass: 'bg-brand-50 text-brand-600',
-      textClass: 'text-slate-500',
+      emphasis: true,
+      active: filters.status === 'PENDING',
    },
    {
-      status: 'APPROVED' as ApprovalStatus,
+      id: 'APPROVED',
       label: 'Aprobadas',
-      count: statusCounts.value.APPROVED,
+      value: String(statusCounts.value.APPROVED),
+      caption: 'Resueltas',
       icon: 'fa-solid fa-circle-check',
-      panelClass: 'border-slate-200 bg-white hover:border-brand-200 hover:bg-brand-50/20',
-      iconClass: 'bg-brand-50 text-brand-600',
-      textClass: 'text-slate-500',
+      active: filters.status === 'APPROVED',
    },
    {
-      status: 'REJECTED' as ApprovalStatus,
+      id: 'REJECTED',
       label: 'Rechazadas',
-      count: statusCounts.value.REJECTED,
+      value: String(statusCounts.value.REJECTED),
+      caption: 'Revisadas',
       icon: 'fa-solid fa-arrows-rotate',
-      panelClass: 'border-slate-200 bg-white hover:border-brand-200 hover:bg-brand-50/20',
-      iconClass: 'bg-brand-50 text-brand-600',
-      textClass: 'text-slate-500',
+      active: filters.status === 'REJECTED',
    },
    {
-      status: 'CANCELLED' as ApprovalStatus,
+      id: 'CANCELLED',
       label: 'Canceladas',
-      count: statusCounts.value.CANCELLED,
+      value: String(statusCounts.value.CANCELLED),
+      caption: 'Archivables',
       icon: 'fa-solid fa-ban',
-      panelClass: 'border-slate-200 bg-white hover:border-brand-200 hover:bg-brand-50/20',
-      iconClass: 'bg-slate-100 text-slate-500',
-      textClass: 'text-slate-500',
+      active: filters.status === 'CANCELLED',
    },
 ]);
 
-const emptyMessage = computed(() =>
-   activeTab.value === 'assigned'
-      ? 'No tienes solicitudes pendientes de resolver.'
-      : 'No has enviado ninguna solicitud aun.'
-);
+const emptyMessage = computed(() => 'No hay solicitudes con los filtros actuales.');
 
 const listTitle = computed(() => {
-   const scope = activeTab.value === 'assigned' ? 'pendientes' : 'enviadas';
-   return `Lista de solicitudes ${scope} (${sortedRows.value.length})`;
+   return `Solicitudes (${sortedRows.value.length})`;
 });
 
 const currentRangeLabel = computed(() => {
@@ -177,7 +188,7 @@ const tableRows = computed(() => {
 });
 
 const filteredApprovals = computed(() =>
-   activeList.value.filter(approval => {
+   unifiedApprovals.value.filter(approval => {
       const matchesStatus = !filters.status || approval.status === filters.status;
       const matchesType = !filters.type || approval.type === filters.type;
 
@@ -225,8 +236,15 @@ const selectStatusFilter = (status?: ApprovalStatus) => {
    applyFilters();
 };
 
+const handleTrayMetricClick = (metric: TrayMetric) => {
+   const status = metric.id as ApprovalStatus | undefined;
+   if (!status) return;
+
+   selectStatusFilter(status);
+};
+
 const handleView = (id: number) => {
-   selectedApproval.value = activeList.value.find(approval => approval.id === id) || null;
+   selectedApproval.value = unifiedApprovals.value.find(approval => approval.id === id) || null;
    showDetailModal.value = true;
 };
 
@@ -235,11 +253,25 @@ const handleResolved = () => {
    selectedApproval.value = null;
    approvalsStore.fetchAssignedApprovals();
    approvalsStore.fetchApprovals();
+   profileStore.fetchNotifications();
 };
 
-const changeTab = (tab: Tab) => {
-   activeTab.value = tab;
-   currentPage.value = 1;
+const canDeleteCancelled = (approval: Approval) =>
+   approval.status === 'CANCELLED' && (isSuperAdmin.value || assignedIds.value.has(approval.id));
+
+const handleDeleteCancelled = async (approval: Approval, event?: Event) => {
+   event?.stopPropagation();
+   if (!canDeleteCancelled(approval)) return;
+   if (!confirm(`Borrar la solicitud cancelada "${approval.title}"?`)) return;
+
+   await approvalsStore.deleteCancelledApproval(approval.id);
+};
+
+const handleDeleteAllCancelled = async () => {
+   if (!canBulkDeleteCancelled.value) return;
+   if (!confirm('Borrar todas las solicitudes canceladas? Esta accion no se puede deshacer.')) return;
+
+   await approvalsStore.deleteAllCancelledApprovals();
 };
 
 const changePage = (page: number) => {
@@ -250,20 +282,11 @@ const openApprovalFromRoute = async (approvalId: unknown) => {
    const id = Number(Array.isArray(approvalId) ? approvalId[0] : approvalId);
    if (!Number.isInteger(id) || id <= 0) return;
 
-   let approval = approvalsStore.assignedApprovals.find(item => item.id === id) || null;
-   if (approval) {
-      activeTab.value = 'assigned';
-   } else {
-      approval = approvalsStore.approvals.find(item => item.id === id) || null;
-      if (approval) {
-         activeTab.value = 'mine';
-      }
-   }
+   let approval = unifiedApprovals.value.find(item => item.id === id) || null;
 
    if (!approval) {
       await approvalsStore.fetchApprovalById(id);
       approval = approvalsStore.selectedApproval;
-      activeTab.value = 'assigned';
    }
 
    if (approval) {
@@ -294,29 +317,93 @@ watch(totalPages, pageCount => {
 
 function toApprovalRow(approval: Approval): ApprovalRow {
    const typeConfig = APPROVAL_TYPE_CONFIG[approval.type] || {
-      label: approval.type,
       color: 'text-slate-600',
       icon: 'fa-solid fa-file',
    };
    const statusConfig = APPROVAL_STATUS_CONFIG[approval.status] || APPROVAL_STATUS_CONFIG.PENDING;
    const requestedAt = new Date(approval.requestedAt);
-   const priority = getPriority(approval, requestedAt);
+   const isAssigned = assignedIds.value.has(approval.id);
+   const embarque = buildEmbarqueInfo(approval);
 
    return {
       approval,
-      typeLabel: typeLabels[approval.type] || typeConfig.label,
       typeIcon: typeConfig.icon,
       statusLabel: statusConfig.label,
       statusIcon: statusConfig.icon,
-      statusBadgeClass: statusBadgeClass(approval.status),
       requestedDate: formatDate(requestedAt),
       requestedTime: formatTime(requestedAt),
-      timeAgo: formatTimeAgo(requestedAt),
-      initials: approval.requestedBy.substring(0, 2).toUpperCase(),
-      priorityLabel: priority.label,
-      priorityClass: priority.textClass,
-      priorityDotClass: priority.dotClass,
       meta: buildMeta(approval),
+      storeName: buildStoreName(approval),
+      orderLabel: buildOrderLabel(approval),
+      embarqueLabel: embarque.label,
+      embarqueToneClass: embarque.toneClass,
+      embarqueStatusLabel: embarque.statusLabel,
+      actionLabel: actionLabel(approval.status),
+      actionClass: actionButtonClass(approval.status),
+      canResolve: approval.status === 'PENDING' && (isSuperAdmin.value || isAssigned),
+   };
+}
+
+function buildStoreName(approval: Approval) {
+   const payload = approval.payload || {};
+   return readPayloadValue(payload, ['nombre_tienda', 'tienda', 'storeName', 'id_cliente']) || 'Sin tienda';
+}
+
+function buildOrderLabel(approval: Approval) {
+   const payload = approval.payload || {};
+   if (Array.isArray(payload.num_pedidos)) {
+      return payload.num_pedidos.map(item => String(item)).join(', ');
+   }
+   return readPayloadValue(payload, ['num_pedido', 'pedido', 'orderId', 'id']) || 'Sin pedido';
+}
+
+function buildEmbarqueInfo(approval: Approval) {
+   const payload = approval.payload || {};
+   const rawDate = readPayloadValue(payload, [
+      'fec_fin_embarque',
+      'fecha_fin_embarque',
+      'fin_embarque',
+      'endDate',
+      'fecha_fin',
+   ]);
+   const date = parseDateValue(rawDate);
+
+   if (!date) {
+      return {
+         label: 'Sin fecha',
+         statusLabel: 'No registrada',
+         toneClass: 'border-slate-200 bg-slate-100 text-slate-700',
+      };
+   }
+
+   const today = startOfDay(new Date());
+   const target = startOfDay(date);
+   const diffDays = Math.round((target.getTime() - today.getTime()) / 86400000);
+
+   if (diffDays < 0) {
+      return {
+         label: formatFullDate(date),
+         statusLabel: `Vencio hace ${Math.abs(diffDays)} dia${Math.abs(diffDays) === 1 ? '' : 's'}`,
+         toneClass: 'border-red-200 bg-red-50 text-red-700',
+      };
+   }
+
+   if (diffDays === 0) {
+      return {
+         label: formatFullDate(date),
+         statusLabel: 'Vence hoy',
+         toneClass: 'border-red-200 bg-red-50 text-red-700',
+      };
+   }
+
+   return {
+      label: formatFullDate(date),
+      statusLabel: `Faltan ${diffDays} dia${diffDays === 1 ? '' : 's'}`,
+      toneClass: diffDays <= 2
+         ? 'border-red-200 bg-red-50 text-red-700'
+         : diffDays <= 7
+            ? 'border-amber-300 bg-amber-50 text-amber-800'
+            : 'border-amber-200 bg-amber-50/60 text-amber-700',
    };
 }
 
@@ -343,47 +430,55 @@ function readPayloadValue(payload: Record<string, unknown>, keys: string[]) {
    return key ? String(payload[key]) : '';
 }
 
-function getPriority(approval: Approval, requestedAt: Date) {
-   const ageHours = (Date.now() - requestedAt.getTime()) / 36e5;
-
-   if (approval.status === 'PENDING' && ageHours >= 36) {
-      return {
-         label: 'Alta',
-         textClass: 'text-red-700',
-         dotClass: 'bg-red-500',
-      };
-   }
-
-   if (approval.status === 'PENDING' && ageHours >= 12) {
-      return {
-         label: 'Media',
-         textClass: 'text-amber-700',
-         dotClass: 'bg-amber-500',
-      };
-   }
-
-   return {
-      label: 'Baja',
-      textClass: 'text-emerald-700',
-      dotClass: 'bg-emerald-500',
+function actionLabel(status: ApprovalStatus) {
+   const labels: Record<ApprovalStatus, string> = {
+      PENDING: 'Pendiente',
+      APPROVED: 'Aprobada',
+      REJECTED: 'Rechazada',
+      CANCELLED: 'Cancelada',
    };
+
+   return labels[status];
 }
 
-function statusBadgeClass(status: ApprovalStatus) {
+function actionButtonClass(status: ApprovalStatus) {
    const classes: Record<ApprovalStatus, string> = {
-      PENDING: 'border-orange-200 bg-orange-50 text-red-700',
-      APPROVED: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-      REJECTED: 'border-red-200 bg-red-50 text-red-700',
-      CANCELLED: 'border-slate-200 bg-slate-50 text-slate-600',
+      PENDING: 'border-red-200 bg-red-50 text-red-700 hover:border-red-200 hover:bg-red-100',
+      APPROVED: 'border-slate-300 bg-slate-100 text-slate-800 hover:border-red-200 hover:bg-red-50 hover:text-red-700',
+      REJECTED: 'border-red-200 bg-red-50 text-red-700 hover:border-red-200 hover:bg-red-100',
+      CANCELLED: 'border-slate-300 bg-slate-100 text-slate-700 hover:border-red-200 hover:bg-red-50 hover:text-red-700',
    };
 
    return classes[status];
+}
+
+function parseDateValue(value: string) {
+   if (!value) return null;
+
+   const dateOnlyMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+   const date = dateOnlyMatch
+      ? new Date(Number(dateOnlyMatch[1]), Number(dateOnlyMatch[2]) - 1, Number(dateOnlyMatch[3]))
+      : new Date(value);
+
+   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function startOfDay(date: Date) {
+   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 function formatDate(date: Date) {
    return new Intl.DateTimeFormat('es-MX', {
       day: '2-digit',
       month: 'short',
+   }).format(date);
+}
+
+function formatFullDate(date: Date) {
+   return new Intl.DateTimeFormat('es-MX', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
    }).format(date);
 }
 
@@ -394,407 +489,261 @@ function formatTime(date: Date) {
    }).format(date);
 }
 
-function formatTimeAgo(date: Date) {
-   const diff = Date.now() - date.getTime();
-   const mins = Math.max(0, Math.floor(diff / 60000));
-
-   if (mins < 60) return `hace ${mins} min`;
-
-   const hours = Math.floor(mins / 60);
-   if (hours < 24) return `hace ${hours} h`;
-
-   const days = Math.floor(hours / 24);
-   return `hace ${days} dia${days === 1 ? '' : 's'}`;
-}
 </script>
 
 <template>
    <div class="min-h-full bg-slate-50 px-3 py-4 sm:px-5 lg:px-8 lg:py-7">
-      <div class="mx-auto max-w-[1500px] space-y-5">
-         <header class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div class="flex min-w-0 items-start gap-4">
-               <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-brand-100">
-                  <i class="fa-solid fa-list-check text-base"></i>
-               </div>
-               <div class="min-w-0">
-                  <h1 class="text-2xl font-extrabold leading-tight text-slate-900 sm:text-3xl">
-                     Solicitudes de Aprobacion
-                  </h1>
-                  <p class="mt-1 max-w-3xl text-sm leading-5 text-slate-500">
-                     Gestiona las solicitudes asignadas a ti y el estado de las que enviaste.
-                  </p>
-               </div>
-            </div>
+      <div class="mx-auto max-w-[1360px] space-y-4 sm:space-y-5">
+         <ManagementTray
+            eyebrow="Bandeja de gestion"
+            title="Aprobaciones CPFR y solicitudes internas"
+            subtitle="Accesos directos al panel de aprobaciones para revisar pendientes, seguimiento e historial."
+            icon="fa-solid fa-clipboard-check"
+            :metrics="managementTrayMetrics"
+            :load-approvals="false"
+            @metric-click="handleTrayMetricClick"
+         />
 
-            <div
-               v-if="approvalsStore.totalPendingCount > 0"
-               class="flex w-full items-center justify-between gap-4 rounded-lg border border-brand-200 bg-brand-50/40 px-4 py-3 text-brand-700 shadow-sm sm:w-auto sm:min-w-[150px] sm:justify-center"
-            >
-               <i class="fa-regular fa-clipboard text-lg"></i>
-               <div class="text-right sm:text-center">
-                  <p class="text-2xl font-black leading-none text-slate-950">{{ approvalsStore.totalPendingCount }}</p>
-                  <p class="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Pendientes</p>
-               </div>
-            </div>
-         </header>
-
-         <section class="border-b border-slate-200">
-            <div class="flex gap-2 overflow-x-auto">
-               <button
-                  type="button"
-                  class="flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition-colors"
-                  :class="activeTab === 'assigned'
-                     ? 'border-brand-600 text-brand-700'
-                     : 'border-transparent text-slate-500 hover:text-brand-600'"
-                  @click="changeTab('assigned')"
-               >
-                  <i class="fa-solid fa-list-check"></i>
-                  Por resolver
-                  <span class="rounded-full bg-brand-50 px-2 py-0.5 text-xs text-brand-700 ring-1 ring-brand-100">
-                     {{ approvalsStore.assignedPendingCount }}
-                  </span>
-               </button>
-
-               <button
-                  type="button"
-                  class="flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition-colors"
-                  :class="activeTab === 'mine'
-                     ? 'border-brand-600 text-brand-700'
-                     : 'border-transparent text-slate-500 hover:text-brand-600'"
-                  @click="changeTab('mine')"
-               >
-                  <i class="fa-regular fa-paper-plane"></i>
-                  Mis solicitudes
-                  <span class="rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-700">
-                     {{ approvalsStore.pendingCount }}
-                  </span>
-               </button>
-            </div>
-         </section>
-
-         <section v-if="!isDetailOpen" class="grid gap-3 md:grid-cols-[minmax(170px,1fr)_minmax(170px,1fr)_auto] xl:grid-cols-[190px_190px_auto_1fr]">
-            <select
-               v-model="filters.status"
-               class="h-11 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm outline-none transition focus:border-brand-300 focus:ring-4 focus:ring-brand-50"
-               @change="applyFilters"
-            >
-               <option v-for="option in statusOptions" :key="option.value" :value="option.value || undefined">
-                  {{ option.label }}
-               </option>
-            </select>
-
-            <select
-               v-model="filters.type"
-               class="h-11 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm outline-none transition focus:border-brand-300 focus:ring-4 focus:ring-brand-50"
-               @change="applyFilters"
-            >
-               <option v-for="option in typeOptions" :key="option.value" :value="option.value || undefined">
-                  {{ option.label }}
-               </option>
-            </select>
-
-            <button
-               type="button"
-               class="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 shadow-sm transition hover:border-brand-200 hover:bg-brand-50/20 hover:text-brand-700"
-               @click="clearFilters"
-            >
-               <i class="fa-solid fa-sliders"></i>
-               Filtros
-            </button>
-         </section>
-
-         <section v-if="!isDetailOpen" class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
-               <button
-                  v-for="card in statCards"
-                  :key="card.status"
-                  type="button"
-                  class="group flex min-h-[86px] items-center gap-4 rounded-lg border px-4 py-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm"
-                  :class="[
-                     card.panelClass,
-                     filters.status === card.status ? 'border-brand-200 bg-brand-50/40 hover:border-brand-300' : '',
-                  ]"
-                  @click="selectStatusFilter(card.status)"
-               >
-                  <span
-                     class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm"
-                     :class="filters.status === card.status ? 'bg-white text-brand-600 ring-1 ring-brand-100' : card.iconClass"
+         <template v-if="!isDetailOpen">
+            <section class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+               <div class="grid gap-3 lg:grid-cols-[minmax(150px,190px)_minmax(150px,190px)_minmax(160px,210px)_1fr_auto]">
+                  <select
+                     v-model="filters.status"
+                     class="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 outline-none transition focus:border-brand-300 focus:ring-4 focus:ring-brand-50"
+                     @change="applyFilters"
                   >
-                     <i :class="card.icon"></i>
-                  </span>
-                  <span class="min-w-0">
-                     <span class="block text-2xl font-black leading-none text-slate-950">{{ card.count }}</span>
-                     <span class="mt-1 block text-[10px] font-black uppercase tracking-[0.18em]" :class="card.textClass">{{ card.label }}</span>
-                  </span>
-               </button>
-            </div>
-         </section>
+                     <option v-for="option in statusOptions" :key="option.value" :value="option.value || undefined">
+                        {{ option.label }}
+                     </option>
+                  </select>
 
-         <section v-if="!isDetailOpen" class="space-y-4">
-            <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-               <h2 class="text-base font-extrabold text-slate-900">
-                  {{ listTitle }}
-               </h2>
+                  <select
+                     v-model="filters.type"
+                     class="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 outline-none transition focus:border-brand-300 focus:ring-4 focus:ring-brand-50"
+                     @change="applyFilters"
+                  >
+                     <option v-for="option in typeOptions" :key="option.value" :value="option.value || undefined">
+                        {{ option.label }}
+                     </option>
+                  </select>
 
-               <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between lg:justify-end">
-                  <label class="flex items-center gap-2 text-sm font-medium text-slate-600">
-                     Ordenar por:
-                     <select
-                        v-model="sortKey"
-                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm outline-none focus:border-brand-300 focus:ring-4 focus:ring-brand-50"
-                     >
-                        <option v-for="option in sortOptions" :key="option.value" :value="option.value">
-                           {{ option.label }}
-                        </option>
-                     </select>
-                  </label>
+                  <select
+                     v-model="sortKey"
+                     class="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 outline-none transition focus:border-brand-300 focus:ring-4 focus:ring-brand-50"
+                  >
+                     <option v-for="option in sortOptions" :key="option.value" :value="option.value">
+                        {{ option.label }}
+                     </option>
+                  </select>
 
-                  <div class="hidden items-center gap-2 lg:flex">
+                  <div class="hidden lg:block"></div>
+
+                  <div class="grid gap-2 sm:grid-cols-2 lg:flex lg:justify-end">
                      <button
                         type="button"
-                        class="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-brand-600"
-                        :class="density === 'compact' ? 'border-brand-200 bg-brand-50 text-brand-700' : ''"
-                        title="Vista compacta"
-                        @click="density = 'compact'"
+                        class="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:border-brand-200 hover:bg-brand-50/20 hover:text-brand-700"
+                        @click="clearFilters"
                      >
-                        <i class="fa-solid fa-table-cells-large"></i>
+                        <i class="fa-solid fa-sliders"></i>
+                        Limpiar
                      </button>
+
                      <button
+                        v-if="canBulkDeleteCancelled"
                         type="button"
-                        class="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-brand-600"
-                        :class="density === 'table' ? 'border-brand-200 bg-brand-50 text-brand-700' : ''"
-                        title="Vista de tabla"
-                        @click="density = 'table'"
+                        class="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 text-sm font-black text-red-700 transition hover:bg-red-50"
+                        @click="handleDeleteAllCancelled"
                      >
-                        <i class="fa-solid fa-list"></i>
+                        <i class="fa-solid fa-xmark"></i>
+                        Canceladas ({{ allCancelledCount }})
                      </button>
                   </div>
                </div>
-            </div>
+            </section>
 
-            <div v-if="isActiveLoading" class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-               <div v-for="index in 8" :key="index" class="grid gap-4 border-b border-slate-100 p-4 lg:grid-cols-[2fr_0.7fr_0.7fr_0.55fr_0.55fr_0.55fr_0.45fr]">
-                  <div class="h-5 animate-pulse rounded bg-slate-100"></div>
-                  <div class="h-5 animate-pulse rounded bg-slate-100"></div>
-                  <div class="h-5 animate-pulse rounded bg-slate-100"></div>
-                  <div class="h-5 animate-pulse rounded bg-slate-100"></div>
-                  <div class="h-5 animate-pulse rounded bg-slate-100"></div>
-                  <div class="h-5 animate-pulse rounded bg-slate-100"></div>
-                  <div class="h-5 animate-pulse rounded bg-slate-100"></div>
-               </div>
-            </div>
-
-            <div
-               v-else-if="approvalsStore.error"
-               class="rounded-lg border border-red-200 bg-red-50 p-8 text-center text-red-700 shadow-sm"
-            >
-               <i class="fa-solid fa-circle-exclamation text-2xl"></i>
-               <p class="mt-3 text-sm font-bold">{{ approvalsStore.error }}</p>
-               <button type="button" class="mt-4 text-sm font-black underline" @click="handleResolved">
-                  Reintentar
-               </button>
-            </div>
-
-            <div
-               v-else-if="activeList.length === 0"
-               class="rounded-lg border border-slate-200 bg-white p-10 text-center shadow-sm"
-            >
-               <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-brand-50 text-brand-300">
-                  <i class="fa-solid fa-inbox text-2xl"></i>
-               </div>
-               <h3 class="mt-4 text-lg font-black text-slate-800">Sin solicitudes</h3>
-               <p class="mt-1 text-sm font-medium text-slate-500">{{ emptyMessage }}</p>
-            </div>
-
-            <template v-else>
-               <div class="hidden overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm lg:block">
-                  <table class="w-full table-fixed border-collapse">
-                     <thead>
-                        <tr class="border-b border-slate-100 bg-white text-left text-[10px] font-black uppercase tracking-[0.18em] text-brand-500">
-                           <th class="w-[36%] px-5 py-4">Solicitud</th>
-                           <th class="w-[12%] px-4 py-4">Tipo</th>
-                           <th class="w-[13%] px-4 py-4">Solicitante</th>
-                           <th class="w-[11%] px-4 py-4">Fecha</th>
-                           <th class="w-[9%] px-4 py-4">Prioridad</th>
-                           <th class="w-[10%] px-4 py-4">Estado</th>
-                           <th class="w-[9%] px-4 py-4 text-right">Accion</th>
-                        </tr>
-                     </thead>
-                     <tbody class="divide-y divide-slate-200 text-sm">
-                        <tr
-                           v-for="row in tableRows"
-                           :key="row.approval.id"
-                           class="group transition hover:bg-brand-50/20"
-                           :class="density === 'compact' ? 'text-xs' : ''"
-                        >
-                           <td class="px-5 py-4">
-                              <div class="flex min-w-0 items-center gap-3">
-                                 <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
-                                    <i :class="row.typeIcon"></i>
-                                 </div>
-                                 <div class="min-w-0">
-                                    <p class="truncate font-extrabold text-slate-900 group-hover:text-brand-700">
-                                       {{ row.approval.title }}
-                                    </p>
-                                    <p class="mt-1 truncate text-xs font-semibold text-slate-500">
-                                       {{ row.meta }}
-                                    </p>
-                                 </div>
-                              </div>
-                           </td>
-                           <td class="px-4 py-4">
-                              <span class="inline-flex max-w-full items-center truncate rounded-lg bg-brand-50 px-3 py-1 text-xs font-bold text-brand-700">
-                                 {{ row.typeLabel }}
-                              </span>
-                           </td>
-                           <td class="px-4 py-4">
-                              <div class="flex min-w-0 items-center gap-2">
-                                 <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-black text-slate-600">
-                                    {{ row.initials }}
-                                 </span>
-                                 <span class="truncate font-bold text-slate-700">{{ row.approval.requestedBy }}</span>
-                              </div>
-                           </td>
-                           <td class="px-4 py-4">
-                              <p class="font-black text-slate-900">{{ row.requestedDate }}, {{ row.requestedTime }}</p>
-                              <p class="mt-1 text-xs font-semibold text-slate-500">{{ row.timeAgo }}</p>
-                           </td>
-                           <td class="px-4 py-4">
-                              <span class="inline-flex items-center gap-2 font-bold" :class="row.priorityClass">
-                                 <span class="h-2 w-2 rounded-full" :class="row.priorityDotClass"></span>
-                                 {{ row.priorityLabel }}
-                              </span>
-                           </td>
-                           <td class="px-4 py-4">
-                              <span class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-black" :class="row.statusBadgeClass">
-                                 <i :class="row.statusIcon" class="text-[10px]"></i>
-                                 {{ row.statusLabel }}
-                              </span>
-                           </td>
-                           <td class="px-4 py-4">
-                              <div class="flex items-center justify-end gap-2">
-                                 <button
-                                    type="button"
-                                    class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-brand-200 hover:bg-brand-50/20 hover:text-brand-700"
-                                    @click="handleView(row.approval.id)"
-                                 >
-                                    Revisar
-                                 </button>
-                                 <button
-                                    type="button"
-                                    class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-                                    title="Mas acciones"
-                                    @click="handleView(row.approval.id)"
-                                 >
-                                    <i class="fa-solid fa-ellipsis-vertical"></i>
-                                 </button>
-                              </div>
-                           </td>
-                        </tr>
-                     </tbody>
-                  </table>
+            <section class="space-y-3">
+               <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                     <h2 class="text-base font-black text-slate-950">{{ listTitle }}</h2>
+                     <p class="mt-1 text-xs font-semibold text-slate-500">{{ currentRangeLabel }}</p>
+                  </div>
                </div>
 
-               <div class="grid gap-3 lg:hidden">
-                  <button
-                     v-for="row in tableRows"
-                     :key="row.approval.id"
-                     type="button"
-                     class="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm transition active:scale-[0.99]"
-                     @click="handleView(row.approval.id)"
-                  >
-                     <div class="flex items-start justify-between gap-3">
-                        <div class="flex min-w-0 items-center gap-3">
-                           <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
-                              <i :class="row.typeIcon"></i>
-                           </div>
-                           <div class="min-w-0">
-                              <p class="truncate text-sm font-black text-slate-900">{{ row.approval.title }}</p>
-                              <p class="mt-1 truncate text-xs font-semibold text-slate-500">{{ row.meta }}</p>
-                           </div>
-                        </div>
-                        <span class="inline-flex items-center rounded-lg border px-2 py-1 text-[11px] font-black" :class="row.statusBadgeClass">
-                           {{ row.statusLabel }}
-                        </span>
-                     </div>
-
-                     <div class="mt-4 grid grid-cols-2 gap-3 text-xs">
-                        <div>
-                           <p class="font-black uppercase tracking-wide text-slate-400">Solicitante</p>
-                           <p class="mt-1 truncate font-bold text-slate-700">{{ row.approval.requestedBy }}</p>
-                        </div>
-                        <div>
-                           <p class="font-black uppercase tracking-wide text-slate-400">Fecha</p>
-                           <p class="mt-1 font-bold text-slate-700">{{ row.requestedDate }}, {{ row.requestedTime }}</p>
-                        </div>
-                        <div>
-                           <p class="font-black uppercase tracking-wide text-slate-400">Tipo</p>
-                           <p class="mt-1 font-bold text-brand-700">{{ row.typeLabel }}</p>
-                        </div>
-                        <div>
-                           <p class="font-black uppercase tracking-wide text-slate-400">Prioridad</p>
-                           <p class="mt-1 inline-flex items-center gap-2 font-bold" :class="row.priorityClass">
-                              <span class="h-2 w-2 rounded-full" :class="row.priorityDotClass"></span>
-                              {{ row.priorityLabel }}
-                           </p>
+               <div v-if="isActiveLoading" class="grid gap-3">
+                  <div v-for="index in 5" :key="index" class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                     <div class="flex gap-3">
+                        <div class="h-10 w-10 animate-pulse rounded-lg bg-slate-100"></div>
+                        <div class="min-w-0 flex-1 space-y-3">
+                           <div class="h-4 w-2/3 animate-pulse rounded bg-slate-100"></div>
+                           <div class="h-3 w-full animate-pulse rounded bg-slate-100"></div>
+                           <div class="h-3 w-1/2 animate-pulse rounded bg-slate-100"></div>
                         </div>
                      </div>
+                  </div>
+               </div>
+
+               <div
+                  v-else-if="approvalsStore.error"
+                  class="rounded-lg border border-red-200 bg-red-50 p-8 text-center text-red-700 shadow-sm"
+               >
+                  <i class="fa-solid fa-circle-exclamation text-2xl"></i>
+                  <p class="mt-3 text-sm font-bold">{{ approvalsStore.error }}</p>
+                  <button type="button" class="mt-4 text-sm font-black underline" @click="handleResolved">
+                     Reintentar
                   </button>
                </div>
 
-               <footer class="flex flex-col gap-3 text-sm font-medium text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-                  <p>{{ currentRangeLabel }}</p>
-
-                  <div class="flex items-center gap-2 overflow-x-auto">
-                     <button
-                        type="button"
-                        class="h-10 rounded-lg border border-slate-200 bg-white px-4 font-bold text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-50"
-                        :disabled="currentPage === 1"
-                        @click="changePage(currentPage - 1)"
-                     >
-                        Anterior
-                     </button>
-                     <button
-                        v-for="page in visiblePages"
-                        :key="page"
-                        type="button"
-                        class="h-10 min-w-10 rounded-lg border px-3 font-black transition"
-                        :class="page === currentPage
-                           ? 'border-brand-500 bg-white text-brand-700'
-                           : 'border-slate-200 bg-white text-slate-700 hover:border-brand-200'"
-                        @click="changePage(page)"
-                     >
-                        {{ page }}
-                     </button>
-                     <span v-if="totalPages > visiblePages[visiblePages.length - 1]" class="px-2 font-black text-slate-400">
-                        ...
-                     </span>
-                     <button
-                        v-if="totalPages > visiblePages[visiblePages.length - 1]"
-                        type="button"
-                        class="h-10 min-w-10 rounded-lg border border-slate-200 bg-white px-3 font-black text-slate-700 transition hover:border-brand-200"
-                        @click="changePage(totalPages)"
-                     >
-                        {{ totalPages }}
-                     </button>
-                     <button
-                        type="button"
-                        class="h-10 rounded-lg border border-slate-200 bg-white px-4 font-bold text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-50"
-                        :disabled="currentPage === totalPages"
-                        @click="changePage(currentPage + 1)"
-                     >
-                        Siguiente
-                     </button>
+               <div
+                  v-else-if="unifiedApprovals.length === 0 || sortedRows.length === 0"
+                  class="rounded-lg border border-slate-200 bg-white p-10 text-center shadow-sm"
+               >
+                  <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-brand-50 text-brand-300">
+                     <i class="fa-solid fa-inbox text-2xl"></i>
                   </div>
-               </footer>
-            </template>
-         </section>
+                  <h3 class="mt-4 text-lg font-black text-slate-800">Sin solicitudes</h3>
+                  <p class="mt-1 text-sm font-medium text-slate-500">{{ emptyMessage }}</p>
+               </div>
+
+               <template v-else>
+                  <div class="grid gap-3">
+                     <article
+                        v-for="row in tableRows"
+                        :key="row.approval.id"
+                        class="group rounded-lg border border-slate-200 bg-white shadow-sm transition hover:border-brand-200 hover:shadow-md"
+                     >
+                        <div class="grid gap-0 lg:grid-cols-[1fr_240px]">
+                           <button
+                              type="button"
+                              class="min-w-0 p-4 text-left sm:p-5"
+                              @click="handleView(row.approval.id)"
+                           >
+                              <div class="flex min-w-0 items-start gap-3">
+                                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-brand-100">
+                                    <i :class="row.typeIcon"></i>
+                                 </span>
+                                 <span class="min-w-0 flex-1">
+                                    <span class="flex flex-wrap items-center gap-2">
+                                       <span class="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] font-black uppercase leading-none" :class="row.embarqueToneClass">
+                                          <i class="fa-regular fa-calendar-check"></i>
+                                          Fin embarque: {{ row.embarqueLabel }}
+                                       </span>
+                                    </span>
+
+                                    <span class="mt-3 block text-base font-black leading-6 text-slate-950 group-hover:text-brand-700">
+                                       {{ row.storeName }}
+                                    </span>
+                                    <span class="mt-1 block break-words text-sm font-semibold leading-5 text-slate-500">
+                                       {{ row.approval.title }}
+                                    </span>
+                                 </span>
+                              </div>
+
+                              <div class="mt-4 grid gap-3 text-xs sm:grid-cols-2 xl:grid-cols-5">
+                                 <div class="rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
+                                    <p class="font-black uppercase tracking-[0.14em] text-slate-400">Pedido</p>
+                                    <p class="mt-1 truncate font-black text-slate-800">{{ row.orderLabel }}</p>
+                                 </div>
+                                 <div class="rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
+                                    <p class="font-black uppercase tracking-[0.14em] text-slate-400">Detalle</p>
+                                    <p class="mt-1 truncate font-bold text-slate-700">{{ row.meta }}</p>
+                                 </div>
+                                 <div class="rounded-lg border px-3 py-2" :class="row.embarqueToneClass">
+                                    <p class="font-black uppercase tracking-[0.14em]">Fin de embarque</p>
+                                    <p class="mt-1 truncate font-black">{{ row.embarqueLabel }}</p>
+                                    <p class="mt-0.5 truncate font-semibold normal-case tracking-normal">{{ row.embarqueStatusLabel }}</p>
+                                 </div>
+                                 <div class="rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
+                                    <p class="font-black uppercase tracking-[0.14em] text-slate-400">Solicitante</p>
+                                    <p class="mt-1 truncate font-bold text-slate-700">{{ row.approval.requestedBy }}</p>
+                                 </div>
+                                 <div class="rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
+                                    <p class="font-black uppercase tracking-[0.14em] text-slate-400">Fecha</p>
+                                    <p class="mt-1 truncate font-bold text-slate-700">{{ row.requestedDate }}, {{ row.requestedTime }}</p>
+                                 </div>
+                              </div>
+                           </button>
+
+                           <div class="flex items-center gap-2 border-t border-slate-100 px-4 pb-4 lg:flex-col lg:items-stretch lg:justify-center lg:border-l lg:border-t-0 lg:p-4">
+                              <button
+                                 type="button"
+                                 class="group/action inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-black transition lg:flex-none"
+                                 :class="row.canResolve ? 'border-brand-200 bg-white text-brand-700 hover:bg-brand-50/60' : row.actionClass"
+                                 @click="handleView(row.approval.id)"
+                              >
+                                 <i :class="[row.canResolve ? 'fa-solid fa-check' : row.statusIcon, row.canResolve ? '' : 'group-hover/action:hidden']" class="text-xs"></i>
+                                 <i v-if="!row.canResolve" class="fa-solid fa-eye hidden text-xs group-hover/action:inline-block"></i>
+                                 <span :class="row.canResolve ? '' : 'group-hover/action:hidden'">{{ row.canResolve ? 'Resolver' : row.actionLabel }}</span>
+                                 <span v-if="!row.canResolve" class="hidden group-hover/action:inline">Revisar</span>
+                              </button>
+
+                              <button
+                                 v-if="canDeleteCancelled(row.approval)"
+                                 type="button"
+                                 class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-red-100 bg-white text-red-600 transition hover:bg-red-50"
+                                 title="Borrar solicitud cancelada"
+                                 @click="handleDeleteCancelled(row.approval, $event)"
+                              >
+                                 <i class="fa-solid fa-xmark"></i>
+                              </button>
+                           </div>
+                        </div>
+                     </article>
+                  </div>
+
+                  <footer class="flex flex-col gap-3 pt-1 text-sm font-medium text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                     <p>{{ currentRangeLabel }}</p>
+
+                     <div class="flex items-center gap-2 overflow-x-auto">
+                        <button
+                           type="button"
+                           class="h-10 rounded-lg border border-slate-200 bg-white px-4 font-bold text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-50"
+                           :disabled="currentPage === 1"
+                           @click="changePage(currentPage - 1)"
+                        >
+                           Anterior
+                        </button>
+                        <button
+                           v-for="page in visiblePages"
+                           :key="page"
+                           type="button"
+                           class="h-10 min-w-10 rounded-lg border px-3 font-black transition"
+                           :class="page === currentPage
+                              ? 'border-brand-500 bg-white text-brand-700'
+                              : 'border-slate-200 bg-white text-slate-700 hover:border-brand-200'"
+                           @click="changePage(page)"
+                        >
+                           {{ page }}
+                        </button>
+                        <span v-if="totalPages > visiblePages[visiblePages.length - 1]" class="px-2 font-black text-slate-400">
+                           ...
+                        </span>
+                        <button
+                           v-if="totalPages > visiblePages[visiblePages.length - 1]"
+                           type="button"
+                           class="h-10 min-w-10 rounded-lg border border-slate-200 bg-white px-3 font-black text-slate-700 transition hover:border-brand-200"
+                           @click="changePage(totalPages)"
+                        >
+                           {{ totalPages }}
+                        </button>
+                        <button
+                           type="button"
+                           class="h-10 rounded-lg border border-slate-200 bg-white px-4 font-bold text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-50"
+                           :disabled="currentPage === totalPages"
+                           @click="changePage(currentPage + 1)"
+                        >
+                           Siguiente
+                        </button>
+                     </div>
+                  </footer>
+               </template>
+            </section>
+         </template>
 
          <section v-if="isDetailOpen" class="-mx-3 bg-white px-3 py-4 sm:mx-0 sm:rounded-lg sm:p-5 sm:shadow-sm">
             <ApprovalDetailModal
                v-model="showDetailModal"
                :approval="selectedApproval"
-               :can-resolve="canResolveInTab && selectedApproval?.status === 'PENDING'"
+               :can-resolve="canResolveSelected"
                @resolved="handleResolved"
             />
          </section>

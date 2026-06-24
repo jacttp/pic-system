@@ -7,6 +7,8 @@ import { useRouter, useRoute } from 'vue-router';
 import NotificationCenter from '@/modules/UserProfile/components/NotificationCenter.vue';
 import coronaLogo from '@/assets/logo.png';
 
+const SIDEBAR_COLLAPSE_KEY = 'pic_admin_sidebar_collapsed';
+
 const auth = useAuthStore();
 const setupStore = useSetupStore();
 const profileStore = useProfileStore();
@@ -21,6 +23,7 @@ const showMobileSidebar = ref(false);
 let notifPoll: ReturnType<typeof setInterval> | null = null;
 
 onMounted(async () => {
+   isCollapsed.value = localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === 'true';
    await setupStore.fetchModules();
    setupStore.fetchHubConfig();
    profileStore.fetchProfile();
@@ -60,6 +63,11 @@ const toggleNotifications = () => {
 const toggleUserMenu = () => {
    showUserMenu.value = !showUserMenu.value;
    showNotifDropdown.value = false;
+};
+
+const toggleSidebar = () => {
+   isCollapsed.value = !isCollapsed.value;
+   localStorage.setItem(SIDEBAR_COLLAPSE_KEY, String(isCollapsed.value));
 };
 
 const goToProfile = () => {
@@ -327,6 +335,25 @@ const userInitials = computed(() => {
             class="relative z-40 hidden shrink-0 flex-col border-r border-slate-200 bg-white transition-all duration-300 ease-in-out md:flex"
             :class="isCollapsed ? 'w-20' : 'w-64'"
          >
+            <div
+               class="flex h-12 shrink-0 items-center border-b border-slate-100 px-3"
+               :class="isCollapsed ? 'justify-center' : 'justify-end'"
+            >
+               <button
+                  type="button"
+                  class="group flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 shadow-sm shadow-slate-100 transition hover:border-red-100 hover:bg-red-50/40 hover:text-red-700 focus:outline-none focus:ring-4 focus:ring-red-50"
+                  :title="isCollapsed ? 'Expandir menu' : 'Contraer menu'"
+                  :aria-label="isCollapsed ? 'Expandir menu lateral' : 'Contraer menu lateral'"
+                  :aria-pressed="isCollapsed"
+                  @click="toggleSidebar"
+               >
+                  <i
+                     class="fa-solid text-[11px] transition-transform group-hover:scale-110"
+                     :class="isCollapsed ? 'fa-angles-right' : 'fa-angles-left'"
+                  ></i>
+               </button>
+            </div>
+
             <nav class="flex-1 space-y-1 overflow-y-auto overflow-x-hidden p-3 custom-scrollbar">
                <div v-if="setupStore.isLoading" class="space-y-4 p-2">
                   <div v-for="i in 3" :key="i" class="animate-pulse">

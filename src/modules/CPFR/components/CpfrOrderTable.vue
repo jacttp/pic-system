@@ -335,6 +335,57 @@ function storeStatusKey(idCliente: string): string {
     return `store:${idCliente}`
 }
 
+type CpfrOrderStatus = 'pendiente' | 'borrador' | 'revision' | 'aprobado' | 'cerrado' | 'reemplazado' | 'enviado'
+
+const cardStatusOptions: Array<{
+    estado: CpfrOrderStatus;
+    label: string;
+    description: string;
+    icon: string;
+    cls: string;
+}> = [
+    {
+        estado: 'borrador',
+        label: 'Borrador',
+        description: 'Regresa la OC a edición operativa.',
+        icon: 'fa-solid fa-file-pen',
+        cls: 'text-amber-700 hover:bg-amber-50',
+    },
+    {
+        estado: 'revision',
+        label: 'Revisión',
+        description: 'Envía la OC al flujo de aprobación.',
+        icon: 'fa-solid fa-paper-plane',
+        cls: 'text-indigo-700 hover:bg-indigo-50',
+    },
+    {
+        estado: 'aprobado',
+        label: 'Aprobado',
+        description: 'Aprueba la OC directamente.',
+        icon: 'fa-solid fa-circle-check',
+        cls: 'text-emerald-700 hover:bg-emerald-50',
+    },
+    {
+        estado: 'cerrado',
+        label: 'Cerrado',
+        description: 'Retira la OC del flujo operativo.',
+        icon: 'fa-solid fa-lock',
+        cls: 'text-slate-700 hover:bg-slate-100',
+    },
+]
+
+function canUseCardDirectStatusMode(): boolean {
+    return currentTab.value !== 'historial'
+}
+
+function getVisibleOCNumbers(skus: CpfrSkuDash[]): string[] {
+    const nums = new Set<string>()
+    for (const sku of getFlatVisibleSkus(skus)) {
+        if (sku.num_pedido) nums.add(sku.num_pedido)
+    }
+    return [...nums]
+}
+
 function getVisibleEditableOCNumbers(skus: CpfrSkuDash[]): string[] {
     const nums = new Set<string>()
     for (const sku of getFlatVisibleSkus(skus)) {
@@ -387,7 +438,7 @@ async function changeOCStatus(num_pedido: string | null, estado: string) {
     openStatusOC.value = null
 
     const isRevision = estado === 'revision'
-    if (isRevision) submittingOC.value = num_pedido
+    submittingOC.value = num_pedido
 
     const result = await store.updateStatus({
         num_pedido: num_pedido,
@@ -396,8 +447,9 @@ async function changeOCStatus(num_pedido: string | null, estado: string) {
         estado: estado as any,
     })
 
+    submittingOC.value = null
+
     if (isRevision) {
-        submittingOC.value = null
         if (result.ok) {
             toast({
                 title: '\u2705 Pedido enviado a revisión',
@@ -414,13 +466,22 @@ async function changeOCStatus(num_pedido: string | null, estado: string) {
                 duration: 5000,
             })
         }
+    } else {
+        toast({
+            title: result.ok ? 'Estado actualizado' : 'Error al cambiar estado',
+            description: result.ok
+                ? `La OC ${num_pedido} cambió a ${estadoBadge(estado).label}.`
+                : `No se pudo cambiar la OC ${num_pedido}. Intenta de nuevo.`,
+            variant: result.ok ? undefined : 'destructive',
+            duration: 4200,
+        })
     }
 }
 
-async function changeStoreVisibleOCStatus(tienda: CpfrStoreDash, estado: string) {
+async function changeStoreVisibleOCStatus(tienda: CpfrStoreDash, estado: string, options: { includeAllVisible?: boolean; directMode?: boolean } = {}) {
     if (!store.currentWeek) return
 
-    const ocNumbers = getVisibleEditableOCNumbers(tienda.skus)
+    const ocNumbers = options.includeAllVisible ? getVisibleOCNumbers(tienda.skus) : getVisibleEditableOCNumbers(tienda.skus)
     if (!ocNumbers.length) return
 
     const submitKey = storeStatusKey(tienda.id_cliente)
@@ -453,6 +514,15 @@ async function changeStoreVisibleOCStatus(tienda: CpfrStoreDash, estado: string)
                 duration: 5000,
             })
         }
+    } else {
+        toast({
+            title: result.ok ? 'Estado actualizado por tienda' : 'Error al cambiar estado',
+            description: result.ok
+                ? `${ocNumbers.length} OC visibles de ${tienda.nombre_tienda} cambiaron a ${estadoBadge(estado).label}${options.directMode ? ' desde la vista de tarjetas' : ''}.`
+                : `No se pudieron actualizar las ${ocNumbers.length} OC visibles de ${tienda.nombre_tienda}.`,
+            variant: result.ok ? undefined : 'destructive',
+            duration: 5000,
+        })
     }
 }
 
@@ -1741,7 +1811,51 @@ const totalUniqueOCs = computed(() => {
                             </div>
 
                             <!-- Acciones Cabecera -->
-                            <div class="flex items-center gap-2 pl-5 border-l border-slate-100 hidden lg:flex">
+                            <div class="flex items-center gap-2 lg:pl-5 lg:border-l lg:border-slate-100">
+                                <div
+                                  v-if="canUseCardDirectStatusMode() && getVisibleOCNumbers(tienda.skus).length"
+                                  class="relative"
+                                >
+                                    <button
+                                      class="h-8 rounded-lg border border-brand-200 bg-brand-50 px-2.5 text-[9px] font-black uppercase tracking-wider text-brand-700 shadow-sm transition-all hover:border-brand-300 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                      :class="openStatusOC === storeStatusKey(tienda.id_cliente) ? 'ring-2 ring-brand-400 ring-offset-1' : ''"
+                                      :disabled="submittingOC === storeStatusKey(tienda.id_cliente)"
+                                      title="Cambiar estado de las OC visibles de esta tienda"
+                                      @click.stop="toggleStatusOC(storeStatusKey(tienda.id_cliente))"
+                                    >
+                                        <i v-if="submittingOC === storeStatusKey(tienda.id_cliente)" class="fa-solid fa-circle-notch fa-spin mr-1"></i>
+                                        <i v-else class="fa-solid fa-sliders mr-1"></i>
+                                        Estado
+                                        <span class="ml-1 opacity-70">({{ getVisibleOCNumbers(tienda.skus).length }})</span>
+                                    </button>
+
+                                    <div
+                                      v-if="openStatusOC === storeStatusKey(tienda.id_cliente)"
+                                      class="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-brand-100 bg-white text-[11px] shadow-2xl ring-1 ring-brand-900/5 animate-in fade-in zoom-in-95 duration-200"
+                                      @click.stop
+                                    >
+                                        <div class="border-b border-brand-50 bg-brand-50/70 px-3 py-2.5">
+                                            <p class="text-[9px] font-black uppercase tracking-[0.22em] text-brand-600">Cambio por tienda</p>
+                                            <p class="mt-0.5 text-[10px] font-semibold leading-snug text-slate-500">
+                                                Aplica a {{ getVisibleOCNumbers(tienda.skus).length }} OC visible{{ getVisibleOCNumbers(tienda.skus).length !== 1 ? 's' : '' }} de la tienda.
+                                            </p>
+                                        </div>
+                                        <button
+                                          v-for="option in cardStatusOptions"
+                                          :key="option.estado"
+                                          class="flex w-full items-start gap-2 px-3 py-2.5 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                          :class="option.cls"
+                                          :disabled="submittingOC === storeStatusKey(tienda.id_cliente)"
+                                          @click.stop="changeStoreVisibleOCStatus(tienda, option.estado, { includeAllVisible: true, directMode: true })"
+                                        >
+                                            <i :class="option.icon" class="mt-0.5 w-4 text-center text-[11px]"></i>
+                                            <span class="min-w-0">
+                                                <span class="block font-black">{{ option.label }}</span>
+                                                <span class="block text-[9px] font-semibold leading-snug text-slate-400">{{ option.description }}</span>
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
                                 <div class="flex items-center justify-center w-7 h-7 rounded-full bg-slate-50 text-slate-300 group-hover/card:bg-brand-50 group-hover/card:text-brand-500 transition-all">
                                     <i class="fa-solid transition-transform duration-300 text-xs" :class="store.expandedStores[tienda.id_cliente] ? 'fa-chevron-up text-brand-500' : 'fa-chevron-down'"></i>
                                 </div>
@@ -1791,25 +1905,34 @@ const totalUniqueOCs = computed(() => {
                                               @click.stop="toggleStatusOC(tienda.id_cliente + '_' + oc.group_id)"
                                               class="text-[9px] b-1 font-black px-1.5 py-0.5 rounded-lg border uppercase tracking-wider transition-all hover:shadow-md hover:-translate-y-0.5 active:translate-y-0" 
                                               :class="estadoBadge(oc.estado_oc).cls"
-                                              :disabled="submittingOC === oc.num_pedido"
+                                              :disabled="submittingOC === oc.num_pedido || !canUseCardDirectStatusMode()"
+                                              :title="canUseCardDirectStatusMode() ? 'Cambiar estado de la OC' : 'Estado de la OC'"
                                             >
                                                 <i v-if="submittingOC === oc.num_pedido" class="fa-solid fa-circle-notch fa-spin mr-1"></i>
                                                 {{ estadoBadge(oc.estado_oc).label }}
                                             </button>
 
-                                            <!-- Dropdown Cambio Estado (Solo para Centralizados) -->
-                                            <div v-if="openStatusOC === (tienda.id_cliente + '_' + oc.group_id) && currentTab === 'centralizados'" 
+                                            <!-- Dropdown Cambio Estado -->
+                                            <div v-if="openStatusOC === (tienda.id_cliente + '_' + oc.group_id) && canUseCardDirectStatusMode()" 
                                                  class="absolute right-0 top-full mt-2 z-50 bg-white border border-slate-200 shadow-2xl rounded-xl py-1.5 w-48 animate-in fade-in zoom-in-95 duration-200"
                                                  @click.stop>
-                                                <p class="px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 mb-1">Cambiar Estado</p>
-                                                <button @click="changeOCStatus(oc.num_pedido, 'borrador')" 
-                                                   class="w-full text-left px-4 py-2.5 text-[11px] font-bold text-slate-600 hover:bg-amber-50 hover:text-amber-700 flex items-center gap-2 transition-colors">
-                                                    <span class="w-2 h-2 rounded-full bg-amber-400"></span> Borrador
-                                                </button>
-                                                <button @click="changeOCStatus(oc.num_pedido, 'revision')" 
-                                                   class="w-full text-left px-4 py-2.5 text-[11px] font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2 transition-colors">
-                                                    <span class="w-2 h-2 rounded-full bg-indigo-400"></span> Enviar a Revisión
-                                                </button>
+                                                <div v-if="canUseCardDirectStatusMode()">
+                                                    <p class="px-4 py-2 text-[10px] font-black text-brand-600 uppercase tracking-widest border-b border-brand-50 mb-1">Cambiar Estado</p>
+                                                    <button
+                                                      v-for="option in cardStatusOptions"
+                                                      :key="option.estado"
+                                                      class="flex w-full items-start gap-2 px-4 py-2.5 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                      :class="option.cls"
+                                                      :disabled="submittingOC === oc.num_pedido"
+                                                      @click.stop="changeOCStatus(oc.num_pedido, option.estado)"
+                                                    >
+                                                        <i :class="option.icon" class="mt-0.5 w-4 text-center text-[11px]"></i>
+                                                        <span>
+                                                            <span class="block text-[11px] font-black">{{ option.label }}</span>
+                                                            <span class="block text-[9px] font-semibold leading-snug text-slate-400">{{ option.description }}</span>
+                                                        </span>
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

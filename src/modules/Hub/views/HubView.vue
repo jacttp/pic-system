@@ -6,7 +6,7 @@ import { useSetupStore } from '@/modules/Setup/stores/setupStores';
 import { useProfileStore } from '@/modules/UserProfile/stores/profileStore';
 import type { HubMainBlockKey, HubSidebarBlockKey } from '@/modules/Setup/types/setupTypes';
 import CacheProgress from '@/modules/Shared/components/CacheProgress.vue';
-import ManagementTray from '../components/ManagementTray.vue';
+import ManagementTray from '@/modules/Shared/components/ManagementTray.vue';
 import NoticesPanel from '../components/NoticesPanel.vue';
 
 const auth = useAuthStore();

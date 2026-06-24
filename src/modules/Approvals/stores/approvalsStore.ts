@@ -166,6 +166,37 @@ export const useApprovalsStore = defineStore('approvals', () => {
       }
    }
 
+   async function deleteCancelledApproval(id: number) {
+      error.value = null;
+      try {
+         await approvalsApi.deleteCancelledApproval(id);
+         approvals.value = approvals.value.filter(a => a.id !== id);
+         assignedApprovals.value = assignedApprovals.value.filter(a => a.id !== id);
+         if (selectedApproval.value?.id === id) {
+            selectedApproval.value = null;
+         }
+      } catch (err: any) {
+         error.value = err.response?.data?.message || 'Error al borrar solicitud cancelada.';
+         throw err;
+      }
+   }
+
+   async function deleteAllCancelledApprovals() {
+      error.value = null;
+      try {
+         const deleted = await approvalsApi.deleteAllCancelledApprovals();
+         approvals.value = approvals.value.filter(a => a.status !== 'CANCELLED');
+         assignedApprovals.value = assignedApprovals.value.filter(a => a.status !== 'CANCELLED');
+         if (selectedApproval.value?.status === 'CANCELLED') {
+            selectedApproval.value = null;
+         }
+         return deleted;
+      } catch (err: any) {
+         error.value = err.response?.data?.message || 'Error al borrar solicitudes canceladas.';
+         throw err;
+      }
+   }
+
    return {
       // Estado
       approvals,
@@ -187,5 +218,7 @@ export const useApprovalsStore = defineStore('approvals', () => {
       createApproval,
       resolveApproval,
       cancelApproval,
+      deleteCancelledApproval,
+      deleteAllCancelledApprovals,
    };
 });
