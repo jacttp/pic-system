@@ -28,7 +28,7 @@ interface CpfrPreviewRow {
    cant_pedida: number
    cantidad_base_uni: number
    ajuste: number
-   pzas_caja: number
+   pzas_bolsa: number
    ajusteValido: boolean
    cantidad_oc: number
    pedido_kg: number
@@ -177,9 +177,9 @@ const toNumericValue = (value: unknown, fallback = 0) => {
    return Number.isFinite(numeric) ? numeric : fallback;
 };
 
-const isAdjustmentMultiple = (adjustment: number, boxMultiple: number) => {
-   if (adjustment === 0 || boxMultiple <= 0) return true;
-   return Math.abs(adjustment % boxMultiple) < 0.0001;
+const isAdjustmentMultiple = (adjustment: number, bagMultiple: number) => {
+   if (adjustment === 0 || bagMultiple <= 0) return true;
+   return Math.abs(adjustment % bagMultiple) < 0.0001;
 };
 
 const cpfrPreviewRows = computed(() => {
@@ -191,7 +191,7 @@ const cpfrPreviewRows = computed(() => {
       return rawRows.map((row: any): CpfrPreviewRow => {
          const unidad = toNumericValue(row.unidad_inventario);
          const ajuste = toNumericValue(row.ajuste);
-         const pzasCaja = toNumericValue(row.pzas_caja);
+         const pzasBolsa = toNumericValue(row.pzas_bolsa ?? row.pzas_caja);
          const cantidadBase = toNumericValue(
             row.cantidad_base_uni ?? row.cantidad_final_uni ?? row.pedido_sugerido_pz_red ?? row.cant_pedida ?? row.total_pzas_sugeridas
          );
@@ -212,8 +212,8 @@ const cpfrPreviewRows = computed(() => {
          cant_pedida: cantPedida,
          cantidad_base_uni: cantidadBase,
          ajuste,
-         pzas_caja: pzasCaja,
-         ajusteValido: isAdjustmentMultiple(ajuste, pzasCaja),
+         pzas_bolsa: pzasBolsa,
+         ajusteValido: isAdjustmentMultiple(ajuste, pzasBolsa),
          cantidad_oc: Number(row.cantidad_oc ?? row.cant_pedida_oc ?? 0),
          pedido_kg: Number(row.pedido_kg ?? (cantPedida * unidad) ?? 0),
          inv_actual_pz: Number(row.inv_actual_pz ?? row.inv_actual_uni ?? 0),
@@ -247,7 +247,7 @@ const cpfrPreviewRows = computed(() => {
       cant_pedida: Number(p.total_pzas_sugeridas ?? 0),
       cantidad_base_uni: Number(p.total_pzas_sugeridas ?? 0),
       ajuste: 0,
-      pzas_caja: 0,
+      pzas_bolsa: 0,
       ajusteValido: true,
       cantidad_oc: Number(p.total_pzas_cadena ?? 0),
       pedido_kg: 0,
@@ -413,9 +413,9 @@ const refreshCpfrDetail = async () => {
 const handleAdjustPedido = async (row: CpfrPreviewRow, direction: 1 | -1) => {
    if (!props.approval || !canEditCpfrOrder.value || isRowAdjusting(row)) return;
 
-   const step = Number(row.pzas_caja || 0);
+   const step = Number(row.pzas_bolsa || 0);
    if (step <= 0) {
-      errorMessage.value = 'Este SKU no tiene pzas_caja configurado para ajustar.';
+      errorMessage.value = 'Este SKU no tiene pzas_bolsa configurado para ajustar.';
       return;
    }
 
@@ -671,7 +671,7 @@ const handleConfirm = async () => {
                                        <td
                                           class="px-3 py-2 text-right font-black"
                                           :class="row.ajusteValido ? (row.ajuste === 0 ? 'text-slate-400' : 'text-amber-700') : 'text-red-700'"
-                                          :title="row.ajusteValido ? 'Ajuste sobre cantidad base' : 'El ajuste no respeta el multiplo pzas_caja'"
+                                          :title="row.ajusteValido ? 'Ajuste sobre cantidad base' : 'El ajuste no respeta el multiplo pzas_bolsa'"
                                        >
                                           {{ row.ajuste > 0 ? '+' : '' }}{{ formatNumber(row.ajuste, 0) }}
                                        </td>
@@ -684,7 +684,7 @@ const handleConfirm = async () => {
                                                 type="button"
                                                 class="flex h-8 w-8 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
                                                 title="Disminuir pedido"
-                                                :disabled="isRowAdjusting(row) || !row.sku_muliix || row.pzas_caja <= 0 || row.cant_pedida - row.pzas_caja < 0"
+                                                :disabled="isRowAdjusting(row) || !row.sku_muliix || row.pzas_bolsa <= 0 || row.cant_pedida - row.pzas_bolsa < 0"
                                                 @click="handleAdjustPedido(row, -1)"
                                              >
                                                 <i class="fa-solid fa-minus text-[10px]"></i>
@@ -697,7 +697,7 @@ const handleConfirm = async () => {
                                                 type="button"
                                                 class="flex h-8 w-8 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
                                                 title="Incrementar pedido"
-                                                :disabled="isRowAdjusting(row) || !row.sku_muliix || row.pzas_caja <= 0"
+                                                :disabled="isRowAdjusting(row) || !row.sku_muliix || row.pzas_bolsa <= 0"
                                                 @click="handleAdjustPedido(row, 1)"
                                              >
                                                 <i class="fa-solid fa-plus text-[10px]"></i>
