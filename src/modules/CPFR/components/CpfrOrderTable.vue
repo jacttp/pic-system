@@ -33,7 +33,7 @@ const tableColumnCount = computed(() => showAdjustmentColumn.value ? 10 : 9)
 const tabs = [ 
     { id: 'centralizados', label: 'Centralizados' },
     { id: 'revision',       label: 'Revisión' },
-    { id: 'aprobada',       label: 'Aprobada' },
+    { id: 'aprobada',       label: 'Aprobados' },
     { id: 'sin_embarcar',   label: 'Sin Embarcar' },
     { id: 'historial',      label: 'Historial' },
 ]
@@ -846,10 +846,7 @@ const filteredDias = computed(() => {
         return (y < last.year) || (y === last.year && w < last.week);
     };
 
-    const isCentralizadosVisibleOC = (sku: any, leadTime: number | null | undefined) => {
-        const state = sku.estado_oc;
-        if (state === 'revision' || state === 'aprobado') return false;
-        if (!(state === 'pendiente' || state === 'borrador' || !state)) return false;
+    const isVisibleOrderWindow = (sku: any, leadTime: number | null | undefined) => {
         if (!canStillShipByLeadTime(sku, leadTime, today)) return false;
 
         const pedidoDate = parseLocalDate(sku.fec_pedido_cadena);
@@ -869,6 +866,13 @@ const filteredDias = computed(() => {
             && pedidoDate.getTime() >= rollingSevenDaysStart.getTime();
     };
 
+    const isCentralizadosVisibleOC = (sku: any, leadTime: number | null | undefined) => {
+        const state = sku.estado_oc;
+        if (state === 'revision' || state === 'aprobado') return false;
+        if (!(state === 'pendiente' || state === 'borrador' || !state)) return false;
+        return isVisibleOrderWindow(sku, leadTime);
+    };
+
     return (currentTab.value === 'historial' ? store.historialDias : store.dias).map(dia => {
         const filteredTiendas = dia.tiendas.map(tienda => {
             const filteredSkus = tienda.skus.filter(sku => {
@@ -879,7 +883,7 @@ const filteredDias = computed(() => {
                 } else if (currentTab.value === 'revision') {
                     if ((!isCurrentWeek(sku) && !isPreviousWeek(sku)) || state !== 'revision') return false;
                 } else if (currentTab.value === 'aprobada') {
-                    if ((!isCurrentWeek(sku) && !isPreviousWeek(sku)) || state !== 'aprobado') return false;
+                    if (state !== 'aprobado' || !isVisibleOrderWindow(sku, tienda.resumen?.lead_time)) return false;
                 } else if (currentTab.value === 'sin_embarcar') {
                     if (state !== 'cerrado') return false;
                     
