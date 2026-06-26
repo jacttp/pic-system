@@ -167,6 +167,26 @@ function formatAdjustment(sku: CpfrSkuDash): string {
     return `${value > 0 ? '+' : ''}${n(value, 0)}`
 }
 
+function formatSignedNumber(value: number): string {
+    return `${value > 0 ? '+' : ''}${n(value, 0)}`
+}
+
+function ocAdjustmentTotal(oc: GroupedOC): number {
+    return oc.skus.reduce((total, sku) => total + skuAdjustment(sku), 0)
+}
+
+function ocBaseOrderTotal(oc: GroupedOC): number {
+    return oc.skus.reduce((total, sku) => total + skuBaseQuantity(sku), 0)
+}
+
+function skuFinalOrderQuantity(sku: CpfrSkuDash): number {
+    return skuBaseQuantity(sku) + skuAdjustment(sku)
+}
+
+function ocFinalOrderTotal(oc: GroupedOC): number {
+    return oc.skus.reduce((total, sku) => total + skuFinalOrderQuantity(sku), 0)
+}
+
 function canDecreaseAdjustment(sku: CpfrSkuDash): boolean {
     const step = Number(sku.pzas_bolsa || 0)
     return step > 0 && skuBaseQuantity(sku) + skuAdjustment(sku) - step >= 0
@@ -1579,68 +1599,149 @@ const totalUniqueOCs = computed(() => {
                     <span class="text-[10px] font-bold text-slate-500">{{ week.skus.length }} SKU</span>
                   </div>
 
-                  <div v-if="groupByOC" class="divide-y divide-slate-100">
-                    <div v-for="oc in week.ocs" :key="oc.group_id" class="border-l-4" :class="isZ8(oc.num_pedido) ? 'border-l-purple-500 bg-purple-50/25' : 'border-l-slate-200 bg-white'">
-                      <div class="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div class="flex min-w-0 flex-wrap items-center gap-2">
-                          <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-700">
-                            <i class="fa-solid fa-file-invoice text-slate-400"></i>
-                            {{ oc.num_pedido || 'Sin número' }}
-                          </span>
-                          <span
-                            class="rounded-md border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider"
-                            :class="estadoBadge(oc.estado_oc).cls"
-                          >
-                            {{ estadoBadge(oc.estado_oc).label }}
-                          </span>
-                          <span v-if="oc.fec_pedido_cadena" class="text-[10px] font-bold text-slate-400">{{ formatShortDate(oc.fec_pedido_cadena) }}</span>
-                        </div>
-                        <div class="flex shrink-0 gap-3 text-[10px] font-bold text-slate-500">
-                          <span>{{ oc.skus.length }} SKU</span>
-                          <span>Central {{ n(oc.cant_pedida_total, 0) }}</span>
+                  <div v-if="groupByOC" class="space-y-4 bg-white">
+                    <div
+                      v-for="oc in week.ocs"
+                      :key="oc.group_id"
+                      class="overflow-hidden border-t border-slate-200 bg-white pt-3 first:border-t-0 first:pt-0"
+                    >
+                      <div
+                        class="border-l-4 px-3 py-2.5"
+                        :class="isZ8(oc.num_pedido) ? 'border-l-brand-600 bg-red-50/20' : 'border-l-brand-600 bg-slate-50/90'"
+                      >
+                        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                          <div class="flex min-w-0 flex-wrap items-center gap-2">
+                            <span class="inline-flex items-center gap-1 rounded-md bg-white/80 px-2 py-0.5 text-[10px] font-black text-slate-700">
+                              <i class="fa-solid fa-file-invoice text-slate-400"></i>
+                              OC {{ oc.num_pedido || 'Sin número' }}
+                            </span>
+                            <span
+                              class="rounded-md border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider"
+                              :class="estadoBadge(oc.estado_oc).cls"
+                            >
+                              {{ estadoBadge(oc.estado_oc).label }}
+                            </span>
+                            <span v-if="oc.fec_pedido_cadena" class="text-[10px] font-bold text-slate-400">{{ formatShortDate(oc.fec_pedido_cadena) }}</span>
+                          </div>
+                          <div class="grid grid-cols-2 gap-2 text-[10px] sm:grid-cols-4">
+                            <div class="rounded-md bg-white/70 px-2 py-1 text-right">
+                              <p class="text-[8px] font-black uppercase tracking-wider text-slate-400">SKUs</p>
+                              <p class="font-black text-slate-700">{{ oc.skus.length }}</p>
+                            </div>
+                            <div class="rounded-md bg-amber-50/60 px-2 py-1 text-right">
+                              <p class="text-[8px] font-black uppercase tracking-wider text-amber-600">Pedido base</p>
+                              <p class="font-black text-amber-700">{{ n(ocBaseOrderTotal(oc), 0) }}</p>
+                            </div>
+                            <div class="rounded-md bg-white/70 px-2 py-1 text-right">
+                              <p class="text-[8px] font-black uppercase tracking-wider text-slate-400">Ajuste</p>
+                              <p class="font-black" :class="ocAdjustmentTotal(oc) === 0 ? 'text-slate-500' : 'text-amber-700'">{{ formatSignedNumber(ocAdjustmentTotal(oc)) }}</p>
+                            </div>
+                            <div class="rounded-md bg-white/70 px-2 py-1 text-right">
+                              <p class="text-[8px] font-black uppercase tracking-wider text-slate-400">Pedido</p>
+                              <p class="font-black text-slate-700">{{ n(ocFinalOrderTotal(oc), 0) }}</p>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div class="divide-y divide-slate-100 border-t border-slate-100 bg-white">
+                      <div class="bg-white">
+                        <div class="hidden grid-cols-[minmax(220px,1.25fr)_120px_82px_98px_96px_76px_96px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2 text-[9px] font-black uppercase tracking-wider text-slate-500 md:grid">
+                          <span>SKU</span>
+                          <span>UPC / Código</span>
+                          <span class="text-right">Inventario</span>
+                          <span class="text-right">Sellout prom.</span>
+                          <span class="text-right text-amber-700">Pedido base</span>
+                          <span class="text-right">Ajuste</span>
+                          <span class="text-right">Pedido</span>
+                        </div>
                         <div
                           v-for="(sku, idx) in oc.skus"
                           :key="sku.sku_muliix ? `${oc.group_id}_${sku.sku_muliix}` : `${oc.group_id}_${idx}`"
-                          class="grid grid-cols-1 gap-2 px-4 py-2 text-[11px] md:grid-cols-[minmax(0,1fr)_110px_90px_90px]"
+                          class="grid grid-cols-2 gap-x-3 gap-y-2 px-4 py-3 text-[11px] even:bg-slate-50/45 md:grid-cols-[minmax(220px,1.25fr)_120px_82px_98px_96px_76px_96px] md:items-center md:border-b md:border-slate-100 md:py-2.5 md:last:border-b-0"
                         >
-                          <button class="min-w-0 text-left font-semibold text-slate-700 hover:text-brand-700" @click.stop="openHistorialProductPanel(tienda, sku)">
+                          <button class="col-span-2 min-w-0 text-left font-semibold text-slate-700 hover:text-brand-700 md:col-span-1" @click.stop="openHistorialProductPanel(tienda, sku)">
                             <span class="block truncate">{{ sku.sku_nombre }}</span>
-                            <span class="mt-0.5 block truncate font-mono text-[9px] text-slate-400">{{ sku.sku_cadena || sku.upc_cadena || '—' }}</span>
+                            <span class="mt-0.5 block truncate font-mono text-[9px] text-slate-400">SKU {{ sku.sku_muliix || sku.sku_cadena || '—' }}</span>
                           </button>
-                          <span class="font-mono text-slate-500">{{ sku.upc_cadena || '—' }}</span>
-                          <span class="text-right font-black text-slate-700">Ped. {{ n(sku.cant_pedida, 0) }}</span>
-                          <span class="text-right font-black" :class="fillClass(calcularFillRateDinamico(sku))">
-                            {{ calcularFillRateDinamico(sku) != null ? (calcularFillRateDinamico(sku)! * 100).toFixed(0) + '%' : '—' }}
-                          </span>
+                          <div class="col-span-2 min-w-0 font-mono text-slate-500 md:col-span-1">
+                            <span class="mr-1 font-sans text-[9px] font-black uppercase text-slate-400 md:hidden">UPC</span>
+                            <span class="truncate">{{ sku.upc_cadena || sku.sku_cadena || '—' }}</span>
+                          </div>
+                          <div class="text-right">
+                            <p class="text-[8px] font-black uppercase tracking-wider text-slate-400 md:hidden">Inventario</p>
+                            <p class="font-mono font-bold text-slate-600">{{ n(sku.inv_actual_pz, 0) }}</p>
+                          </div>
+                          <div class="text-right">
+                            <p class="text-[8px] font-black uppercase tracking-wider text-slate-400 md:hidden">Sellout promedio</p>
+                            <p class="font-mono font-bold text-slate-600">{{ n(sku.promedio_sellout_pz, 1) }}</p>
+                          </div>
+                          <div class="text-right">
+                            <p class="text-[8px] font-black uppercase tracking-wider text-amber-600 md:hidden">Pedido base</p>
+                            <p class="font-black text-amber-700">{{ n(skuBaseQuantity(sku), 0) }}</p>
+                          </div>
+                          <div class="text-right">
+                            <p class="text-[8px] font-black uppercase tracking-wider text-slate-400 md:hidden">Ajuste</p>
+                            <p class="font-black" :class="skuAdjustment(sku) === 0 ? 'text-slate-500' : 'text-amber-700'">{{ formatAdjustment(sku) }}</p>
+                          </div>
+                          <div class="text-right">
+                            <p class="text-[8px] font-black uppercase tracking-wider text-slate-400 md:hidden">Pedido</p>
+                            <p class="font-black text-slate-700">{{ n(skuFinalOrderQuantity(sku), 0) }}</p>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
 
                   <div v-else class="divide-y divide-slate-100 bg-white">
+                    <div class="hidden grid-cols-[170px_minmax(220px,1.25fr)_120px_82px_98px_96px_76px_96px] gap-3 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[9px] font-black uppercase tracking-wider text-slate-500 md:grid">
+                      <span>OC / Estado</span>
+                      <span>SKU</span>
+                      <span>UPC / Código</span>
+                      <span class="text-right">Inventario</span>
+                      <span class="text-right">Sellout prom.</span>
+                      <span class="text-right text-amber-700">Pedido base</span>
+                      <span class="text-right">Ajuste</span>
+                      <span class="text-right">Pedido</span>
+                    </div>
                     <div
                       v-for="(sku, idx) in week.skus"
                       :key="sku.sku_muliix ? `${week.key}_${sku.sku_muliix}` : `${week.key}_${idx}`"
-                      class="grid grid-cols-1 gap-2 border-l-4 px-3 py-2 text-[11px] md:grid-cols-[170px_minmax(0,1fr)_90px_90px]"
-                      :class="isZ8(sku.num_pedido) ? 'border-l-purple-500 bg-purple-50/20' : 'border-l-slate-200'"
+                      class="grid grid-cols-2 gap-x-3 gap-y-2 border-l-4 px-3 py-3 text-[11px] md:grid-cols-[170px_minmax(220px,1.25fr)_120px_82px_98px_96px_76px_96px] md:items-center md:py-2.5"
+                      :class="isZ8(sku.num_pedido) ? 'border-l-brand-600 bg-red-50/20' : 'border-l-slate-200'"
                     >
-                      <div class="flex min-w-0 flex-wrap items-center gap-2">
-                        <span class="rounded-md bg-slate-100 px-2 py-0.5 font-black text-slate-700">{{ sku.num_pedido || 'Sin OC' }}</span>
+                      <div class="col-span-2 flex min-w-0 flex-wrap items-center gap-2 md:col-span-1">
+                        <span class="rounded-md bg-slate-100 px-2 py-0.5 font-black text-slate-700">OC {{ sku.num_pedido || 'Sin número' }}</span>
                         <span class="rounded-md border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider" :class="estadoBadge(sku.estado_oc).cls">
                           {{ estadoBadge(sku.estado_oc).label }}
                         </span>
                       </div>
-                      <button class="min-w-0 text-left font-semibold text-slate-700 hover:text-brand-700" @click.stop="openHistorialProductPanel(tienda, sku)">
+                      <button class="col-span-2 min-w-0 text-left font-semibold text-slate-700 hover:text-brand-700 md:col-span-1" @click.stop="openHistorialProductPanel(tienda, sku)">
                         <span class="block truncate">{{ sku.sku_nombre }}</span>
-                        <span class="mt-0.5 block truncate font-mono text-[9px] text-slate-400">{{ sku.sku_cadena || sku.upc_cadena || '—' }}</span>
+                        <span class="mt-0.5 block truncate font-mono text-[9px] text-slate-400">SKU {{ sku.sku_muliix || sku.sku_cadena || '—' }}</span>
                       </button>
-                      <span class="text-right font-black text-slate-700">Ped. {{ n(sku.cant_pedida, 0) }}</span>
-                      <span class="text-right font-black" :class="fillClass(calcularFillRateDinamico(sku))">
-                        {{ calcularFillRateDinamico(sku) != null ? (calcularFillRateDinamico(sku)! * 100).toFixed(0) + '%' : '—' }}
-                      </span>
+                      <div class="col-span-2 min-w-0 font-mono text-slate-500 md:col-span-1">
+                        <span class="mr-1 font-sans text-[9px] font-black uppercase text-slate-400 md:hidden">UPC</span>
+                        <span class="truncate">{{ sku.upc_cadena || sku.sku_cadena || '—' }}</span>
+                      </div>
+                      <div class="text-right">
+                        <p class="text-[8px] font-black uppercase tracking-wider text-slate-400 md:hidden">Inventario</p>
+                        <p class="font-mono font-bold text-slate-600">{{ n(sku.inv_actual_pz, 0) }}</p>
+                      </div>
+                      <div class="text-right">
+                        <p class="text-[8px] font-black uppercase tracking-wider text-slate-400 md:hidden">Sellout promedio</p>
+                        <p class="font-mono font-bold text-slate-600">{{ n(sku.promedio_sellout_pz, 1) }}</p>
+                      </div>
+                      <div class="text-right">
+                        <p class="text-[8px] font-black uppercase tracking-wider text-amber-600 md:hidden">Pedido base</p>
+                        <p class="font-black text-amber-700">{{ n(skuBaseQuantity(sku), 0) }}</p>
+                      </div>
+                      <div class="text-right">
+                        <p class="text-[8px] font-black uppercase tracking-wider text-slate-400 md:hidden">Ajuste</p>
+                        <p class="font-black" :class="skuAdjustment(sku) === 0 ? 'text-slate-500' : 'text-amber-700'">{{ formatAdjustment(sku) }}</p>
+                      </div>
+                      <div class="text-right">
+                        <p class="text-[8px] font-black uppercase tracking-wider text-slate-400 md:hidden">Pedido</p>
+                        <p class="font-black text-slate-700">{{ n(skuFinalOrderQuantity(sku), 0) }}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
