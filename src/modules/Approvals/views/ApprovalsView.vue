@@ -257,7 +257,8 @@ const handleResolved = () => {
 };
 
 const canDeleteCancelled = (approval: Approval) =>
-   approval.status === 'CANCELLED' && (isSuperAdmin.value || assignedIds.value.has(approval.id));
+   approval.status === 'CANCELLED'
+   && (isSuperAdmin.value || assignedIds.value.has(approval.id) || approval.requestedById === authStore.user?.id);
 
 const handleDeleteCancelled = async (approval: Approval, event?: Event) => {
    event?.stopPropagation();

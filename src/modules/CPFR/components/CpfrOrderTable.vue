@@ -27,6 +27,8 @@ const currentTab = computed({
   get: () => store.activeTab,
   set: (val) => store.setActiveTab(val)
 })
+const showAdjustmentColumn = computed(() => currentTab.value !== 'centralizados')
+const tableColumnCount = computed(() => showAdjustmentColumn.value ? 10 : 9)
 
 const tabs = [ 
     { id: 'centralizados', label: 'Centralizados' },
@@ -42,12 +44,56 @@ const availableWeeks = computed(() => {
   return store.allCpfrWeeks
 })
 
+const historyWeekPickerOpen = ref(false)
+const historyWeekSearch = ref('')
+
+const filteredHistoryWeeks = computed(() => {
+    const term = historyWeekSearch.value.trim().toLowerCase()
+    if (!term) return availableWeeks.value
+
+    return availableWeeks.value.filter(w => {
+        const label = `semana ${w.semana} ${w.anio} ${w.key}`.toLowerCase()
+        return label.includes(term)
+    })
+})
+
+function loadHistoryFromSelection() {
+    store.loadHistorial(store.historialSelectedWeeks)
+}
+
+const selectedHistoryWeeksLabel = computed(() => {
+    const selected = store.historialSelectedWeeks
+    if (!selected.length) return 'Elegir semanas'
+    if (selected.length === 1) {
+        const week = selected[0]
+        return `Semana ${week.semana} (${week.anio})`
+    }
+    return `${selected.length} semanas seleccionadas`
+})
+
+function isHistoryWeekSelected(key: string): boolean {
+    return store.historialSelectedWeeks.some(w => w.key === key)
+}
+
+function toggleHistoryWeek(week: { anio: number; semana: number; semana_ic: string; key: string }) {
+    if (isHistoryWeekSelected(week.key)) {
+        store.historialSelectedWeeks = store.historialSelectedWeeks.filter(w => w.key !== week.key)
+    } else {
+        store.historialSelectedWeeks = [...store.historialSelectedWeeks, week]
+    }
+}
+
+function clearHistoryWeeks() {
+    store.historialSelectedWeeks = []
+}
+
+function selectRecentHistoryWeeks(count: number) {
+    store.historialSelectedWeeks = availableWeeks.value.slice(0, count)
+}
+
 watch(currentTab, (newTab) => {
   if (newTab !== 'sin_embarcar' && newTab !== 'historial') {
     selectedFilterWeek.value = 'TODAS'
-  }
-  if (newTab === 'historial' && !store.historialLoading) {
-    store.loadHistorial()
   }
 })
 
@@ -59,6 +105,7 @@ const savedId   = ref<string | null>(null)
 
 // ── Estado de envío a revisión ────────────────────────────────────────────────
 const submittingOC = ref<string | null>(null)
+const adjustingSkuKey = ref<string | null>(null)
 
 function startEdit(sku: CpfrSkuDash) {
     if (currentTab.value !== 'centralizados') return;
@@ -98,6 +145,60 @@ async function confirmEdit(sku: CpfrSkuDash, id_cliente: string) {
     editingId.value = null
 }
 
+function adjustmentKey(idCliente: string, sku: CpfrSkuDash): string {
+    return `${idCliente}|${sku.num_pedido || ''}|${sku.sku_muliix || ''}|${sku.fec_pedido_cadena || ''}`
+}
+
+function skuBaseQuantity(sku: CpfrSkuDash): number {
+    if (sku.cantidad_base_uni !== undefined && sku.cantidad_base_uni !== null) {
+        const base = Number(sku.cantidad_base_uni)
+        return Number.isFinite(base) ? base : 0
+    }
+    return Number(sku.pedido_sugerido_pz_red || 0)
+}
+
+function skuAdjustment(sku: CpfrSkuDash): number {
+    const value = Number(sku.ajuste ?? 0)
+    return Number.isFinite(value) ? value : 0
+}
+
+function formatAdjustment(sku: CpfrSkuDash): string {
+    const value = skuAdjustment(sku)
+    return `${value > 0 ? '+' : ''}${n(value, 0)}`
+}
+
+function canDecreaseAdjustment(sku: CpfrSkuDash): boolean {
+    const step = Number(sku.pzas_bolsa || 0)
+    return step > 0 && skuBaseQuantity(sku) + skuAdjustment(sku) - step >= 0
+}
+
+function adjustmentTooltip(idCliente: string, sku: CpfrSkuDash): string {
+    if (currentTab.value === 'aprobada') return 'Ajuste aprobado de solo lectura'
+    if (currentTab.value !== 'revision') return 'Ajuste disponible solo en revision'
+    if (!sku.sku_muliix || !sku.num_pedido || !sku.fec_pedido_cadena) return 'Faltan datos para ajustar este SKU'
+    if (!sku.pzas_bolsa || sku.pzas_bolsa <= 0) return 'Este SKU no tiene pzas_bolsa configurado'
+    if (!store.getCachedApprovalIdForSku(idCliente, sku)) return 'No se encontro la solicitud de aprobacion pendiente'
+    return `Ajuste por bolsa: ${n(sku.pzas_bolsa, 0)} pz`
+}
+
+async function adjustReviewSku(idCliente: string, sku: CpfrSkuDash, direction: 1 | -1) {
+    const key = adjustmentKey(idCliente, sku)
+    if (adjustingSkuKey.value) return
+    adjustingSkuKey.value = key
+
+    const result = await store.adjustReviewSkuAdjustment(idCliente, sku, direction)
+    adjustingSkuKey.value = null
+
+    if (!result.ok) {
+        toast({
+            title: 'No se pudo ajustar el pedido',
+            description: result.message || 'Intenta de nuevo.',
+            variant: 'destructive',
+            duration: 4200,
+        })
+    }
+}
+
 // ── Popovers State (Sellout & Status) ──────────────────────────────────────────
 const openSelloutId = ref<string | null>(null)
 const openStatusOC  = ref<string | null>(null)
@@ -105,6 +206,7 @@ const openStatusOC  = ref<string | null>(null)
 function closeAllPopovers() {
     openSelloutId.value = null
     openStatusOC.value  = null
+    historyWeekPickerOpen.value = false
 }
 
 function closeSellout() {
@@ -118,6 +220,18 @@ function openProductPanel(tienda: CpfrStoreDash, sku: CpfrSkuDash) {
 
 function closeProductPanel() {
     selectedProductContext.value = null
+}
+
+function openHistorialProductPanel(tienda: HistorialStoreGroup, sku: CpfrSkuDash) {
+    selectedProductContext.value = {
+        tienda: {
+            ...tienda.source,
+            skus: tienda.skus,
+            total_skus: tienda.skus.length,
+        },
+        sku,
+    }
+    closeAllPopovers()
 }
 
 function toggleSellout(id: string) {
@@ -210,6 +324,36 @@ function groupOCs(skus: CpfrSkuDash[]): GroupedOC[] {
     })
 }
 
+function groupHistorialOCs(skus: CpfrSkuDash[]): GroupedOC[] {
+    const map = new Map<string, GroupedOC>()
+    for (const sku of skus) {
+        const key = sku.num_pedido || 'UNSAVED'
+        if (!map.has(key)) {
+            map.set(key, {
+                group_id: key,
+                num_pedido: sku.num_pedido,
+                semana_ic: sku.semana_ic,
+                fec_pedido_cadena: sku.fec_pedido_cadena,
+                fec_fin_embarque: sku.fec_fin_embarque,
+                estado_oc: sku.estado_oc,
+                pedido_sugerido_pz_red_total: 0,
+                cant_pedida_total: 0,
+                skus: []
+            })
+        }
+        const oc = map.get(key)!
+        oc.pedido_sugerido_pz_red_total += sku.pedido_sugerido_pz_red
+        oc.cant_pedida_total += (sku.cant_pedida || 0)
+        oc.skus.push(sku)
+    }
+
+    return Array.from(map.values()).sort((a, b) => {
+        const dateA = a.fec_pedido_cadena ? new Date(a.fec_pedido_cadena).getTime() : 0
+        const dateB = b.fec_pedido_cadena ? new Date(b.fec_pedido_cadena).getTime() : 0
+        return dateB - dateA
+    })
+}
+
 const groupByOC = computed({
     get: () => store.groupByOC,
     set: (val) => store.setGroupByOC(val)
@@ -289,13 +433,6 @@ function storeRowBgClass(isExpanded: boolean): string {
     return isExpanded
         ? 'bg-slate-50/80 border-l-[3px] border-l-brand-400 border-b border-slate-200'
         : 'bg-white border-l-[3px] border-l-transparent border-b border-slate-100 hover:bg-slate-50/80'
-}
-
-function instockBadge(pct: number | null): { label: string; cls: string } {
-    if (pct === null)  return { label: '—',        cls: 'bg-slate-100 text-slate-500' }
-    if (pct >= 100)    return { label: 'INSTOCK',  cls: 'bg-emerald-100 text-emerald-700' }
-    if (pct >= 50)     return { label: 'BAJO',     cls: 'bg-amber-100 text-amber-700' }
-    return                    { label: 'CRÍTICO',  cls: 'bg-rose-100 text-rose-700' }
 }
 
 function escenarioCls(esc: 'A' | 'B' | null, numPedido?: string | null) {
@@ -683,8 +820,6 @@ const filteredDias = computed(() => {
                            sf.bajoStock || sf.sobrestock || sf.fillrateBajo || 
                            sf.fillrate100 || sf.sobrepedido;
     
-    const todayStr = new Date().toISOString().split('T')[0];
-
     const today = new Date();
     const curr = getISOContext(today);
     const last = getISOContext(new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000));
@@ -746,8 +881,7 @@ const filteredDias = computed(() => {
                 } else if (currentTab.value === 'aprobada') {
                     if ((!isCurrentWeek(sku) && !isPreviousWeek(sku)) || state !== 'aprobado') return false;
                 } else if (currentTab.value === 'sin_embarcar') {
-                    const fecFin = sku.fec_fin_embarque ? sku.fec_fin_embarque.slice(0, 10) : null;
-                    if (!fecFin || fecFin >= todayStr || state === 'aprobado') return false;
+                    if (state !== 'cerrado') return false;
                     
                     if (selectedFilterWeek.value !== 'TODAS') {
                         const y = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0;
@@ -938,7 +1072,123 @@ function formatShortDate(value: string | null | undefined): string {
     return value.slice(0, 10)
 }
 
+function skuWeekKey(sku: CpfrSkuDash): string {
+    const anio = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0
+    const semana = sku.semana_ic ? parseInt(sku.semana_ic) : 0
+    return `${anio}-W${String(semana).padStart(2, '0')}`
+}
+
+function skuWeekLabel(sku: CpfrSkuDash): string {
+    const anio = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0
+    return `Semana ${sku.semana_ic || '—'} (${anio || '—'})`
+}
+
+type HistorialWeekGroup = {
+    key: string
+    label: string
+    skus: CpfrSkuDash[]
+    ocs: GroupedOC[]
+}
+
+type HistorialStoreGroup = {
+    source: CpfrStoreDash
+    id_cliente: string
+    nombre_tienda: string
+    jefatura: string
+    skus: CpfrSkuDash[]
+    weeks: HistorialWeekGroup[]
+    ocCount: number
+    states: string[]
+}
+
+const historialStoreGroups = computed<HistorialStoreGroup[]>(() => {
+    const term = store.historialSearch.trim().toLowerCase()
+    const map = new Map<string, HistorialStoreGroup>()
+
+    for (const dia of store.historialDias) {
+        for (const tienda of dia.tiendas) {
+            for (const sku of tienda.skus) {
+                const state = sku.estado_oc
+                if (state !== 'aprobado' && state !== 'cerrado') continue
+
+                const searchable = [
+                    tienda.nombre_tienda,
+                    tienda.id_cliente,
+                    state,
+                    estadoBadge(state).label,
+                    sku.num_pedido,
+                ].filter(Boolean).join(' ').toLowerCase()
+
+                if (term && !searchable.includes(term)) continue
+
+                if (!map.has(tienda.id_cliente)) {
+                    map.set(tienda.id_cliente, {
+                        source: tienda,
+                        id_cliente: tienda.id_cliente,
+                        nombre_tienda: tienda.nombre_tienda,
+                        jefatura: tienda.jefatura,
+                        skus: [],
+                        weeks: [],
+                        ocCount: 0,
+                        states: [],
+                    })
+                }
+
+                map.get(tienda.id_cliente)!.skus.push(sku)
+            }
+        }
+    }
+
+    for (const group of map.values()) {
+        group.skus.sort((a, b) => {
+            const dateA = a.fec_pedido_cadena ? new Date(a.fec_pedido_cadena).getTime() : 0
+            const dateB = b.fec_pedido_cadena ? new Date(b.fec_pedido_cadena).getTime() : 0
+            return dateB - dateA
+        })
+
+        const weekMap = new Map<string, HistorialWeekGroup>()
+        for (const sku of group.skus) {
+            const key = skuWeekKey(sku)
+            if (!weekMap.has(key)) {
+                weekMap.set(key, { key, label: skuWeekLabel(sku), skus: [], ocs: [] })
+            }
+            weekMap.get(key)!.skus.push(sku)
+        }
+
+        group.weeks = [...weekMap.values()].map(week => ({
+            ...week,
+            ocs: groupHistorialOCs(week.skus),
+        }))
+        group.ocCount = new Set(group.skus.map(s => s.num_pedido).filter(Boolean)).size
+        group.states = [...new Set(group.skus.map(s => s.estado_oc).filter(Boolean) as string[])]
+    }
+
+    return [...map.values()].sort((a, b) => a.nombre_tienda.localeCompare(b.nombre_tienda))
+})
+
+const historialSummary = computed(() => {
+    const ocSet = new Set<string>()
+    let skus = 0
+
+    for (const group of historialStoreGroups.value) {
+        for (const sku of group.skus) {
+            skus += 1
+            if (sku.num_pedido) ocSet.add(`${group.id_cliente}|${sku.num_pedido}`)
+        }
+    }
+
+    return {
+        tiendas: historialStoreGroups.value.length,
+        ocs: ocSet.size,
+        skus,
+    }
+})
+
+const showHistoryWeekGroups = computed(() => store.historialSelectedWeeks.length > 1)
+
 const totalUniqueOCs = computed(() => {
+    if (currentTab.value === 'historial') return historialSummary.value.ocs
+
     const ocSet = new Set<string>();
     filteredDias.value.forEach(dia => {
         dia.tiendas.forEach(tienda => {
@@ -1031,8 +1281,8 @@ const totalUniqueOCs = computed(() => {
             >{{ t.label }}</button>
           </div>
 
-          <!-- Selector de semanas anteriores (discreto y elegante, aparece solo si es sin_embarcar o historial) -->
-          <div v-if="currentTab === 'sin_embarcar' || currentTab === 'historial'" class="flex items-center animate-in fade-in slide-in-from-left-2 duration-200">
+          <!-- Selector de semanas anteriores para Sin Embarcar -->
+          <div v-if="currentTab === 'sin_embarcar'" class="flex items-center animate-in fade-in slide-in-from-left-2 duration-200">
             <select
               v-model="selectedFilterWeek"
               class="h-8 bg-white border border-slate-200 text-slate-700 text-[10px] font-bold uppercase tracking-wider rounded-lg px-2.5 shadow-sm focus:outline-none focus:ring-1 focus:ring-brand-500 cursor-pointer hover:border-slate-300 transition-colors"
@@ -1042,6 +1292,151 @@ const totalUniqueOCs = computed(() => {
                 Semana {{ w.semana }} ({{ w.anio }})
               </option>
             </select>
+          </div>
+
+          <!-- Controles exclusivos de Historial -->
+          <div v-if="currentTab === 'historial'" class="flex flex-wrap items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-200">
+            <div class="relative" @click.stop>
+              <button
+                class="group inline-flex h-9 min-w-[220px] items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white pl-3 pr-2 text-left shadow-sm shadow-slate-100 transition hover:border-red-100 hover:bg-red-50/20 focus:outline-none focus:ring-2 focus:ring-red-100"
+                :class="historyWeekPickerOpen ? 'border-red-200 ring-2 ring-red-100' : ''"
+                title="Seleccionar semanas de historial"
+                @click.stop="historyWeekPickerOpen = !historyWeekPickerOpen"
+              >
+                <span class="flex min-w-0 items-center gap-2">
+                  <span class="inline-flex h-5 w-1 rounded-full bg-red-600"></span>
+                  <span class="min-w-0">
+                    <span class="block text-[9px] font-black uppercase leading-none text-red-600">Historial</span>
+                    <span class="mt-0.5 block truncate text-[11px] font-black text-slate-900">{{ selectedHistoryWeeksLabel }}</span>
+                  </span>
+                </span>
+                <span class="flex shrink-0 items-center gap-2">
+                  <span
+                    v-if="store.historialSelectedWeeks.length"
+                    class="rounded-md bg-red-50 px-1.5 py-0.5 text-[10px] font-black text-red-700"
+                  >
+                    {{ store.historialSelectedWeeks.length }}
+                  </span>
+                  <i class="fa-solid fa-chevron-down text-[10px] text-slate-400 transition-transform group-hover:text-red-600" :class="historyWeekPickerOpen ? 'rotate-180 text-red-600' : ''"></i>
+                </span>
+              </button>
+
+              <div
+                v-if="historyWeekPickerOpen"
+                class="absolute left-0 top-full z-50 mt-2 w-[320px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-200/60"
+              >
+                <div class="border-b border-slate-100 bg-slate-50/80 p-3">
+                  <div class="flex items-start justify-between gap-3">
+                    <div>
+                      <p class="text-[10px] font-black uppercase text-red-600">Semanas disponibles</p>
+                      <p class="mt-0.5 text-xs font-semibold text-slate-500">Elige una o varias semanas para cargar.</p>
+                    </div>
+                    <button
+                      class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:border-red-200 hover:bg-red-50/70 hover:text-red-700"
+                      title="Cerrar selector"
+                      @click.stop="historyWeekPickerOpen = false"
+                    >
+                      <i class="fa-solid fa-xmark text-[11px]"></i>
+                    </button>
+                  </div>
+
+                  <div class="relative mt-3">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-300"></i>
+                    <input
+                      v-model="historyWeekSearch"
+                      type="text"
+                      placeholder="Buscar semana o año"
+                      class="h-8 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-xs font-semibold text-slate-700 outline-none transition hover:border-red-100 focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                    />
+                  </div>
+
+                  <div class="mt-2 flex items-center gap-2">
+                    <button
+                      class="h-7 rounded-lg border border-slate-200 bg-white px-2.5 text-[10px] font-black uppercase text-slate-600 transition hover:border-red-200 hover:bg-red-50/70 hover:text-red-700"
+                      @click.stop="selectRecentHistoryWeeks(4)"
+                    >
+                      Últimas 4
+                    </button>
+                    <button
+                      class="h-7 rounded-lg border border-slate-200 bg-white px-2.5 text-[10px] font-black uppercase text-slate-600 transition hover:border-red-200 hover:bg-red-50/70 hover:text-red-700"
+                      @click.stop="clearHistoryWeeks"
+                    >
+                      Limpiar
+                    </button>
+                  </div>
+                </div>
+
+                <div class="max-h-64 overflow-auto p-2 scrollbar-thin">
+                  <button
+                    v-for="w in filteredHistoryWeeks"
+                    :key="w.key"
+                    class="group/week flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition"
+                    :class="isHistoryWeekSelected(w.key)
+                      ? 'border-red-200 bg-red-50/80'
+                      : 'border-transparent bg-white hover:border-red-100 hover:bg-red-50/30'"
+                    @click.stop="toggleHistoryWeek(w)"
+                  >
+                    <span class="flex min-w-0 items-center gap-3">
+                      <span
+                        class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-[10px] transition"
+                        :class="isHistoryWeekSelected(w.key)
+                          ? 'border-red-600 bg-red-600 text-white'
+                          : 'border-slate-200 bg-white text-transparent group-hover/week:border-red-200'"
+                      >
+                        <i class="fa-solid fa-check"></i>
+                      </span>
+                      <span class="min-w-0">
+                        <span class="block text-xs font-black text-slate-900">Semana {{ w.semana }}</span>
+                        <span class="block text-[10px] font-semibold text-slate-500">{{ w.anio }} · {{ w.key }}</span>
+                      </span>
+                    </span>
+                  </button>
+
+                  <div v-if="!filteredHistoryWeeks.length" class="px-3 py-8 text-center">
+                    <i class="fa-regular fa-calendar-xmark text-2xl text-slate-300"></i>
+                    <p class="mt-2 text-xs font-semibold text-slate-500">Sin semanas para esa búsqueda.</p>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between border-t border-slate-100 bg-slate-50/80 px-3 py-2">
+                  <span class="text-[10px] font-black uppercase text-slate-500">{{ store.historialSelectedWeeks.length }} seleccionada{{ store.historialSelectedWeeks.length === 1 ? '' : 's' }}</span>
+                  <button
+                    class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-red-600 px-3 text-[10px] font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    :disabled="store.historialLoading || !store.historialSelectedWeeks.length"
+                    @click.stop="loadHistoryFromSelection(); historyWeekPickerOpen = false"
+                  >
+                    <i v-if="store.historialLoading" class="fa-solid fa-circle-notch fa-spin"></i>
+                    <i v-else class="fa-solid fa-arrow-down-to-bracket"></i>
+                    Cargar
+                  </button>
+                </div>
+              </div>
+            </div>
+            <button
+              class="inline-flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-3 text-[10px] font-black uppercase tracking-wider text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="store.historialLoading || !store.historialSelectedWeeks.length"
+              @click.stop="loadHistoryFromSelection"
+            >
+              <i v-if="store.historialLoading" class="fa-solid fa-circle-notch fa-spin"></i>
+              <i v-else class="fa-solid fa-clock-rotate-left"></i>
+              Cargar historial
+            </button>
+            <div class="relative h-8 w-full max-w-[260px] sm:w-[240px]">
+              <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-300"></i>
+              <input
+                v-model="store.historialSearch"
+                type="text"
+                placeholder="Tienda, estado u OC"
+                class="h-full w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-8 text-xs font-semibold text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-100"
+              />
+              <button
+                v-if="store.historialSearch"
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 transition-colors hover:text-slate-500"
+                @click.stop="store.historialSearch = ''"
+              >
+                <i class="fa-solid fa-xmark text-[11px]"></i>
+              </button>
+            </div>
           </div>
         </div>
         
@@ -1087,18 +1482,175 @@ const totalUniqueOCs = computed(() => {
           <p class="text-sm font-medium">Cargando historial de órdenes…</p>
         </div>
 
-        <!-- ── Sin datos en Historial ── -->
+        <!-- ── Historial sin carga inicial ── -->
         <div
-          v-else-if="currentTab === 'historial' && !store.historialLoading && filteredDias.length === 0"
-          class="flex flex-col items-center justify-center gap-3 text-slate-400 py-16"
+          v-else-if="currentTab === 'historial' && !store.historialLoaded"
+          class="flex flex-col items-center justify-center gap-3 px-6 py-20 text-center text-slate-400"
         >
-          <i class="fa-solid fa-clock-rotate-left text-3xl text-slate-300"></i>
-          <p class="text-sm font-medium">No hay órdenes históricas para los filtros seleccionados.</p>
-          <p class="text-xs text-slate-400">Selecciona una semana diferente o ajusta los filtros.</p>
+          <div class="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-300">
+            <i class="fa-solid fa-clock-rotate-left text-xl"></i>
+          </div>
+          <p class="text-sm font-bold text-slate-600">Selecciona una o más semanas para cargar historial.</p>
+          <p class="max-w-md text-xs font-medium text-slate-400">
+            La pestaña no carga datos por defecto para evitar consultas pesadas. El historial sólo mostrará OC aprobadas o cerradas.
+          </p>
+          <p v-if="store.historialError" class="text-xs font-bold text-rose-500">{{ store.historialError }}</p>
+        </div>
+
+        <!-- ── Historial sin resultados ── -->
+        <div
+          v-else-if="currentTab === 'historial' && historialStoreGroups.length === 0"
+          class="flex flex-col items-center justify-center gap-3 px-6 py-20 text-center text-slate-400"
+        >
+          <i class="fa-solid fa-folder-open text-4xl text-slate-300"></i>
+          <p class="text-sm font-bold text-slate-600">No hay órdenes históricas para la selección actual.</p>
+          <p class="text-xs text-slate-400">Ajusta semanas o búsqueda. Sólo se consideran estados aprobado y cerrado.</p>
+        </div>
+
+        <!-- ── Vista dedicada Historial ── -->
+        <div v-else-if="currentTab === 'historial'" class="min-h-full bg-slate-50/60 p-4">
+          <div class="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div class="rounded-lg border border-brand-100 bg-white px-4 py-3 shadow-sm">
+              <p class="text-[9px] font-black uppercase tracking-wider text-brand-500">Tiendas</p>
+              <p class="mt-1 text-xl font-black text-slate-800">{{ historialSummary.tiendas }}</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+              <p class="text-[9px] font-black uppercase tracking-wider text-slate-500">OC</p>
+              <p class="mt-1 text-xl font-black text-slate-800">{{ historialSummary.ocs }}</p>
+            </div>
+            <div class="rounded-lg border border-emerald-100 bg-white px-4 py-3 shadow-sm">
+              <p class="text-[9px] font-black uppercase tracking-wider text-emerald-600">SKUs</p>
+              <p class="mt-1 text-xl font-black text-slate-800">{{ historialSummary.skus }}</p>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <section
+              v-for="tienda in historialStoreGroups"
+              :key="tienda.id_cliente"
+              class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+            >
+              <button
+                class="flex w-full items-center justify-between gap-4 border-l-4 border-l-brand-600 bg-white px-4 py-3 text-left transition-colors hover:bg-slate-50"
+                @click="store.toggleStore(tienda.id_cliente)"
+              >
+                <div class="flex min-w-0 items-center gap-3">
+                  <i
+                    class="fa-solid fa-chevron-right text-[11px] text-slate-300 transition-transform"
+                    :class="store.expandedStores[tienda.id_cliente] ? 'rotate-90 text-brand-500' : ''"
+                  ></i>
+                  <div class="min-w-0">
+                    <p class="truncate text-sm font-black text-slate-800">{{ tienda.nombre_tienda }}</p>
+                    <p class="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-600">{{ tienda.jefatura }}</p>
+                  </div>
+                </div>
+                <div class="flex shrink-0 flex-wrap justify-end gap-2">
+                  <span
+                    v-for="state in tienda.states"
+                    :key="state"
+                    class="rounded-md border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider"
+                    :class="estadoBadge(state).cls"
+                  >
+                    {{ estadoBadge(state).label }}
+                  </span>
+                  <span class="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-600">{{ tienda.ocCount }} OC</span>
+                  <span class="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-600">{{ tienda.skus.length }} SKU</span>
+                </div>
+              </button>
+
+              <div v-if="store.expandedStores[tienda.id_cliente]" class="border-t border-slate-100 bg-slate-50/60 p-3">
+                <div
+                  v-for="week in tienda.weeks"
+                  :key="week.key"
+                  class="mb-3 overflow-hidden rounded-lg border border-slate-200 bg-white last:mb-0"
+                >
+                  <div
+                    v-if="showHistoryWeekGroups"
+                    class="flex items-center justify-between border-b border-slate-100 bg-slate-100/70 px-3 py-2"
+                  >
+                    <div class="flex items-center gap-2">
+                      <i class="fa-regular fa-calendar text-slate-400 text-[11px]"></i>
+                      <span class="text-[10px] font-black uppercase tracking-wider text-slate-700">{{ week.label }}</span>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-500">{{ week.skus.length }} SKU</span>
+                  </div>
+
+                  <div v-if="groupByOC" class="divide-y divide-slate-100">
+                    <div v-for="oc in week.ocs" :key="oc.group_id" class="border-l-4" :class="isZ8(oc.num_pedido) ? 'border-l-purple-500 bg-purple-50/25' : 'border-l-slate-200 bg-white'">
+                      <div class="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex min-w-0 flex-wrap items-center gap-2">
+                          <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-700">
+                            <i class="fa-solid fa-file-invoice text-slate-400"></i>
+                            {{ oc.num_pedido || 'Sin número' }}
+                          </span>
+                          <span
+                            class="rounded-md border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider"
+                            :class="estadoBadge(oc.estado_oc).cls"
+                          >
+                            {{ estadoBadge(oc.estado_oc).label }}
+                          </span>
+                          <span v-if="oc.fec_pedido_cadena" class="text-[10px] font-bold text-slate-400">{{ formatShortDate(oc.fec_pedido_cadena) }}</span>
+                        </div>
+                        <div class="flex shrink-0 gap-3 text-[10px] font-bold text-slate-500">
+                          <span>{{ oc.skus.length }} SKU</span>
+                          <span>Central {{ n(oc.cant_pedida_total, 0) }}</span>
+                        </div>
+                      </div>
+                      <div class="divide-y divide-slate-100 border-t border-slate-100 bg-white">
+                        <div
+                          v-for="(sku, idx) in oc.skus"
+                          :key="sku.sku_muliix ? `${oc.group_id}_${sku.sku_muliix}` : `${oc.group_id}_${idx}`"
+                          class="grid grid-cols-1 gap-2 px-4 py-2 text-[11px] md:grid-cols-[minmax(0,1fr)_110px_90px_90px]"
+                        >
+                          <button class="min-w-0 text-left font-semibold text-slate-700 hover:text-brand-700" @click.stop="openHistorialProductPanel(tienda, sku)">
+                            <span class="block truncate">{{ sku.sku_nombre }}</span>
+                            <span class="mt-0.5 block truncate font-mono text-[9px] text-slate-400">{{ sku.sku_cadena || sku.upc_cadena || '—' }}</span>
+                          </button>
+                          <span class="font-mono text-slate-500">{{ sku.upc_cadena || '—' }}</span>
+                          <span class="text-right font-black text-slate-700">Ped. {{ n(sku.cant_pedida, 0) }}</span>
+                          <span class="text-right font-black" :class="fillClass(calcularFillRateDinamico(sku))">
+                            {{ calcularFillRateDinamico(sku) != null ? (calcularFillRateDinamico(sku)! * 100).toFixed(0) + '%' : '—' }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div v-else class="divide-y divide-slate-100 bg-white">
+                    <div
+                      v-for="(sku, idx) in week.skus"
+                      :key="sku.sku_muliix ? `${week.key}_${sku.sku_muliix}` : `${week.key}_${idx}`"
+                      class="grid grid-cols-1 gap-2 border-l-4 px-3 py-2 text-[11px] md:grid-cols-[170px_minmax(0,1fr)_90px_90px]"
+                      :class="isZ8(sku.num_pedido) ? 'border-l-purple-500 bg-purple-50/20' : 'border-l-slate-200'"
+                    >
+                      <div class="flex min-w-0 flex-wrap items-center gap-2">
+                        <span class="rounded-md bg-slate-100 px-2 py-0.5 font-black text-slate-700">{{ sku.num_pedido || 'Sin OC' }}</span>
+                        <span class="rounded-md border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider" :class="estadoBadge(sku.estado_oc).cls">
+                          {{ estadoBadge(sku.estado_oc).label }}
+                        </span>
+                      </div>
+                      <button class="min-w-0 text-left font-semibold text-slate-700 hover:text-brand-700" @click.stop="openHistorialProductPanel(tienda, sku)">
+                        <span class="block truncate">{{ sku.sku_nombre }}</span>
+                        <span class="mt-0.5 block truncate font-mono text-[9px] text-slate-400">{{ sku.sku_cadena || sku.upc_cadena || '—' }}</span>
+                      </button>
+                      <span class="text-right font-black text-slate-700">Ped. {{ n(sku.cant_pedida, 0) }}</span>
+                      <span class="text-right font-black" :class="fillClass(calcularFillRateDinamico(sku))">
+                        {{ calcularFillRateDinamico(sku) != null ? (calcularFillRateDinamico(sku)! * 100).toFixed(0) + '%' : '—' }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
         </div>
         
         <!-- ── Vista de Tabla ── -->
-        <table v-else-if="store.viewMode === 'table'" class="w-full min-w-[1180px] text-left border-collapse table-fixed transition-all duration-300">
+        <table
+          v-else-if="store.viewMode === 'table'"
+          class="w-full text-left border-collapse table-fixed transition-all duration-300"
+          :class="showAdjustmentColumn ? 'min-w-[1180px]' : 'min-w-[1080px]'"
+        >
           <colgroup>
             <col style="width: 26%" />
             <col style="width: 8%" />
@@ -1107,9 +1659,9 @@ const totalUniqueOCs = computed(() => {
             <col style="width: 5%" />
             <col style="width: 6.5%" />
             <col style="width: 9%" />
+            <col v-if="showAdjustmentColumn" style="width: 8.5%" />
             <col style="width: 8%" />
-            <col style="width: 8.5%" />
-            <col style="width: 12%" />
+            <col style="width: 10.5%" />
           </colgroup>
 
           <!-- Cabecera fija: NIVEL 1 -->
@@ -1122,9 +1674,9 @@ const totalUniqueOCs = computed(() => {
               <th class="px-2 py-3 font-bold text-right whitespace-nowrap">Crit.<br>(S.)</th>
               <th class="px-2 py-3 font-bold text-right whitespace-nowrap">Cob.<br>(S.)</th>
               <th class="px-2.5 py-3 font-bold text-right text-amber-700 bg-amber-50 border-x border-amber-100 whitespace-nowrap">Pedido<br>Sugerido</th>
+              <th v-if="showAdjustmentColumn" class="px-2.5 py-3 font-bold text-center whitespace-nowrap">Ajuste</th>
               <th class="px-2.5 py-3 font-bold text-right whitespace-nowrap">Centralizado</th>
               <th class="px-2.5 py-3 font-bold text-right whitespace-nowrap">Fill Rate</th>
-              <th class="px-2.5 py-3 font-bold text-center whitespace-nowrap">INSTOCK</th>
             </tr>
           </thead>
 
@@ -1138,7 +1690,7 @@ const totalUniqueOCs = computed(() => {
                 class="cursor-pointer select-none group bg-slate-100/70 border-y border-slate-200 hover:bg-slate-200/50 transition-colors"
                 @click="toggleDay(dia.dia_num)"
               >
-                <td colspan="10" class="px-4 py-2.5">
+                <td :colspan="tableColumnCount" class="px-4 py-2.5">
                   <div class="flex items-center gap-3">
                     <i
                       class="fa-solid text-slate-400 text-[11px] transition-transform duration-200 group-hover:text-slate-600"
@@ -1256,6 +1808,13 @@ const totalUniqueOCs = computed(() => {
                       {{ tienda.resumen.pedido_sugerido_pz_red.toLocaleString('es-MX') }}
                     </td>
 
+                    <!-- Ajuste -->
+                    <td v-if="showAdjustmentColumn" class="px-2.5 py-3 text-center">
+                      <span class="inline-flex items-center justify-center rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-black text-slate-500">
+                        Por SKU
+                      </span>
+                    </td>
+
                     <!-- Pedido Cadena (cant_pedida de la OC) -->
                     <td class="px-2.5 py-2.5 text-right font-semibold text-slate-700">
                       {{ tienda.resumen.cant_pedida_total.toLocaleString('es-MX') }}
@@ -1267,16 +1826,6 @@ const totalUniqueOCs = computed(() => {
                       {{ tienda.resumen.fill_rate != null ? (tienda.resumen.fill_rate * 100).toFixed(1) + '%' : '—' }}
                     </td>
 
-                    <!-- INSTOCK -->
-                    <td class="px-2.5 py-3 text-center">
-                      <span
-                        class="inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-md"
-                        :class="instockBadge(tienda.resumen.instock).cls"
-                      >
-                        {{ instockBadge(tienda.resumen.instock).label }}
-                      </span>
-                    </td>
-
 
                   </tr>
 
@@ -1285,7 +1834,7 @@ const totalUniqueOCs = computed(() => {
 
                     <!-- Empty -->
                     <tr v-if="!tienda.skus.length">
-                      <td colspan="10" class="px-8 py-6 bg-slate-50/50 text-slate-500 text-sm text-center border-b border-slate-100">
+                      <td :colspan="tableColumnCount" class="px-8 py-6 bg-slate-50/50 text-slate-500 text-sm text-center border-b border-slate-100">
                         Sin SKUs registrados para esta tienda.
                       </td>
                     </tr>
@@ -1368,12 +1917,20 @@ const totalUniqueOCs = computed(() => {
                           {{ n(ocGroup.pedido_sugerido_pz_red_total, 0) }}
                         </td>
 
+                        <!-- Ajuste SUM -->
+                        <td v-if="showAdjustmentColumn" class="px-2.5 py-2 text-center font-bold border-t-[12px] border-t-white">
+                          <span class="inline-flex items-center justify-center rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-black"
+                                :class="ocGroup.skus.reduce((a, s) => a + skuAdjustment(s), 0) === 0 ? 'text-slate-400' : 'text-amber-700 border-amber-200 bg-amber-50'">
+                            {{ ocGroup.skus.reduce((a, s) => a + skuAdjustment(s), 0) > 0 ? '+' : '' }}{{ n(ocGroup.skus.reduce((a, s) => a + skuAdjustment(s), 0), 0) }}
+                          </span>
+                        </td>
+
                         <!-- Pedido Cadena SUM -->
                         <td class="px-2.5 py-2 text-right font-bold text-slate-800 border-t-[12px] border-t-white">
                           {{ n(ocGroup.cant_pedida_total, 0) }}
                         </td>
 
-                        <td class="px-2.5 py-2 text-center text-slate-400 border-t-[12px] border-t-white" colspan="2">
+                        <td class="px-2.5 py-2 text-center text-slate-400 border-t-[12px] border-t-white">
                           <span class="text-[10px] italic">Detalle en fila inferior</span>
                         </td>
                       </tr>
@@ -1477,7 +2034,7 @@ const totalUniqueOCs = computed(() => {
                           <td class="px-2 py-2 align-middle bg-amber-50/50 border-x border-amber-100/50 relative group/cell">
                             <div class="absolute inset-y-0 left-0 w-[2px] bg-amber-400/20"></div>
                             
-                            <div v-if="editingId === sku.sku_muliix && sku.sku_muliix" class="flex items-center gap-1.5 justify-end h-full">
+                            <div v-if="currentTab === 'centralizados' && editingId === sku.sku_muliix && sku.sku_muliix" class="flex items-center gap-1.5 justify-end h-full">
                               <input
                                 v-model.number="editValue"
                                 type="number" min="0" :step="sku.pzas_bolsa || 1"
@@ -1493,7 +2050,7 @@ const totalUniqueOCs = computed(() => {
                               </div>
                             </div>
                             <button
-                              v-else
+                              v-else-if="currentTab === 'centralizados'"
                               class="w-full text-right bg-white border border-slate-200 hover:border-brand-400 hover:shadow-sm rounded-md px-2 py-1 flex items-center justify-between transition-all"
                               :class="{ 'ring-2 ring-emerald-400 border-transparent bg-emerald-50': savedId === sku.sku_muliix }"
                               :title="esSinSellout(sku)
@@ -1507,6 +2064,50 @@ const totalUniqueOCs = computed(() => {
                               </span>
                               <span class="text-[12px] font-bold text-slate-800" :class="{ 'text-brand-700': sku.pedido_sugerido_pz_red > 0 }">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
                             </button>
+                            <div v-else class="flex w-full items-center justify-end rounded-md border border-amber-100 bg-white/75 px-2 py-1">
+                              <span class="text-[12px] font-black text-amber-700">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
+                            </div>
+                          </td>
+
+                          <!-- Ajuste -->
+                          <td v-if="showAdjustmentColumn" class="px-2 py-2 text-center" :title="adjustmentTooltip(tienda.id_cliente, sku)">
+                            <div
+                              v-if="currentTab === 'revision'"
+                              class="mx-auto flex h-8 w-[118px] items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+                            >
+                              <button
+                                type="button"
+                                class="flex h-8 w-8 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-35"
+                                title="Disminuir ajuste"
+                                :disabled="adjustingSkuKey === adjustmentKey(tienda.id_cliente, sku) || !canDecreaseAdjustment(sku) || !store.getCachedApprovalIdForSku(tienda.id_cliente, sku)"
+                                @click.stop="adjustReviewSku(tienda.id_cliente, sku, -1)"
+                              >
+                                <i class="fa-solid fa-minus text-[10px]"></i>
+                              </button>
+                              <span
+                                class="flex h-8 min-w-0 flex-1 items-center justify-center border-x border-slate-200 px-2 text-center text-[11px] font-black"
+                                :class="skuAdjustment(sku) === 0 ? 'text-slate-400' : 'text-amber-700'"
+                              >
+                                <i v-if="adjustingSkuKey === adjustmentKey(tienda.id_cliente, sku)" class="fa-solid fa-circle-notch fa-spin text-[10px]"></i>
+                                <span v-else>{{ formatAdjustment(sku) }}</span>
+                              </span>
+                              <button
+                                type="button"
+                                class="flex h-8 w-8 shrink-0 items-center justify-center text-slate-400 transition disabled:cursor-not-allowed disabled:opacity-35"
+                                title="Incremento temporalmente deshabilitado"
+                                :disabled="true"
+                                @click.stop="adjustReviewSku(tienda.id_cliente, sku, 1)"
+                              >
+                                <i class="fa-solid fa-plus text-[10px]"></i>
+                              </button>
+                            </div>
+                            <span
+                              v-else
+                              class="inline-flex min-w-[58px] items-center justify-center rounded-md border px-2 py-1 text-[11px] font-black"
+                              :class="skuAdjustment(sku) === 0 ? 'border-slate-200 bg-white text-slate-400' : 'border-amber-200 bg-amber-50 text-amber-700'"
+                            >
+                              {{ formatAdjustment(sku) }}
+                            </span>
                           </td>
 
                           <!-- Pedido Cadena (cant_pedida) -->
@@ -1527,22 +2128,12 @@ const totalUniqueOCs = computed(() => {
                             </span>
                           </td>
 
-                          <!-- INSTOCK per SKU -->
-                          <td class="px-2.5 py-2 text-center">
-                            <span
-                              class="inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-md border w-fit mx-auto"
-                              :class="instockBadge(sku.instock).cls"
-                            >
-                              {{ instockBadge(sku.instock).label }}
-                            </span>
-                          </td>
-
 
                         </tr>
                       </template>
 
                       <!-- Margin Bottom para el grupo de OC -->
-                      <tr class="bg-white border-none"><td colspan="10" class="py-2.5"></td></tr>
+                      <tr class="bg-white border-none"><td :colspan="tableColumnCount" class="py-2.5"></td></tr>
 
                     </template>
 
@@ -1669,7 +2260,7 @@ const totalUniqueOCs = computed(() => {
                         <td class="px-2 py-2 align-middle bg-amber-50/50 border-x border-amber-100/50 relative group/cell">
                           <div class="absolute inset-y-0 left-0 w-[2px] bg-amber-400/20"></div>
                           
-                          <div v-if="editingId === sku.sku_muliix && sku.sku_muliix" class="flex items-center gap-1.5 justify-end h-full">
+                          <div v-if="currentTab === 'centralizados' && editingId === sku.sku_muliix && sku.sku_muliix" class="flex items-center gap-1.5 justify-end h-full">
                             <input
                               v-model.number="editValue"
                               type="number" min="0" :step="sku.pzas_bolsa || 1"
@@ -1685,7 +2276,7 @@ const totalUniqueOCs = computed(() => {
                             </div>
                           </div>
                           <button
-                            v-else
+                            v-else-if="currentTab === 'centralizados'"
                             class="w-full text-right bg-white border border-slate-200 hover:border-brand-400 hover:shadow-sm rounded-md px-2 py-1 flex items-center justify-between transition-all"
                             :class="{ 'ring-2 ring-emerald-400 border-transparent bg-emerald-50': savedId === sku.sku_muliix }"
                             :title="esSinSellout(sku)
@@ -1699,6 +2290,50 @@ const totalUniqueOCs = computed(() => {
                             </span>
                             <span class="text-[12px] font-bold text-slate-800" :class="{ 'text-brand-700': sku.pedido_sugerido_pz_red > 0 }">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
                           </button>
+                          <div v-else class="flex w-full items-center justify-end rounded-md border border-amber-100 bg-white/75 px-2 py-1">
+                            <span class="text-[12px] font-black text-amber-700">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
+                          </div>
+                        </td>
+
+                        <!-- Ajuste -->
+                        <td v-if="showAdjustmentColumn" class="px-2 py-2 text-center" :title="adjustmentTooltip(tienda.id_cliente, sku)">
+                          <div
+                            v-if="currentTab === 'revision'"
+                            class="mx-auto flex h-8 w-[118px] items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+                          >
+                            <button
+                              type="button"
+                              class="flex h-8 w-8 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-35"
+                              title="Disminuir ajuste"
+                              :disabled="adjustingSkuKey === adjustmentKey(tienda.id_cliente, sku) || !canDecreaseAdjustment(sku) || !store.getCachedApprovalIdForSku(tienda.id_cliente, sku)"
+                              @click.stop="adjustReviewSku(tienda.id_cliente, sku, -1)"
+                            >
+                              <i class="fa-solid fa-minus text-[10px]"></i>
+                            </button>
+                            <span
+                              class="flex h-8 min-w-0 flex-1 items-center justify-center border-x border-slate-200 px-2 text-center text-[11px] font-black"
+                              :class="skuAdjustment(sku) === 0 ? 'text-slate-400' : 'text-amber-700'"
+                            >
+                              <i v-if="adjustingSkuKey === adjustmentKey(tienda.id_cliente, sku)" class="fa-solid fa-circle-notch fa-spin text-[10px]"></i>
+                              <span v-else>{{ formatAdjustment(sku) }}</span>
+                            </span>
+                            <button
+                              type="button"
+                              class="flex h-8 w-8 shrink-0 items-center justify-center text-slate-400 transition disabled:cursor-not-allowed disabled:opacity-35"
+                              title="Incremento temporalmente deshabilitado"
+                              :disabled="true"
+                              @click.stop="adjustReviewSku(tienda.id_cliente, sku, 1)"
+                            >
+                              <i class="fa-solid fa-plus text-[10px]"></i>
+                            </button>
+                          </div>
+                          <span
+                            v-else
+                            class="inline-flex min-w-[58px] items-center justify-center rounded-md border px-2 py-1 text-[11px] font-black"
+                            :class="skuAdjustment(sku) === 0 ? 'border-slate-200 bg-white text-slate-400' : 'border-amber-200 bg-amber-50 text-amber-700'"
+                          >
+                            {{ formatAdjustment(sku) }}
+                          </span>
                         </td>
 
                         <!-- Pedido Cadena (cant_pedida) -->
@@ -1715,16 +2350,6 @@ const totalUniqueOCs = computed(() => {
                           <span class="flex items-center justify-end gap-1.5">
                             <i v-if="fillRateBadge(calcularFillRateDinamico(sku)).icon" :class="fillRateBadge(calcularFillRateDinamico(sku)).icon" class="text-[10px] flex-shrink-0"></i>
                             {{ calcularFillRateDinamico(sku) != null ? (calcularFillRateDinamico(sku)! * 100).toFixed(1) + '%' : '—' }}
-                          </span>
-                        </td>
-
-                        <!-- INSTOCK per SKU -->
-                        <td class="px-2.5 py-2 text-center">
-                          <span
-                            class="inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-md border w-fit mx-auto"
-                            :class="instockBadge(sku.instock).cls"
-                          >
-                            {{ instockBadge(sku.instock).label }}
                           </span>
                         </td>
                       </tr>
@@ -1781,9 +2406,6 @@ const totalUniqueOCs = computed(() => {
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <span class="px-2 py-0.5 rounded-full text-[9px] font-black border uppercase tracking-wider" :class="instockBadge(tienda.resumen.instock).cls">
-                                        {{ instockBadge(tienda.resumen.instock).label }}
-                                    </span>
                                     <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200 uppercase">
                                        <i class="fa-solid fa-boxes-stacked mr-1 opacity-70"></i> {{ tienda.total_skus }} SKUs
                                     </span>
@@ -2040,7 +2662,7 @@ const totalUniqueOCs = computed(() => {
                                                     <div class="flex flex-col items-center justify-center w-[110px] h-12 lg:h-auto bg-amber-50/50">
                                                         <p class="text-[7px] font-black text-amber-600 uppercase tracking-tighter mb-0.5">Sugerido</p>
                                                         <div class="flex items-center justify-center gap-1 w-full px-1">
-                                                            <div v-if="editingId === sku.sku_muliix" class="flex items-center justify-center gap-1">
+                                                            <div v-if="currentTab === 'centralizados' && editingId === sku.sku_muliix" class="flex items-center justify-center gap-1">
                                                                 <input 
                                                                     v-model.number="editValue" 
                                                                     type="number" min="0" :step="sku.pzas_bolsa || 1"
@@ -2053,11 +2675,55 @@ const totalUniqueOCs = computed(() => {
                                                                   <i :class="saving ? 'fa-solid fa-circle-notch fa-spin text-[10px]' : 'fa-solid fa-check text-[11px]'"></i>
                                                                 </button>
                                                             </div>
-                                                            <button v-else @click="startEdit(sku)" class="h-7 w-[70px] bg-white border border-slate-200 hover:border-brand-400 rounded-lg flex items-center justify-center gap-1 transition-all group/edit" :class="{ 'ring-2 ring-emerald-400 border-transparent bg-emerald-50': savedId === sku.sku_muliix }">
+                                                            <button v-else-if="currentTab === 'centralizados'" @click="startEdit(sku)" class="h-7 w-[70px] bg-white border border-slate-200 hover:border-brand-400 rounded-lg flex items-center justify-center gap-1 transition-all group/edit" :class="{ 'ring-2 ring-emerald-400 border-transparent bg-emerald-50': savedId === sku.sku_muliix }">
                                                                 <i v-if="esSinSellout(sku)" class="fa-solid fa-seedling text-[8px] text-amber-500 shrink-0"></i>
                                                                 <span class="text-[12px] font-black truncate" :class="sku.pedido_sugerido_pz_red > 0 ? 'text-brand-700' : 'text-slate-800'">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
                                                             </button>
+                                                            <span v-else class="h-7 w-[70px] rounded-lg border border-amber-100 bg-white px-2 text-center text-[12px] font-black leading-7 text-amber-700">
+                                                                {{ n(sku.pedido_sugerido_pz_red, 0) }}
+                                                            </span>
                                                         </div>
+                                                    </div>
+
+                                                    <!-- Ajuste -->
+                                                    <div
+                                                      v-if="showAdjustmentColumn"
+                                                      class="flex flex-col items-center justify-center w-[118px] h-12 lg:h-auto"
+                                                      :title="adjustmentTooltip(tienda.id_cliente, sku)"
+                                                    >
+                                                        <p class="text-[7px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">Ajuste</p>
+                                                        <div
+                                                          v-if="currentTab === 'revision'"
+                                                          class="flex h-7 w-[104px] items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white"
+                                                        >
+                                                            <button
+                                                              type="button"
+                                                              class="flex h-7 w-7 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-35"
+                                                              :disabled="adjustingSkuKey === adjustmentKey(tienda.id_cliente, sku) || !canDecreaseAdjustment(sku) || !store.getCachedApprovalIdForSku(tienda.id_cliente, sku)"
+                                                              @click.stop="adjustReviewSku(tienda.id_cliente, sku, -1)"
+                                                            >
+                                                                <i class="fa-solid fa-minus text-[9px]"></i>
+                                                            </button>
+                                                            <span class="flex h-7 flex-1 items-center justify-center border-x border-slate-200 text-[10px] font-black" :class="skuAdjustment(sku) === 0 ? 'text-slate-400' : 'text-amber-700'">
+                                                                <i v-if="adjustingSkuKey === adjustmentKey(tienda.id_cliente, sku)" class="fa-solid fa-circle-notch fa-spin text-[9px]"></i>
+                                                                <span v-else>{{ formatAdjustment(sku) }}</span>
+                                                            </span>
+                                                            <button
+                                                              type="button"
+                                                              class="flex h-7 w-7 shrink-0 items-center justify-center text-slate-400 disabled:cursor-not-allowed disabled:opacity-35"
+                                                              :disabled="true"
+                                                              @click.stop="adjustReviewSku(tienda.id_cliente, sku, 1)"
+                                                            >
+                                                                <i class="fa-solid fa-plus text-[9px]"></i>
+                                                            </button>
+                                                        </div>
+                                                        <span
+                                                          v-else
+                                                          class="inline-flex h-7 min-w-[64px] items-center justify-center rounded-lg border px-2 text-[11px] font-black"
+                                                          :class="skuAdjustment(sku) === 0 ? 'border-slate-200 bg-white text-slate-400' : 'border-amber-200 bg-amber-50 text-amber-700'"
+                                                        >
+                                                            {{ formatAdjustment(sku) }}
+                                                        </span>
                                                     </div>
     
                                                     <!-- Cobertura -->

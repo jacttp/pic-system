@@ -3,6 +3,8 @@
 import { defineStore } from 'pinia'
 import { ref, reactive, computed } from 'vue'
 import { cpfrApi } from '../services/cpfrApi'
+import { approvalsApi } from '@/modules/Approvals/services/approvalsApi'
+import type { Approval, ApprovalStatus } from '@/modules/Approvals/types/approval.types'
 import type {
     CpfrCurrentWeek,
     CpfrContext,
@@ -13,12 +15,15 @@ import type {
     CpfrUpdateStatusBody,
     CpfrBulkUpdateStatusBody,
     CpfrStoreConfig,
+    CpfrSkuDash,
     CpfrSkuOverride,
     CpfrSkuUnit,
     CpfrSkuUnitPayload,
 } from '../types/cpfrTypes'
 
 export const useCpfrStore = defineStore('cpfr', () => {
+
+    type HistorialWeek = { anio: number; semana: number; semana_ic: string; key: string }
 
     // ── State ─────────────────────────────────────────────────────────────────
 
@@ -36,6 +41,13 @@ export const useCpfrStore = defineStore('cpfr', () => {
     // Historial — datos cargados con estado='all' para mostrar OC de semanas pasadas sin importar estado
     const historialDias = ref<CpfrDiaDash[]>([])
     const historialLoading = ref(false)
+    const historialLoaded = ref(false)
+    const historialError = ref<string | null>(null)
+    const historialSelectedWeeks = ref<HistorialWeek[]>([])
+    const historialSearch = ref('')
+    const approvalIdsByOrder = reactive<Record<string, number>>({})
+    const approvalLookupLoadedByStatus = reactive<Record<string, boolean>>({})
+    const cpfrApprovalDetails = reactive<Record<number, any>>({})
 
     const criterio_global = ref<number>(2.5)
     const nom_cadena = ref<string>((localStorage.getItem('cpfr_nom_cadena') || 'SORIANA').toUpperCase())
@@ -79,7 +91,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
     function setActiveTab(tab: string) {
         activeTab.value = tab
         if (!currentWeek.value || tab === 'historial') return
-        if (['centralizados', 'revision', 'aprobada'].includes(tab)) {
+        if (['centralizados', 'revision', 'aprobada', 'sin_embarcar'].includes(tab)) {
             loadDashboard()
         }
     }
@@ -95,6 +107,10 @@ export const useCpfrStore = defineStore('cpfr', () => {
         nom_cadena.value = normalized
         localStorage.setItem('cpfr_nom_cadena', normalized)
         historialDias.value = []
+        historialLoaded.value = false
+        historialError.value = null
+        historialSelectedWeeks.value = []
+        historialSearch.value = ''
         activeTab.value = 'centralizados'
         loadDashboard()
     }
@@ -105,6 +121,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         const estadoPedido =
             activeTab.value === 'revision' ? 'revision'
             : activeTab.value === 'aprobada' ? 'aprobado'
+            : activeTab.value === 'sin_embarcar' ? 'cerrado'
             : 'pendiente'
 
         return {
@@ -122,6 +139,180 @@ export const useCpfrStore = defineStore('cpfr', () => {
         preview.value = data.preview === true
         // Expand all stores by default
         expandAll()
+    }
+
+    function skuYear(sku: CpfrSkuDash): string {
+        const dateYear = sku.fec_pedido_cadena ? String(sku.fec_pedido_cadena).slice(0, 4) : ''
+        return /^\d{4}$/.test(dateYear) ? dateYear : String(currentWeek.value?.anio || '')
+    }
+
+    function skuWeek(sku: CpfrSkuDash): string {
+        return String(sku.semana_ic || currentWeek.value?.semana_ic || '').padStart(2, '0')
+    }
+
+    function approvalOrderKey(idCliente: string, numPedido: string | null | undefined, anio: string | number, semanaIc: string | number): string {
+        return [
+            String(idCliente || '').trim().toLowerCase(),
+            String(numPedido || '').trim().toLowerCase(),
+            String(anio || '').trim(),
+            String(semanaIc || '').padStart(2, '0'),
+        ].join('|')
+    }
+
+    function normalizeApprovalOrderNumbers(value: unknown): string[] {
+        const raw = Array.isArray(value) ? value : value == null ? [] : [value]
+        return raw
+            .flatMap(item => String(item || '').split(','))
+            .map(item => item.trim())
+            .filter(Boolean)
+    }
+
+    function indexApproval(approval: Approval) {
+        const payload = approval.payload || {}
+        const idCliente = String(payload.id_cliente || '').trim()
+        const anio = String(payload.year || payload.anio || '').trim()
+        const semanaIc = String(payload.semana_ic || payload.week || '').padStart(2, '0')
+        const nums = normalizeApprovalOrderNumbers(payload.num_pedidos || payload.num_pedido || payload.num_pedido_ref)
+
+        if (!idCliente || !anio || !semanaIc || !nums.length) return
+        for (const num of nums) {
+            approvalIdsByOrder[approvalOrderKey(idCliente, num, anio, semanaIc)] = approval.id
+        }
+    }
+
+    async function ensureApprovalLookup(status: ApprovalStatus): Promise<void> {
+        if (approvalLookupLoadedByStatus[status]) return
+
+        const lists = await Promise.allSettled([
+            approvalsApi.getApprovals({ status, type: 'CPFR_ORDER', role: 'assignee' }),
+            approvalsApi.getApprovals({ status, type: 'CPFR_ORDER' }),
+        ])
+
+        for (const result of lists) {
+            if (result.status !== 'fulfilled') continue
+            for (const approval of result.value) indexApproval(approval)
+        }
+
+        approvalLookupLoadedByStatus[status] = true
+    }
+
+    async function resolveApprovalIdForSku(idCliente: string, sku: CpfrSkuDash, status: ApprovalStatus): Promise<number | null> {
+        const key = approvalOrderKey(idCliente, sku.num_pedido, skuYear(sku), skuWeek(sku))
+        if (approvalIdsByOrder[key]) return approvalIdsByOrder[key]
+
+        await ensureApprovalLookup(status)
+        return approvalIdsByOrder[key] || null
+    }
+
+    function getCachedApprovalIdForSku(idCliente: string, sku: CpfrSkuDash): number | null {
+        const key = approvalOrderKey(idCliente, sku.num_pedido, skuYear(sku), skuWeek(sku))
+        return approvalIdsByOrder[key] || null
+    }
+
+    function getSkuBaseQuantity(sku: CpfrSkuDash): number {
+        if (sku.cantidad_base_uni !== undefined && sku.cantidad_base_uni !== null) {
+            const base = Number(sku.cantidad_base_uni)
+            return Number.isFinite(base) ? base : 0
+        }
+        return Number(sku.pedido_sugerido_pz_red || 0)
+    }
+
+    function getSkuAdjustment(sku: CpfrSkuDash): number {
+        const adjustment = Number(sku.ajuste ?? 0)
+        return Number.isFinite(adjustment) ? adjustment : 0
+    }
+
+    function updateLocalSkuAdjustment(
+        idCliente: string,
+        skuRef: CpfrSkuDash,
+        payload: { cantidad_base_uni: number; ajuste: number; cant_pedida: number }
+    ) {
+        for (const dia of dias.value) {
+            const tiendaRow = dia.tiendas.find(t => t.id_cliente === idCliente)
+            if (!tiendaRow) continue
+
+            const sku = tiendaRow.skus.find(s =>
+                s.sku_muliix === skuRef.sku_muliix &&
+                s.num_pedido === skuRef.num_pedido &&
+                s.fec_pedido_cadena === skuRef.fec_pedido_cadena
+            )
+
+            if (!sku) continue
+            sku.cantidad_base_uni = Number(payload.cantidad_base_uni || 0)
+            sku.ajuste = Number(payload.ajuste || 0)
+            sku.pedido_sugerido_pz_red = Number(payload.cant_pedida || 0)
+            sku.pedido_sugerido_kg = sku.pedido_sugerido_pz_red * Number(sku.unidad_inventario || 0)
+            sku.fill_rate = sku.cant_pedida > 0 ? sku.pedido_sugerido_pz_red / sku.cant_pedida : null
+            _recalcStoreResumen(tiendaRow)
+            return
+        }
+    }
+
+    function hydrateSkuAdjustmentsFromRows(idCliente: string, rows: any[]) {
+        for (const dia of dias.value) {
+            for (const tiendaRow of dia.tiendas) {
+                if (tiendaRow.id_cliente !== idCliente) continue
+
+                let changed = false
+                for (const sku of tiendaRow.skus) {
+                    const match = rows.find(row =>
+                        String(row.id_cliente || idCliente) === idCliente &&
+                        String(row.sku_muliix || '') === String(sku.sku_muliix || '') &&
+                        String(row.num_pedido || '') === String(sku.num_pedido || '') &&
+                        String(row.fec_pedido_cadena || '').slice(0, 10) === String(sku.fec_pedido_cadena || '').slice(0, 10)
+                    )
+
+                    if (!match) continue
+                    const base = Number(match.cantidad_base_uni ?? sku.pedido_sugerido_pz_red ?? 0)
+                    const adjustment = Number(match.ajuste ?? 0)
+                    const total = base + adjustment
+                    sku.cantidad_base_uni = base
+                    sku.ajuste = adjustment
+                    sku.pedido_sugerido_pz_red = total
+                    sku.pedido_sugerido_kg = total * Number(sku.unidad_inventario || 0)
+                    sku.fill_rate = sku.cant_pedida > 0 ? total / sku.cant_pedida : null
+                    changed = true
+                }
+
+                if (changed) _recalcStoreResumen(tiendaRow)
+            }
+        }
+    }
+
+    async function ensureApprovalDetail(approvalId: number): Promise<any | null> {
+        if (cpfrApprovalDetails[approvalId]) return cpfrApprovalDetails[approvalId]
+        try {
+            const detail = await approvalsApi.getCpfrOrderDetail(approvalId)
+            cpfrApprovalDetails[approvalId] = detail
+            return detail
+        } catch (e) {
+            console.warn('[cpfrStore.ensureApprovalDetail]', e)
+            return null
+        }
+    }
+
+    async function hydrateApprovalAdjustmentsForCurrentTab(): Promise<void> {
+        if (activeTab.value !== 'revision' && activeTab.value !== 'aprobada') return
+        const status: ApprovalStatus = activeTab.value === 'revision' ? 'PENDING' : 'APPROVED'
+        await ensureApprovalLookup(status)
+
+        const approvalIds = new Set<number>()
+        for (const dia of dias.value) {
+            for (const tienda of dia.tiendas) {
+                for (const sku of tienda.skus) {
+                    const key = approvalOrderKey(tienda.id_cliente, sku.num_pedido, skuYear(sku), skuWeek(sku))
+                    const approvalId = approvalIdsByOrder[key]
+                    if (approvalId) approvalIds.add(approvalId)
+                }
+            }
+        }
+
+        for (const approvalId of approvalIds) {
+            const detail = await ensureApprovalDetail(approvalId)
+            const rows = Array.isArray(detail?.rows) ? detail.rows : Array.isArray(detail?.sku_rows) ? detail.sku_rows : []
+            const idCliente = String(detail?.id_cliente || rows[0]?.id_cliente || '')
+            if (idCliente && rows.length) hydrateSkuAdjustmentsFromRows(idCliente, rows)
+        }
     }
 
     // ── Actions principales ───────────────────────────────────────────────────
@@ -142,9 +333,26 @@ export const useCpfrStore = defineStore('cpfr', () => {
         }
     }
 
-    async function loadHistorial(): Promise<void> {
+    async function loadHistorial(weeks = historialSelectedWeeks.value): Promise<void> {
         if (!currentWeek.value) return
+        const normalizedWeeks = weeks
+            .map(w => ({
+                anio: Number(w.anio),
+                semana: Number(w.semana),
+                semana_ic: String(w.semana_ic || w.semana).padStart(2, '0'),
+                key: w.key || `${w.anio}-W${String(w.semana).padStart(2, '0')}`,
+            }))
+            .filter(w => Number.isInteger(w.anio) && Number.isInteger(w.semana) && w.semana >= 1 && w.semana <= 53)
+
+        if (!normalizedWeeks.length) {
+            historialDias.value = []
+            historialLoaded.value = false
+            historialError.value = 'Selecciona una o más semanas para cargar historial.'
+            return
+        }
+
         historialLoading.value = true
+        historialError.value = null
         try {
             const body = {
                 year: currentWeek.value!.anio,
@@ -153,12 +361,21 @@ export const useCpfrStore = defineStore('cpfr', () => {
                 criterio_global: criterio_global.value,
                 filters: {
                     ...filters,
-                    estado_pedido: 'all',     // Traer OCs de cualquier estado
+                    estado_pedido: 'historial_finalizado' as const,
+                    historial_weeks: normalizedWeeks.map(w => ({ anio: w.anio, semana: w.semana })),
                 }
             }
             const res = await cpfrApi.loadDashboard(body)
             historialDias.value = res.dias
+            historialLoaded.value = true
+            historialSelectedWeeks.value = normalizedWeeks
+            for (const dia of res.dias) {
+                for (const tienda of dia.tiendas) {
+                    expandedStores[tienda.id_cliente] = true
+                }
+            }
         } catch (e: any) {
+            historialError.value = 'Error al cargar el historial CPFR.'
             console.error('[cpfrStore.loadHistorial]', e)
         } finally {
             historialLoading.value = false
@@ -174,6 +391,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         try {
             const res = await cpfrApi.loadDashboard(buildDashBody())
             applyResponse(res)
+            await hydrateApprovalAdjustmentsForCurrentTab()
         } catch (e: any) {
             error.value = 'Error al cargar el dashboard CPFR.'
             console.error('[cpfrStore.loadDashboard]', e)
@@ -235,6 +453,55 @@ export const useCpfrStore = defineStore('cpfr', () => {
         }
     }
 
+    async function adjustReviewSkuAdjustment(
+        id_cliente: string,
+        sku: CpfrSkuDash,
+        direction: 1 | -1
+    ): Promise<{ ok: boolean; message?: string }> {
+        if (activeTab.value !== 'revision') return { ok: false, message: 'Solo se puede ajustar en revision.' }
+        if (!sku.sku_muliix || !sku.num_pedido || !sku.fec_pedido_cadena) {
+            return { ok: false, message: 'Faltan datos del SKU para ajustar.' }
+        }
+
+        const step = Number(sku.pzas_bolsa || 0)
+        if (step <= 0) return { ok: false, message: 'Este SKU no tiene pzas_bolsa configurado.' }
+
+        const base = getSkuBaseQuantity(sku)
+        const currentAdjustment = getSkuAdjustment(sku)
+        const nextAdjustment = currentAdjustment + (step * direction)
+        const nextTotal = base + nextAdjustment
+
+        if (nextTotal < 0) return { ok: false, message: 'El pedido no puede quedar en negativo.' }
+
+        const approvalId = await resolveApprovalIdForSku(id_cliente, sku, 'PENDING')
+        if (!approvalId) {
+            return { ok: false, message: 'No se encontro la solicitud de aprobacion pendiente para esta OC.' }
+        }
+
+        try {
+            const data = await approvalsApi.updateCpfrOrderAdjustment(approvalId, {
+                id_cliente,
+                sku_muliix: sku.sku_muliix,
+                num_pedido: sku.num_pedido,
+                anio: skuYear(sku),
+                semana_ic: skuWeek(sku),
+                fec_pedido_cadena: String(sku.fec_pedido_cadena).slice(0, 10),
+                ajuste: nextAdjustment,
+            })
+
+            cpfrApprovalDetails[approvalId] = null
+            updateLocalSkuAdjustment(id_cliente, sku, {
+                cantidad_base_uni: Number(data?.cantidad_base_uni ?? base),
+                ajuste: Number(data?.ajuste ?? nextAdjustment),
+                cant_pedida: Number(data?.cant_pedida ?? nextTotal),
+            })
+            return { ok: true }
+        } catch (e: any) {
+            console.error('[cpfrStore.adjustReviewSkuAdjustment]', e)
+            return { ok: false, message: e?.response?.data?.message || 'No se pudo ajustar el pedido.' }
+        }
+    }
+
     async function updateStatus(body: CpfrUpdateStatusBody): Promise<{ ok: boolean; approvalId?: number }> {
         try {
             const res = await cpfrApi.updateStatus(body)
@@ -245,6 +512,16 @@ export const useCpfrStore = defineStore('cpfr', () => {
                     for (const sku of store.skus) {
                         if (sku.num_pedido === body.num_pedido) {
                             sku.estado_oc = localEstado
+                        }
+                    }
+                }
+            }
+            if (body.estado === 'revision' && body.num_pedido && res.approval_id) {
+                approvalIdsByOrder[approvalOrderKey('', body.num_pedido, body.year, body.week)] = res.approval_id
+                for (const dia of dias.value) {
+                    for (const tienda of dia.tiendas) {
+                        if (tienda.skus.some(s => s.num_pedido === body.num_pedido)) {
+                            approvalIdsByOrder[approvalOrderKey(tienda.id_cliente, body.num_pedido, body.year, body.week)] = res.approval_id
                         }
                     }
                 }
@@ -304,7 +581,8 @@ export const useCpfrStore = defineStore('cpfr', () => {
     }
 
     function expandAll() {
-        for (const dia of dias.value) {
+        const source = activeTab.value === 'historial' ? historialDias.value : dias.value
+        for (const dia of source) {
             for (const t of dia.tiendas) {
                 expandedStores[t.id_cliente] = true
             }
@@ -321,7 +599,8 @@ export const useCpfrStore = defineStore('cpfr', () => {
     }
 
     function expandAllOCs(ocGroupKeys: Record<string, boolean>) {
-        for (const dia of dias.value) {
+        const source = activeTab.value === 'historial' ? historialDias.value : dias.value
+        for (const dia of source) {
             for (const t of dia.tiendas) {
                 const seen = new Set<string>()
                 for (const sku of t.skus) {
@@ -389,6 +668,16 @@ export const useCpfrStore = defineStore('cpfr', () => {
                     }
                 }
             }
+            if (body.estado === 'revision' && res.approval_id) {
+                for (const dia of dias.value) {
+                    for (const tienda of dia.tiendas) {
+                        for (const sku of tienda.skus) {
+                            if (!sku.num_pedido || !nums.has(sku.num_pedido)) continue
+                            approvalIdsByOrder[approvalOrderKey(tienda.id_cliente, sku.num_pedido, body.year, sku.semana_ic || body.week)] = res.approval_id
+                        }
+                    }
+                }
+            }
             return { ok: true, approvalId: res.approval_id ?? undefined, updatedOrders: res.updated_orders ?? body.num_pedidos.length }
         } catch (e: any) {
             console.error('[cpfrStore.updateStatusBulk]', e)
@@ -426,8 +715,20 @@ export const useCpfrStore = defineStore('cpfr', () => {
     function _recalcStoreResumen(store: import('../types/cpfrTypes').CpfrStoreDash) {
         const skus = store.skus
         if (!skus.length) return
-        store.resumen.pedido_sugerido_pz_red = skus.reduce((a, s) => a + s.pedido_sugerido_pz_red, 0)
+        store.resumen.pedido_sugerido_pz_red = skus.reduce((a, s) => a + (s.pedido_sugerido_pz_red || 0), 0)
+        store.resumen.pedido_sugerido_kg = skus.reduce((a, s) => a + ((s.pedido_sugerido_pz_red || 0) * (s.unidad_inventario || 0)), 0)
         store.resumen.cant_pedida_total = skus.reduce((a, s) => a + (s.cant_pedida ?? 0), 0)
+        store.resumen.fill_rate = store.resumen.cant_pedida_total > 0
+            ? store.resumen.pedido_sugerido_pz_red / store.resumen.cant_pedida_total
+            : null
+
+        const ventaPromKg = skus.reduce((a, s) => a + (s.promedio_sellout_kg || 0), 0)
+        if (ventaPromKg > 0) {
+            const invMasPedidoKg = skus.reduce((a, s) => {
+                return a + (s.inv_actual_kg || 0) + ((s.pedido_sugerido_pz_red || 0) * (s.unidad_inventario || 0))
+            }, 0)
+            store.resumen.cobertura_actual = invMasPedidoKg / ventaPromKg
+        }
     }
 
     // ── Config de tienda — conservado para CpfrStoreConfigModal ─────────────
@@ -603,12 +904,14 @@ export const useCpfrStore = defineStore('cpfr', () => {
         // State
         currentWeek, context, dias, loading, preview, error,
         z8Loading, z8Result, allCpfrWeeks, weeksLoading,
-        historialDias, historialLoading,
+        historialDias, historialLoading, historialLoaded, historialError,
+        historialSelectedWeeks, historialSearch,
+        approvalIdsByOrder,
         criterio_global, nom_cadena, filters, overrides, expandedStores,
         statusFilters, viewMode, activeTab, groupByOC,
         // Actions
         init, fetchCurrentWeek, fetchAllCpfrWeeks, loadDashboard, loadHistorial, recalculate, generateZ8,
-        adjustSku, updateStatus, updateStatusBulk,
+        adjustSku, adjustReviewSkuAdjustment, resolveApprovalIdForSku, getCachedApprovalIdForSku, updateStatus, updateStatusBulk,
         toggleStore, expandAll, collapseAll, expandAllOCs, collapseAllOCs,
         setFilter, clearFilters,
         toggleStatusFilter, clearStatusFilters, setViewMode, setActiveTab, setGroupByOC, setNomCadena,

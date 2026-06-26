@@ -108,7 +108,6 @@ function coberturaStatus(sku: CpfrSkuDash): 'ok' | 'bajo' | 'sobre' | 'sin_datos
 
 function shouldIncludeSkuByTableTab(sku: CpfrSkuDash): boolean {
     const sf = store.statusFilters
-    const todayStr = new Date().toISOString().split('T')[0]
     const today = new Date()
     const curr = getISOContext(today)
     const last = getISOContext(new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000))
@@ -127,8 +126,7 @@ function shouldIncludeSkuByTableTab(sku: CpfrSkuDash): boolean {
     } else if (store.activeTab === 'aprobada') {
         if ((!isCurrentWeek && !isPreviousWeek) || state !== 'aprobado') return false
     } else if (store.activeTab === 'sin_embarcar') {
-        const fecFin = sku.fec_fin_embarque ? sku.fec_fin_embarque.slice(0, 10) : null
-        if (!fecFin || fecFin >= todayStr || state === 'aprobado') return false
+        if (state !== 'cerrado') return false
     } else if (store.activeTab === 'historial') {
         if (isCurrentWeek || isPreviousWeek) return false
     }

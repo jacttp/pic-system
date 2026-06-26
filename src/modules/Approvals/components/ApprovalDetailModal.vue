@@ -696,8 +696,8 @@ const handleConfirm = async () => {
                                              <button
                                                 type="button"
                                                 class="flex h-8 w-8 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
-                                                title="Incrementar pedido"
-                                                :disabled="isRowAdjusting(row) || !row.sku_muliix || row.pzas_bolsa <= 0"
+                                                title="Incremento temporalmente deshabilitado"
+                                                :disabled="true"
                                                 @click="handleAdjustPedido(row, 1)"
                                              >
                                                 <i class="fa-solid fa-plus text-[10px]"></i>

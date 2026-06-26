@@ -56,6 +56,8 @@ export interface CpfrSkuDash {
     pedido_sugerido_kg: number
     pedido_sugerido_pz_br: number
     pedido_sugerido_pz_red: number          // editable inline
+    cantidad_base_uni?: number
+    ajuste?: number
     pedido_cadena_pz: number
     escenario: 'A' | 'B' | null
     demanda_requerida_kg: number | null
@@ -122,7 +124,8 @@ export interface CpfrFilters {
     id_cliente?: string
     nombre_tienda?: string
     semanas_sellout?: number
-    estado_pedido?: 'pendiente' | 'borrador' | 'revision' | 'aprobado' | 'cerrado' | 'all'
+    estado_pedido?: 'pendiente' | 'borrador' | 'revision' | 'aprobado' | 'cerrado' | 'all' | 'historial_finalizado'
+    historial_weeks?: Array<{ anio: number; semana: number }>
 }
 
 // ─── Override de criterio por tienda (para /recalculate) ────────────────────
