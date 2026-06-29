@@ -112,6 +112,7 @@ export const useSetupStore = defineStore('setup', () => {
       // Sistema
       { ModuleId: 9, ModuleKey: 'AUDIT', Label: 'Auditoría', Route: '/admin/audit', Icon: 'fa-solid fa-shield-cat', Category: 'Sistema', DisplayOrder: 90, IsActive: true, MinRoleLevel: 3, DevStatus: 'Maintaining' },
       { ModuleId: 10, ModuleKey: 'SETUP', Label: 'Setup', Route: '/admin/setup', Icon: 'fa-solid fa-gear', Category: 'Sistema', DisplayOrder: 100, IsActive: true, MinRoleLevel: 3, DevStatus: 'Finished' },
+      { ModuleId: 11, ModuleKey: 'UI_STANDARDS', Label: 'UI Standards', Route: '/admin/ui-standards', Icon: 'fa-solid fa-swatchbook', Category: 'Sistema', DisplayOrder: 110, IsActive: true, MinRoleLevel: 3, DevStatus: 'Development', Description: 'Catalogo vivo de componentes STD, patrones visuales y tokens UI.', IconColor: 'text-red-600', BgColor: 'bg-red-50' },
    ];
 
    // 1. Fetch de módulos

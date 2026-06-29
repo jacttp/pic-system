@@ -21,6 +21,28 @@ export default {
 					'900': '#70141a',
 					'950': '#3d080b'
 				},
+				pic: {
+					brand: 'hsl(var(--pic-brand))',
+					'brand-soft': 'hsl(var(--pic-brand-soft))',
+					'brand-border': 'hsl(var(--pic-brand-border))',
+					surface: 'hsl(var(--pic-surface))',
+					background: 'hsl(var(--pic-background))',
+					'muted-surface': 'hsl(var(--pic-muted-surface))',
+					'text-main': 'hsl(var(--pic-text-main))',
+					'text-muted': 'hsl(var(--pic-text-muted))',
+					border: 'hsl(var(--pic-border))',
+					success: 'hsl(var(--pic-success))',
+					warning: 'hsl(var(--pic-warning))',
+					danger: 'hsl(var(--pic-danger))',
+					info: 'hsl(var(--pic-info))',
+					chart: {
+						'1': 'hsl(var(--pic-chart-1))',
+						'2': 'hsl(var(--pic-chart-2))',
+						'3': 'hsl(var(--pic-chart-3))',
+						'4': 'hsl(var(--pic-chart-4))',
+						'5': 'hsl(var(--pic-chart-5))'
+					}
+				},
 				background: 'hsl(var(--background))',
 				foreground: 'hsl(var(--foreground))',
 				card: {

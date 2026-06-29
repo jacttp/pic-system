@@ -143,6 +143,16 @@ const router = createRouter({
                name: 'setup',
                component: () => import('@/modules/Setup/views/SystemConfigView.vue')
             },
+            {
+               path: 'ui-standards',
+               name: 'ui-standards',
+               component: () => import('@/modules/UIStandards/views/UIStandardsView.vue'),
+               meta: {
+                  requiresAuth: true,
+                  moduleKey: 'UI_STANDARDS',
+                  title: 'UI Standards'
+               }
+            },
             // NUEVA RUTA: Módulo PIC (Fase 2)
             {
                path: 'pic',

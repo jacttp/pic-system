@@ -37,6 +37,27 @@ body {
 
 @layer base {
   :root {
+    --pic-brand: 357 84% 45%;
+    --pic-brand-soft: 0 86% 97%;
+    --pic-brand-border: 0 96% 89%;
+    --pic-surface: 0 0% 100%;
+    --pic-background: 210 40% 98%;
+    --pic-muted-surface: 210 40% 98%;
+    --pic-text-main: 222 47% 11%;
+    --pic-text-muted: 215 16% 47%;
+    --pic-border: 214 32% 91%;
+    --pic-success: 160 84% 34%;
+    --pic-warning: 32 95% 44%;
+    --pic-danger: 0 72% 51%;
+    --pic-info: 221 83% 53%;
+    --pic-chart-1: 357 84% 45%;
+    --pic-chart-2: 176 69% 30%;
+    --pic-chart-3: 221 83% 53%;
+    --pic-chart-4: 32 95% 44%;
+    --pic-chart-5: 215 16% 47%;
+    --pic-control-height: 2.5rem;
+    --pic-table-row-height: 2.75rem;
+    --pic-focus-ring: 0 96% 89%;
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
@@ -64,6 +85,24 @@ body {
     --radius: 0.5rem;
   }
   .dark {
+    --pic-brand: 357 78% 58%;
+    --pic-brand-soft: 357 40% 12%;
+    --pic-brand-border: 357 45% 24%;
+    --pic-surface: 222 47% 8%;
+    --pic-background: 222 47% 5%;
+    --pic-muted-surface: 222 30% 12%;
+    --pic-text-main: 210 40% 98%;
+    --pic-text-muted: 215 20% 65%;
+    --pic-border: 217 33% 18%;
+    --pic-success: 160 70% 45%;
+    --pic-warning: 38 92% 50%;
+    --pic-danger: 0 84% 60%;
+    --pic-info: 217 91% 60%;
+    --pic-chart-1: 357 78% 58%;
+    --pic-chart-2: 173 58% 45%;
+    --pic-chart-3: 217 91% 60%;
+    --pic-chart-4: 38 92% 50%;
+    --pic-chart-5: 215 20% 65%;
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
     --card: 0 0% 3.9%;

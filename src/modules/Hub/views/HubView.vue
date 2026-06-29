@@ -115,6 +115,7 @@ const MODULE_STYLES: Record<string, { color: string, bg: string, desc?: string }
     'COM_STRUCT': { color: 'text-teal-600', bg: 'bg-teal-50', desc: 'Gestion de la estructura territorial comercial: Gerencia, Zona, Jefatura y Ruta.' },
     'UPLOAD_METAS': { color: 'text-teal-700', bg: 'bg-teal-50', desc: 'Importa archivos Excel con las metas de ventas y visualiza el historico.' },
     'CHAIN_CONFIG': { color: 'text-sky-600', bg: 'bg-sky-50', desc: 'Asocia SKUs internos con cadenas, conversiones y parametros operativos CPFR.' },
+    'UI_STANDARDS': { color: 'text-red-600', bg: 'bg-red-50', desc: 'Catalogo vivo de componentes STD, patrones visuales y tokens UI.' },
 
     'DEFAULT': { color: 'text-slate-500', bg: 'bg-slate-50', desc: 'Modulo del sistema.' },
 };

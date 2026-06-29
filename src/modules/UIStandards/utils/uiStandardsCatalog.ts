@@ -1,0 +1,200 @@
+import type { ComponentExample, DashboardPattern, UiToken } from '../types/uiStandardsTypes';
+import type { StdTableColumn } from '@/modules/Shared/components/std';
+
+export const colorTokens: UiToken[] = [
+  { name: 'PIC Brand', value: '#D3121E', usage: 'CTA, foco, activo y acento institucional', className: 'bg-red-600' },
+  { name: 'Brand Soft', value: '#FEF2F2', usage: 'Hover suave, icon wells y fondos seleccionados', className: 'bg-red-50' },
+  { name: 'Surface', value: '#FFFFFF', usage: 'Paneles, cards y tablas', className: 'bg-white' },
+  { name: 'Background', value: '#F8FAFC', usage: 'Fondo operativo de modulos', className: 'bg-slate-50' },
+  { name: 'Text Main', value: '#0F172A', usage: 'Titulos y valores clave', className: 'bg-slate-900' },
+  { name: 'Text Muted', value: '#64748B', usage: 'Descripciones y metadatos', className: 'bg-slate-500' },
+  { name: 'Border', value: '#E2E8F0', usage: 'Separadores y contornos', className: 'bg-slate-200' },
+  { name: 'Success', value: '#059669', usage: 'Estados completados o positivos', className: 'bg-emerald-600' },
+  { name: 'Warning', value: '#D97706', usage: 'Advertencias operativas', className: 'bg-amber-600' },
+  { name: 'Danger', value: '#DC2626', usage: 'Errores y acciones destructivas', className: 'bg-red-600' },
+];
+
+export const chartTokens: UiToken[] = [
+  { name: 'Chart 1', value: '#D3121E', usage: 'Serie principal' },
+  { name: 'Chart 2', value: '#0F766E', usage: 'Serie comparativa' },
+  { name: 'Chart 3', value: '#2563EB', usage: 'Serie informativa' },
+  { name: 'Chart 4', value: '#D97706', usage: 'Serie alerta' },
+  { name: 'Chart 5', value: '#64748B', usage: 'Serie neutral' },
+];
+
+export const componentExamples: ComponentExample[] = [
+  {
+    id: 'layout',
+    group: 'Componentes',
+    title: 'Layout y navegacion',
+    standardName: 'StdPageHeader + StdSection',
+    description: 'Estructura base para pantallas administrativas con header, breadcrumbs, toolbar y paneles.',
+    usage: 'Usalo al crear vistas de modulo, pantallas CRUD, tableros operativos y configuraciones.',
+    source: '@/modules/Shared/components/std',
+    notes: 'Disponible como componentes reutilizables. Mantener acciones y filtros dentro de toolbars compactas.',
+    status: 'available',
+  },
+  {
+    id: 'kpi',
+    group: 'Componentes',
+    title: 'KPIs y tarjetas',
+    standardName: 'StdKpiCard',
+    description: 'Indicadores con valor principal, tendencia, icono, detalle y sparkline.',
+    usage: 'Usalo en dashboards, resumenes ejecutivos y bloques de monitoreo.',
+    source: '@/modules/Shared/components/std/StdKpiCard.vue',
+    notes: 'Disponible. El color principal responde a tokens pic-* cuando el tono es brand.',
+    status: 'available',
+  },
+  {
+    id: 'tables',
+    group: 'Datos',
+    title: 'Tablas y datos',
+    standardName: 'StdDataTable',
+    description: 'Tabla operativa responsive con ordenamiento, seleccion, acciones y estados.',
+    usage: 'Usalo para listados administrativos, resultados filtrables y detalle transaccional.',
+    source: '@/modules/Shared/components/std/StdDataTable.vue',
+    notes: 'Disponible. En mobile convierte filas en cards para evitar scroll horizontal innecesario.',
+    status: 'available',
+  },
+  {
+    id: 'filters',
+    group: 'Datos',
+    title: 'Filtros y formularios',
+    standardName: 'StdFilterBar',
+    description: 'Search, selects, tags, chips, radio, checkbox y controles segmentados.',
+    usage: 'Usalo como patron visual para toolbars de filtrado antes de crear componentes nuevos.',
+    source: 'Patron documentado en UIStandards',
+    notes: 'Patron visual. La siguiente fase debe extraer FilterBar, DateRange y TagSelect si se repiten.',
+    status: 'pattern',
+  },
+  {
+    id: 'controls',
+    group: 'Componentes',
+    title: 'Controles',
+    standardName: 'StdButton + StdSwitch',
+    description: 'Botones, icon buttons, switches, tabs, slider y stepper para operacion diaria.',
+    usage: 'Usalo en acciones primarias/secundarias, alternadores y ajustes locales.',
+    source: '@/modules/Shared/components/std',
+    notes: 'Boton y switch disponibles. Tabs, slider y stepper quedan como patron hasta extraerlos.',
+    status: 'available',
+  },
+  {
+    id: 'charts',
+    group: 'Datos',
+    title: 'Graficos ECharts',
+    standardName: 'StdChartPanel',
+    description: 'Lineas, barras, dona, radar, heatmap y gauge con Apache ECharts.',
+    usage: 'Usalo para visualizaciones interactivas o complejas. Mantener Chart.js solo en graficas simples existentes.',
+    source: 'Apache ECharts + tokens pic-chart-*',
+    notes: 'Patron visual. La siguiente fase puede extraer un wrapper compartido de ECharts.',
+    status: 'pattern',
+  },
+  {
+    id: 'calendar',
+    group: 'Entrada',
+    title: 'Calendario y tiempo',
+    standardName: 'StdDateRange + StdCalendarPanel',
+    description: 'Date picker, calendario mensual, timeline de periodo y agenda.',
+    usage: 'Usalo en filtros por fecha, planificacion y vistas temporales.',
+    source: 'Patron documentado en UIStandards',
+    notes: 'Pendiente de componente reusable si aparece en mas de un modulo.',
+    status: 'planned',
+  },
+  {
+    id: 'feedback',
+    group: 'Respuesta',
+    title: 'Estados y feedback',
+    standardName: 'StdAlert + StatusBadge',
+    description: 'Alerts, toast preview, skeleton, progreso, empty state y badges.',
+    usage: 'Usalo para comunicar carga, error, exito, vacios y estados de negocio.',
+    source: '@/modules/Shared/components/std/StdAlert.vue y Shared/StatusBadge.vue',
+    notes: 'Alert disponible. Badges existen en Shared; conviene alinearlos a tokens pic-* en adopcion.',
+    status: 'available',
+  },
+  {
+    id: 'overlays',
+    group: 'Capas',
+    title: 'Overlays',
+    standardName: 'ModalDialog + StdDrawer',
+    description: 'Modal, drawer lateral, dialogo de confirmacion, tooltip y popover.',
+    usage: 'Usalo para edicion enfocada, confirmaciones destructivas y ayuda contextual.',
+    source: '@/modules/Shared/components/ModalDialog.vue',
+    notes: 'Modal existe. Drawer, confirm y popover quedan como patrones hasta extraer componentes.',
+    status: 'pattern',
+  },
+  {
+    id: 'dashboards',
+    group: 'Patrones',
+    title: 'Patrones de dashboard',
+    standardName: 'Dashboard operativo PIC',
+    description: 'Composiciones completas para analitica, CRUD, filtros y vista mobile.',
+    usage: 'Usalo como referencia para pedir pantallas completas con lenguaje comun.',
+    source: 'Patrones documentados en UIStandards',
+    notes: 'Patron visual. No debe convertirse en componente unico; cada modulo decide datos y flujo.',
+    status: 'pattern',
+  },
+];
+
+export const kpiExamples = [
+  {
+    label: 'Ingresos YTD',
+    value: '$24.58M',
+    detail: '+12.5% vs LY',
+    trend: 'up' as const,
+    tone: 'brand' as const,
+    icon: 'fa-solid fa-chart-line',
+    sparkline: 'M2 28 L14 22 L26 26 L38 14 L50 20 L62 12 L74 18 L86 8 L100 12',
+  },
+  {
+    label: 'Usuarios activos',
+    value: '12,540',
+    detail: '+6.1% vs mes',
+    trend: 'up' as const,
+    tone: 'success' as const,
+    icon: 'fa-solid fa-users',
+    sparkline: 'M2 25 L14 18 L26 23 L38 19 L50 15 L62 16 L74 10 L86 14 L100 7',
+  },
+  {
+    label: 'Alertas abiertas',
+    value: '41',
+    detail: '-4.1% vs semana',
+    trend: 'down' as const,
+    tone: 'warning' as const,
+    icon: 'fa-solid fa-triangle-exclamation',
+    sparkline: 'M2 14 L14 18 L26 12 L38 16 L50 20 L62 17 L74 24 L86 22 L100 28',
+  },
+];
+
+export const tableColumns: StdTableColumn[] = [
+  { key: 'id', label: 'ID', sortable: true },
+  { key: 'product', label: 'Producto', sortable: true },
+  { key: 'status', label: 'Estado', align: 'center' },
+  { key: 'amount', label: 'Importe', align: 'right', sortable: true },
+];
+
+export const tableRows = [
+  { id: 101, product: 'Producto A', status: 'Activo', statusClass: 'border-emerald-200 bg-emerald-50 text-emerald-700', amount: '$120.00' },
+  { id: 102, product: 'Producto B', status: 'Inactivo', statusClass: 'border-slate-200 bg-slate-50 text-slate-500', amount: '$80.00' },
+  { id: 103, product: 'Producto C', status: 'Activo', statusClass: 'border-emerald-200 bg-emerald-50 text-emerald-700', amount: '$95.50' },
+];
+
+export const dashboardPatterns: DashboardPattern[] = [
+  {
+    title: 'Analitica operativa',
+    description: 'Sidebar + KPIs + grafica principal + tabla de detalle.',
+    layout: 'xl:grid-cols-[220px_minmax(0,1fr)]',
+    icon: 'fa-solid fa-chart-column',
+  },
+  {
+    title: 'CRUD denso',
+    description: 'Header compacto + filtros + tabla + drawer de edicion.',
+    layout: 'grid-cols-1',
+    icon: 'fa-solid fa-table-list',
+  },
+  {
+    title: 'Vista movil',
+    description: 'Cards apiladas, acciones visibles y tabla convertida a cards.',
+    layout: 'grid-cols-1',
+    icon: 'fa-solid fa-mobile-screen-button',
+  },
+];

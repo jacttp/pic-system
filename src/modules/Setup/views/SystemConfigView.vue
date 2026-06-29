@@ -229,6 +229,30 @@ const PRESET_BG_COLORS = [
         </div>
     </div>
 
+    <section class="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex min-w-0 items-start gap-3">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-red-100 bg-red-50 text-red-600">
+                    <i class="fa-solid fa-swatchbook"></i>
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[10px] font-black uppercase text-red-600">UI Standards</p>
+                    <h2 class="mt-1 text-sm font-black text-slate-900">Configuracion UI y catalogo STD</h2>
+                    <p class="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                        Accede a la paleta activa, tokens frontend, componentes STD, patrones de dashboard y ejemplos ECharts.
+                    </p>
+                </div>
+            </div>
+            <router-link
+                to="/admin/ui-standards"
+                class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-red-600 bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700 sm:w-auto"
+            >
+                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                Abrir UI Standards
+            </router-link>
+        </div>
+    </section>
+
     <!-- HUB DISPLAY SETTINGS -->
     <section class="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
