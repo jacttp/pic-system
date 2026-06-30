@@ -4,6 +4,8 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import './style.css' // Importante: Tailwind
+import { applyCachedUiThemeCatalog } from '@/modules/Shared/design/uiTheme'
+import { useUiThemeStore } from '@/modules/Shared/stores/uiThemeStore'
 
 //En revisión
 import './utils/chartConfig';
@@ -27,9 +29,14 @@ L.Icon.Default.mergeOptions({
    shadowUrl,
 });
 
-const app = createApp(App)
+applyCachedUiThemeCatalog()
 
-app.use(createPinia())
+const app = createApp(App)
+const pinia = createPinia()
+
+app.use(pinia)
 app.use(router)
+
+useUiThemeStore(pinia).loadThemeCatalog()
 
 app.mount('#app')

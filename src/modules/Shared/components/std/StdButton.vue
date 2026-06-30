@@ -23,7 +23,7 @@ const emit = defineEmits<{
 const variantClasses = computed(() => ({
   primary: 'border-pic-brand bg-pic-brand text-white shadow-lg shadow-pic-brand/20 hover:brightness-95 hover:-translate-y-0.5',
   secondary: 'border-slate-200 bg-white text-slate-700 shadow-sm hover:border-pic-brand-border hover:bg-slate-50 hover:text-pic-brand hover:-translate-y-0.5',
-  danger: 'border-red-200 bg-white text-red-700 shadow-sm hover:border-red-300 hover:bg-red-50/70 hover:-translate-y-0.5',
+  danger: 'border-[hsl(var(--pic-danger)/0.28)] bg-white text-[hsl(var(--pic-danger))] shadow-sm shadow-[hsl(var(--pic-danger)/0.08)] hover:border-[hsl(var(--pic-danger)/0.42)] hover:bg-[hsl(var(--pic-danger)/0.08)] hover:-translate-y-0.5 focus:ring-[hsl(var(--pic-danger)/0.22)]',
   ghost: 'border-transparent bg-transparent text-slate-600 hover:bg-pic-brand-soft hover:text-pic-brand',
 }[props.variant]));
 

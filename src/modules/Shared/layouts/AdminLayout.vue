@@ -3,6 +3,7 @@ import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import { useSetupStore } from '@/modules/Setup/stores/setupStores';
 import { useProfileStore } from '@/modules/UserProfile/stores/profileStore';
+import { useUiThemeStore } from '@/modules/Shared/stores/uiThemeStore';
 import { useRouter, useRoute } from 'vue-router';
 import NotificationCenter from '@/modules/UserProfile/components/NotificationCenter.vue';
 import coronaLogo from '@/assets/logo.png';
@@ -12,6 +13,7 @@ const SIDEBAR_COLLAPSE_KEY = 'pic_admin_sidebar_collapsed';
 const auth = useAuthStore();
 const setupStore = useSetupStore();
 const profileStore = useProfileStore();
+const uiThemeStore = useUiThemeStore();
 const router = useRouter();
 const route = useRoute();
 
@@ -24,6 +26,7 @@ let notifPoll: ReturnType<typeof setInterval> | null = null;
 
 onMounted(async () => {
    isCollapsed.value = localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === 'true';
+   uiThemeStore.loadThemeCatalog();
    await setupStore.fetchModules();
    setupStore.fetchHubConfig();
    profileStore.fetchProfile();

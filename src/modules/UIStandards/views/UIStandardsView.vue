@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { storeToRefs } from 'pinia';
 import {
   StdAlert,
   StdButton,
@@ -11,15 +12,18 @@ import {
 } from '@/modules/Shared/components/std';
 import UiEChartPreview from '../components/UiEChartPreview.vue';
 import {
-  chartTokens,
-  colorTokens,
   componentExamples,
   dashboardPatterns,
   kpiExamples,
   tableColumns,
   tableRows,
 } from '../utils/uiStandardsCatalog';
-import { applyUiThemePreset, getStoredUiThemePreset, uiThemePresets } from '../utils/uiTheme';
+import {
+  hslTripletToHex,
+  hexToHslTriplet,
+  uiThemeTokenDefinitions,
+} from '@/modules/Shared/design/uiTheme';
+import { useUiThemeStore } from '@/modules/Shared/stores/uiThemeStore';
 
 const selectedRows = ref<Array<string | number>>([101]);
 const sortKey = ref('id');
@@ -29,7 +33,16 @@ const activeSegment = ref('Mes');
 const activeTab = ref('Catalogo');
 const sliderValue = ref(60);
 const stepperValue = ref(1);
-const selectedThemeId = ref('pic-red');
+const uiThemeStore = useUiThemeStore();
+const {
+  palettes,
+  activePaletteId,
+  activePalette,
+  isLoading: isThemeLoading,
+  isSaving: isThemeSaving,
+  isUsingFallback: isThemeFallback,
+  lastError: themeError,
+} = storeToRefs(uiThemeStore);
 
 const segments = ['Dia', 'Semana', 'Mes', 'Ano'];
 const tabs = ['Catalogo', 'Tokens', 'Patrones'];
@@ -211,19 +224,23 @@ const navigationGroups = computed(() => {
 });
 
 const tokenGroups = computed(() => [
-  { title: 'Paleta base', tokens: colorTokens },
-  { title: 'Graficas', tokens: chartTokens },
+  { title: 'Paleta base', icon: 'fa-solid fa-swatchbook', tokens: uiThemeTokenDefinitions.filter((token) => token.group === 'base') },
+  { title: 'Estados', icon: 'fa-solid fa-signal', tokens: uiThemeTokenDefinitions.filter((token) => token.group === 'state') },
+  { title: 'Graficas', icon: 'fa-solid fa-chart-simple', tokens: uiThemeTokenDefinitions.filter((token) => token.group === 'chart') },
 ]);
-
-const selectedTheme = computed(() => uiThemePresets.find((preset) => preset.id === selectedThemeId.value) || uiThemePresets[0]!);
+const activePaletteTokens = computed(() => activePalette.value.tokens);
+const activePalettePreviewTokens = computed(() => uiThemeTokenDefinitions.slice(0, 6));
+const activePaletteStatusLabel = computed(() => {
+  if (isThemeSaving.value) return 'Guardando...';
+  if (isThemeFallback.value) return 'Fallback local';
+  return 'Guardado global';
+});
 const tableSelectionLabel = computed(() => `${selectedRows.value.length} seleccionados`);
 
 const getComponent = (id: string) => componentExamples.find((item) => item.id === id)!;
 
 onMounted(() => {
-  const storedPreset = getStoredUiThemePreset();
-  selectedThemeId.value = storedPreset.id;
-  applyUiThemePreset(storedPreset);
+  uiThemeStore.loadThemeCatalog();
 });
 
 const handleSort = (key: string) => {
@@ -249,11 +266,51 @@ const incrementStepper = (amount: number) => {
   stepperValue.value = Math.max(0, stepperValue.value + amount);
 };
 
-const handleThemeChange = (themeId: string) => {
-  const nextTheme = uiThemePresets.find((preset) => preset.id === themeId);
-  if (!nextTheme) return;
-  selectedThemeId.value = nextTheme.id;
-  applyUiThemePreset(nextTheme);
+const getTokenHex = (token: string) => hslTripletToHex(activePaletteTokens.value[token] || '0 0% 0%');
+
+const getTokenHsl = (token: string) => activePaletteTokens.value[token] || '0 0% 0%';
+
+const handlePaletteNameInput = (event: Event) => {
+  uiThemeStore.updatePalette(activePaletteId.value, { name: (event.target as HTMLInputElement).value });
+};
+
+const handlePaletteDescriptionInput = (event: Event) => {
+  uiThemeStore.updatePalette(activePaletteId.value, { description: (event.target as HTMLTextAreaElement).value });
+};
+
+const handleTokenColorInput = (token: string, event: Event) => {
+  uiThemeStore.updatePalette(activePaletteId.value, {
+    tokens: {
+      [token]: hexToHslTriplet((event.target as HTMLInputElement).value),
+    },
+  });
+};
+
+const handleTokenHexInput = (token: string, event: Event) => {
+  const value = (event.target as HTMLInputElement).value.trim();
+  if (!/^#[0-9a-fA-F]{6}$/.test(value)) return;
+
+  uiThemeStore.updatePalette(activePaletteId.value, {
+    tokens: {
+      [token]: hexToHslTriplet(value),
+    },
+  });
+};
+
+const handleCreatePalette = () => {
+  uiThemeStore.createPalette();
+};
+
+const handleDuplicatePalette = () => {
+  uiThemeStore.duplicatePalette(activePaletteId.value);
+};
+
+const handleDeletePalette = () => {
+  uiThemeStore.deletePalette(activePaletteId.value);
+};
+
+const handleApplyPalette = () => {
+  uiThemeStore.applyPalette(activePalette.value);
 };
 </script>
 
@@ -297,78 +354,171 @@ const handleThemeChange = (themeId: string) => {
             id="configuration"
             title="Configuracion UI"
             eyebrow="Paleta activa"
-            description="La paleta se aplica a variables CSS --pic-* y hoy se persiste en localStorage. La siguiente fase es mover esta preferencia a Setup/backend."
+            description="Consola para crear, editar, aplicar y persistir paletas globales desde SysUIsettings. Los modulos adoptan estos valores al usar tokens pic-*."
             icon="fa-solid fa-palette"
           >
-            <div class="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1fr)_420px]">
-              <div class="space-y-4">
-                <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div class="grid grid-cols-1 gap-4 2xl:grid-cols-[280px_minmax(0,1fr)]">
+              <aside class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                <div class="mb-3 flex items-center justify-between gap-2">
+                  <div>
+                    <p class="text-[10px] font-black uppercase text-slate-500">Paletas</p>
+                    <p class="text-xs font-semibold text-slate-500">{{ palettes.length }} disponibles</p>
+                  </div>
                   <button
-                    v-for="preset in uiThemePresets"
-                    :key="preset.id"
                     type="button"
-                    class="rounded-xl border bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-                    :class="selectedThemeId === preset.id ? 'border-pic-brand bg-pic-brand-soft ring-2 ring-pic-brand-border' : 'border-slate-200 hover:border-pic-brand-border'"
-                    @click="handleThemeChange(preset.id)"
+                    class="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand"
+                    title="Crear paleta"
+                    @click="handleCreatePalette"
                   >
-                    <div class="mb-3 flex items-center gap-2">
-                      <span
-                        v-for="(value, tokenName) in preset.values"
-                        :key="tokenName"
-                        class="h-5 w-5 rounded-full border border-white shadow-sm ring-1 ring-slate-200"
-                        :style="{ backgroundColor: `hsl(${value})` }"
-                      ></span>
-                    </div>
-                    <p class="text-sm font-black text-slate-900">{{ preset.name }}</p>
-                    <p class="mt-1 text-xs font-semibold leading-5 text-slate-500">{{ preset.description }}</p>
+                    <i class="fa-solid fa-plus text-xs"></i>
                   </button>
                 </div>
 
-                <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4 shadow-inner">
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p class="text-[10px] font-black uppercase text-slate-500">Preset activo</p>
-                      <p class="mt-1 text-sm font-black text-slate-900">{{ selectedTheme.name }}</p>
-                      <p class="mt-1 text-xs font-semibold leading-5 text-slate-500">
-                        Afecta acentos, foco, series de ECharts y componentes que usan tokens pic-*.
-                      </p>
+                <div class="space-y-2">
+                  <button
+                    v-for="palette in palettes"
+                    :key="palette.id"
+                    type="button"
+                    class="group w-full rounded-lg border px-3 py-3 text-left transition hover:bg-slate-50"
+                    :class="palette.id === activePaletteId ? 'border-pic-brand-border bg-pic-brand-soft shadow-[inset_4px_0_0_0_hsl(var(--pic-brand))]' : 'border-slate-200 bg-white'"
+                    @click="uiThemeStore.setActivePalette(palette.id)"
+                  >
+                    <div class="mb-2 flex items-center gap-1.5">
+                      <span
+                        v-for="token in activePalettePreviewTokens"
+                        :key="`${palette.id}-${token.token}`"
+                        class="h-4 w-4 rounded-full border border-white shadow-sm ring-1 ring-slate-200"
+                        :style="{ backgroundColor: `hsl(${palette.tokens[token.token]})` }"
+                      ></span>
                     </div>
-                    <span class="inline-flex h-8 items-center rounded-lg border border-pic-brand bg-pic-brand px-3 text-xs font-black text-white">
-                      Aplicado localmente
-                    </span>
+                    <div class="flex items-start justify-between gap-2">
+                      <div class="min-w-0">
+                        <p class="truncate text-xs font-black text-slate-900">{{ palette.name }}</p>
+                        <p class="mt-0.5 truncate text-[11px] font-semibold text-slate-500">{{ palette.id }}</p>
+                      </div>
+                      <div class="flex shrink-0 flex-col items-end gap-1">
+                        <span v-if="palette.id === activePaletteId" class="rounded-full border border-pic-brand-border bg-white px-2 py-0.5 text-[9px] font-black uppercase text-pic-brand">Activa</span>
+                        <span v-if="palette.isSystem" class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9px] font-black uppercase text-slate-500">Sistema</span>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </aside>
+
+              <div class="min-w-0 space-y-4">
+                <div class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5">
+                  <div class="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(220px,280px)_minmax(0,1fr)]">
+                    <label class="block min-w-0">
+                      <span class="mb-1 block text-[10px] font-black uppercase text-slate-500">Nombre</span>
+                      <input
+                        :value="activePalette.name"
+                        type="text"
+                        class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition hover:bg-slate-50 focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border"
+                        @input="handlePaletteNameInput"
+                      />
+                    </label>
+                    <label class="block min-w-0">
+                      <span class="mb-1 block text-[10px] font-black uppercase text-slate-500">Descripcion</span>
+                      <textarea
+                        :value="activePalette.description"
+                        rows="2"
+                        class="min-h-[72px] w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold leading-5 text-slate-600 outline-none transition hover:bg-slate-50 focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border"
+                        @input="handlePaletteDescriptionInput"
+                      ></textarea>
+                    </label>
+                  </div>
+
+                  <div class="mt-3 flex flex-col gap-3 border-t border-slate-100 pt-3 xl:flex-row xl:items-center xl:justify-between">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="inline-flex h-7 items-center rounded-lg border border-pic-brand-border bg-pic-brand-soft px-2.5 text-[10px] font-black uppercase text-pic-brand">
+                        {{ activePaletteStatusLabel }}
+                      </span>
+                      <span v-if="themeError" class="inline-flex h-7 items-center rounded-lg border border-red-200 bg-red-50 px-2.5 text-[10px] font-black uppercase text-red-700">
+                        {{ themeError }}
+                      </span>
+                      <span class="font-mono text-[10px] font-bold text-slate-400">{{ activePalette.id }}</span>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2 xl:justify-end">
+                      <StdButton size="sm" icon="fa-solid fa-wand-magic-sparkles" @click="handleApplyPalette">Aplicar sin guardar</StdButton>
+                      <StdButton size="sm" icon="fa-solid fa-copy" @click="handleDuplicatePalette">Duplicar</StdButton>
+                      <StdButton size="sm" icon="fa-solid fa-rotate-left" :disabled="isThemeLoading" @click="uiThemeStore.loadThemeCatalog()">Restaurar cambios</StdButton>
+                      <StdButton size="sm" variant="danger" icon="fa-solid fa-trash" :disabled="activePalette.isSystem" @click="handleDeletePalette">Eliminar</StdButton>
+                      <StdButton size="sm" variant="primary" icon="fa-solid fa-floppy-disk" :disabled="isThemeSaving" @click="uiThemeStore.saveThemeCatalog()">
+                        {{ isThemeSaving ? 'Guardando' : 'Guardar paleta' }}
+                      </StdButton>
+                    </div>
                   </div>
                 </div>
 
-                <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  <div v-for="group in tokenGroups" :key="group.title">
-                    <h3 class="mb-3 text-xs font-black uppercase text-slate-500">{{ group.title }}</h3>
-                    <div class="space-y-2">
+                <div class="space-y-4">
+                  <section
+                    v-for="group in tokenGroups"
+                    :key="group.title"
+                    class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5"
+                  >
+                    <div class="mb-3 flex items-center justify-between gap-3">
+                      <div class="flex items-center gap-2">
+                        <span class="flex h-8 w-8 items-center justify-center rounded-lg border border-pic-brand-border bg-pic-brand-soft text-pic-brand">
+                          <i :class="group.icon"></i>
+                        </span>
+                        <div>
+                          <h3 class="text-xs font-black uppercase text-slate-500">{{ group.title }}</h3>
+                          <p class="text-[11px] font-semibold text-slate-500">{{ group.tokens.length }} tokens editables</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
                       <article
                         v-for="token in group.tokens"
-                        :key="token.name"
-                        class="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3"
+                        :key="token.token"
+                        class="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 transition hover:bg-slate-50 lg:grid-cols-[minmax(0,1fr)_minmax(170px,210px)] lg:items-center"
                       >
-                        <span class="h-9 w-9 shrink-0 rounded-lg border border-slate-200" :class="token.className" :style="{ backgroundColor: token.className ? undefined : token.value }"></span>
-                        <div class="min-w-0 flex-1">
-                          <p class="text-xs font-black text-slate-900">{{ token.name }}</p>
-                          <p class="truncate text-[11px] font-semibold text-slate-500">{{ token.usage }}</p>
+                        <div class="flex min-w-0 items-center gap-3">
+                          <input
+                            type="color"
+                            class="h-10 w-10 shrink-0 cursor-pointer rounded-lg border border-slate-200 bg-white p-1 shadow-sm transition hover:border-pic-brand-border focus:outline-none focus:ring-2 focus:ring-pic-brand-border"
+                            :value="getTokenHex(token.token)"
+                            :aria-label="`Cambiar ${token.label}`"
+                            @input="handleTokenColorInput(token.token, $event)"
+                          />
+                          <div class="min-w-0">
+                            <p class="truncate text-xs font-black text-slate-900">{{ token.label }}</p>
+                            <p class="truncate text-[11px] font-semibold text-slate-500">{{ token.usage }}</p>
+                          </div>
                         </div>
-                        <span class="font-mono text-[10px] font-bold text-slate-400">{{ token.value }}</span>
+
+                        <div class="min-w-0">
+                          <label class="sr-only" :for="`hex-${token.token}`">HEX {{ token.label }}</label>
+                          <input
+                            :id="`hex-${token.token}`"
+                            type="text"
+                            maxlength="7"
+                            class="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 font-mono text-[11px] font-black uppercase text-slate-700 outline-none transition hover:bg-slate-50 focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border"
+                            :value="getTokenHex(token.token)"
+                            @change="handleTokenHexInput(token.token, $event)"
+                          />
+                          <div class="mt-1 flex items-center justify-between gap-2">
+                            <span class="truncate font-mono text-[9px] font-black text-slate-400">{{ token.token }}</span>
+                            <span class="shrink-0 font-mono text-[9px] font-bold text-slate-400">{{ getTokenHsl(token.token) }}</span>
+                          </div>
+                        </div>
                       </article>
                     </div>
-                  </div>
+                  </section>
                 </div>
               </div>
 
-              <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
-                <div class="mb-4 flex items-center justify-between gap-3">
+              <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md 2xl:col-span-2">
+                <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p class="text-[10px] font-black uppercase text-pic-brand">Preview de impacto</p>
-                    <h3 class="mt-1 text-sm font-black text-slate-900">Componentes con tokens</h3>
+                    <h3 class="mt-1 text-sm font-black text-slate-900">Componentes con tokens de la paleta activa</h3>
                   </div>
                   <StdButton size="sm" variant="primary" icon="fa-solid fa-check">CTA</StdButton>
                 </div>
-                <div class="space-y-3">
+                <div class="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(260px,360px)_minmax(0,1fr)_minmax(280px,380px)]">
                   <StdKpiCard
                     label="Ingresos activos"
                     value="$24.58M"
@@ -378,16 +528,16 @@ const handleThemeChange = (themeId: string) => {
                     icon="fa-solid fa-chart-line"
                     sparkline="M2 28 L14 22 L26 26 L38 14 L50 20 L62 12 L74 18 L86 8 L100 12"
                   />
-                  <UiEChartPreview :key="`preview-${selectedThemeId}`" type="area" title="Serie con paleta activa" />
-                  <div class="overflow-hidden rounded-lg border border-slate-200 text-xs">
+                  <UiEChartPreview :key="`preview-${activePaletteId}`" type="area" title="Serie con paleta activa" />
+                  <div class="self-start overflow-hidden rounded-lg border border-slate-200 text-xs shadow-sm">
                     <div class="grid grid-cols-3 bg-slate-800 font-semibold uppercase text-white">
                       <span class="px-3 py-2">ID</span>
                       <span class="px-3 py-2">Estado</span>
                       <span class="px-3 py-2 text-right">Valor</span>
                     </div>
-                    <div class="grid grid-cols-3 border-t border-slate-100 font-semibold text-slate-600">
+                    <div class="grid grid-cols-3 border-t border-slate-100 font-semibold text-slate-600 transition hover:bg-pic-brand-soft">
                       <span class="px-3 py-2">101</span>
-                      <span class="px-3 py-2">Activo</span>
+                      <span class="px-3 py-2 text-pic-brand">Activo</span>
                       <span class="px-3 py-2 text-right">$120.00</span>
                     </div>
                   </div>
@@ -844,7 +994,7 @@ const handleThemeChange = (themeId: string) => {
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               <UiEChartPreview
                 v-for="chart in chartExamples"
-                :key="`${chart.type}-${selectedThemeId}`"
+                :key="`${chart.type}-${activePaletteId}`"
                 :type="chart.type"
                 :title="chart.title"
               />
@@ -1316,7 +1466,7 @@ const handleThemeChange = (themeId: string) => {
                     />
                   </div>
                   <div class="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
-                    <UiEChartPreview :key="`dashboard-${selectedThemeId}`" type="line" title="Tendencia principal" />
+                    <UiEChartPreview :key="`dashboard-${activePaletteId}`" type="line" title="Tendencia principal" />
                     <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                       <div class="bg-slate-800 px-3 py-2 text-[10px] font-semibold uppercase text-white">Tabla resumen</div>
                       <div class="divide-y divide-slate-100">

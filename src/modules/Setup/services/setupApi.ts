@@ -1,6 +1,7 @@
 /* src/modules/Setup/services/setupApi.ts */
 import api from '@/api/axios';
 import type { HubConfigResponse, HubFeatureKey, SystemFeatureFlag, SystemModule } from '../types/setupTypes';
+import type { UiThemeCatalog } from '@/modules/Shared/design/uiTheme';
 
 const V2 = import.meta.env.VITE_API_V2_PATH;
 
@@ -45,6 +46,16 @@ export default {
 
    async getFeatureFlags(): Promise<SystemFeatureFlag[]> {
       const { data } = await api.get<{ success: boolean; data: SystemFeatureFlag[] }>(`${V2}/setup/feature-flags`);
+      return data.data;
+   },
+
+   async getUiThemeCatalog(): Promise<{ catalog: UiThemeCatalog; fallback: boolean }> {
+      const { data } = await api.get<{ success: boolean; data: UiThemeCatalog; fallback?: boolean }>(`${V2}/setup/ui-theme-catalog`);
+      return { catalog: data.data, fallback: Boolean(data.fallback) };
+   },
+
+   async updateUiThemeCatalog(payload: UiThemeCatalog): Promise<UiThemeCatalog> {
+      const { data } = await api.put<{ success: boolean; data: UiThemeCatalog }>(`${V2}/setup/ui-theme-catalog`, payload);
       return data.data;
    },
 
