@@ -45,11 +45,11 @@ const palette = computed(() => [
 ]);
 
 const baseGrid = {
-  left: 8,
-  right: 8,
-  top: 12,
-  bottom: 8,
-  containLabel: false,
+  left: 24,
+  right: 18,
+  top: 24,
+  bottom: 24,
+  containLabel: true,
 };
 
 const chartOption = computed<echarts.EChartsOption>(() => {
@@ -58,8 +58,8 @@ const chartOption = computed<echarts.EChartsOption>(() => {
     color: colors,
     tooltip: { show: true, trigger: 'axis' },
     grid: baseGrid,
-    xAxis: { type: 'category', show: false, data: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'] },
-    yAxis: { type: 'value', show: false },
+    xAxis: { type: 'category', data: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'], axisTick: { show: false } },
+    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: '#e2e8f0' } } },
   } satisfies echarts.EChartsOption;
 
   if (props.type === 'bar') {
@@ -108,8 +108,8 @@ const chartOption = computed<echarts.EChartsOption>(() => {
       color: colors,
       tooltip: { show: true },
       grid: baseGrid,
-      xAxis: { show: false },
-      yAxis: { show: false },
+      xAxis: { axisLine: { show: false }, splitLine: { lineStyle: { color: '#e2e8f0' } } },
+      yAxis: { axisLine: { show: false }, splitLine: { lineStyle: { color: '#e2e8f0' } } },
       series: [{ type: 'scatter', symbolSize: 8, data: [[1, 4], [2, 7], [3, 3], [4, 9], [5, 5], [6, 8], [7, 4]] }],
     };
   }
@@ -130,7 +130,7 @@ const chartOption = computed<echarts.EChartsOption>(() => {
   if (props.type === 'heatmap') {
     return {
       tooltip: { show: true },
-      grid: { left: 6, right: 6, top: 6, bottom: 6 },
+      grid: { left: 20, right: 20, top: 20, bottom: 20 },
       xAxis: { type: 'category', show: false, data: ['1', '2', '3', '4', '5'] },
       yAxis: { type: 'category', show: false, data: ['A', 'B', 'C', 'D'] },
       visualMap: { show: false, min: 0, max: 10, inRange: { color: ['#eff6ff', colors[0]] } },
@@ -188,8 +188,20 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <article class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm shadow-slate-100">
-    <p class="mb-2 text-center text-[10px] font-black uppercase text-slate-500">{{ title }}</p>
-    <div ref="chartRef" class="h-28 w-full"></div>
+  <article class="pic-chart-card flex h-full min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+    <div class="mb-3 flex items-center justify-between gap-3">
+      <h3 class="flex items-center gap-2 text-sm font-bold text-slate-700">
+        <i class="fa-solid fa-chart-simple text-pic-brand"></i>
+        {{ title }}
+      </h3>
+      <button
+        type="button"
+        class="flex h-7 w-7 items-center justify-center rounded-lg border border-transparent text-slate-400 transition-all hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand"
+        title="Analizar este grafico con IA"
+      >
+        <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
+      </button>
+    </div>
+    <div ref="chartRef" class="pic-chart-surface min-h-[250px] w-full min-w-0 flex-1"></div>
   </article>
 </template>

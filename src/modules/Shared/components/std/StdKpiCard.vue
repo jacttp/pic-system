@@ -33,13 +33,13 @@ const trendIcon = computed(() => ({
 </script>
 
 <template>
-  <article class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-100 transition hover:border-pic-brand-border hover:bg-pic-brand-soft">
+  <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:shadow-md">
     <div class="flex items-start justify-between gap-3">
       <div class="min-w-0">
         <p class="text-[10px] font-black uppercase text-slate-500">
           {{ label }}
         </p>
-        <p class="mt-2 text-xl font-black text-slate-900">
+        <p class="mt-2 text-2xl font-black text-slate-900">
           {{ value }}
         </p>
         <p v-if="detail" class="mt-1 flex items-center gap-1 text-xs font-black" :class="toneClasses">
@@ -47,7 +47,7 @@ const trendIcon = computed(() => ({
           <span>{{ detail }}</span>
         </p>
       </div>
-      <span v-if="icon" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border" :class="toneClasses">
+      <span v-if="icon" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border shadow-sm" :class="toneClasses">
         <i :class="icon"></i>
       </span>
     </div>

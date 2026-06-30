@@ -18,11 +18,10 @@ const sectionPadding = computed(() => props.density === 'compact' ? 'p-3 sm:p-4'
 
 <template>
   <section
-    class="relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm shadow-slate-100"
+    class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md"
     :class="sectionPadding"
   >
-    <div class="absolute inset-y-0 left-0 w-1 bg-pic-brand"></div>
-    <div class="pl-1">
+    <div>
       <div class="flex min-w-0 items-start justify-between gap-3">
         <div class="min-w-0">
           <p v-if="eyebrow" class="text-[10px] font-black uppercase text-pic-brand">
@@ -35,7 +34,7 @@ const sectionPadding = computed(() => props.density === 'compact' ? 'p-3 sm:p-4'
             {{ description }}
           </p>
         </div>
-        <span v-if="icon" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-pic-brand-soft text-pic-brand">
+        <span v-if="icon" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-pic-brand-soft text-pic-brand shadow-sm">
           <i :class="icon"></i>
         </span>
       </div>

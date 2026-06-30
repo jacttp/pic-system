@@ -21,9 +21,9 @@ const emit = defineEmits<{
 }>();
 
 const variantClasses = computed(() => ({
-  primary: 'border-pic-brand bg-pic-brand text-white hover:opacity-90',
-  secondary: 'border-slate-200 bg-white text-slate-700 hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand',
-  danger: 'border-red-200 bg-white text-red-700 hover:border-red-300 hover:bg-red-50/70',
+  primary: 'border-pic-brand bg-pic-brand text-white shadow-lg shadow-pic-brand/20 hover:brightness-95 hover:-translate-y-0.5',
+  secondary: 'border-slate-200 bg-white text-slate-700 shadow-sm hover:border-pic-brand-border hover:bg-slate-50 hover:text-pic-brand hover:-translate-y-0.5',
+  danger: 'border-red-200 bg-white text-red-700 shadow-sm hover:border-red-300 hover:bg-red-50/70 hover:-translate-y-0.5',
   ghost: 'border-transparent bg-transparent text-slate-600 hover:bg-pic-brand-soft hover:text-pic-brand',
 }[props.variant]));
 
@@ -42,7 +42,7 @@ const handleClick = (event: MouseEvent) => {
   <button
     :type="type"
     :disabled="disabled"
-    class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border font-black transition focus:outline-none focus:ring-2 focus:ring-pic-brand-border disabled:cursor-not-allowed disabled:opacity-50"
+    class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border font-black transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-pic-brand-border disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
     :class="[variantClasses, sizeClasses]"
     @click="handleClick"
   >

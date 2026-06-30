@@ -25,10 +25,10 @@ export const chartTokens: UiToken[] = [
 export const componentExamples: ComponentExample[] = [
   {
     id: 'layout',
-    group: 'Componentes',
-    title: 'Layout y navegacion',
+    group: '1. Estructura general',
+    title: 'Estructura general',
     standardName: 'StdPageHeader + StdSection',
-    description: 'Estructura base para pantallas administrativas con header, breadcrumbs, toolbar y paneles.',
+    description: 'Estructura base para pantallas administrativas con sidebar, topbar, breadcrumbs, content area y footer.',
     usage: 'Usalo al crear vistas de modulo, pantallas CRUD, tableros operativos y configuraciones.',
     source: '@/modules/Shared/components/std',
     notes: 'Disponible como componentes reutilizables. Mantener acciones y filtros dentro de toolbars compactas.',
@@ -36,7 +36,7 @@ export const componentExamples: ComponentExample[] = [
   },
   {
     id: 'kpi',
-    group: 'Componentes',
+    group: '2. KPIs y tarjetas',
     title: 'KPIs y tarjetas',
     standardName: 'StdKpiCard',
     description: 'Indicadores con valor principal, tendencia, icono, detalle y sparkline.',
@@ -47,8 +47,8 @@ export const componentExamples: ComponentExample[] = [
   },
   {
     id: 'tables',
-    group: 'Datos',
-    title: 'Tablas y datos',
+    group: '3. Tablas',
+    title: 'Tablas',
     standardName: 'StdDataTable',
     description: 'Tabla operativa responsive con ordenamiento, seleccion, acciones y estados.',
     usage: 'Usalo para listados administrativos, resultados filtrables y detalle transaccional.',
@@ -58,10 +58,10 @@ export const componentExamples: ComponentExample[] = [
   },
   {
     id: 'filters',
-    group: 'Datos',
-    title: 'Filtros y formularios',
+    group: '5. Filtros y seleccion',
+    title: 'Filtros y seleccion',
     standardName: 'StdFilterBar',
-    description: 'Search, selects, tags, chips, radio, checkbox y controles segmentados.',
+    description: 'Search, selects, tags, chips, radio, checkbox y rangos de fecha.',
     usage: 'Usalo como patron visual para toolbars de filtrado antes de crear componentes nuevos.',
     source: 'Patron documentado en UIStandards',
     notes: 'Patron visual. La siguiente fase debe extraer FilterBar, DateRange y TagSelect si se repiten.',
@@ -69,7 +69,7 @@ export const componentExamples: ComponentExample[] = [
   },
   {
     id: 'controls',
-    group: 'Componentes',
+    group: '6. Controles',
     title: 'Controles',
     standardName: 'StdButton + StdSwitch',
     description: 'Botones, icon buttons, switches, tabs, slider y stepper para operacion diaria.',
@@ -80,8 +80,8 @@ export const componentExamples: ComponentExample[] = [
   },
   {
     id: 'charts',
-    group: 'Datos',
-    title: 'Graficos ECharts',
+    group: '4. Graficos',
+    title: 'Graficos',
     standardName: 'StdChartPanel',
     description: 'Lineas, barras, dona, radar, heatmap y gauge con Apache ECharts.',
     usage: 'Usalo para visualizaciones interactivas o complejas. Mantener Chart.js solo en graficas simples existentes.',
@@ -91,8 +91,8 @@ export const componentExamples: ComponentExample[] = [
   },
   {
     id: 'calendar',
-    group: 'Entrada',
-    title: 'Calendario y tiempo',
+    group: '7. Calendarios y tiempo',
+    title: 'Calendarios y tiempo',
     standardName: 'StdDateRange + StdCalendarPanel',
     description: 'Date picker, calendario mensual, timeline de periodo y agenda.',
     usage: 'Usalo en filtros por fecha, planificacion y vistas temporales.',
@@ -102,7 +102,7 @@ export const componentExamples: ComponentExample[] = [
   },
   {
     id: 'feedback',
-    group: 'Respuesta',
+    group: '8. Estados y feedback',
     title: 'Estados y feedback',
     standardName: 'StdAlert + StatusBadge',
     description: 'Alerts, toast preview, skeleton, progreso, empty state y badges.',
@@ -113,8 +113,8 @@ export const componentExamples: ComponentExample[] = [
   },
   {
     id: 'overlays',
-    group: 'Capas',
-    title: 'Overlays',
+    group: '9. Ventanas y capas',
+    title: 'Ventanas y capas',
     standardName: 'ModalDialog + StdDrawer',
     description: 'Modal, drawer lateral, dialogo de confirmacion, tooltip y popover.',
     usage: 'Usalo para edicion enfocada, confirmaciones destructivas y ayuda contextual.',
@@ -124,7 +124,7 @@ export const componentExamples: ComponentExample[] = [
   },
   {
     id: 'dashboards',
-    group: 'Patrones',
+    group: '10. Patrones de dashboard',
     title: 'Patrones de dashboard',
     standardName: 'Dashboard operativo PIC',
     description: 'Composiciones completas para analitica, CRUD, filtros y vista mobile.',

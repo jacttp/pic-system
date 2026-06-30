@@ -11,7 +11,7 @@ defineProps<Props>();
 </script>
 
 <template>
-  <header class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+  <header class="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:flex-row lg:items-start lg:justify-between">
     <div class="min-w-0">
       <p v-if="eyebrow" class="text-[10px] font-black uppercase text-pic-brand">
         {{ eyebrow }}
@@ -19,7 +19,7 @@ defineProps<Props>();
       <div class="mt-1 flex min-w-0 items-center gap-3">
         <span
           v-if="icon"
-          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-pic-brand-border bg-pic-brand-soft text-pic-brand"
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-pic-brand-border bg-pic-brand-soft text-pic-brand shadow-sm"
         >
           <i :class="icon"></i>
         </span>
