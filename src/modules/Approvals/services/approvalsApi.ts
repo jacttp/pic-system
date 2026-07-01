@@ -46,6 +46,21 @@ export const approvalsApi = {
       return data.data;
    },
 
+   async getCpfrMixPreview(id: number): Promise<any> {
+      const { data } = await api.get(`/v2/approvals/${id}/cpfr-mix-preview`);
+      return data.data;
+   },
+
+   async recalculateCpfrMixPreview(id: number, overrides: any[]): Promise<any> {
+      const { data } = await api.post(`/v2/approvals/${id}/cpfr-mix-preview`, { overrides });
+      return data.data;
+   },
+
+   async applyCpfrMix(id: number, overrides: any[]): Promise<any> {
+      const { data } = await api.post(`/v2/approvals/${id}/cpfr-mix-apply`, { overrides });
+      return data.data;
+   },
+
    async updateCpfrOrderAdjustment(id: number, payload: {
       id_cliente: string
       sku_muliix: string
@@ -53,6 +68,7 @@ export const approvalsApi = {
       anio: string
       semana_ic: string
       fec_pedido_cadena: string
+      source_type?: string
       ajuste: number
    }): Promise<any> {
       const { data } = await api.patch(`/v2/approvals/${id}/cpfr-order-adjustment`, payload);

@@ -2,7 +2,7 @@ export const ALLOWED_CHAINS = ['SORIANA', 'SAMS', 'CHEDRAUI', 'WALMART', 'CITYCL
 
 export type AllowedChain = typeof ALLOWED_CHAINS[number];
 
-export const Z8_PERMISSION_OPTIONS = ['z8', 'z8carnes', 'NoResurtible'] as const;
+export const Z8_PERMISSION_OPTIONS = ['z8', 'z8carnes', 'NoResurtible', 'mix'] as const;
 
 export type Z8Permission = typeof Z8_PERMISSION_OPTIONS[number];
 
@@ -25,5 +25,6 @@ export function normalizeZ8Permission(value: string | null | undefined): Z8Permi
    const permission = String(value || 'z8').trim().toLowerCase();
    if (permission === 'z8carnes') return 'z8carnes';
    if (permission === 'noresurtible') return 'NoResurtible';
+   if (permission === 'mix') return 'mix';
    return 'z8';
 }

@@ -74,6 +74,7 @@ const groupedStores = computed(() => {
             z8: group.items.filter(item => item.permiso_oc === 'z8').length,
             z8carnes: group.items.filter(item => item.permiso_oc === 'z8carnes').length,
             noResurtible: group.items.filter(item => item.permiso_oc === 'NoResurtible').length,
+            mix: group.items.filter(item => item.permiso_oc === 'mix').length,
          },
       }))
       .sort((a, b) => a.nombre_tienda.localeCompare(b.nombre_tienda));
@@ -146,6 +147,7 @@ async function deleteItem(id: number) {
 function permissionClass(permission: string) {
    if (permission === 'z8carnes') return 'bg-purple-50 text-purple-700 border-purple-100 ring-1 ring-purple-100';
    if (permission === 'NoResurtible') return 'bg-violet-50 text-violet-600 border-violet-100 ring-1 ring-violet-100';
+   if (permission === 'mix') return 'bg-emerald-50 text-emerald-700 border-emerald-100 ring-1 ring-emerald-100';
    return 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100 ring-1 ring-fuchsia-100';
 }
 
@@ -295,6 +297,7 @@ function toggleStore(idCliente: string) {
                            <span class="summary-pill bg-fuchsia-50 text-fuchsia-700 ring-fuchsia-100">z8 {{ group.permissions.z8 }}</span>
                            <span class="summary-pill bg-purple-50 text-purple-700 ring-purple-100">z8carnes {{ group.permissions.z8carnes }}</span>
                            <span class="summary-pill bg-violet-50 text-violet-600 ring-violet-100">NoRes {{ group.permissions.noResurtible }}</span>
+                           <span class="summary-pill bg-emerald-50 text-emerald-700 ring-emerald-100">mix {{ group.permissions.mix }}</span>
                         </div>
                      </button>
                   </header>

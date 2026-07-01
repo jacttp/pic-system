@@ -58,6 +58,7 @@ export interface CpfrSkuDash {
     pedido_sugerido_pz_red: number          // editable inline
     cantidad_base_uni?: number
     ajuste?: number
+    ajuste_mix?: number
     pedido_cadena_pz: number
     escenario: 'A' | 'B' | null
     demanda_requerida_kg: number | null

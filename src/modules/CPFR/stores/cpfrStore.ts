@@ -225,7 +225,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
     function updateLocalSkuAdjustment(
         idCliente: string,
         skuRef: CpfrSkuDash,
-        payload: { cantidad_base_uni: number; ajuste: number; cant_pedida: number }
+        payload: { cantidad_base_uni: number; ajuste: number; ajuste_mix?: number; cant_pedida: number }
     ) {
         for (const dia of dias.value) {
             const tiendaRow = dia.tiendas.find(t => t.id_cliente === idCliente)
@@ -240,6 +240,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
             if (!sku) continue
             sku.cantidad_base_uni = Number(payload.cantidad_base_uni || 0)
             sku.ajuste = Number(payload.ajuste || 0)
+            sku.ajuste_mix = Number(payload.ajuste_mix || 0)
             sku.pedido_sugerido_pz_red = Number(payload.cant_pedida || 0)
             sku.pedido_sugerido_kg = sku.pedido_sugerido_pz_red * Number(sku.unidad_inventario || 0)
             sku.fill_rate = sku.cant_pedida > 0 ? sku.pedido_sugerido_pz_red / sku.cant_pedida : null
@@ -265,9 +266,11 @@ export const useCpfrStore = defineStore('cpfr', () => {
                     if (!match) continue
                     const base = Number(match.cantidad_base_uni ?? sku.pedido_sugerido_pz_red ?? 0)
                     const adjustment = Number(match.ajuste ?? 0)
-                    const total = base + adjustment
+                    const mixAdjustment = Number(match.ajuste_mix ?? 0)
+                    const total = base + adjustment + mixAdjustment
                     sku.cantidad_base_uni = base
                     sku.ajuste = adjustment
+                    sku.ajuste_mix = mixAdjustment
                     sku.pedido_sugerido_pz_red = total
                     sku.pedido_sugerido_kg = total * Number(sku.unidad_inventario || 0)
                     sku.fill_rate = sku.cant_pedida > 0 ? total / sku.cant_pedida : null

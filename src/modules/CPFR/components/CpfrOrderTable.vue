@@ -162,6 +162,11 @@ function skuAdjustment(sku: CpfrSkuDash): number {
     return Number.isFinite(value) ? value : 0
 }
 
+function skuMixAdjustment(sku: CpfrSkuDash): number {
+    const value = Number(sku.ajuste_mix ?? 0)
+    return Number.isFinite(value) ? value : 0
+}
+
 function formatAdjustment(sku: CpfrSkuDash): string {
     const value = skuAdjustment(sku)
     return `${value > 0 ? '+' : ''}${n(value, 0)}`
@@ -180,7 +185,7 @@ function ocBaseOrderTotal(oc: GroupedOC): number {
 }
 
 function skuFinalOrderQuantity(sku: CpfrSkuDash): number {
-    return skuBaseQuantity(sku) + skuAdjustment(sku)
+    return skuBaseQuantity(sku) + skuAdjustment(sku) + skuMixAdjustment(sku)
 }
 
 function ocFinalOrderTotal(oc: GroupedOC): number {
