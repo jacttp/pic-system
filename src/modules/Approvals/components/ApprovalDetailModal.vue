@@ -293,6 +293,8 @@ const selectedMixGroup = computed(() => {
 });
 
 const rowHasMixMetadata = (row: CpfrPreviewRow) => Boolean(row.par_muliix);
+const isMixPairRow = (row: CpfrPreviewRow) => String(row.permiso_oc || '').toLowerCase() === 'mix';
+const canShowCpfrStepper = computed(() => canEditCpfrOrder.value);
 const getMixRowKey = (row: CpfrPreviewRow) => `${row.source_type}|${row.num_pedido}|${row.sku_muliix}`;
 const getRowMixGroup = (row: CpfrPreviewRow) => cpfrMixGroupsByRowKey.value.get(getMixRowKey(row)) || null;
 const openRowMix = (row: CpfrPreviewRow) => {
@@ -1008,27 +1010,31 @@ const handleConfirm = async () => {
                                        </td>
                                        <td class="px-3 py-2">
                                           <div
-                                             v-if="canEditCpfrOrder"
+                                             v-if="canShowCpfrStepper"
                                              class="ml-auto flex items-center justify-end gap-1.5"
                                           >
                                              <div class="flex w-[116px] items-center justify-end overflow-hidden rounded-lg border border-slate-200 bg-white">
                                                 <button
                                                    type="button"
                                                    class="flex h-8 w-8 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
-                                                   title="Disminuir pedido"
-                                                   :disabled="isRowAdjusting(row) || !row.sku_muliix || row.pzas_bolsa <= 0 || row.cantidad_base_uni + row.ajuste - row.pzas_bolsa < 0"
+                                                   :title="isMixPairRow(row) ? 'Renglon generado por mix' : 'Disminuir pedido'"
+                                                   :disabled="isMixPairRow(row) || isRowAdjusting(row) || !row.sku_muliix || row.pzas_bolsa <= 0 || row.cantidad_base_uni + row.ajuste - row.pzas_bolsa < 0"
                                                    @click="handleAdjustPedido(row, -1)"
                                                 >
                                                    <i class="fa-solid fa-minus text-[10px]"></i>
                                                 </button>
-                                                <span class="flex h-8 min-w-0 flex-1 items-center justify-center border-x border-slate-200 px-2 text-center font-black text-brand-700">
+                                                <span
+                                                   class="flex h-8 min-w-0 flex-1 items-center justify-center border-x border-slate-200 px-2 text-center font-black"
+                                                   :class="isMixPairRow(row) ? 'bg-slate-50 text-slate-500' : 'text-brand-700'"
+                                                   :title="isMixPairRow(row) ? 'Renglon generado por mix; ajusta el SKU base' : 'Pedido final'"
+                                                >
                                                    <i v-if="isRowAdjusting(row)" class="fa-solid fa-circle-notch fa-spin text-[10px]"></i>
                                                    <span v-else>{{ formatNumber(row.cant_pedida, 0) }}</span>
                                                 </span>
                                                 <button
                                                    type="button"
                                                    class="flex h-8 w-8 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
-                                                   title="Incremento temporalmente deshabilitado"
+                                                   :title="isMixPairRow(row) ? 'Renglon generado por mix' : 'Incremento temporalmente deshabilitado'"
                                                    :disabled="true"
                                                    @click="handleAdjustPedido(row, 1)"
                                                 >
@@ -1047,8 +1053,9 @@ const handleConfirm = async () => {
                                              </button>
                                              <span v-else class="h-8 w-7 shrink-0" aria-hidden="true"></span>
                                           </div>
-                                          <p v-else class="text-right font-black text-brand-700">
+                                          <p v-else class="text-right font-black" :class="isMixPairRow(row) ? 'text-emerald-700' : 'text-brand-700'">
                                              {{ formatNumber(row.cant_pedida, 0) }} pz
+                                             <span v-if="isMixPairRow(row)" class="ml-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[8px] font-black uppercase text-emerald-700">mix</span>
                                           </p>
                                        </td>
                                     </tr>
