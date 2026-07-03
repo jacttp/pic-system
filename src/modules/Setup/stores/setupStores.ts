@@ -173,7 +173,8 @@ export const useSetupStore = defineStore('setup', () => {
 
    const hubFeatureVisibility = computed<Record<HubFeatureKey, boolean>>(() => {
       const authStore = useAuthStore();
-      const apiVisibility = hubConfig.value?.visibility;
+      const apiVisibility = hubConfig.value?.fallback ? undefined : hubConfig.value?.visibility;
+      const useLocalFeatureSettings = hubConfig.value?.fallback;
       const featureByKey = new Map(normalizedFeatureFlags.value.map(feature => [feature.FeatureKey, feature]));
       const isFeatureVisible = (
          featureKey: HubFeatureKey,
@@ -181,7 +182,7 @@ export const useSetupStore = defineStore('setup', () => {
          defaultMinAccessLevel = 4
       ) => {
          const feature = featureByKey.get(featureKey);
-         const isEnabled = feature?.IsEnabled ?? localSetting;
+         const isEnabled = useLocalFeatureSettings ? localSetting : (feature?.IsEnabled ?? localSetting);
          const minAccessLevel = Number(feature?.MinAccessLevel ?? defaultMinAccessLevel);
 
          return Boolean(isEnabled) && authStore.userLevel >= minAccessLevel;

@@ -224,12 +224,18 @@ const navigationGroups = computed(() => {
 });
 
 const tokenGroups = computed(() => [
-  { title: 'Paleta base', icon: 'fa-solid fa-swatchbook', tokens: uiThemeTokenDefinitions.filter((token) => token.group === 'base') },
+  { title: 'Base operativa', icon: 'fa-solid fa-swatchbook', tokens: uiThemeTokenDefinitions.filter((token) => token.group === 'base') },
+  { title: 'Navegacion', icon: 'fa-solid fa-bars-staggered', tokens: uiThemeTokenDefinitions.filter((token) => token.group === 'navigation') },
   { title: 'Estados', icon: 'fa-solid fa-signal', tokens: uiThemeTokenDefinitions.filter((token) => token.group === 'state') },
+  { title: 'Modulos', icon: 'fa-solid fa-shapes', tokens: uiThemeTokenDefinitions.filter((token) => token.group === 'module') },
   { title: 'Graficas', icon: 'fa-solid fa-chart-simple', tokens: uiThemeTokenDefinitions.filter((token) => token.group === 'chart') },
 ]);
 const activePaletteTokens = computed(() => activePalette.value.tokens);
-const activePalettePreviewTokens = computed(() => uiThemeTokenDefinitions.slice(0, 6));
+const activePalettePreviewTokens = computed(() =>
+  uiThemeTokenDefinitions.filter((token) =>
+    ['--pic-brand', '--pic-nav', '--pic-accent-orange', '--pic-accent-blue', '--pic-accent-purple', '--pic-accent-teal'].includes(token.token)
+  )
+);
 const activePaletteStatusLabel = computed(() => {
   if (isThemeSaving.value) return 'Guardando...';
   if (isThemeFallback.value) return 'Fallback local';
@@ -354,7 +360,7 @@ const handleApplyPalette = () => {
             id="configuration"
             title="Configuracion UI"
             eyebrow="Paleta activa"
-            description="Consola para crear, editar, aplicar y persistir paletas globales desde SysUIsettings. Los modulos adoptan estos valores al usar tokens pic-*."
+            description="Consola para crear, editar, aplicar y persistir paletas globales desde SysUIsettings. Hub, navegacion y modulos adoptan estos valores al usar tokens pic-*."
             icon="fa-solid fa-palette"
           >
             <div class="grid grid-cols-1 gap-4 2xl:grid-cols-[280px_minmax(0,1fr)]">

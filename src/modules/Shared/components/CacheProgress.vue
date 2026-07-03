@@ -52,7 +52,7 @@ const statusColor = computed(() => {
 </script>
 
 <template>
-    <div v-if="status" class="flex items-center gap-3 px-4 py-2 bg-white rounded-xl border border-slate-100 shadow-sm transition-all duration-500">
+    <div v-if="status" class="cache-progress-card flex items-center gap-3 px-4 py-2 bg-white rounded-xl border border-slate-100 shadow-sm transition-all duration-500">
         <!-- Icono con animación si está en progreso -->
         <div :class="statusColor">
             <i v-if="!status.isComplete" class="fa-solid fa-circle-notch fa-spin text-lg"></i>

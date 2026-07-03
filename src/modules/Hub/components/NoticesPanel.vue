@@ -40,31 +40,36 @@ const props = withDefaults(defineProps<{
 </script>
 
 <template>
-    <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div class="flex items-center gap-3 border-b border-slate-100 p-4">
-            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-700">
+    <section class="overflow-hidden rounded-xl border border-pic-border bg-white shadow-sm">
+        <div class="flex items-center justify-between gap-3 border-b border-pic-border px-4 py-4 sm:px-5">
+            <div class="flex min-w-0 items-center gap-3">
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-pic-brand-soft text-pic-brand shadow-sm">
                 <i class="fa-solid fa-bell text-sm"></i>
             </span>
             <div class="min-w-0">
-                <p class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{{ title }}</p>
-                <h2 class="truncate text-sm font-extrabold text-slate-900">Senales recientes</h2>
+                <p class="text-[10px] font-black uppercase tracking-[0.22em] text-pic-brand">{{ title }}</p>
+                <h2 class="truncate text-sm font-black text-pic-text-main">Senales recientes</h2>
             </div>
+            </div>
+            <span class="rounded-lg border border-pic-border bg-pic-muted-surface px-2.5 py-1 text-[10px] font-black uppercase text-pic-text-muted">
+                {{ props.notices.length }} avisos
+            </span>
         </div>
 
-        <div class="divide-y divide-slate-100">
+        <div class="divide-y divide-pic-border">
             <article
                 v-for="notice in props.notices"
                 :key="notice.id"
-                class="grid grid-cols-[32px_minmax(0,1fr)_32px] gap-3 p-4"
+                class="grid grid-cols-[40px_minmax(0,1fr)_42px] gap-3 px-4 py-4 transition hover:bg-pic-muted-surface sm:px-5"
             >
-                <span class="flex h-8 w-8 items-center justify-center rounded-lg" :class="notice.badgeClass">
+                <span class="flex h-10 w-10 items-center justify-center rounded-lg shadow-sm" :class="notice.badgeClass">
                     <i :class="[notice.icon, notice.iconClass, 'text-xs']"></i>
                 </span>
                 <div class="min-w-0">
-                    <p class="truncate text-xs font-black text-slate-800">{{ notice.title }}</p>
-                    <p class="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-500">{{ notice.detail }}</p>
+                    <p class="truncate text-sm font-black text-pic-text-main">{{ notice.title }}</p>
+                    <p class="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-pic-text-muted">{{ notice.detail }}</p>
                 </div>
-                <time class="pt-0.5 text-right text-[10px] font-black uppercase tracking-wide text-slate-400">
+                <time class="pt-1 text-right text-[10px] font-black uppercase tracking-wide text-pic-text-muted">
                     {{ notice.time }}
                 </time>
             </article>
@@ -72,7 +77,7 @@ const props = withDefaults(defineProps<{
 
         <router-link
             :to="historyRoute"
-            class="flex items-center justify-center gap-2 border-t border-slate-100 px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 transition hover:bg-slate-50 hover:text-brand-600"
+            class="flex items-center justify-center gap-2 border-t border-pic-border px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-pic-text-muted transition hover:bg-pic-brand-soft hover:text-pic-brand"
         >
             Ver historial
             <i class="fa-solid fa-chevron-right text-[10px]"></i>
