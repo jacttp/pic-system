@@ -10,6 +10,7 @@ import { toast } from '@/components/ui/toast/use-toast'
 import type { CpfrSkuDash, CpfrStoreDash } from '../types/cpfrTypes'
 import CpfrZ8Panel from '../components/CpfrZ8Panel.vue'
 import CpfrProductBehaviorPanel from '../components/CpfrProductBehaviorPanel.vue'
+import { buildVisibleCpfrDias } from '../composables/useCpfrVisibility'
 
 const showZ8Panel = ref(false)
 const selectedProductContext = ref<{ tienda: CpfrStoreDash; sku: CpfrSkuDash } | null>(null)
@@ -27,8 +28,13 @@ const currentTab = computed({
   get: () => store.activeTab,
   set: (val) => store.setActiveTab(val)
 })
-const showAdjustmentColumn = computed(() => currentTab.value !== 'centralizados')
-const tableColumnCount = computed(() => showAdjustmentColumn.value ? 10 : 9)
+const isApprovedTab = computed(() => currentTab.value === 'aprobada')
+const showAdjustmentColumn = computed(() => currentTab.value !== 'centralizados' && !isApprovedTab.value)
+const showCentralizedColumn = computed(() => !isApprovedTab.value)
+const tableColumnCount = computed(() => {
+  const fixedColumns = 8
+  return fixedColumns + (showAdjustmentColumn.value ? 1 : 0) + (showCentralizedColumn.value ? 1 : 0)
+})
 
 const tabs = [ 
     { id: 'centralizados', label: 'Centralizados' },
@@ -195,6 +201,11 @@ function ocFinalOrderTotal(oc: GroupedOC): number {
 function canDecreaseAdjustment(sku: CpfrSkuDash): boolean {
     const step = Number(sku.pzas_bolsa || 0)
     return step > 0 && skuBaseQuantity(sku) + skuAdjustment(sku) - step >= 0
+}
+
+function canIncreaseAdjustment(sku: CpfrSkuDash): boolean {
+    const step = Number(sku.pzas_bolsa || 0)
+    return step > 0 && skuAdjustment(sku) < 0 && skuBaseQuantity(sku) + skuAdjustment(sku) + step <= skuBaseQuantity(sku)
 }
 
 function adjustmentTooltip(idCliente: string, sku: CpfrSkuDash): string {
@@ -839,151 +850,14 @@ function canStillShipByLeadTime(sku: any, leadTime: number | null | undefined, t
     return finEmbarqueDate.getTime() >= earliestShipDate.getTime()
 }
 
-const filteredDias = computed(() => {
-    const sf = store.statusFilters;
-    const hasStatusFilter = sf.escenarioA || sf.escenarioB || sf.sinSellout || sf.desabasto || 
-                           sf.bajoStock || sf.sobrestock || sf.fillrateBajo || 
-                           sf.fillrate100 || sf.sobrepedido;
-    
-    const today = new Date();
-    const curr = getISOContext(today);
-    const last = getISOContext(new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000));
-    const currentWeekStart = startOfISOWeek(today);
-    const immediatePreviousSaturday = addDays(currentWeekStart, -2);
-    const immediatePreviousSunday = addDays(currentWeekStart, -1);
-    const rollingSevenDaysStart = addDays(startOfLocalDay(today), -7);
-
-    const isCurrentWeek = (sku: any) => {
-        const y = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0;
-        const w = sku.semana_ic ? parseInt(sku.semana_ic) : 0;
-        return y === curr.year && w === curr.week;
-    };
-
-    const isPreviousWeek = (sku: any) => {
-        const y = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0;
-        const w = sku.semana_ic ? parseInt(sku.semana_ic) : 0;
-        return y === last.year && w === last.week;
-    };
-
-    const isOlderWeek = (sku: any) => {
-        const y = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0;
-        const w = sku.semana_ic ? parseInt(sku.semana_ic) : 0;
-        return (y < last.year) || (y === last.year && w < last.week);
-    };
-
-    const isVisibleOrderWindow = (sku: any, leadTime: number | null | undefined) => {
-        if (!canStillShipByLeadTime(sku, leadTime, today)) return false;
-
-        const pedidoDate = parseLocalDate(sku.fec_pedido_cadena);
-        const finEmbarqueDate = parseLocalDate(sku.fec_fin_embarque);
-
-        if (isSameISOWeek(pedidoDate, curr)) return true;
-
-        const isImmediatePreviousWeekend =
-            sameLocalDay(pedidoDate, immediatePreviousSaturday)
-            || sameLocalDay(pedidoDate, immediatePreviousSunday);
-
-        if (isImmediatePreviousWeekend) return true;
-
-        return isSameISOWeek(pedidoDate, last)
-            && isSameISOWeek(finEmbarqueDate, curr)
-            && !!pedidoDate
-            && pedidoDate.getTime() >= rollingSevenDaysStart.getTime();
-    };
-
-    const isCentralizadosVisibleOC = (sku: any, leadTime: number | null | undefined) => {
-        const state = sku.estado_oc;
-        if (state === 'revision' || state === 'aprobado') return false;
-        if (!(state === 'pendiente' || state === 'borrador' || !state)) return false;
-        return isVisibleOrderWindow(sku, leadTime);
-    };
-
-    return (currentTab.value === 'historial' ? store.historialDias : store.dias).map(dia => {
-        const filteredTiendas = dia.tiendas.map(tienda => {
-            const filteredSkus = tienda.skus.filter(sku => {
-                // 1. Filtro por Pestaña (Tab)
-                const state = sku.estado_oc;
-                if (currentTab.value === 'centralizados') {
-                    if (!isCentralizadosVisibleOC(sku, tienda.resumen?.lead_time)) return false;
-                } else if (currentTab.value === 'revision') {
-                    if ((!isCurrentWeek(sku) && !isPreviousWeek(sku)) || state !== 'revision') return false;
-                } else if (currentTab.value === 'aprobada') {
-                    if (state !== 'aprobado' || !isVisibleOrderWindow(sku, tienda.resumen?.lead_time)) return false;
-                } else if (currentTab.value === 'sin_embarcar') {
-                    if (state !== 'cerrado') return false;
-                    
-                    if (selectedFilterWeek.value !== 'TODAS') {
-                        const y = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0;
-                        const w = sku.semana_ic ? parseInt(sku.semana_ic) : 0;
-                        const key = `${y}-W${w.toString().padStart(2, '0')}`;
-                        if (key !== selectedFilterWeek.value) return false;
-                    }
-                } else if (currentTab.value === 'historial') {
-                    // Historial: mostrar OCs de semanas pasadas sin importar estado
-                    // Solo excluir la semana actual y la anterior (que ya aparecen en otras pestañas)
-                    const isCurrentOrPrev = isCurrentWeek(sku) || isPreviousWeek(sku);
-                    if (isCurrentOrPrev) return false;
-
-                    if (selectedFilterWeek.value !== 'TODAS') {
-                        const y = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0;
-                        const w = sku.semana_ic ? parseInt(sku.semana_ic) : 0;
-                        const key = `${y}-W${w.toString().padStart(2, '0')}`;
-                        if (key !== selectedFilterWeek.value) return false;
-                    }
-                }
-
-                // 2. Filtro de Búsqueda
-                if (sf.searchOC) {
-                    const term = sf.searchOC.toLowerCase();
-                    const num = (sku.num_pedido || '').toLowerCase();
-                    if (!num.includes(term)) return false;
-                }
-
-                if (sf.searchSku) {
-                    const term = sf.searchSku.toLowerCase();
-                    const searchableSku = [
-                        sku.sku_nombre,
-                        sku.sku_muliix,
-                        sku.sku_cadena,
-                        sku.upc_cadena,
-                        sku.desc_art,
-                    ].filter(Boolean).join(' ').toLowerCase();
-                    if (!searchableSku.includes(term)) return false;
-                }
-
-                // 3. Filtros de Estado dinámicos (OR)
-                if (!hasStatusFilter) return true;
-
-                const fr = calcularFillRateDinamico(sku);
-                const cobStatus = coberturaStatus(sku);
-
-                if (sf.escenarioA && sku.escenario === 'A') return true;
-                if (sf.escenarioB && sku.escenario === 'B') return true;
-                if (sf.sinSellout && esSinSellout(sku)) return true;
-                if (sf.bajoStock && cobStatus === 'bajo') return true;
-                if (sf.sobrestock && cobStatus === 'sobre') return true;
-                
-                if (sf.fillrateBajo && fr !== null && fr < 0.999) return true;
-                if (sf.fillrate100 && fr !== null && Math.abs(fr - 1) < 0.001) return true;
-                if (sf.sobrepedido && fr !== null && fr > 1.001) return true;
-                
-                if (sf.desabasto && sku.inv_actual_pz <= 0) return true;
-                
-                return false;
-            });
-            // Ordenar por fecha de pedido (más recientes arriba)
-            filteredSkus.sort((a, b) => {
-                const dateA = a.fec_pedido_cadena ? new Date(a.fec_pedido_cadena).getTime() : 0;
-                const dateB = b.fec_pedido_cadena ? new Date(b.fec_pedido_cadena).getTime() : 0;
-                return dateB - dateA;
-            });
-
-            return { ...tienda, skus: filteredSkus };
-        }).filter(tienda => tienda.skus.length > 0);
-        
-        return { ...dia, tiendas: filteredTiendas };
-    }).filter(dia => dia.tiendas.length > 0);
-});
+const filteredDias = computed(() => buildVisibleCpfrDias({
+    activeTab: currentTab.value,
+    dias: store.dias,
+    historialDias: store.historialDias,
+    statusFilters: store.statusFilters,
+    criterioGlobal: store.criterio_global,
+    selectedFilterWeek: selectedFilterWeek.value,
+}))
 
 const expiredCentralizedOCs = computed(() => {
     const today = new Date()
@@ -1628,40 +1502,44 @@ const totalUniqueOCs = computed(() => {
                             </span>
                             <span v-if="oc.fec_pedido_cadena" class="text-[10px] font-bold text-slate-400">{{ formatShortDate(oc.fec_pedido_cadena) }}</span>
                           </div>
-                          <div class="grid grid-cols-2 gap-2 text-[10px] sm:grid-cols-4">
+                          <div class="grid grid-cols-2 gap-2 text-[10px]" :class="isApprovedTab ? 'sm:grid-cols-2' : 'sm:grid-cols-4'">
                             <div class="rounded-md bg-white/70 px-2 py-1 text-right">
                               <p class="text-[8px] font-black uppercase tracking-wider text-slate-400">SKUs</p>
                               <p class="font-black text-slate-700">{{ oc.skus.length }}</p>
                             </div>
-                            <div class="rounded-md bg-amber-50/60 px-2 py-1 text-right">
+                            <div v-if="!isApprovedTab" class="rounded-md bg-amber-50/60 px-2 py-1 text-right">
                               <p class="text-[8px] font-black uppercase tracking-wider text-amber-600">Pedido base</p>
                               <p class="font-black text-amber-700">{{ n(ocBaseOrderTotal(oc), 0) }}</p>
                             </div>
-                            <div class="rounded-md bg-white/70 px-2 py-1 text-right">
+                            <div v-if="!isApprovedTab" class="rounded-md bg-white/70 px-2 py-1 text-right">
                               <p class="text-[8px] font-black uppercase tracking-wider text-slate-400">Ajuste</p>
                               <p class="font-black" :class="ocAdjustmentTotal(oc) === 0 ? 'text-slate-500' : 'text-amber-700'">{{ formatSignedNumber(ocAdjustmentTotal(oc)) }}</p>
                             </div>
-                            <div class="rounded-md bg-white/70 px-2 py-1 text-right">
-                              <p class="text-[8px] font-black uppercase tracking-wider text-slate-400">Pedido</p>
-                              <p class="font-black text-slate-700">{{ n(ocFinalOrderTotal(oc), 0) }}</p>
+                            <div class="rounded-md px-2 py-1 text-right" :class="isApprovedTab ? 'bg-emerald-50/70' : 'bg-white/70'">
+                              <p class="text-[8px] font-black uppercase tracking-wider" :class="isApprovedTab ? 'text-emerald-600' : 'text-slate-400'">{{ isApprovedTab ? 'Pedido aprobado' : 'Pedido' }}</p>
+                              <p class="font-black" :class="isApprovedTab ? 'text-emerald-700' : 'text-slate-700'">{{ n(ocFinalOrderTotal(oc), 0) }}</p>
                             </div>
                           </div>
                         </div>
                       </div>
                       <div class="bg-white">
-                        <div class="hidden grid-cols-[minmax(220px,1.25fr)_120px_82px_98px_96px_76px_96px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2 text-[9px] font-black uppercase tracking-wider text-slate-500 md:grid">
+                        <div
+                          class="hidden gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2 text-[9px] font-black uppercase tracking-wider text-slate-500 md:grid"
+                          :class="isApprovedTab ? 'grid-cols-[minmax(220px,1.25fr)_120px_82px_98px_110px]' : 'grid-cols-[minmax(220px,1.25fr)_120px_82px_98px_96px_76px_96px]'"
+                        >
                           <span>SKU</span>
                           <span>UPC / Código</span>
                           <span class="text-right">Inventario</span>
                           <span class="text-right">Sellout prom.</span>
-                          <span class="text-right text-amber-700">Pedido base</span>
-                          <span class="text-right">Ajuste</span>
-                          <span class="text-right">Pedido</span>
+                          <span v-if="!isApprovedTab" class="text-right text-amber-700">Pedido base</span>
+                          <span v-if="!isApprovedTab" class="text-right">Ajuste</span>
+                          <span class="text-right" :class="isApprovedTab ? 'text-emerald-700' : ''">{{ isApprovedTab ? 'Pedido aprobado' : 'Pedido' }}</span>
                         </div>
                         <div
                           v-for="(sku, idx) in oc.skus"
                           :key="sku.sku_muliix ? `${oc.group_id}_${sku.sku_muliix}` : `${oc.group_id}_${idx}`"
-                          class="grid grid-cols-2 gap-x-3 gap-y-2 px-4 py-3 text-[11px] even:bg-slate-50/45 md:grid-cols-[minmax(220px,1.25fr)_120px_82px_98px_96px_76px_96px] md:items-center md:border-b md:border-slate-100 md:py-2.5 md:last:border-b-0"
+                          class="grid grid-cols-2 gap-x-3 gap-y-2 px-4 py-3 text-[11px] even:bg-slate-50/45 md:items-center md:border-b md:border-slate-100 md:py-2.5 md:last:border-b-0"
+                          :class="isApprovedTab ? 'md:grid-cols-[minmax(220px,1.25fr)_120px_82px_98px_110px]' : 'md:grid-cols-[minmax(220px,1.25fr)_120px_82px_98px_96px_76px_96px]'"
                         >
                           <button class="col-span-2 min-w-0 text-left font-semibold text-slate-700 hover:text-brand-700 md:col-span-1" @click.stop="openHistorialProductPanel(tienda, sku)">
                             <span class="block truncate">{{ sku.sku_nombre }}</span>
@@ -1679,17 +1557,17 @@ const totalUniqueOCs = computed(() => {
                             <p class="text-[8px] font-black uppercase tracking-wider text-slate-400 md:hidden">Sellout promedio</p>
                             <p class="font-mono font-bold text-slate-600">{{ n(sku.promedio_sellout_pz, 1) }}</p>
                           </div>
-                          <div class="text-right">
+                          <div v-if="!isApprovedTab" class="text-right">
                             <p class="text-[8px] font-black uppercase tracking-wider text-amber-600 md:hidden">Pedido base</p>
                             <p class="font-black text-amber-700">{{ n(skuBaseQuantity(sku), 0) }}</p>
                           </div>
-                          <div class="text-right">
+                          <div v-if="!isApprovedTab" class="text-right">
                             <p class="text-[8px] font-black uppercase tracking-wider text-slate-400 md:hidden">Ajuste</p>
                             <p class="font-black" :class="skuAdjustment(sku) === 0 ? 'text-slate-500' : 'text-amber-700'">{{ formatAdjustment(sku) }}</p>
                           </div>
                           <div class="text-right">
-                            <p class="text-[8px] font-black uppercase tracking-wider text-slate-400 md:hidden">Pedido</p>
-                            <p class="font-black text-slate-700">{{ n(skuFinalOrderQuantity(sku), 0) }}</p>
+                            <p class="text-[8px] font-black uppercase tracking-wider md:hidden" :class="isApprovedTab ? 'text-emerald-600' : 'text-slate-400'">{{ isApprovedTab ? 'Pedido aprobado' : 'Pedido' }}</p>
+                            <p class="font-black" :class="isApprovedTab ? 'text-emerald-700' : 'text-slate-700'">{{ n(skuFinalOrderQuantity(sku), 0) }}</p>
                           </div>
                         </div>
                       </div>
@@ -1697,21 +1575,27 @@ const totalUniqueOCs = computed(() => {
                   </div>
 
                   <div v-else class="divide-y divide-slate-100 bg-white">
-                    <div class="hidden grid-cols-[170px_minmax(220px,1.25fr)_120px_82px_98px_96px_76px_96px] gap-3 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[9px] font-black uppercase tracking-wider text-slate-500 md:grid">
+                    <div
+                      class="hidden gap-3 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[9px] font-black uppercase tracking-wider text-slate-500 md:grid"
+                      :class="isApprovedTab ? 'grid-cols-[170px_minmax(220px,1.25fr)_120px_82px_98px_110px]' : 'grid-cols-[170px_minmax(220px,1.25fr)_120px_82px_98px_96px_76px_96px]'"
+                    >
                       <span>OC / Estado</span>
                       <span>SKU</span>
                       <span>UPC / Código</span>
                       <span class="text-right">Inventario</span>
                       <span class="text-right">Sellout prom.</span>
-                      <span class="text-right text-amber-700">Pedido base</span>
-                      <span class="text-right">Ajuste</span>
-                      <span class="text-right">Pedido</span>
+                      <span v-if="!isApprovedTab" class="text-right text-amber-700">Pedido base</span>
+                      <span v-if="!isApprovedTab" class="text-right">Ajuste</span>
+                      <span class="text-right" :class="isApprovedTab ? 'text-emerald-700' : ''">{{ isApprovedTab ? 'Pedido aprobado' : 'Pedido' }}</span>
                     </div>
                     <div
                       v-for="(sku, idx) in week.skus"
                       :key="sku.sku_muliix ? `${week.key}_${sku.sku_muliix}` : `${week.key}_${idx}`"
-                      class="grid grid-cols-2 gap-x-3 gap-y-2 border-l-4 px-3 py-3 text-[11px] md:grid-cols-[170px_minmax(220px,1.25fr)_120px_82px_98px_96px_76px_96px] md:items-center md:py-2.5"
-                      :class="isZ8(sku.num_pedido) ? 'border-l-brand-600 bg-red-50/20' : 'border-l-slate-200'"
+                      class="grid grid-cols-2 gap-x-3 gap-y-2 border-l-4 px-3 py-3 text-[11px] md:items-center md:py-2.5"
+                      :class="[
+                        isApprovedTab ? 'md:grid-cols-[170px_minmax(220px,1.25fr)_120px_82px_98px_110px]' : 'md:grid-cols-[170px_minmax(220px,1.25fr)_120px_82px_98px_96px_76px_96px]',
+                        isZ8(sku.num_pedido) ? 'border-l-brand-600 bg-red-50/20' : 'border-l-slate-200'
+                      ]"
                     >
                       <div class="col-span-2 flex min-w-0 flex-wrap items-center gap-2 md:col-span-1">
                         <span class="rounded-md bg-slate-100 px-2 py-0.5 font-black text-slate-700">OC {{ sku.num_pedido || 'Sin número' }}</span>
@@ -1735,17 +1619,17 @@ const totalUniqueOCs = computed(() => {
                         <p class="text-[8px] font-black uppercase tracking-wider text-slate-400 md:hidden">Sellout promedio</p>
                         <p class="font-mono font-bold text-slate-600">{{ n(sku.promedio_sellout_pz, 1) }}</p>
                       </div>
-                      <div class="text-right">
+                      <div v-if="!isApprovedTab" class="text-right">
                         <p class="text-[8px] font-black uppercase tracking-wider text-amber-600 md:hidden">Pedido base</p>
                         <p class="font-black text-amber-700">{{ n(skuBaseQuantity(sku), 0) }}</p>
                       </div>
-                      <div class="text-right">
+                      <div v-if="!isApprovedTab" class="text-right">
                         <p class="text-[8px] font-black uppercase tracking-wider text-slate-400 md:hidden">Ajuste</p>
                         <p class="font-black" :class="skuAdjustment(sku) === 0 ? 'text-slate-500' : 'text-amber-700'">{{ formatAdjustment(sku) }}</p>
                       </div>
                       <div class="text-right">
-                        <p class="text-[8px] font-black uppercase tracking-wider text-slate-400 md:hidden">Pedido</p>
-                        <p class="font-black text-slate-700">{{ n(skuFinalOrderQuantity(sku), 0) }}</p>
+                        <p class="text-[8px] font-black uppercase tracking-wider md:hidden" :class="isApprovedTab ? 'text-emerald-600' : 'text-slate-400'">{{ isApprovedTab ? 'Pedido aprobado' : 'Pedido' }}</p>
+                        <p class="font-black" :class="isApprovedTab ? 'text-emerald-700' : 'text-slate-700'">{{ n(skuFinalOrderQuantity(sku), 0) }}</p>
                       </div>
                     </div>
                   </div>
@@ -1759,7 +1643,7 @@ const totalUniqueOCs = computed(() => {
         <table
           v-else-if="store.viewMode === 'table'"
           class="w-full text-left border-collapse table-fixed transition-all duration-300"
-          :class="showAdjustmentColumn ? 'min-w-[1180px]' : 'min-w-[1080px]'"
+          :class="showAdjustmentColumn ? 'min-w-[1180px]' : isApprovedTab ? 'min-w-[980px]' : 'min-w-[1080px]'"
         >
           <colgroup>
             <col style="width: 26%" />
@@ -1770,7 +1654,7 @@ const totalUniqueOCs = computed(() => {
             <col style="width: 6.5%" />
             <col style="width: 9%" />
             <col v-if="showAdjustmentColumn" style="width: 8.5%" />
-            <col style="width: 8%" />
+            <col v-if="showCentralizedColumn" style="width: 8%" />
             <col style="width: 10.5%" />
           </colgroup>
 
@@ -1783,9 +1667,11 @@ const totalUniqueOCs = computed(() => {
               <th class="px-2.5 py-3 font-bold text-right whitespace-nowrap">Sellout Prom.<br>(pz)</th>
               <th class="px-2 py-3 font-bold text-right whitespace-nowrap">Crit.<br>(S.)</th>
               <th class="px-2 py-3 font-bold text-right whitespace-nowrap">Cob.<br>(S.)</th>
-              <th class="px-2.5 py-3 font-bold text-right text-amber-700 bg-amber-50 border-x border-amber-100 whitespace-nowrap">Pedido<br>Sugerido</th>
+              <th class="px-2.5 py-3 font-bold text-right whitespace-nowrap" :class="isApprovedTab ? 'text-emerald-700 bg-emerald-50 border-x border-emerald-100' : 'text-amber-700 bg-amber-50 border-x border-amber-100'">
+                Pedido<br>{{ isApprovedTab ? 'Aprobado' : 'Sugerido' }}
+              </th>
               <th v-if="showAdjustmentColumn" class="px-2.5 py-3 font-bold text-center whitespace-nowrap">Ajuste</th>
-              <th class="px-2.5 py-3 font-bold text-right whitespace-nowrap">Centralizado</th>
+              <th v-if="showCentralizedColumn" class="px-2.5 py-3 font-bold text-right whitespace-nowrap">Centralizado</th>
               <th class="px-2.5 py-3 font-bold text-right whitespace-nowrap">Fill Rate</th>
             </tr>
           </thead>
@@ -1912,10 +1798,13 @@ const totalUniqueOCs = computed(() => {
                       {{ n(tienda.resumen.cobertura_actual, 2) }}
                     </td>
 
-                    <!-- Pedido Sugerido -->
-                    <td class="px-2.5 py-3 text-right font-black text-amber-700 bg-amber-50/50 border-x border-amber-100 text-sm tracking-tight relative">
-                      <div class="absolute inset-y-0 left-0 w-[4px] bg-amber-400/30"></div>
-                      {{ tienda.resumen.pedido_sugerido_pz_red.toLocaleString('es-MX') }}
+                    <!-- Pedido Sugerido / Aprobado -->
+                    <td
+                      class="px-2.5 py-3 text-right font-black border-x text-sm tracking-tight relative"
+                      :class="isApprovedTab ? 'text-emerald-700 bg-emerald-50/50 border-emerald-100' : 'text-amber-700 bg-amber-50/50 border-amber-100'"
+                    >
+                      <div class="absolute inset-y-0 left-0 w-[4px]" :class="isApprovedTab ? 'bg-emerald-400/30' : 'bg-amber-400/30'"></div>
+                      {{ n(isApprovedTab ? tienda.skus.reduce((sum, sku) => sum + skuFinalOrderQuantity(sku), 0) : tienda.resumen.pedido_sugerido_pz_red, 0) }}
                     </td>
 
                     <!-- Ajuste -->
@@ -1926,7 +1815,7 @@ const totalUniqueOCs = computed(() => {
                     </td>
 
                     <!-- Pedido Cadena (cant_pedida de la OC) -->
-                    <td class="px-2.5 py-2.5 text-right font-semibold text-slate-700">
+                    <td v-if="showCentralizedColumn" class="px-2.5 py-2.5 text-right font-semibold text-slate-700">
                       {{ tienda.resumen.cant_pedida_total.toLocaleString('es-MX') }}
                     </td>
 
@@ -2022,9 +1911,12 @@ const totalUniqueOCs = computed(() => {
                           </div>
                         </td>
 
-                          <!-- Pedido Sugerido SUM -->
-                        <td class="px-2.5 py-2 text-right font-bold text-amber-700 bg-amber-50/50 border-x border-amber-100/70 border-t-[12px] border-t-white text-sm tracking-tight">
-                          {{ n(ocGroup.pedido_sugerido_pz_red_total, 0) }}
+                          <!-- Pedido Sugerido / Aprobado SUM -->
+                        <td
+                          class="px-2.5 py-2 text-right font-bold border-x border-t-[12px] border-t-white text-sm tracking-tight"
+                          :class="isApprovedTab ? 'text-emerald-700 bg-emerald-50/50 border-emerald-100/70' : 'text-amber-700 bg-amber-50/50 border-amber-100/70'"
+                        >
+                          {{ n(isApprovedTab ? ocFinalOrderTotal(ocGroup) : ocGroup.pedido_sugerido_pz_red_total, 0) }}
                         </td>
 
                         <!-- Ajuste SUM -->
@@ -2036,7 +1928,7 @@ const totalUniqueOCs = computed(() => {
                         </td>
 
                         <!-- Pedido Cadena SUM -->
-                        <td class="px-2.5 py-2 text-right font-bold text-slate-800 border-t-[12px] border-t-white">
+                        <td v-if="showCentralizedColumn" class="px-2.5 py-2 text-right font-bold text-slate-800 border-t-[12px] border-t-white">
                           {{ n(ocGroup.cant_pedida_total, 0) }}
                         </td>
 
@@ -2140,9 +2032,12 @@ const totalUniqueOCs = computed(() => {
                             </span>
                           </td>
 
-                          <!-- Pedido Sugerido (editable Excel-style) -->
-                          <td class="px-2 py-2 align-middle bg-amber-50/50 border-x border-amber-100/50 relative group/cell">
-                            <div class="absolute inset-y-0 left-0 w-[2px] bg-amber-400/20"></div>
+                          <!-- Pedido Sugerido / Aprobado -->
+                          <td
+                            class="px-2 py-2 align-middle border-x relative group/cell"
+                            :class="isApprovedTab ? 'bg-emerald-50/50 border-emerald-100/50' : 'bg-amber-50/50 border-amber-100/50'"
+                          >
+                            <div class="absolute inset-y-0 left-0 w-[2px]" :class="isApprovedTab ? 'bg-emerald-400/20' : 'bg-amber-400/20'"></div>
                             
                             <div v-if="currentTab === 'centralizados' && editingId === sku.sku_muliix && sku.sku_muliix" class="flex items-center gap-1.5 justify-end h-full">
                               <input
@@ -2174,8 +2069,8 @@ const totalUniqueOCs = computed(() => {
                               </span>
                               <span class="text-[12px] font-bold text-slate-800" :class="{ 'text-brand-700': sku.pedido_sugerido_pz_red > 0 }">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
                             </button>
-                            <div v-else class="flex w-full items-center justify-end rounded-md border border-amber-100 bg-white/75 px-2 py-1">
-                              <span class="text-[12px] font-black text-amber-700">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
+                            <div v-else class="flex w-full items-center justify-end rounded-md border bg-white/75 px-2 py-1" :class="isApprovedTab ? 'border-emerald-100' : 'border-amber-100'">
+                              <span class="text-[12px] font-black" :class="isApprovedTab ? 'text-emerald-700' : 'text-amber-700'">{{ n(isApprovedTab ? skuFinalOrderQuantity(sku) : sku.pedido_sugerido_pz_red, 0) }}</span>
                             </div>
                           </td>
 
@@ -2204,8 +2099,8 @@ const totalUniqueOCs = computed(() => {
                               <button
                                 type="button"
                                 class="flex h-8 w-8 shrink-0 items-center justify-center text-slate-400 transition disabled:cursor-not-allowed disabled:opacity-35"
-                                title="Incremento temporalmente deshabilitado"
-                                :disabled="true"
+                                title="Regresar hacia pedido base"
+                                :disabled="adjustingSkuKey === adjustmentKey(tienda.id_cliente, sku) || !canIncreaseAdjustment(sku) || !store.getCachedApprovalIdForSku(tienda.id_cliente, sku)"
                                 @click.stop="adjustReviewSku(tienda.id_cliente, sku, 1)"
                               >
                                 <i class="fa-solid fa-plus text-[10px]"></i>
@@ -2221,7 +2116,7 @@ const totalUniqueOCs = computed(() => {
                           </td>
 
                           <!-- Pedido Cadena (cant_pedida) -->
-                          <td class="px-2.5 py-2 text-right font-semibold text-slate-800">
+                          <td v-if="showCentralizedColumn" class="px-2.5 py-2 text-right font-semibold text-slate-800">
                             {{ n(sku.cant_pedida, 0) }}
                           </td>
 
@@ -2366,9 +2261,12 @@ const totalUniqueOCs = computed(() => {
                           </span>
                         </td>
 
-                        <!-- Pedido Sugerido (editable Excel-style) -->
-                        <td class="px-2 py-2 align-middle bg-amber-50/50 border-x border-amber-100/50 relative group/cell">
-                          <div class="absolute inset-y-0 left-0 w-[2px] bg-amber-400/20"></div>
+                        <!-- Pedido Sugerido / Aprobado -->
+                        <td
+                          class="px-2 py-2 align-middle border-x relative group/cell"
+                          :class="isApprovedTab ? 'bg-emerald-50/50 border-emerald-100/50' : 'bg-amber-50/50 border-amber-100/50'"
+                        >
+                          <div class="absolute inset-y-0 left-0 w-[2px]" :class="isApprovedTab ? 'bg-emerald-400/20' : 'bg-amber-400/20'"></div>
                           
                           <div v-if="currentTab === 'centralizados' && editingId === sku.sku_muliix && sku.sku_muliix" class="flex items-center gap-1.5 justify-end h-full">
                             <input
@@ -2400,8 +2298,8 @@ const totalUniqueOCs = computed(() => {
                             </span>
                             <span class="text-[12px] font-bold text-slate-800" :class="{ 'text-brand-700': sku.pedido_sugerido_pz_red > 0 }">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
                           </button>
-                          <div v-else class="flex w-full items-center justify-end rounded-md border border-amber-100 bg-white/75 px-2 py-1">
-                            <span class="text-[12px] font-black text-amber-700">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
+                          <div v-else class="flex w-full items-center justify-end rounded-md border bg-white/75 px-2 py-1" :class="isApprovedTab ? 'border-emerald-100' : 'border-amber-100'">
+                            <span class="text-[12px] font-black" :class="isApprovedTab ? 'text-emerald-700' : 'text-amber-700'">{{ n(isApprovedTab ? skuFinalOrderQuantity(sku) : sku.pedido_sugerido_pz_red, 0) }}</span>
                           </div>
                         </td>
 
@@ -2430,8 +2328,8 @@ const totalUniqueOCs = computed(() => {
                             <button
                               type="button"
                               class="flex h-8 w-8 shrink-0 items-center justify-center text-slate-400 transition disabled:cursor-not-allowed disabled:opacity-35"
-                              title="Incremento temporalmente deshabilitado"
-                              :disabled="true"
+                              title="Regresar hacia pedido base"
+                              :disabled="adjustingSkuKey === adjustmentKey(tienda.id_cliente, sku) || !canIncreaseAdjustment(sku) || !store.getCachedApprovalIdForSku(tienda.id_cliente, sku)"
                               @click.stop="adjustReviewSku(tienda.id_cliente, sku, 1)"
                             >
                               <i class="fa-solid fa-plus text-[10px]"></i>
@@ -2447,7 +2345,7 @@ const totalUniqueOCs = computed(() => {
                         </td>
 
                         <!-- Pedido Cadena (cant_pedida) -->
-                        <td class="px-2.5 py-2 text-right font-semibold text-slate-800">
+                        <td v-if="showCentralizedColumn" class="px-2.5 py-2 text-right font-semibold text-slate-800">
                           {{ n(sku.cant_pedida, 0) }}
                         </td>
 
@@ -2532,9 +2430,12 @@ const totalUniqueOCs = computed(() => {
                                     <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Vta. Prom</p>
                                     <p class="text-[13px] font-black text-slate-700">{{ n(tienda.resumen.promedio_sellout_pz, 1) }} <span class="text-[9px] text-slate-400 font-medium">pz</span></p>
                                 </div>
-                                <div class="bg-amber-50/50 border border-amber-100 rounded-xl p-2.5 shadow-sm min-w-[100px] hover:bg-amber-50 transition-colors">
-                                    <p class="text-[8px] font-black text-amber-400 uppercase tracking-widest mb-0.5">Sugerido</p>
-                                    <p class="text-[13px] font-black text-amber-700">{{ tienda.resumen.pedido_sugerido_pz_red.toLocaleString('es-MX') }}</p>
+                                <div
+                                  class="rounded-xl p-2.5 shadow-sm min-w-[100px] transition-colors"
+                                  :class="isApprovedTab ? 'bg-emerald-50/50 border border-emerald-100 hover:bg-emerald-50' : 'bg-amber-50/50 border border-amber-100 hover:bg-amber-50'"
+                                >
+                                    <p class="text-[8px] font-black uppercase tracking-widest mb-0.5" :class="isApprovedTab ? 'text-emerald-500' : 'text-amber-400'">{{ isApprovedTab ? 'Aprobado' : 'Sugerido' }}</p>
+                                    <p class="text-[13px] font-black" :class="isApprovedTab ? 'text-emerald-700' : 'text-amber-700'">{{ n(isApprovedTab ? tienda.skus.reduce((sum, sku) => sum + skuFinalOrderQuantity(sku), 0) : tienda.resumen.pedido_sugerido_pz_red, 0) }}</p>
                                 </div>
                                 <div class="bg-slate-50 border border-slate-200 rounded-xl p-2.5 shadow-sm min-w-[100px] hover:bg-slate-100 transition-colors">
                                     <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Cobertura</p>
@@ -2763,14 +2664,14 @@ const totalUniqueOCs = computed(() => {
                                             <div class="shrink-0 flex flex-wrap lg:flex-nowrap items-center gap-3 w-full lg:w-auto">
                                                 <div class="flex items-center grow lg:grow-0 divide-x divide-slate-100 bg-slate-50 lg:bg-transparent rounded-xl lg:rounded-none overflow-hidden border lg:border-0 border-slate-100">
                                                     <!-- Cadena -->
-                                                    <div class="flex flex-col items-center justify-center w-[65px] h-12 lg:h-auto">
+                                                    <div v-if="showCentralizedColumn" class="flex flex-col items-center justify-center w-[65px] h-12 lg:h-auto">
                                                         <p class="text-[7px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">Central</p>
                                                         <span class="text-[12px] font-black text-slate-800">{{ n(sku.cant_pedida, 0) }}</span>
                                                     </div>
     
-                                                    <!-- Pedido Sugerido -->
-                                                    <div class="flex flex-col items-center justify-center w-[110px] h-12 lg:h-auto bg-amber-50/50">
-                                                        <p class="text-[7px] font-black text-amber-600 uppercase tracking-tighter mb-0.5">Sugerido</p>
+                                                    <!-- Pedido Sugerido / Aprobado -->
+                                                    <div class="flex flex-col items-center justify-center w-[110px] h-12 lg:h-auto" :class="isApprovedTab ? 'bg-emerald-50/60' : 'bg-amber-50/50'">
+                                                        <p class="text-[7px] font-black uppercase tracking-tighter mb-0.5" :class="isApprovedTab ? 'text-emerald-600' : 'text-amber-600'">{{ isApprovedTab ? 'Aprobado' : 'Sugerido' }}</p>
                                                         <div class="flex items-center justify-center gap-1 w-full px-1">
                                                             <div v-if="currentTab === 'centralizados' && editingId === sku.sku_muliix" class="flex items-center justify-center gap-1">
                                                                 <input 
@@ -2789,8 +2690,12 @@ const totalUniqueOCs = computed(() => {
                                                                 <i v-if="esSinSellout(sku)" class="fa-solid fa-seedling text-[8px] text-amber-500 shrink-0"></i>
                                                                 <span class="text-[12px] font-black truncate" :class="sku.pedido_sugerido_pz_red > 0 ? 'text-brand-700' : 'text-slate-800'">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
                                                             </button>
-                                                            <span v-else class="h-7 w-[70px] rounded-lg border border-amber-100 bg-white px-2 text-center text-[12px] font-black leading-7 text-amber-700">
-                                                                {{ n(sku.pedido_sugerido_pz_red, 0) }}
+                                                            <span
+                                                              v-else
+                                                              class="h-7 w-[70px] rounded-lg border bg-white px-2 text-center text-[12px] font-black leading-7"
+                                                              :class="isApprovedTab ? 'border-emerald-100 text-emerald-700' : 'border-amber-100 text-amber-700'"
+                                                            >
+                                                                {{ n(isApprovedTab ? skuFinalOrderQuantity(sku) : sku.pedido_sugerido_pz_red, 0) }}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -2821,7 +2726,8 @@ const totalUniqueOCs = computed(() => {
                                                             <button
                                                               type="button"
                                                               class="flex h-7 w-7 shrink-0 items-center justify-center text-slate-400 disabled:cursor-not-allowed disabled:opacity-35"
-                                                              :disabled="true"
+                                                              title="Regresar hacia pedido base"
+                                                              :disabled="adjustingSkuKey === adjustmentKey(tienda.id_cliente, sku) || !canIncreaseAdjustment(sku) || !store.getCachedApprovalIdForSku(tienda.id_cliente, sku)"
                                                               @click.stop="adjustReviewSku(tienda.id_cliente, sku, 1)"
                                                             >
                                                                 <i class="fa-solid fa-plus text-[9px]"></i>

@@ -10,6 +10,7 @@ import CpfrExportPanel     from '../components/CpfrExportPanel.vue'
 import CpfrStoreConfigModal from '../components/CpfrStoreConfigModal.vue'
 import CpfrInfoModal        from '../components/CpfrInfoModal.vue'
 import CpfrZ8ManagerPanel  from '../components/CpfrZ8ManagerPanel.vue'
+import { buildVisibleCpfrDias, cpfrSkuFinalPieces } from '../composables/useCpfrVisibility'
 
 const store = useCpfrStore()
 const router = useRouter()
@@ -21,37 +22,29 @@ const showZ8Manager    = ref(false)
 const configStore      = ref<{ id: string; nombre: string } | null>(null)
 const chainLabel = computed(() => store.nom_cadena === 'SAMS' ? "Sam's" : 'Soriana')
 
-function isSkuInCurrentTab(estado: string | null): boolean {
-    if (store.activeTab === 'centralizados') {
-        return !estado || estado === 'pendiente' || estado === 'borrador'
-    }
-
-    if (store.activeTab === 'revision') return estado === 'revision'
-    if (store.activeTab === 'aprobada') return estado === 'aprobado'
-
-    return true
-}
+const visibleDias = computed(() => buildVisibleCpfrDias({
+    activeTab: store.activeTab,
+    dias: store.dias,
+    historialDias: store.historialDias,
+    statusFilters: store.statusFilters,
+    criterioGlobal: store.criterio_global,
+}))
 
 const orderTotals = computed(() => {
     let piezas = 0
     let kg = 0
     const tiendas = new Set<string>()
 
-    for (const dia of store.dias) {
+    for (const dia of visibleDias.value) {
         for (const tienda of dia.tiendas) {
-            let hasMatchingSku = false
-
             for (const sku of tienda.skus) {
-                if (!isSkuInCurrentTab(sku.estado_oc)) continue
-
-                const piezasSku = Number(sku.pedido_sugerido_pz_red ?? 0)
+                const piezasSku = cpfrSkuFinalPieces(sku)
                 const kgPorPieza = Number(sku.unidad_inventario ?? 0)
                 piezas += piezasSku
                 kg += kgPorPieza > 0 ? piezasSku * kgPorPieza : Number(sku.pedido_sugerido_kg ?? 0)
-                hasMatchingSku = true
             }
 
-            if (hasMatchingSku) tiendas.add(tienda.id_cliente)
+            tiendas.add(tienda.id_cliente)
         }
     }
 
@@ -191,6 +184,8 @@ function openChainConfig() {
     <!-- ── Paneles y Modales ────────────────────────────────────────────── -->
     <CpfrExportPanel
       v-if="showExportPanel"
+      :key="store.activeTab"
+      :tab="store.activeTab"
       @close="showExportPanel = false"
     />
 

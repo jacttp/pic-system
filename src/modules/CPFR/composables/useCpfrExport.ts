@@ -1,6 +1,7 @@
 // src/modules/CPFR/composables/useCpfrExport.ts
 import * as XLSX from 'xlsx';
 import logoUrl from '@/assets/logo.png'
+import { cpfrSkuFinalPieces } from './useCpfrVisibility'
 
 const DAY_MAP: Record<number, string> = {
     1: 'LU',
@@ -29,6 +30,7 @@ export interface ExportRow {
     cobertura_calculada: number | null
     upc: string           // upc_cadena
     desc: string          // JUST sku_nombre
+    estado_oc?: string | null
 }
 
 export interface ExportTiendaItem {
@@ -58,6 +60,11 @@ function splitIdCliente(id_cliente: string): { cliente: string; sucursal: string
     }
 }
 
+function normalizeOrderState(value: unknown): string | null {
+    const state = String(value ?? '').trim().toLowerCase()
+    return state || null
+}
+
 function formatDateToAAAAMMDD(dateStr: string | null | undefined): string {
     if (!dateStr) return ''
     return dateStr.slice(0, 10).replace(/-/g, '')
@@ -65,7 +72,7 @@ function formatDateToAAAAMMDD(dateStr: string | null | undefined): string {
 
 function calcularCoberturaDinamica(sku: any): number | null {
     if (!sku || !sku.promedio_sellout_kg || sku.promedio_sellout_kg <= 0) return null
-    const qtyPz = sku.pedido_sugerido_pz_red || 0
+    const qtyPz = cpfrSkuFinalPieces(sku)
     const invKg = sku.inv_actual_kg || 0
     const unInv = sku.unidad_inventario || 0
     const promKg = sku.promedio_sellout_kg
@@ -255,31 +262,35 @@ export function buildExportItems(dias: any[]): ExportTiendaItem[] {
             for (const [num_pedido, skus] of Object.entries(groups) as [string, any[]][]) {
                 const { cliente, sucursal } = splitIdCliente(tienda.id_cliente)
 
-                const rows: ExportRow[] = skus.map(sku => ({
-                    sku_key: String(sku.oc_id ?? sku.sku_muliix ?? sku.sku_cadena ?? sku.upc_cadena ?? sku.sku_nombre ?? ''),
-                    cliente,
-                    nombre: tienda.nombre_tienda,
-                    sucursal,
-                    jefatura: tienda.jefatura || null,
-                    semana_ic: sku.semana_ic || null,
-                    fec_pedido_cadena: formatDateToAAAAMMDD(sku.fec_pedido_cadena),
-                    fec_fin_embarque: formatDateToAAAAMMDD(sku.fec_fin_embarque),
-                    num_pedido: sku.num_pedido || '',
-                    cant_pedida: sku.pedido_sugerido_pz_red ?? 0,
-                    pedido_kg: (sku.pedido_sugerido_pz_red ?? 0) * (sku.unidad_inventario ?? 0),
-                    inv_actual_pz: sku.inv_actual_pz ?? 0,
-                    promedio_sellout_pz: sku.promedio_sellout_pz ?? 0,
-                    cobertura_calculada: calcularCoberturaDinamica(sku),
-                    upc: sku.upc_cadena || '',
-                    desc: sku.sku_nombre || ''
-                }))
+                const rows: ExportRow[] = skus.map(sku => {
+                    const finalPieces = cpfrSkuFinalPieces(sku)
+                    return {
+                        sku_key: String(sku.oc_id ?? sku.sku_muliix ?? sku.sku_cadena ?? sku.upc_cadena ?? sku.sku_nombre ?? ''),
+                        cliente,
+                        nombre: tienda.nombre_tienda,
+                        sucursal,
+                        jefatura: tienda.jefatura || null,
+                        semana_ic: sku.semana_ic || null,
+                        fec_pedido_cadena: formatDateToAAAAMMDD(sku.fec_pedido_cadena),
+                        fec_fin_embarque: formatDateToAAAAMMDD(sku.fec_fin_embarque),
+                        num_pedido: sku.num_pedido || '',
+                        cant_pedida: finalPieces,
+                        pedido_kg: finalPieces * (sku.unidad_inventario ?? 0),
+                        inv_actual_pz: sku.inv_actual_pz ?? 0,
+                        promedio_sellout_pz: sku.promedio_sellout_pz ?? 0,
+                        cobertura_calculada: calcularCoberturaDinamica(sku),
+                        upc: sku.upc_cadena || '',
+                        desc: sku.sku_nombre || '',
+                        estado_oc: normalizeOrderState(sku.estado_oc ?? sku.estado ?? sku.estado_pedido ?? tienda.estado_pedido)
+                    }
+                })
 
                 items.push({
                     id_cliente: tienda.id_cliente,
                     nombre_tienda: tienda.nombre_tienda,
                     jefatura: tienda.jefatura || null,
                     num_pedido,
-                    estado_oc: skus[0]?.estado_oc || null,
+                    estado_oc: normalizeOrderState(skus[0]?.estado_oc ?? skus[0]?.estado ?? skus[0]?.estado_pedido ?? tienda.estado_pedido),
                     semana_ic: skus[0]?.semana_ic || null,
                     anio: skus[0]?.fec_pedido_cadena ? parseInt(skus[0].fec_pedido_cadena.slice(0, 4)) : null,
                     dayNum: dia.dia_num,

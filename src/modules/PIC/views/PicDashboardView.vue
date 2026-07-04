@@ -153,14 +153,14 @@ const handleExportConfirm = async (config: any) => {
 </script>
 
 <template>
-    <div class="flex h-screen overflow-hidden bg-slate-100">
+    <div class="flex h-full min-h-0 overflow-hidden bg-slate-100">
         
         <PicExportModal 
             v-model="showExportModal" 
             @export="handleExportConfirm"
         />
 
-        <div class="flex-1 flex flex-col relative overflow-hidden">
+        <div class="flex-1 flex min-h-0 flex-col relative overflow-hidden">
             
             <!-- Overlay de carga -->
             <div 
@@ -181,7 +181,7 @@ const handleExportConfirm = async (config: any) => {
                 <CacheProgress />
             </header>
 
-            <main class="flex-1 overflow-y-auto p-8 relative">
+            <main class="min-h-0 flex-1 overflow-y-auto p-8 relative">
                 
                 <div v-if="!isReportActive" class="flex h-full items-center justify-center">
                     <div class="text-center max-w-lg">

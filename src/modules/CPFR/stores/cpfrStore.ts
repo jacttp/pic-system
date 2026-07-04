@@ -475,6 +475,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         const nextTotal = base + nextAdjustment
 
         if (nextTotal < 0) return { ok: false, message: 'El pedido no puede quedar en negativo.' }
+        if (nextTotal > base) return { ok: false, message: 'El ajuste no puede superar el pedido base.' }
 
         const approvalId = await resolveApprovalIdForSku(id_cliente, sku, 'PENDING')
         if (!approvalId) {

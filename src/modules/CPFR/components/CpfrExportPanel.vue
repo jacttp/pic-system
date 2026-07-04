@@ -4,15 +4,21 @@ import { ref, computed, watch } from 'vue'
 import { useCpfrStore } from '../stores/cpfrStore'
 import { useCpfrExport, buildExportItems } from '../composables/useCpfrExport'
 import type { ExportRow, ExportTiendaItem } from '../composables/useCpfrExport'
-import type { CpfrDiaDash, CpfrSkuDash } from '../types/cpfrTypes'
+import type { CpfrDiaDash } from '../types/cpfrTypes'
+import { buildVisibleCpfrDias, normalizeCpfrOrderState } from '../composables/useCpfrVisibility'
 import { toast } from '@/components/ui/toast/use-toast'
 
 const emit = defineEmits<{
     (e: 'close'): void
 }>()
 
+const props = defineProps<{
+    tab?: string
+}>()
+
 const store = useCpfrStore()
 const { generateExcel, generateStorePdfs } = useCpfrExport()
+const panelTab = computed(() => props.tab || store.activeTab)
 
 // ── Day Labels ────────────────────────────────────────────────────────────────
 const DAY_LABELS: Record<number, string> = { 1: 'L', 2: 'M', 3: 'X', 4: 'J', 5: 'V', 6: 'S', 7: 'D' }
@@ -20,12 +26,16 @@ const DAY_NAMES: Record<number, string>  = { 1: 'Lunes', 2: 'Martes', 3: 'Miérc
 const DAY_CODES: Record<number, string>  = { 1: 'LU', 2: 'MA', 3: 'MI', 4: 'JU', 5: 'VI', 6: 'SA', 7: 'DO' }
 
 // ── Multi-Day Selection ───────────────────────────────────────────────────────
-const sourceDias = computed<CpfrDiaDash[]>(() =>
-    store.activeTab === 'historial' ? store.historialDias : store.dias
-)
+const visibleDias = computed<CpfrDiaDash[]>(() => buildVisibleCpfrDias({
+    activeTab: panelTab.value,
+    dias: store.dias,
+    historialDias: store.historialDias,
+    statusFilters: store.statusFilters,
+    criterioGlobal: store.criterio_global,
+}))
 
 const availableDays = computed(() => {
-    const nums = [...new Set(sourceDias.value.map(d => d.dia_num))].sort()
+    const nums = [...new Set(visibleDias.value.map(d => d.dia_num))].sort()
     return nums.map(n => ({ num: n, label: DAY_LABELS[n] || String(n), name: DAY_NAMES[n] || `Día ${n}` }))
 })
 
@@ -68,107 +78,6 @@ function toggleDay(num: number) {
 // ── Filters & Search ──────────────────────────────────────────────────────────
 const search = ref('')
 
-function getISOContext(date: Date) {
-    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-    const dayNum = d.getUTCDay() || 7
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum)
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
-    const week = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
-    return { year: d.getUTCFullYear(), week }
-}
-
-function calcularCoberturaDinamica(sku: CpfrSkuDash): number | null {
-    if (!sku || !sku.promedio_sellout_kg || sku.promedio_sellout_kg <= 0) return null
-    const qtyPz = sku.pedido_sugerido_pz_red || 0
-    const invKg = sku.inv_actual_kg || 0
-    const unInv = sku.unidad_inventario || 0
-    const promKg = sku.promedio_sellout_kg
-    return ((qtyPz * unInv) + invKg) / promKg
-}
-
-function calcularFillRateDinamico(sku: CpfrSkuDash): number | null {
-    if (!sku || !sku.cant_pedida || sku.cant_pedida <= 0) return null
-    const sugerido = sku.pedido_sugerido_pz_red || 0
-    return sugerido / sku.cant_pedida
-}
-
-function esSinSellout(sku: CpfrSkuDash): boolean {
-    return !sku.promedio_sellout_kg || sku.promedio_sellout_kg <= 0
-}
-
-function coberturaStatus(sku: CpfrSkuDash): 'ok' | 'bajo' | 'sobre' | 'sin_datos' {
-    if (esSinSellout(sku)) return 'sin_datos'
-    const cob = calcularCoberturaDinamica(sku)
-    if (cob === null) return 'sin_datos'
-    const crit = sku.semanas_objetivo || store.criterio_global || 2.5
-    if (cob < crit) return 'bajo'
-    if (cob > crit + 0.5) return 'sobre'
-    return 'ok'
-}
-
-function shouldIncludeSkuByTableTab(sku: CpfrSkuDash): boolean {
-    const sf = store.statusFilters
-    const today = new Date()
-    const curr = getISOContext(today)
-    const last = getISOContext(new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000))
-    const skuYear = sku.fec_pedido_cadena ? parseInt(sku.fec_pedido_cadena.slice(0, 4)) : 0
-    const skuWeek = sku.semana_ic ? parseInt(sku.semana_ic) : 0
-    const isCurrentWeek = skuYear === curr.year && skuWeek === curr.week
-    const isPreviousWeek = skuYear === last.year && skuWeek === last.week
-    const state = sku.estado_oc
-
-    if (store.activeTab === 'centralizados') {
-        const isPending = state === 'pendiente' || state === 'borrador' || !state
-        const isFocus = isCurrentWeek || (isPreviousWeek && isPending)
-        if (!isFocus || state === 'revision' || state === 'aprobado') return false
-    } else if (store.activeTab === 'revision') {
-        if ((!isCurrentWeek && !isPreviousWeek) || state !== 'revision') return false
-    } else if (store.activeTab === 'aprobada') {
-        if ((!isCurrentWeek && !isPreviousWeek) || state !== 'aprobado') return false
-    } else if (store.activeTab === 'sin_embarcar') {
-        if (state !== 'cerrado') return false
-    } else if (store.activeTab === 'historial') {
-        if (isCurrentWeek || isPreviousWeek) return false
-    }
-
-    if (sf.searchOC) {
-        const term = sf.searchOC.toLowerCase()
-        const num = (sku.num_pedido || '').toLowerCase()
-        if (!num.includes(term)) return false
-    }
-
-    const hasStatusFilter = sf.escenarioA || sf.escenarioB || sf.sinSellout || sf.desabasto ||
-        sf.bajoStock || sf.sobrestock || sf.fillrateBajo || sf.fillrate100 || sf.sobrepedido
-
-    if (!hasStatusFilter) return true
-
-    const fr = calcularFillRateDinamico(sku)
-    const cobStatus = coberturaStatus(sku)
-
-    if (sf.escenarioA && sku.escenario === 'A') return true
-    if (sf.escenarioB && sku.escenario === 'B') return true
-    if (sf.sinSellout && esSinSellout(sku)) return true
-    if (sf.bajoStock && cobStatus === 'bajo') return true
-    if (sf.sobrestock && cobStatus === 'sobre') return true
-    if (sf.fillrateBajo && fr !== null && fr < 0.999) return true
-    if (sf.fillrate100 && fr !== null && Math.abs(fr - 1) < 0.001) return true
-    if (sf.sobrepedido && fr !== null && fr > 1.001) return true
-    if (sf.desabasto && sku.inv_actual_pz <= 0) return true
-
-    return false
-}
-
-const visibleDias = computed<CpfrDiaDash[]>(() => {
-    return sourceDias.value.map(dia => {
-        const tiendas = dia.tiendas.map(tienda => {
-            const skus = tienda.skus.filter(shouldIncludeSkuByTableTab)
-            return { ...tienda, skus }
-        }).filter(tienda => tienda.skus.length > 0)
-
-        return { ...dia, tiendas }
-    }).filter(dia => dia.tiendas.length > 0)
-})
-
 // All flat items
 const allItems = computed<ExportTiendaItem[]>(() => buildExportItems(visibleDias.value))
 
@@ -196,25 +105,36 @@ function toggleWeek(weekKey: string) {
 const filteredItems = computed<ExportTiendaItem[]>(() => {
     const term = search.value.trim().toLowerCase()
 
-    return allItems.value.filter(i => {
+    return allItems.value.map(i => {
+        const rows = panelTab.value === 'aprobada'
+            ? i.rows.filter(row => normalizeCpfrOrderState(row.estado_oc) === 'aprobado')
+            : i.rows
+        if (!rows.length) return null
+
         // Week Filter
         if (selectedWeeks.value.size > 0 && i.anio && i.semana_ic) {
-            if (!selectedWeeks.value.has(`${i.anio}-${i.semana_ic}`)) return false
+            if (!selectedWeeks.value.has(`${i.anio}-${i.semana_ic}`)) return null
         }
 
         // Day Filter
-        if (!selectedDays.value.has(i.dayNum)) return false
+        if (!selectedDays.value.has(i.dayNum)) return null
 
         // Search Filter
         if (term) {
-            return (
+            const matches = (
                 i.nombre_tienda.toLowerCase().includes(term) ||
                 (i.num_pedido ?? '').toLowerCase().includes(term) ||
                 i.id_cliente.toLowerCase().includes(term)
             )
+            if (!matches) return null
         }
-        return true
-    })
+
+        return {
+            ...i,
+            estado_oc: rows[0]?.estado_oc || i.estado_oc,
+            rows
+        }
+    }).filter((i): i is ExportTiendaItem => i !== null)
 })
 
 // ── Exclusion logic ───────────────────────────────────────────────────────────
@@ -290,7 +210,7 @@ function toggleExpandStore(id_cliente: string) {
 }
 
 // Reset exclusions when multi-filters change
-watch([selectedDays, search, selectedWeeks, () => store.activeTab, () => JSON.stringify(store.statusFilters)], () => {
+watch([selectedDays, search, selectedWeeks, () => panelTab.value, () => JSON.stringify(store.statusFilters)], () => {
     excludedStores.value = new Set()
     excludedOCs.value     = new Set()
     excludedSKUs.value    = new Set()
@@ -304,7 +224,10 @@ const includedItems = computed(() => {
         if (excludedOCs.value.has(itemKey(i))) return null
 
         // Filter SKU rows
-        const filteredRows = i.rows.filter(r => !excludedSKUs.value.has(skuKey(i, r)))
+        const filteredRows = i.rows.filter(r =>
+            !excludedSKUs.value.has(skuKey(i, r))
+            && (panelTab.value !== 'aprobada' || normalizeCpfrOrderState(r.estado_oc) === 'aprobado')
+        )
         if (filteredRows.length === 0) return null
 
         return {
@@ -366,8 +289,8 @@ const storesMap = computed(() => {
 // ── Main Combined Action ──────────────────────────────────────────────────────
 const processing = ref(false)
 const pdfProcessing = ref(false)
-const pdfOnlyTabs = computed(() => store.activeTab === 'sin_embarcar' || store.activeTab === 'historial')
-const canApproveExport = computed(() => store.activeTab !== 'aprobada' && !pdfOnlyTabs.value)
+const pdfOnlyTabs = computed(() => panelTab.value === 'sin_embarcar' || panelTab.value === 'historial')
+const canApproveExport = computed(() => panelTab.value !== 'aprobada' && !pdfOnlyTabs.value)
 
 async function handlePdfExport() {
     if (includedItems.value.length === 0) {
