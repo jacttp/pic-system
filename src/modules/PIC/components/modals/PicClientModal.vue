@@ -86,11 +86,11 @@ const toggleSort = (key: SortKey) => {
 };
 
 const sortIcon = (key: SortKey) => {
-    if (sortKey.value !== key) return 'fa-solid fa-sort text-slate-300';
+    if (sortKey.value !== key) return 'fa-solid fa-sort text-pic-text-muted/60';
 
     return sortDirection.value === 'asc'
-        ? 'fa-solid fa-sort-up text-brand-500'
-        : 'fa-solid fa-sort-down text-brand-500';
+        ? 'fa-solid fa-sort-up text-pic-brand'
+        : 'fa-solid fa-sort-down text-pic-brand';
 };
 
 const sortedClientsList = computed(() => {
@@ -129,35 +129,35 @@ const isPageFullySelected = computed(() => {
         size="4xl"
         @close="close"
     >
-        <div class="flex flex-col h-[500px]"> 
+        <div class="flex h-[500px] flex-col"> 
             
-            <div class="mb-4 relative shrink-0">
-                <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+            <div class="relative mb-4 shrink-0">
+                <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-xs text-pic-text-muted"></i>
                 <input 
                     v-model="searchTerm"
                     type="text" 
                     placeholder="Buscar por ID, Nombre, Cadena..." 
-                    class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none text-xs transition-all"
+                    class="w-full rounded-lg border border-pic-border bg-pic-muted-surface py-2 pl-9 pr-4 text-xs text-pic-text-main outline-none transition-all placeholder:text-pic-text-muted focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border"
                     autofocus
                 >
             </div>
 
-            <div class="flex-1 overflow-y-auto border border-slate-200 rounded-lg relative">
+            <div class="relative flex-1 overflow-y-auto rounded-lg border border-pic-border">
                 
-                <div v-if="isLoading" class="absolute inset-0 bg-white/80 z-20 flex items-center justify-center backdrop-blur-sm">
+                <div v-if="isLoading" class="absolute inset-0 z-20 flex items-center justify-center bg-pic-surface/80 backdrop-blur-sm">
                     <div class="flex flex-col items-center gap-2">
-                        <i class="fa-solid fa-circle-notch fa-spin text-brand-600 text-2xl"></i>
-                        <span class="text-xs text-slate-500 font-medium">Cargando clientes...</span>
+                        <i class="fa-solid fa-circle-notch fa-spin text-2xl text-pic-brand"></i>
+                        <span class="text-xs font-medium text-pic-text-muted">Cargando clientes...</span>
                     </div>
                 </div>
 
-                <table class="w-full text-xs text-left border-collapse table-fixed">
-                    <thead class="bg-brand-50/50 text-brand-600 uppercase font-bold sticky top-0 z-10 backdrop-blur-sm border-b border-brand-100">
+                <table class="w-full table-fixed border-collapse text-left text-xs">
+                    <thead class="sticky top-0 z-10 border-b border-pic-brand-border bg-pic-brand-soft/70 font-bold uppercase text-pic-brand backdrop-blur-sm">
                         <tr>
                             <th class="px-2 py-3 w-10 text-center">
                                 <input 
                                     type="checkbox" 
-                                    class="rounded border-brand-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
+                                    class="cursor-pointer rounded border-pic-brand-border text-pic-brand focus:ring-pic-brand"
                                     :checked="isPageFullySelected"
                                     @change="toggleSelectAllPage"
                                 >
@@ -166,7 +166,7 @@ const isPageFullySelected = computed(() => {
                             <th class="px-2 py-3 w-24">
                                 <button
                                     type="button"
-                                    class="flex items-center gap-1.5 text-left hover:text-brand-700 transition-colors"
+                                    class="flex items-center gap-1.5 text-left transition-colors hover:text-pic-text-main"
                                     @click="toggleSort('Matriz')"
                                 >
                                     Matriz <i :class="sortIcon('Matriz')"></i>
@@ -175,7 +175,7 @@ const isPageFullySelected = computed(() => {
                             <th class="px-2 py-3 w-28">
                                 <button
                                     type="button"
-                                    class="flex items-center gap-1.5 text-left hover:text-brand-700 transition-colors"
+                                    class="flex items-center gap-1.5 text-left transition-colors hover:text-pic-text-main"
                                     @click="toggleSort('Cadena')"
                                 >
                                     Cadena <i :class="sortIcon('Cadena')"></i>
@@ -184,7 +184,7 @@ const isPageFullySelected = computed(() => {
                             <th class="px-2 py-3 w-64">
                                 <button
                                     type="button"
-                                    class="flex items-center gap-1.5 text-left hover:text-brand-700 transition-colors"
+                                    class="flex items-center gap-1.5 text-left transition-colors hover:text-pic-text-main"
                                     @click="toggleSort('NOM_CLIENTE')"
                                 >
                                     Nombre <i :class="sortIcon('NOM_CLIENTE')"></i>
@@ -196,50 +196,50 @@ const isPageFullySelected = computed(() => {
                         </tr>
                     </thead>
                     
-                    <tbody class="divide-y divide-slate-100">
+                    <tbody class="divide-y divide-pic-border">
                         <tr 
                             v-for="client in sortedClientsList" 
                             :key="client.IDCLIENTE"
-                            class="hover:bg-slate-50 transition-colors cursor-pointer group"
-                            :class="{'bg-brand-50/40': store.selectedClients.has(client.IDCLIENTE)}"
+                            class="group cursor-pointer transition-colors hover:bg-pic-muted-surface"
+                            :class="{'bg-pic-brand-soft/50': store.selectedClients.has(client.IDCLIENTE)}"
                             @click="store.toggleClientSelection(client.IDCLIENTE, client.NOM_CLIENTE)"
                         >
                             <td class="px-2 py-2 text-center" @click.stop>
                                 <input 
                                     type="checkbox" 
-                                    class="rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
+                                    class="cursor-pointer rounded border-pic-border text-pic-brand focus:ring-pic-brand"
                                     :checked="store.selectedClients.has(client.IDCLIENTE)"
                                     @change="store.toggleClientSelection(client.IDCLIENTE, client.NOM_CLIENTE)"
                                 >
                             </td>
                             
-                            <td class="px-2 py-2 font-mono text-slate-500 truncate" :title="client.IDCLIENTE">
+                            <td class="truncate px-2 py-2 font-mono text-pic-text-muted" :title="client.IDCLIENTE">
                                 {{ client.IDCLIENTE }}
                             </td>
-                            <td class="px-2 py-2 text-slate-600 truncate" :title="client.Matriz">
+                            <td class="truncate px-2 py-2 text-pic-text-muted" :title="client.Matriz">
                                 {{ client.Matriz || '-' }}
                             </td>
-                            <td class="px-2 py-2 text-slate-600 truncate" :title="client.Cadena">
+                            <td class="truncate px-2 py-2 text-pic-text-muted" :title="client.Cadena">
                                 {{ client.Cadena || '-' }}
                             </td>
-                            <td class="px-2 py-2 font-semibold text-slate-700 truncate" :title="client.NOM_CLIENTE">
+                            <td class="truncate px-2 py-2 font-semibold text-pic-text-main" :title="client.NOM_CLIENTE">
                                 {{ client.NOM_CLIENTE }}
                             </td>
-                            <td class="px-2 py-2 text-slate-600 truncate" :title="client.formatocte">
+                            <td class="truncate px-2 py-2 text-pic-text-muted" :title="client.formatocte">
                                 {{ client.formatocte || '-' }}
                             </td>
-                            <td class="px-2 py-2 text-slate-600 truncate" :title="client.TipoCLI">
+                            <td class="truncate px-2 py-2 text-pic-text-muted" :title="client.TipoCLI">
                                 {{ client.TipoCLI || '-' }}
                             </td>
                             <td class="px-2 py-2">
-                                <span class="truncate block text-slate-500" :title="client.EST2017">
+                                <span class="block truncate text-pic-text-muted" :title="client.EST2017">
                                     {{ client.EST2017 || '-' }}
                                 </span>
                             </td>
                         </tr>
                         
                         <tr v-if="sortedClientsList.length === 0 && !isLoading">
-                            <td colspan="8" class="px-4 py-12 text-center text-slate-400 flex flex-col items-center justify-center w-full">
+                            <td colspan="8" class="flex w-full flex-col items-center justify-center px-4 py-12 text-center text-pic-text-muted">
                                 <i class="fa-regular fa-folder-open text-2xl mb-2 opacity-50"></i>
                                 <span>No se encontraron resultados.</span>
                             </td>
@@ -248,13 +248,13 @@ const isPageFullySelected = computed(() => {
                 </table>
             </div>
 
-            <div class="mt-4 flex justify-between items-center pt-2 border-t border-slate-100 shrink-0">
-                <div class="text-xs text-slate-500 flex items-center gap-2">
-                    <span class="font-bold text-brand-600 text-sm">{{ store.selectedClients.size }}</span> seleccionados
+            <div class="mt-4 flex shrink-0 items-center justify-between border-t border-pic-border pt-2">
+                <div class="flex items-center gap-2 text-xs text-pic-text-muted">
+                    <span class="text-sm font-bold text-pic-brand">{{ store.selectedClients.size }}</span> seleccionados
                     <button 
                         v-if="store.selectedClients.size > 0" 
                         @click="store.clearSelectedClients"
-                        class="text-red-500 hover:text-red-700 hover:underline ml-2 font-medium"
+                        class="ml-2 font-medium text-pic-danger hover:underline"
                     >
                         Borrar todo
                     </button>
@@ -264,17 +264,17 @@ const isPageFullySelected = computed(() => {
                     <button 
                         @click="changePage(currentPage - 1)" 
                         :disabled="currentPage === 1"
-                        class="px-3 py-1 rounded border border-slate-200 text-slate-500 hover:bg-slate-50 text-xs disabled:opacity-50 transition-colors"
+                        class="rounded border border-pic-border px-3 py-1 text-xs text-pic-text-muted transition-colors hover:bg-pic-muted-surface disabled:opacity-50"
                     >
                         <i class="fa-solid fa-chevron-left mr-1"></i> Anterior
                     </button>
-                    <span class="text-xs text-slate-600 font-mono bg-slate-100 px-2 py-1 rounded">
+                    <span class="rounded bg-pic-muted-surface px-2 py-1 font-mono text-xs text-pic-text-main">
                         {{ currentPage }} / {{ totalPages }}
                     </span>
                     <button 
                         @click="changePage(currentPage + 1)" 
                         :disabled="currentPage === totalPages"
-                        class="px-3 py-1 rounded border border-slate-200 text-slate-500 hover:bg-slate-50 text-xs disabled:opacity-50 transition-colors"
+                        class="rounded border border-pic-border px-3 py-1 text-xs text-pic-text-muted transition-colors hover:bg-pic-muted-surface disabled:opacity-50"
                     >
                         Siguiente <i class="fa-solid fa-chevron-right ml-1"></i>
                     </button>
@@ -285,7 +285,7 @@ const isPageFullySelected = computed(() => {
         <template #footer>
             <button 
                 @click="close"
-                class="bg-brand-600 hover:bg-brand-700 text-white px-6 py-2 rounded-lg text-xs font-bold shadow-sm transition-colors uppercase tracking-wide"
+                class="rounded-lg bg-pic-brand px-6 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-sm transition-colors hover:bg-pic-brand/90"
             >
                 Aplicar Selección
             </button>

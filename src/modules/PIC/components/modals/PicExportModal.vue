@@ -34,19 +34,19 @@ const handleExport = () => {
         size="md"
         @close="close"
     >
-        <div class="space-y-5 p-2 text-sm text-slate-700">
+        <div class="space-y-5 p-2 text-sm text-pic-text-main">
             <!-- Título Principal -->
             <div>
-                <label class="block font-bold text-[11px] uppercase tracking-wider text-slate-500 mb-1.5 ml-1">
+                <label class="mb-1.5 ml-1 block text-[11px] font-bold uppercase tracking-wider text-pic-text-muted">
                     Título del Reporte
                 </label>
                 <div class="relative">
-                    <i class="fa-solid fa-heading absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <i class="fa-solid fa-heading absolute left-3 top-1/2 -translate-y-1/2 text-xs text-pic-text-muted"></i>
                     <input 
                         v-model="config.title" 
                         type="text" 
                         placeholder="Ej: Reporte Operativo Mensual"
-                        class="w-full border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all shadow-sm"
+                        class="w-full rounded-xl border border-pic-border bg-pic-surface py-2.5 pl-9 pr-3 text-sm text-pic-text-main shadow-sm outline-none transition-all focus:border-pic-brand focus:ring-1 focus:ring-pic-brand"
                     />
                 </div>
             </div>
@@ -54,71 +54,71 @@ const handleExport = () => {
             <div class="grid grid-cols-2 gap-4">
                 <!-- Tamaño -->
                 <div>
-                    <label class="block font-bold text-[11px] uppercase tracking-wider text-slate-500 mb-1.5 ml-1">
+                    <label class="mb-1.5 ml-1 block text-[11px] font-bold uppercase tracking-wider text-pic-text-muted">
                         Tamaño de Hoja
                     </label>
                     <div class="relative">
-                        <select v-model="config.format" class="w-full border border-slate-300 rounded-xl pl-3 pr-8 py-2.5 text-sm bg-white focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none appearance-none cursor-pointer shadow-sm">
+                        <select v-model="config.format" class="w-full cursor-pointer appearance-none rounded-xl border border-pic-border bg-pic-surface py-2.5 pl-3 pr-8 text-sm text-pic-text-main shadow-sm outline-none focus:border-pic-brand focus:ring-1 focus:ring-pic-brand">
                             <option value="a4">A4 (Estándar)</option>
                             <option value="letter">Carta (Letter)</option>
                             <option value="legal">Oficio (Legal)</option>
                         </select>
-                        <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none"></i>
+                        <i class="fa-solid fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-pic-text-muted"></i>
                     </div>
                 </div>
 
                 <!-- Orientación -->
                 <div>
-                    <label class="block font-bold text-[11px] uppercase tracking-wider text-slate-500 mb-1.5 ml-1">
+                    <label class="mb-1.5 ml-1 block text-[11px] font-bold uppercase tracking-wider text-pic-text-muted">
                         Orientación
                     </label>
                     <div class="relative">
-                        <select v-model="config.orientation" class="w-full border border-slate-300 rounded-xl pl-3 pr-8 py-2.5 text-sm bg-white focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none appearance-none cursor-pointer shadow-sm">
+                        <select v-model="config.orientation" class="w-full cursor-pointer appearance-none rounded-xl border border-pic-border bg-pic-surface py-2.5 pl-3 pr-8 text-sm text-pic-text-main shadow-sm outline-none focus:border-pic-brand focus:ring-1 focus:ring-pic-brand">
                             <option value="landscape">Horizontal (Ideal)</option>
                             <option value="portrait">Vertical</option>
                         </select>
-                        <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none"></i>
+                        <i class="fa-solid fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-pic-text-muted"></i>
                     </div>
                 </div>
             </div>
 
             <!-- Márgenes -->
             <div>
-                <label class="block font-bold text-[11px] uppercase tracking-wider text-slate-500 mb-1.5 ml-1">
+                <label class="mb-1.5 ml-1 block text-[11px] font-bold uppercase tracking-wider text-pic-text-muted">
                     Márgenes Laterales
                 </label>
                 <div class="relative">
-                    <select v-model="config.margin" class="w-full border border-slate-300 rounded-xl pl-3 pr-8 py-2.5 text-sm bg-white focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none appearance-none cursor-pointer shadow-sm">
+                    <select v-model="config.margin" class="w-full cursor-pointer appearance-none rounded-xl border border-pic-border bg-pic-surface py-2.5 pl-3 pr-8 text-sm text-pic-text-main shadow-sm outline-none focus:border-pic-brand focus:ring-1 focus:ring-pic-brand">
                         <option value="estandar">Amplios (12mm) - Más elegante</option>
                         <option value="reducido">Reducidos (6mm) - Más contenido</option>
                         <option value="ninguno">Sin Márgenes (0mm) - Borde a borde</option>
                     </select>
-                    <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none"></i>
+                    <i class="fa-solid fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-pic-text-muted"></i>
                 </div>
             </div>
 
             <!-- Ajustes visuales -->
-            <div class="space-y-3 mt-4 bg-slate-50/80 p-4 rounded-xl border border-slate-200 shadow-inner">
-                <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Insignias del Documento</h4>
+            <div class="mt-4 space-y-3 rounded-xl border border-pic-border bg-pic-muted-surface/80 p-4 shadow-inner">
+                <h4 class="mb-1 text-[10px] font-bold uppercase tracking-widest text-pic-text-muted">Insignias del Documento</h4>
                 
-                <label class="flex items-center gap-3 cursor-pointer group">
+                <label class="group flex cursor-pointer items-center gap-3">
                     <div class="relative flex items-center justify-center">
                         <input type="checkbox" v-model="config.showDate" class="peer sr-only">
-                        <div class="w-5 h-5 rounded border-2 border-slate-300 peer-checked:bg-brand-500 peer-checked:border-brand-500 transition-colors"></div>
+                        <div class="h-5 w-5 rounded border-2 border-pic-border transition-colors peer-checked:border-pic-brand peer-checked:bg-pic-brand"></div>
                         <i class="fa-solid fa-check absolute text-white text-xs opacity-0 peer-checked:opacity-100 transition-opacity"></i>
                     </div>
-                    <span class="text-sm font-medium text-slate-600 group-hover:text-slate-800 transition-colors">
+                    <span class="text-sm font-medium text-pic-text-muted transition-colors group-hover:text-pic-text-main">
                         Sellar con fecha de generación
                     </span>
                 </label>
 
-                <label class="flex items-center gap-3 cursor-pointer group">
+                <label class="group flex cursor-pointer items-center gap-3">
                     <div class="relative flex items-center justify-center">
                         <input type="checkbox" v-model="config.showPageNumbers" class="peer sr-only">
-                        <div class="w-5 h-5 rounded border-2 border-slate-300 peer-checked:bg-brand-500 peer-checked:border-brand-500 transition-colors"></div>
+                        <div class="h-5 w-5 rounded border-2 border-pic-border transition-colors peer-checked:border-pic-brand peer-checked:bg-pic-brand"></div>
                         <i class="fa-solid fa-check absolute text-white text-xs opacity-0 peer-checked:opacity-100 transition-opacity"></i>
                     </div>
-                    <span class="text-sm font-medium text-slate-600 group-hover:text-slate-800 transition-colors">
+                    <span class="text-sm font-medium text-pic-text-muted transition-colors group-hover:text-pic-text-main">
                         Incluir números de página en el pie
                     </span>
                 </label>
@@ -126,16 +126,16 @@ const handleExport = () => {
         </div>
 
         <template #footer>
-            <div class="flex justify-end gap-3 w-full pr-2">
+            <div class="flex w-full justify-end gap-3 pr-2">
                 <button 
                     @click="close" 
-                    class="px-5 py-2.5 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 font-bold text-xs uppercase tracking-wide transition-colors"
+                    class="rounded-lg px-5 py-2.5 text-xs font-bold uppercase tracking-wide text-pic-text-muted transition-colors hover:bg-pic-muted-surface hover:text-pic-text-main"
                 >
                     Cancelar
                 </button>
                 <button 
                     @click="handleExport" 
-                    class="bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-brand-500/20 transition-all active:scale-95 flex items-center gap-2"
+                    class="flex items-center gap-2 rounded-xl bg-pic-brand px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-pic-brand/20 transition-all hover:bg-pic-brand/90 active:scale-95"
                 >
                     <i class="fa-solid fa-file-pdf"></i> Imprimir Reporte
                 </button>

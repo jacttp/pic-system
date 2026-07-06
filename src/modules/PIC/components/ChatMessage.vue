@@ -12,9 +12,9 @@ const isUser = computed(() => props.message.role === 'user');
 const isSystem = computed(() => props.message.role === 'system');
 
 const bubbleClass = computed(() => {
-    if (isSystem.value) return 'bg-red-50 text-red-600 border border-red-100 text-center w-full';
-    if (isUser.value) return 'bg-brand-600 text-white self-end rounded-br-none';
-    return 'bg-white border border-slate-200 text-slate-700 self-start rounded-bl-none shadow-sm';
+    if (isSystem.value) return 'w-full border border-pic-danger/25 bg-pic-danger/10 text-center text-pic-danger';
+    if (isUser.value) return 'self-end rounded-br-none bg-pic-brand text-white';
+    return 'self-start rounded-bl-none border border-pic-border bg-pic-surface text-pic-text-main shadow-sm';
 });
 
 // Función para activar la visualización
@@ -26,7 +26,7 @@ const handleVisualize = () => {
 <template>
     <div class="flex flex-col mb-4 max-w-[85%] animate-fade-in" :class="isUser ? 'items-end self-end' : 'items-start self-start'">
         
-        <span v-if="!isSystem" class="text-[10px] text-slate-400 mb-1 px-1">
+        <span v-if="!isSystem" class="mb-1 px-1 text-[10px] text-pic-text-muted">
             {{ isUser ? 'Tú' : 'PIC Assistant' }}
         </span>
 
@@ -38,21 +38,21 @@ const handleVisualize = () => {
             
             <button 
                 @click="handleVisualize"
-                class="group flex items-center gap-3 bg-white border border-brand-200 hover:border-brand-400 hover:shadow-md p-3 rounded-xl transition-all w-full text-left"
+                class="group flex w-full items-center gap-3 rounded-xl border border-pic-brand-border bg-pic-surface p-3 text-left transition-all hover:border-pic-brand hover:shadow-md"
             >
-                <div class="w-10 h-10 rounded-lg bg-brand-50 flex items-center justify-center text-brand-600 group-hover:scale-110 transition-transform">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-pic-brand-soft text-pic-brand transition-transform group-hover:scale-110">
                     <i class="fa-solid fa-chart-column text-lg"></i>
                 </div>
                 <div>
-                    <p class="text-xs font-bold text-slate-700 group-hover:text-brand-700">Visualizar Datos</p>
-                    <p class="text-[10px] text-slate-400">Clic para generar gráfico en el tablero</p>
+                    <p class="text-xs font-bold text-pic-text-main group-hover:text-pic-brand">Visualizar Datos</p>
+                    <p class="text-[10px] text-pic-text-muted">Clic para generar gráfico en el tablero</p>
                 </div>
-                <i class="fa-solid fa-chevron-right text-slate-300 ml-auto group-hover:text-brand-500"></i>
+                <i class="fa-solid fa-chevron-right ml-auto text-pic-text-muted group-hover:text-pic-brand"></i>
             </button>
 
             </div>
         
-        <span class="text-[10px] text-slate-300 mt-1 px-1">
+        <span class="mt-1 px-1 text-[10px] text-pic-text-muted/70">
             {{ message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
         </span>
     </div>

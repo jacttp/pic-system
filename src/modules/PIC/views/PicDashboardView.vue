@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { usePicFilterStore } from '../stores/picFilterStore';
 import PicChat from '../components/PicChat.vue';
 import PicFilters from '../components/PicFilters.vue';
@@ -12,6 +12,109 @@ import CacheProgress from '@/modules/Shared/components/CacheProgress.vue';
 
 const store = usePicFilterStore();
 const isReportActive = ref(false);
+const reportIsActive = computed(() => isReportActive.value || store.hasGeneratedReport || store.reportData.length > 0);
+
+const selectedYears = computed(() => [...store.selected.Anio].sort());
+const currentYear = computed(() => selectedYears.value[selectedYears.value.length - 1] || String(new Date().getFullYear()));
+const previousYear = computed(() => selectedYears.value.length > 1 ? selectedYears.value[selectedYears.value.length - 2] : null);
+
+const reportUpdatedAt = computed(() => {
+    return new Intl.DateTimeFormat('es-MX', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    }).format(new Date());
+});
+
+const compactCurrency = (value: number) => {
+    const abs = Math.abs(value);
+    const sign = value < 0 ? '-' : '';
+    if (abs >= 1_000_000_000) return `${sign}$${(abs / 1_000_000_000).toFixed(2)}B`;
+    if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`;
+    if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}K`;
+    return `${sign}$${abs.toFixed(0)}`;
+};
+
+const compactKg = (value: number) => {
+    const abs = Math.abs(value);
+    const sign = value < 0 ? '-' : '';
+    if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toFixed(2)}M KG`;
+    if (abs >= 1_000) return `${sign}${(abs / 1_000).toFixed(1)}K KG`;
+    return `${sign}${abs.toFixed(0)} KG`;
+};
+
+const mobileKpis = computed(() => {
+    const current = currentYear.value;
+    const previous = previousYear.value;
+    const totals = store.reportData.reduce((acc, item) => {
+        const year = String(item.Año ?? item['Año'] ?? item['AÃ±o'] ?? item.Anio ?? item.anio ?? '');
+        if (!acc[year]) acc[year] = { sales: 0, metaKg: 0, kg: 0 };
+        acc[year].sales += Number(item.TotalVentaPesos || 0);
+        acc[year].metaKg += Number(item.TotalMetasKG || 0);
+        acc[year].kg += Number(item.TotalVentaKG || 0);
+        return acc;
+    }, {} as Record<string, { sales: number; metaKg: number; kg: number }>);
+
+    const currentSales = totals[current]?.sales || 0;
+    const previousSales = previous ? totals[previous]?.sales || 0 : 0;
+    const diff = currentSales - previousSales;
+    const growth = previousSales ? (diff / previousSales) * 100 : 0;
+    const currentKg = totals[current]?.kg || 0;
+    const currentMeta = totals[current]?.metaKg || 0;
+    const compliance = currentMeta ? (currentKg / currentMeta) * 100 : 0;
+    const previousKg = previous ? totals[previous]?.kg || 0 : 0;
+    const kgDiff = currentKg - previousKg;
+    const kgGrowth = previousKg ? (kgDiff / previousKg) * 100 : 0;
+    const currentAverage = currentKg ? currentSales / currentKg : 0;
+    const previousAverage = previous && previousKg ? previousSales / previousKg : 0;
+    const averageDiff = currentAverage - previousAverage;
+    const averageGrowth = previousAverage ? (averageDiff / previousAverage) * 100 : 0;
+
+    return [
+        {
+            label: `Detalle Volumen ${current}`,
+            value: compactKg(currentKg),
+            icon: 'fa-weight-scale',
+            tone: 'blue',
+            detail: previous ? `${kgGrowth >= 0 ? '+' : '-'} ${Math.abs(kgGrowth).toFixed(1)}% vs ${previous}` : 'Sin comparativo',
+            positive: kgGrowth >= 0
+        },
+        {
+            label: `Facturacion Total ${current}`,
+            value: compactCurrency(currentSales),
+            icon: 'fa-chart-simple',
+            tone: 'purple',
+            detail: previous ? `${growth >= 0 ? '↑' : '↓'} ${Math.abs(growth).toFixed(1)}% vs ${previous}` : 'Sin comparativo',
+            positive: growth >= 0
+        },
+        {
+            label: `Meta ${current}`,
+            value: `${(currentMeta / 1000).toFixed(1)}K KG`,
+            icon: 'fa-bullseye',
+            tone: 'blue',
+            detail: `${compliance.toFixed(1)}% cumplimiento`,
+            positive: compliance >= 100
+        },
+        {
+            label: 'Diferencia vs periodo',
+            value: compactCurrency(diff),
+            icon: 'fa-arrow-trend-up',
+            tone: 'teal',
+            detail: previous ? `${Math.abs(growth).toFixed(1)}% vs ${previous}` : 'Sin comparativo',
+            positive: diff >= 0
+        },
+        {
+            label: 'Precio Promedio Mensual ($/KG)',
+            value: `$${currentAverage.toFixed(2)}`,
+            icon: 'fa-chart-line',
+            tone: 'teal',
+            detail: previous ? `${averageGrowth >= 0 ? '+' : '-'} ${Math.abs(averageGrowth).toFixed(1)}% vs ${previous}` : 'Sin comparativo',
+            positive: averageGrowth >= 0
+        }
+    ];
+});
 
 const handleGenerate = async () => {
     // Secuenciación: Asegurar que los filtros están cargados ANTES de consultar datos
@@ -41,6 +144,11 @@ const openExportModal = () => {
     showExportModal.value = true;
 };
 
+const getPicCssColor = (token: string, fallback: string) => {
+    const value = getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+    return value ? `hsl(${value})` : fallback;
+};
+
 const handleExportConfirm = async (config: any) => {
     if (!reportContent.value) return;
     
@@ -63,7 +171,7 @@ const handleExportConfirm = async (config: any) => {
             windowWidth: PDF_EXPORT_WIDTH,
             scrollX: 0,
             scrollY: 0,
-            backgroundColor: '#f1f5f9',
+            backgroundColor: getPicCssColor('--pic-background', '#f1f5f9'),
             onclone: (clonedDocument: Document) => {
                 const clonedReport = clonedDocument.querySelector('[data-pic-report-content="true"]') as HTMLElement | null;
                 if (!clonedReport) return;
@@ -153,50 +261,48 @@ const handleExportConfirm = async (config: any) => {
 </script>
 
 <template>
-    <div class="flex h-full min-h-0 overflow-hidden bg-slate-100">
+    <div class="flex h-full min-h-0 overflow-hidden bg-pic-background text-pic-text-main">
         
         <PicExportModal 
             v-model="showExportModal" 
             @export="handleExportConfirm"
         />
 
-        <div class="flex-1 flex min-h-0 flex-col relative overflow-hidden">
+        <div class="relative flex min-h-0 flex-1 flex-col overflow-hidden">
             
             <!-- Overlay de carga -->
             <div 
                 v-if="store.isGenerating" 
-                class="absolute inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex flex-col items-center justify-center transition-all duration-300"
+                class="absolute inset-0 z-50 bg-pic-nav/45 backdrop-blur-sm flex flex-col items-center justify-center transition-all duration-300"
             >
-                <div class="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center max-w-sm text-center">
-                    <i class="fa-solid fa-circle-notch fa-spin text-5xl text-brand-500 mb-4"></i>
-                    <h3 class="text-xl font-bold text-slate-800 mb-2">Generando Análisis...</h3>
-                    <p class="text-sm text-slate-500">Procesando los datos, esto puede tomar unos segundos dependiendo de la carga.</p>
+                <div class="bg-pic-surface border border-pic-border p-8 rounded-2xl shadow-2xl flex flex-col items-center max-w-sm text-center">
+                    <i class="fa-solid fa-circle-notch fa-spin text-5xl text-pic-brand mb-4"></i>
+                    <h3 class="text-xl font-bold text-pic-text-main mb-2">Generando Análisis...</h3>
+                    <p class="text-sm text-pic-text-muted">Procesando los datos, esto puede tomar unos segundos dependiendo de la carga.</p>
                 </div>
             </div>
 
-            <PicFilters v-if="isReportActive" />
-            
-            <header v-else class="h-16 bg-white border-b border-slate-200 flex items-center px-8 justify-between shrink-0">
-                <h1 class="text-xl font-bold text-slate-800">Reporte PIC <span class="text-xs font-normal text-slate-400 ml-2">v2.1</span></h1>
+            <header v-if="!reportIsActive" class="h-16 bg-pic-surface border-b border-pic-border flex items-center px-8 justify-between shrink-0">
+                <h1 class="text-xl font-bold text-pic-text-main">Reporte PIC <span class="text-xs font-normal text-pic-text-muted ml-2">v2.1</span></h1>
                 <CacheProgress />
             </header>
 
-            <main class="min-h-0 flex-1 overflow-y-auto p-8 relative">
+            <main class="relative min-h-0 flex-1 overflow-y-auto px-5 py-6 pb-24 md:p-8">
                 
-                <div v-if="!isReportActive" class="flex h-full items-center justify-center">
+                <div v-if="!reportIsActive" class="flex h-full items-center justify-center">
                     <div class="text-center max-w-lg">
-                        <div class="w-20 h-20 bg-white rounded-3xl shadow-sm border border-slate-100 flex items-center justify-center mx-auto mb-6">
-                            <i class="fa-solid fa-chart-pie text-4xl text-brand-500"></i>
+                        <div class="w-20 h-20 bg-pic-surface rounded-3xl shadow-sm border border-pic-border flex items-center justify-center mx-auto mb-6">
+                            <i class="fa-solid fa-chart-pie text-4xl text-pic-brand"></i>
                         </div>
-                        <h2 class="text-2xl font-bold text-slate-800 mb-2">Generador de Reportes</h2>
-                        <p class="text-slate-500 mb-8">
+                        <h2 class="text-2xl font-bold text-pic-text-main mb-2">Generador de Reportes</h2>
+                        <p class="text-pic-text-muted mb-8">
                             Utiliza el panel de filtros o consulta a la IA para visualizar el rendimiento de ventas y metas.
                         </p>
                         
                         <button 
                             @click="handleGenerate"
                             :disabled="store.isGenerating"
-                            class="bg-brand-600 hover:bg-brand-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-brand-500/20 transition-transform active:scale-95 flex items-center gap-2 mx-auto disabled:opacity-70 disabled:cursor-not-allowed disabled:scale-100"
+                            class="bg-pic-brand hover:brightness-95 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-pic-brand/20 transition-transform active:scale-95 flex items-center gap-2 mx-auto disabled:opacity-70 disabled:cursor-not-allowed disabled:scale-100"
                         >
                             <i v-if="store.isGenerating" class="fa-solid fa-circle-notch fa-spin"></i>
                             <i v-else class="fa-solid fa-bolt"></i>
@@ -206,31 +312,63 @@ const handleExportConfirm = async (config: any) => {
                 </div>
 
                 <div v-else class="pb-20">
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-                            <i class="fa-solid fa-chart-pie text-brand-500"></i>
-                            Resultados del Reporte
-                        </h2>
-                        <CacheProgress />
-                        <button 
-                            @click="openExportModal"
-                            :disabled="isExporting"
-                            class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5"
-                            title="Configurar y Exportar PDF"
-                        >
-                            <i v-if="isExporting" class="fa-solid fa-spinner fa-spin text-slate-400"></i>
-                            <i v-else class="fa-solid fa-file-pdf text-brand-500"></i>
-                            {{ isExporting ? 'Generando PDF...' : 'Exportar a PDF' }}
-                        </button>
+                    <div class="mb-5 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-3 md:mb-6 md:flex md:flex-wrap md:items-center md:justify-between md:gap-3">
+                        <div class="min-w-0">
+                            <h2 class="flex items-center gap-2 whitespace-nowrap text-[27px] font-black leading-none tracking-tight text-pic-text-main md:text-lg">
+                                <i class="fa-solid fa-chart-pie hidden text-pic-brand md:inline-block"></i>
+                                <span class="hidden md:inline">Resultados del Reporte</span>
+                                <span class="md:hidden">Reporte PIC</span>
+                            </h2>
+                            <p class="mt-1 whitespace-nowrap text-xs font-medium leading-tight text-pic-text-muted md:hidden">Actualizado: {{ reportUpdatedAt }}</p>
+                        </div>
+                        <div class="pic-report-actions hidden flex-col items-end gap-1.5 md:flex">
+                            <CacheProgress />
+                            <button
+                                @click="openExportModal"
+                                :disabled="isExporting"
+                                class="inline-flex h-9 items-center gap-2 rounded-xl border border-pic-border bg-pic-surface px-4 text-sm font-bold text-pic-text-main shadow-sm transition-all hover:-translate-y-0.5 hover:bg-pic-muted-surface disabled:cursor-not-allowed disabled:opacity-50"
+                                title="Configurar y Exportar PDF"
+                            >
+                                <i v-if="isExporting" class="fa-solid fa-spinner fa-spin text-pic-text-muted"></i>
+                                <i v-else class="fa-solid fa-file-pdf text-pic-brand"></i>
+                                {{ isExporting ? 'Generando PDF...' : 'Exportar a PDF' }}
+                            </button>
+                        </div>
+
+                        <PicFilters class="md:basis-full" />
                     </div>
 
                     <div 
                         ref="reportContent" 
                         data-pic-report-content="true"
-                        class="bg-slate-100 -mx-4 px-4 pb-4"
+                        class="-mx-1 bg-pic-background px-1 pb-4 md:-mx-4 md:px-4"
                         :class="{ 'pic-pdf-export-mode': isExporting }"
                     >
                         <ExecutiveSummaryCard />
+
+                        <div class="mb-5 flex gap-2.5 overflow-x-auto pb-1 [scrollbar-width:none] md:mb-6 md:grid md:grid-cols-5 md:gap-3 md:overflow-visible">
+                            <article
+                                v-for="kpi in mobileKpis"
+                                :key="kpi.label"
+                                class="min-w-[154px] rounded-xl border border-pic-border bg-pic-surface p-3 shadow-sm md:min-w-0 md:p-4"
+                            >
+                                <div class="mb-3 flex items-start gap-2.5 md:mb-4">
+                                    <span
+                                        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg md:h-10 md:w-10"
+                                        :class="{
+                                            'bg-pic-accent-purple-soft text-pic-accent-purple': kpi.tone === 'purple',
+                                            'bg-pic-accent-blue-soft text-pic-accent-blue': kpi.tone === 'blue',
+                                            'bg-pic-accent-teal-soft text-pic-accent-teal': kpi.tone === 'teal'
+                                        }"
+                                    >
+                                        <i class="fa-solid text-sm md:text-base" :class="kpi.icon"></i>
+                                    </span>
+                                    <p class="min-w-0 text-[11px] font-semibold leading-tight text-pic-text-muted md:text-xs">{{ kpi.label }}</p>
+                                </div>
+                                <p class="text-[20px] font-black leading-none tracking-tight text-pic-text-main md:text-2xl">{{ kpi.value }}</p>
+                                <p class="mt-1.5 text-[11px] font-bold leading-tight md:text-xs" :class="kpi.positive ? 'text-pic-success' : 'text-pic-danger'">{{ kpi.detail }}</p>
+                            </article>
+                        </div>
                         
                         <PicGrid />
                     </div>
@@ -239,7 +377,12 @@ const handleExportConfirm = async (config: any) => {
             </main>
         </div>
 
-        <PicChat />
+        <div v-if="reportIsActive" class="2xl:hidden">
+            <PicChat mode="mobile" />
+        </div>
+        <div class="hidden h-full 2xl:block">
+            <PicChat />
+        </div>
 
     </div>
 </template>
@@ -296,5 +439,33 @@ const handleExportConfirm = async (config: any) => {
 
 .pic-pdf-export-mode :deep(button) {
     display: none !important;
+}
+
+.pic-report-actions :deep(.cache-progress-card) {
+    min-height: 0;
+    max-width: 240px;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 4px 8px;
+    border-color: hsl(var(--pic-border));
+    background: transparent;
+    box-shadow: none;
+}
+
+.pic-report-actions :deep(.cache-progress-card > div:first-child i) {
+    font-size: 11px;
+}
+
+.pic-report-actions :deep(.cache-progress-card span) {
+    font-size: 10px;
+    letter-spacing: 0;
+}
+
+.pic-report-actions :deep(.cache-progress-card .text-\[11px\]) {
+    display: none;
+}
+
+.pic-report-actions :deep(.cache-progress-card .w-20) {
+    display: none;
 }
 </style>

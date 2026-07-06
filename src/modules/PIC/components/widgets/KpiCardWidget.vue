@@ -17,20 +17,20 @@ const formattedValue = () => {
 </script>
 
 <template>
-    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-full flex flex-col items-center justify-center text-center relative overflow-hidden group">
-        <div class="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-            <i class="fa-solid fa-chart-line text-6xl text-brand-600"></i>
+    <div class="group relative flex h-full flex-col items-center justify-center overflow-hidden rounded-xl border border-pic-border bg-pic-surface p-6 text-center shadow-sm">
+        <div class="absolute right-0 top-0 p-4 opacity-5 transition-opacity group-hover:opacity-10">
+            <i class="fa-solid fa-chart-line text-6xl text-pic-brand"></i>
         </div>
 
-        <h4 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2 z-10">
+        <h4 class="z-10 mb-2 text-sm font-bold uppercase tracking-wider text-pic-text-muted">
             {{ config.label }}
         </h4>
         
-        <div class="text-4xl md:text-5xl font-black text-slate-800 z-10 mb-2 tracking-tight">
+        <div class="z-10 mb-2 text-4xl font-black tracking-tight text-pic-text-main md:text-5xl">
             {{ formattedValue() }}
         </div>
         
-        <p v-if="config.subtext" class="text-xs text-slate-500 z-10 bg-slate-50 px-2 py-1 rounded-full border border-slate-100">
+        <p v-if="config.subtext" class="z-10 rounded-full border border-pic-border bg-pic-muted-surface px-2 py-1 text-xs text-pic-text-muted">
             {{ config.subtext }}
         </p>
     </div>

@@ -77,7 +77,7 @@ const configKilosMensual = computed(() => {
             label: `Meta ${lastYear}`,
             data: dataKilos.value.slice(start, end).map(d => d[`meta_${lastYear}`]),
             type: 'line' as any,
-            borderColor: '#9333ea', 
+            borderColor: 'hsl(var(--pic-accent-purple))', 
             borderWidth: 2,
             pointRadius: 3,
             backgroundColor: 'transparent',
@@ -130,26 +130,26 @@ const removeWidget = (id: string) => {
 </script>
 
 <template>
-    <div class="space-y-8 pb-20 @container">
+    <div class="space-y-5 pb-20 @container md:space-y-7">
         
-        <div v-if="store.dynamicWidgets.length > 0" class="bg-brand-50/50 rounded-2xl p-6 border border-brand-100 shadow-inner animate-fade-in mb-8">
-            <div class="flex items-center justify-between border-b border-brand-200 pb-3 mb-4">
-                <h3 class="text-sm font-bold text-brand-700 flex items-center gap-2">
-                    <div class="p-1.5 bg-white rounded-md shadow-sm text-brand-600">
+        <div v-if="store.dynamicWidgets.length > 0" class="mb-8 animate-fade-in rounded-2xl border border-pic-brand-border bg-pic-brand-soft/50 p-6 shadow-inner">
+            <div class="mb-4 flex items-center justify-between border-b border-pic-brand-border pb-3">
+                <h3 class="flex items-center gap-2 text-sm font-bold text-pic-brand">
+                    <div class="rounded-md bg-pic-surface p-1.5 text-pic-brand shadow-sm">
                         <i class="fa-solid fa-wand-magic-sparkles"></i>
                     </div>
                     Insights Generados por IA
                 </h3>
-                <button @click="store.clearDynamicWidgets()" class="text-xs font-medium text-slate-500 hover:text-red-500 transition-colors flex items-center gap-1">
+                <button @click="store.clearDynamicWidgets()" class="flex items-center gap-1 text-xs font-medium text-pic-text-muted transition-colors hover:text-pic-danger">
                     <i class="fa-regular fa-trash-can"></i> Limpiar zona
                 </button>
             </div>
 
-            <div class="pic-chart-row grid grid-cols-1 @3xl:grid-cols-2 gap-6">
+            <div class="pic-chart-row grid grid-cols-1 gap-4 xl:grid-cols-2">
                 <div 
                     v-for="widget in store.dynamicWidgets" 
                     :key="widget.id" 
-                    class="pic-chart-cell relative group bg-white rounded-xl shadow-sm border border-slate-200 p-1 transition-all hover:shadow-md"
+                    class="pic-chart-cell group relative rounded-xl border border-pic-border bg-pic-surface p-1 shadow-sm transition-all hover:shadow-md"
                 >
                     <div class="h-80 w-full overflow-hidden rounded-lg"> 
                         
@@ -173,7 +173,7 @@ const removeWidget = (id: string) => {
 
                     <button 
                         @click="removeWidget(widget.id)"
-                        class="absolute top-3 right-3 bg-white text-slate-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg shadow-md border border-slate-100 transition-all opacity-0 group-hover:opacity-100 z-20 scale-90 hover:scale-100"
+                        class="absolute right-3 top-3 z-20 scale-90 rounded-lg border border-pic-border bg-pic-surface p-1.5 text-pic-text-muted opacity-0 shadow-md transition-all hover:scale-100 hover:bg-pic-danger/10 hover:text-pic-danger group-hover:opacity-100"
                         title="Eliminar este elemento"
                     >
                         <i class="fa-solid fa-xmark"></i>
@@ -182,7 +182,24 @@ const removeWidget = (id: string) => {
             </div>
         </div>
 
-       <div class="pic-chart-row grid grid-cols-1 @split:grid-cols-2 gap-6">
+       <div class="pic-chart-row grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div class="pic-chart-cell min-w-0">
+                <PicEChart
+                :option="configKilosAnual"
+                title="Facturación Anual (KG)" />
+            </div>
+            <div class="pic-chart-cell min-w-0">
+                <PicEChart
+                :option="configKilosMensual"
+                title="Venta vs Metas (KG)"
+                :enable-switch="true" />
+            </div>
+        </div>
+        <PicDataTable title="Detalle Volumen (KG)" type="kilos" :processed-data="dataKilos" :years="selectedYears" />
+
+        <div class="my-5 border-t border-pic-border md:my-7"></div>
+
+        <div class="pic-chart-row grid grid-cols-1 gap-4 xl:grid-cols-2">
             <div class="pic-chart-cell min-w-0">
                 <PicEChart
                 :option="configPesosMensual"
@@ -195,26 +212,9 @@ const removeWidget = (id: string) => {
         </div>
         <PicDataTable title="Detalle Facturación ($)" type="pesos" :processed-data="dataPesos" :years="selectedYears" />
 
-        <div class="border-t border-slate-200 my-8"></div>
+        <div class="my-5 border-t border-pic-border md:my-7"></div>
 
-        <div class="pic-chart-row grid grid-cols-1 @split:grid-cols-2 gap-6">
-            <div class="pic-chart-cell min-w-0">
-                <PicEChart
-                :option="configKilosMensual"
-                title="Venta vs Metas (KG)"
-                :enable-switch="true" />
-            </div>
-            <div class="pic-chart-cell min-w-0">
-                <PicEChart :option="configKilosAnual" title="Facturación Anual (KG)" />
-            </div>
-        </div>
-        <PicDataTable title="Detalle Volumen (KG)" type="kilos" 
-        :processed-data="dataKilos" 
-        :years="selectedYears" />
-
-        <div class="border-t border-slate-200 my-8"></div>
-
-        <div class="pic-chart-row grid grid-cols-1 @split:grid-cols-2 gap-6">
+        <div class="pic-chart-row grid grid-cols-1 gap-4 xl:grid-cols-2">
             <div class="pic-chart-cell min-w-0">
                 <PicEChart
                 :option="configPromedioMensual"
@@ -228,7 +228,7 @@ const removeWidget = (id: string) => {
         <PicDataTable title="Detalle Precio Promedio" type="promedio" :processed-data="dataPromedio" :years="selectedYears" />
 
         <div 
-            class="pt-8 border-t-2 border-slate-200 border-dashed mt-12"
+            class="mt-12 border-t-2 border-dashed border-pic-border pt-8"
             :data-html2canvas-ignore="!hasAnyProjectionLoaded ? 'true' : undefined"
         >
             <button 
@@ -236,15 +236,15 @@ const removeWidget = (id: string) => {
                 class="w-full flex justify-between items-center mb-6 group focus:outline-none"
             >
                 <div class="flex items-center gap-2">
-                    <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2 px-1 group-hover:text-brand-600 transition-colors">
-                        <i class="fa-solid fa-layer-group text-brand-500"></i>
+                    <h2 class="flex items-center gap-2 px-1 text-xl font-bold text-pic-text-main transition-colors group-hover:text-pic-brand">
+                        <i class="fa-solid fa-layer-group text-pic-brand"></i>
                         Desglose Operativo
                     </h2>
-                    <span class="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                    <span class="rounded-full border border-pic-border bg-pic-muted-surface px-2 py-0.5 text-xs font-medium text-pic-text-muted">
                         {{ showDesglose ? 'Visible' : 'Oculto' }}
                     </span>
                 </div>
-                <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-brand-50 group-hover:text-brand-600 transition-all">
+                <div class="flex h-8 w-8 items-center justify-center rounded-full bg-pic-muted-surface text-pic-text-muted transition-all group-hover:bg-pic-brand-soft group-hover:text-pic-brand">
                     <i class="fa-solid fa-chevron-down transition-transform duration-300" :class="{'rotate-180': !showDesglose}"></i>
                 </div>
             </button>

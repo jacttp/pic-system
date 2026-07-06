@@ -574,6 +574,8 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       fetchSingleProjection, // Acción nueva
 
       isGenerating,
+      hasGeneratedReport,
+      filtersDirty,
       generateReport,
       filtersReady,
 

@@ -78,30 +78,30 @@ const handleAnalyze = () => {
 </script>
 
 <template>
-    <div class="pic-chart-card bg-white p-4 rounded-xl shadow-sm border border-slate-200 h-full w-full min-w-0 overflow-hidden flex flex-col relative group transition-shadow hover:shadow-md">
+    <div class="pic-chart-card group relative flex h-full w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-pic-border bg-pic-surface p-5 shadow-sm transition-shadow hover:shadow-md md:rounded-xl lg:p-5">
         
-        <div class="flex justify-between items-center mb-4">
-            <div class="flex items-center gap-2">
-                <h3 v-if="title" class="text-sm font-bold text-slate-700 flex items-center gap-2">
-                    <i class="fa-solid fa-chart-simple text-brand-500"></i>
-                    {{ title }}
+        <div class="mb-4 flex items-center justify-between gap-3">
+            <div class="flex min-w-0 items-center gap-2">
+                <h3 v-if="title" class="flex min-w-0 items-center gap-2 text-base font-black text-pic-text-main md:text-[15px] md:font-bold">
+                    <i class="fa-solid fa-chart-simple text-pic-brand"></i>
+                    <span class="truncate">{{ title }}</span>
                 </h3>
             </div>
 
             <div class="flex items-center gap-2">
                 <button 
                     @click="handleAnalyze"
-                    class="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition-all border border-transparent hover:border-brand-200"
+                    class="flex h-7 w-7 items-center justify-center rounded-lg border border-transparent text-pic-text-muted transition-all hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand"
                     title="Analizar este gráfico con IA"
                 >
                     <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
                 </button>
 
-                <div v-if="enableSwitch" class="flex bg-slate-100 rounded-lg p-1 gap-1">
+                <div v-if="enableSwitch" class="flex gap-1 rounded-lg bg-pic-muted-surface p-1">
                     <button 
                         @click="currentType = 'bar'"
                         class="p-1.5 rounded transition-all text-xs flex items-center justify-center w-6 h-6"
-                        :class="currentType === 'bar' ? 'bg-white text-brand-600 shadow-sm font-bold' : 'text-slate-400 hover:text-slate-600'"
+                        :class="currentType === 'bar' ? 'bg-pic-surface text-pic-brand shadow-sm font-bold' : 'text-pic-text-muted hover:text-pic-text-main'"
                         title="Ver como Barras"
                     >
                         <i class="fa-solid fa-chart-bar"></i>
@@ -109,7 +109,7 @@ const handleAnalyze = () => {
                     <button 
                         @click="currentType = 'line'"
                         class="p-1.5 rounded transition-all text-xs flex items-center justify-center w-6 h-6"
-                        :class="currentType === 'line' ? 'bg-white text-brand-600 shadow-sm font-bold' : 'text-slate-400 hover:text-slate-600'"
+                        :class="currentType === 'line' ? 'bg-pic-surface text-pic-brand shadow-sm font-bold' : 'text-pic-text-muted hover:text-pic-text-main'"
                         title="Ver como Líneas"
                     >
                         <i class="fa-solid fa-chart-line"></i>
@@ -118,7 +118,7 @@ const handleAnalyze = () => {
             </div>
         </div>
 
-        <div class="pic-chart-surface flex-1 relative min-h-[250px] w-full min-w-0">
+        <div class="pic-chart-surface relative min-h-[300px] w-full min-w-0 flex-1 md:min-h-[320px] xl:min-h-[350px]">
             <canvas ref="canvasRef"></canvas>
         </div>
     </div>

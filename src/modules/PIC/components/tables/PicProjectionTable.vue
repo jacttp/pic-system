@@ -14,6 +14,8 @@ const props = defineProps<{
 
 const store = usePicFilterStore();
 const isCollapsed = ref(props.initialCollapsed || false);
+const projectionSearch = ref('');
+const mobileShowAllColumns = ref(false);
 
 // --- ESTADO LOCAL PARA EL DRILL-DOWN ---
 // Guardamos los datos de las filas hijas aquí: { "NombreFilaPadre": [datosHijos...] }
@@ -190,118 +192,389 @@ const footer = computed(() => {
     return sums;
 });
 
+const summaryItems = computed(() => {
+    if (!footer.value) return [];
+    return [
+        {
+            label: `Venta ${currentYear.value}`,
+            value: formatNumber(footer.value[`Venta_${currentYear.value}`] || 0),
+            tone: 'main'
+        },
+        {
+            label: `Meta ${currentYear.value}`,
+            value: formatNumber(footer.value.meta || 0),
+            tone: 'accent'
+        },
+        {
+            label: 'Dif meta',
+            value: formatNumber(footer.value.difMeta || 0),
+            tone: (footer.value.difMeta || 0) < 0 ? 'danger' : 'success'
+        },
+        {
+            label: 'Cumpl.',
+            value: `${(footer.value.varMeta || 0).toFixed(1)}%`,
+            tone: (footer.value.varMeta || 0) >= 100 ? 'success' : 'danger'
+        }
+    ];
+});
+
+const isBrandProjection = computed(() => props.dimensionKey === 'marcas');
+const visibleProjectionRows = computed(() => {
+    const query = projectionSearch.value.trim().toLowerCase();
+    if (!query) return processedRows.value;
+
+    return processedRows.value.filter(row =>
+        String(row.Dimension || '').toLowerCase().includes(query)
+    );
+});
+const visibleMobileRows = computed(() => visibleProjectionRows.value);
+
+const projectionMobileFmt = (value: number) => {
+    const numeric = Number(value || 0);
+    const abs = Math.abs(numeric);
+    const sign = numeric < 0 ? '-' : '';
+
+    if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toFixed(2)}M`;
+    if (abs >= 1_000) return `${sign}${(abs / 1_000).toFixed(1)}K`;
+    return `${sign}${abs.toFixed(0)}`;
+};
+
 const colorClass = (val: number, isPercent = false) => {
-    if (val === 0) return 'text-slate-400';
-    if (isPercent && val >= 100) return 'text-emerald-700 font-bold';
-    if (isPercent) return val >= 0 ? 'text-emerald-700' : 'text-red-600';
-    return val >= 0 ? 'text-emerald-700' : 'text-red-600';
+    if (val === 0) return 'text-pic-text-muted/70';
+    if (isPercent && val >= 100) return 'font-bold text-pic-success';
+    if (isPercent) return val >= 0 ? 'text-pic-success' : 'text-pic-danger';
+    return val >= 0 ? 'text-pic-success' : 'text-pic-danger';
 };
 </script>
 
 <template>
     <div 
-        class="pic-report-table bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full transition-all duration-300"
+        class="pic-report-table flex h-full flex-col overflow-hidden rounded-xl border border-pic-border bg-pic-surface shadow-sm transition-all duration-300"
         :data-html2canvas-ignore="tableData.length === 0 ? 'true' : undefined"
     >
         
-        <div class="px-4 py-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center shrink-0">
-            <h3 class="font-bold text-slate-700 text-xs uppercase tracking-wide flex items-center gap-2">
-                <i class="fa-solid fa-chart-gantt text-slate-400"></i>
+        <div class="flex shrink-0 items-center justify-between border-b border-pic-border bg-pic-muted-surface px-4 py-3">
+            <h3 class="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-pic-text-main">
+                <i class="fa-solid fa-chart-gantt text-pic-text-muted"></i>
                 {{ title }}
             </h3>
             
-            <button v-if="tableData.length > 0" @click="isCollapsed = !isCollapsed" class="text-[10px] uppercase font-bold text-slate-400 hover:text-brand-600">
+            <button v-if="tableData.length > 0" @click="isCollapsed = !isCollapsed" class="text-[10px] font-bold uppercase text-pic-text-muted hover:text-pic-brand">
                 {{ isCollapsed ? 'Mostrar' : 'Ocultar' }}
             </button>
         </div>
 
-        <div v-if="tableData.length === 0 && !isLoading" class="p-6 flex flex-col items-center justify-center bg-slate-50/50 min-h-[150px]">
-            <p class="text-xs text-slate-500 mb-3">Análisis disponible bajo demanda</p>
+        <div v-if="tableData.length === 0 && !isLoading" class="flex min-h-[150px] flex-col items-center justify-center bg-pic-muted-surface/50 p-6">
+            <p class="mb-3 text-xs text-pic-text-muted">Análisis disponible bajo demanda</p>
             <button 
                 @click="handleLoad"
-                class="bg-white border border-slate-300 hover:border-brand-400 hover:text-brand-600 text-slate-600 px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all flex items-center gap-2"
+                class="flex items-center gap-2 rounded-lg border border-pic-border bg-pic-surface px-4 py-2 text-xs font-bold text-pic-text-muted shadow-sm transition-all hover:border-pic-brand hover:text-pic-brand"
             >
                 <i class="fa-solid fa-bolt"></i> Generar Tabla
             </button>
         </div>
 
-        <div v-else-if="isLoading" class="p-8 text-center text-slate-500 min-h-[150px] flex items-center justify-center">
+        <div v-else-if="isLoading" class="flex min-h-[150px] items-center justify-center p-8 text-center text-pic-text-muted">
             <div class="flex flex-col items-center gap-2">
-                <i class="fa-solid fa-circle-notch fa-spin text-2xl text-brand-500"></i>
+                <i class="fa-solid fa-circle-notch fa-spin text-2xl text-pic-brand"></i>
                 <span class="text-xs font-medium">Procesando datos...</span>
             </div>
         </div>
 
-        <div v-else-if="!isCollapsed" class="pic-report-table-scroll overflow-x-auto custom-scrollbar animate-fade-in">
-            <table class="w-full text-xs text-left border-collapse whitespace-nowrap">
-                <thead class="bg-slate-800 text-white font-semibold uppercase sticky top-0 z-10">
+        <div v-else-if="!isCollapsed" class="animate-fade-in">
+            <div class="border-b border-pic-border bg-pic-surface px-4 py-3">
+                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span
+                            v-for="item in summaryItems"
+                            :key="item.label"
+                            class="rounded-lg border px-2.5 py-1.5 text-xs"
+                            :class="{
+                                'border-pic-border bg-pic-muted-surface text-pic-text-main': item.tone === 'main',
+                                'border-pic-accent-purple/25 bg-pic-accent-purple-soft text-pic-accent-purple': item.tone === 'accent',
+                                'border-pic-success/25 bg-pic-success/10 text-pic-success': item.tone === 'success',
+                                'border-pic-danger/25 bg-pic-danger/10 text-pic-danger': item.tone === 'danger'
+                            }"
+                        >
+                            <span class="mr-1 text-pic-text-muted">{{ item.label }}</span>
+                            <span class="font-bold tabular-nums">{{ item.value }}</span>
+                        </span>
+                        <span class="rounded-lg border border-pic-border bg-pic-muted-surface px-2.5 py-1.5 text-xs font-medium text-pic-text-muted">
+                            {{ visibleProjectionRows.length }} filas
+                        </span>
+                    </div>
+
+                    <label class="relative hidden w-full max-w-xs md:block">
+                        <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-pic-text-muted"></i>
+                        <input
+                            v-model="projectionSearch"
+                            type="search"
+                            class="h-9 w-full rounded-lg border border-pic-border bg-pic-muted-surface pl-8 pr-3 text-xs text-pic-text-main outline-none transition focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-soft"
+                            placeholder="Buscar concepto..."
+                        />
+                    </label>
+                </div>
+            </div>
+
+            <div class="p-2.5 md:hidden">
+                <div v-if="isBrandProjection" class="space-y-3">
+                    <article
+                        v-for="row in visibleProjectionRows"
+                        :key="row.Dimension"
+                        class="rounded-xl border border-pic-border bg-pic-muted-surface/45 p-3"
+                        @click="toggleRow(row)"
+                    >
+                        <div class="mb-3 flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <h4 class="truncate font-bold text-pic-text-main" :title="row.Dimension">{{ row.Dimension }}</h4>
+                                <p class="mt-1 text-xs text-pic-text-muted">Part. {{ row.share.toFixed(1) }}%</p>
+                            </div>
+                            <span class="rounded-full px-2 py-0.5 text-xs font-bold" :class="colorClass(row.varMeta, true)">
+                                {{ row.varMeta.toFixed(1) }}%
+                            </span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div v-for="y in years" :key="y" class="rounded-lg bg-pic-surface p-2">
+                                <p class="text-pic-text-muted">Venta {{ y }}</p>
+                                <p class="mt-1 font-mono font-bold tabular-nums text-pic-text-main">{{ formatNumber(row[`Venta_${y}`]) }}</p>
+                            </div>
+                            <div class="rounded-lg bg-pic-success/10 p-2">
+                                <p class="text-pic-success">Meta</p>
+                                <p class="mt-1 font-mono font-bold tabular-nums text-pic-success">{{ formatNumber(row.meta) }}</p>
+                            </div>
+                            <div class="rounded-lg bg-pic-surface p-2">
+                                <p class="text-pic-text-muted">Dif meta</p>
+                                <p class="mt-1 font-mono font-bold tabular-nums" :class="colorClass(row.difMeta)">{{ formatNumber(row.difMeta) }}</p>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+
+                <div v-else class="space-y-2.5">
+                    <div v-if="mobileShowAllColumns" class="flex items-center gap-2">
+                        <label class="relative min-w-0 flex-1">
+                            <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-pic-text-muted"></i>
+                            <input
+                                v-model="projectionSearch"
+                                type="search"
+                                class="h-9 w-full rounded-lg border border-pic-border bg-pic-surface pl-8 pr-3 text-xs text-pic-text-main outline-none transition focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-soft"
+                                placeholder="Buscar en esta tabla..."
+                            />
+                        </label>
+                        <button
+                            type="button"
+                            class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-pic-border bg-pic-muted-surface text-pic-text-muted transition hover:border-pic-brand/40 hover:text-pic-brand"
+                            title="Ver columnas principales"
+                            @click="mobileShowAllColumns = false"
+                        >
+                            <i class="fa-solid fa-compress"></i>
+                        </button>
+                    </div>
+
+                    <div class="overflow-hidden rounded-lg border border-pic-border bg-pic-surface shadow-sm">
+                        <div class="overflow-x-auto custom-scrollbar" :class="mobileShowAllColumns ? '' : 'overflow-x-hidden'">
+                            <table class="w-full table-fixed border-collapse text-left text-[10px]" :class="mobileShowAllColumns ? 'min-w-[860px]' : ''">
+                                <thead class="bg-pic-nav text-[9px] font-black uppercase tracking-normal text-pic-nav-text">
+                                    <tr>
+                                        <th class="sticky left-0 z-20 w-[168px] border-r border-pic-nav-muted bg-pic-nav-muted px-2 py-2.5 text-left shadow-[4px_0_10px_rgba(15,23,42,0.14)]">Concepto</th>
+                                        <th
+                                            v-for="y in years"
+                                            v-show="mobileShowAllColumns || y === currentYear"
+                                            :key="y"
+                                            class="px-1.5 py-2.5 text-right"
+                                            :class="y === currentYear ? 'text-pic-nav-text' : 'text-pic-nav-text-muted'"
+                                        >
+                                            Venta {{ y }}
+                                        </th>
+                                        <th class="px-1.5 py-2.5 text-right text-pic-success">Meta</th>
+                                        <th v-if="mobileShowAllColumns" class="px-1.5 py-2.5 text-right text-pic-nav-text-muted">Dif año</th>
+                                        <th class="px-1.5 py-2.5 text-right text-pic-nav-text-muted">Dif meta</th>
+                                        <th class="px-1.5 py-2.5 text-right text-pic-nav-text-muted">Cumpl %</th>
+                                        <th v-if="mobileShowAllColumns" class="px-1.5 py-2.5 text-right text-pic-nav-text-muted">Part %</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-pic-border">
+                                    <template v-for="row in visibleMobileRows" :key="row.Dimension">
+                                        <tr
+                                            class="odd:bg-pic-surface even:bg-pic-muted-surface/35"
+                                            :class="drillDownTarget ? 'cursor-pointer' : ''"
+                                            @click="toggleRow(row)"
+                                        >
+                                            <td class="sticky left-0 z-10 border-r border-pic-border bg-pic-surface px-2 py-2.5 font-bold text-pic-text-main shadow-[4px_0_10px_rgba(15,23,42,0.08)]">
+                                                <div class="flex min-w-0 items-start gap-1.5">
+                                                    <i
+                                                        v-if="drillDownTarget"
+                                                        class="fa-solid mt-0.5 shrink-0 text-[8px] text-pic-text-muted"
+                                                        :class="expandedRows[row.Dimension] || loadingRows[row.Dimension] ? 'fa-chevron-down' : 'fa-chevron-right'"
+                                                    ></i>
+                                                    <span class="whitespace-normal break-words leading-tight" :title="row.Dimension">{{ row.Dimension }}</span>
+                                                </div>
+                                            </td>
+                                            <td
+                                                v-for="y in years"
+                                                v-show="mobileShowAllColumns || y === currentYear"
+                                                :key="y"
+                                                class="px-1.5 py-2.5 text-right font-mono font-semibold tabular-nums"
+                                                :class="y === currentYear ? 'text-pic-text-main' : 'text-pic-text-muted'"
+                                            >
+                                                {{ projectionMobileFmt(row[`Venta_${y}`]) }}
+                                            </td>
+                                            <td class="px-1.5 py-2.5 text-right font-mono font-bold tabular-nums text-pic-success">
+                                                {{ projectionMobileFmt(row.meta) }}
+                                            </td>
+                                            <td v-if="mobileShowAllColumns" class="px-1.5 py-2.5 text-right font-mono font-bold tabular-nums" :class="colorClass(row.difAnual)">
+                                                {{ projectionMobileFmt(row.difAnual) }}
+                                            </td>
+                                            <td class="px-1.5 py-2.5 text-right font-mono font-bold tabular-nums" :class="colorClass(row.difMeta)">
+                                                {{ projectionMobileFmt(row.difMeta) }}
+                                            </td>
+                                            <td class="px-1.5 py-2.5 text-right font-mono font-bold tabular-nums" :class="colorClass(row.varMeta, true)">
+                                                {{ row.varMeta.toFixed(1) }}%
+                                            </td>
+                                            <td v-if="mobileShowAllColumns" class="px-1.5 py-2.5 text-right font-mono font-bold tabular-nums text-pic-text-main">
+                                                {{ row.share.toFixed(1) }}%
+                                            </td>
+                                        </tr>
+
+                                        <tr v-if="loadingRows[row.Dimension]">
+                                            <td :colspan="mobileShowAllColumns ? 8 + years.length : 5" class="bg-pic-muted-surface px-2 py-2 text-center text-[10px] text-pic-text-muted">
+                                                <i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Cargando detalle...
+                                            </td>
+                                        </tr>
+
+                                        <template v-if="expandedRows[row.Dimension]">
+                                            <tr
+                                                v-for="child in getChildRows(row.Dimension)"
+                                                :key="child.Dimension"
+                                                class="bg-pic-muted-surface text-[9px] text-pic-text-muted"
+                                            >
+                                                <td class="sticky left-0 z-10 border-r border-pic-border bg-pic-muted-surface px-2 py-2 pl-5 font-medium shadow-[4px_0_10px_rgba(15,23,42,0.08)]">
+                                                    <span class="whitespace-normal break-words leading-tight" :title="child.Dimension">{{ child.Dimension }}</span>
+                                                </td>
+                                                <td
+                                                    v-for="y in years"
+                                                    v-show="mobileShowAllColumns || y === currentYear"
+                                                    :key="y"
+                                                    class="px-1.5 py-2 text-right font-mono tabular-nums"
+                                                >
+                                                    {{ projectionMobileFmt(child[`Venta_${y}`]) }}
+                                                </td>
+                                                <td class="px-1.5 py-2 text-right font-mono tabular-nums text-pic-success">{{ projectionMobileFmt(child.meta) }}</td>
+                                                <td v-if="mobileShowAllColumns" class="px-1.5 py-2 text-right font-mono tabular-nums" :class="colorClass(child.difAnual)">{{ projectionMobileFmt(child.difAnual) }}</td>
+                                                <td class="px-1.5 py-2 text-right font-mono tabular-nums" :class="colorClass(child.difMeta)">{{ projectionMobileFmt(child.difMeta) }}</td>
+                                                <td class="px-1.5 py-2 text-right font-mono tabular-nums" :class="colorClass(child.varMeta, true)">{{ child.varMeta.toFixed(1) }}%</td>
+                                                <td v-if="mobileShowAllColumns" class="px-1.5 py-2 text-right font-mono tabular-nums">{{ child.share.toFixed(1) }}%</td>
+                                            </tr>
+                                        </template>
+                                    </template>
+                                </tbody>
+                                <tfoot v-if="footer" class="border-t border-pic-border bg-pic-muted-surface font-bold text-pic-text-main">
+                                    <tr>
+                                        <td class="sticky left-0 z-10 border-r border-pic-border bg-pic-muted-surface px-2 py-2.5 shadow-[4px_0_10px_rgba(15,23,42,0.08)]">TOTAL</td>
+                                        <td
+                                            v-for="y in years"
+                                            v-show="mobileShowAllColumns || y === currentYear"
+                                            :key="y"
+                                            class="px-1.5 py-2.5 text-right font-mono tabular-nums"
+                                        >
+                                            {{ projectionMobileFmt(footer[`Venta_${y}`]) }}
+                                        </td>
+                                        <td class="px-1.5 py-2.5 text-right font-mono tabular-nums text-pic-success">{{ projectionMobileFmt(footer.meta) }}</td>
+                                        <td v-if="mobileShowAllColumns" class="px-1.5 py-2.5 text-right font-mono tabular-nums" :class="colorClass(footer.difAnual)">{{ projectionMobileFmt(footer.difAnual) }}</td>
+                                        <td class="px-1.5 py-2.5 text-right font-mono tabular-nums" :class="colorClass(footer.difMeta)">{{ projectionMobileFmt(footer.difMeta) }}</td>
+                                        <td class="px-1.5 py-2.5 text-right font-mono tabular-nums" :class="colorClass(footer.varMeta, true)">{{ footer.varMeta.toFixed(1) }}%</td>
+                                        <td v-if="mobileShowAllColumns" class="px-1.5 py-2.5 text-right font-mono tabular-nums">100%</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+
+                            <div v-if="!visibleMobileRows.length" class="px-4 py-6 text-center text-sm text-pic-text-muted">
+                                No hay registros que coincidan con la busqueda.
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="flex h-11 w-full items-center justify-center gap-2 border-t border-pic-border bg-pic-muted-surface text-xs font-bold text-pic-text-muted transition hover:text-pic-brand"
+                            @click="mobileShowAllColumns = !mobileShowAllColumns"
+                        >
+                            <span>{{ mobileShowAllColumns ? 'Ver columnas principales' : 'Ver todas las columnas' }}</span>
+                            <i class="fa-solid" :class="mobileShowAllColumns ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pic-report-table-scroll hidden max-h-[560px] overflow-auto custom-scrollbar md:block">
+            <table class="w-full min-w-[980px] border-collapse text-left text-xs whitespace-nowrap">
+                <thead class="sticky top-0 z-10 bg-pic-nav font-semibold uppercase text-pic-nav-text">
                     <tr>
-                        <th class="px-3 py-2 text-left bg-slate-900 border-r border-slate-700 min-w-[180px] sticky left-0 z-20">
+                        <th class="sticky left-0 z-20 min-w-[180px] border-r border-pic-nav-muted bg-pic-nav-muted px-3 py-2 text-left shadow-[4px_0_10px_rgba(15,23,42,0.14)]">
                             Concepto
                         </th>
                         <th v-for="y in years" :key="y" class="px-3 py-2 text-right">Venta {{ y }}</th>
-                        <th class="px-3 py-2 text-right bg-slate-700">Meta {{ currentYear }}</th>
+                        <th class="bg-pic-nav-muted px-3 py-2 text-right">Meta {{ currentYear }}</th>
                         <th class="px-3 py-2 text-right">Dif (Año)</th>
                         <th class="px-3 py-2 text-right">Dif (Meta)</th>
                         <th class="px-3 py-2 text-right">Crec %</th>
                         <th class="px-3 py-2 text-right">Cumpl %</th>
-                        <th class="px-3 py-2 text-right bg-slate-900/50">Part %</th>
+                        <th class="bg-pic-nav-muted px-3 py-2 text-right">Part %</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
-                    <template v-for="(row, idx) in processedRows" :key="row.Dimension">
+                <tbody class="divide-y divide-pic-border">
+                    <template v-for="row in visibleProjectionRows" :key="row.Dimension">
                         
                         <tr 
                             class="transition-colors group border-l-4 border-transparent"
                             :class="[
-                                drillDownTarget ? 'cursor-pointer hover:bg-yellow-50' : 'hover:bg-slate-50',
-                                expandedRows[row.Dimension] ? 'bg-slate-50 border-l-brand-500' : ''
+                                drillDownTarget ? 'cursor-pointer hover:bg-pic-accent-yellow-soft' : 'hover:bg-pic-muted-surface',
+                                expandedRows[row.Dimension] ? 'border-l-pic-brand bg-pic-muted-surface' : ''
                             ]"
                             @click="toggleRow(row)"
                         >
-                            <td class="px-3 py-2 font-bold text-slate-700 sticky left-0 bg-inherit border-r border-slate-100 truncate max-w-[200px]" :title="row.Dimension">
+                            <td class="sticky left-0 max-w-[200px] truncate border-r border-pic-border bg-pic-surface px-3 py-2 font-bold text-pic-text-main shadow-[4px_0_10px_rgba(15,23,42,0.06)]" :title="row.Dimension">
                                 <div class="flex items-center gap-2">
                                     <i v-if="drillDownTarget" 
-                                       class="fa-solid text-[10px] text-slate-400 transition-transform duration-200"
+                                       class="fa-solid text-[10px] text-pic-text-muted transition-transform duration-200"
                                        :class="expandedRows[row.Dimension] || loadingRows[row.Dimension] ? 'fa-chevron-down' : 'fa-chevron-right'">
                                     </i>
                                     {{ row.Dimension }}
                                 </div>
                             </td>
 
-                            <td v-for="y in years" :key="y" class="px-3 py-2 text-right text-slate-600 font-mono">{{ formatNumber(row[`Venta_${y}`]) }}</td>
-                            <td class="px-3 py-2 text-right text-emerald-700 font-mono bg-emerald-50/30">{{ formatNumber(row.meta) }}</td>
+                            <td v-for="y in years" :key="y" class="px-3 py-2 text-right font-mono text-pic-text-muted">{{ formatNumber(row[`Venta_${y}`]) }}</td>
+                            <td class="bg-pic-success/10 px-3 py-2 text-right font-mono text-pic-success">{{ formatNumber(row.meta) }}</td>
                             <td class="px-3 py-2 text-right font-mono" :class="colorClass(row.difAnual)">{{ formatNumber(row.difAnual) }}</td>
                             <td class="px-3 py-2 text-right font-mono" :class="colorClass(row.difMeta)">{{ formatNumber(row.difMeta) }}</td>
                             
                             <td class="px-3 py-2 text-right font-bold font-mono" :class="colorClass(row.crec)">{{ row.crec.toFixed(1) }}%</td>
                             <td class="px-3 py-2 text-right font-bold font-mono" :class="colorClass(row.varMeta, true)">{{ row.varMeta.toFixed(1) }}%</td>
-                            <td class="px-3 py-2 text-right text-slate-800 font-bold bg-slate-50 font-mono">{{ row.share.toFixed(1) }}%</td>
+                            <td class="bg-pic-muted-surface px-3 py-2 text-right font-mono font-bold text-pic-text-main">{{ row.share.toFixed(1) }}%</td>
                         </tr>
 
                         <tr v-if="loadingRows[row.Dimension]">
-                            <td :colspan="8 + years.length" class="bg-slate-50 p-2 text-center text-slate-400 text-[10px]">
+                            <td :colspan="8 + years.length" class="bg-pic-muted-surface p-2 text-center text-[10px] text-pic-text-muted">
                                 <i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Cargando detalle...
                             </td>
                         </tr>
 
                         <template v-if="expandedRows[row.Dimension]">
-                            <tr v-for="child in getChildRows(row.Dimension)" :key="child.Dimension" class="bg-slate-50 border-b border-slate-100 hover:bg-slate-100 transition-colors text-[11px] text-slate-600 shadow-inner group">
-                                <td class="px-3 py-1.5 font-medium truncate max-w-[200px] text-slate-500 sticky left-0 bg-slate-50 group-hover:bg-slate-100 border-r border-slate-100 pl-8" :title="child.Dimension">
+                            <tr v-for="child in getChildRows(row.Dimension)" :key="child.Dimension" class="group border-b border-pic-border bg-pic-muted-surface text-[11px] text-pic-text-muted shadow-inner transition-colors hover:bg-pic-brand-soft">
+                                <td class="sticky left-0 max-w-[200px] truncate border-r border-pic-border bg-pic-muted-surface px-3 py-1.5 pl-8 font-medium text-pic-text-muted shadow-[4px_0_10px_rgba(15,23,42,0.06)] group-hover:bg-pic-brand-soft" :title="child.Dimension">
                                     {{ child.Dimension }}
                                 </td>
                                 
-                                <td v-for="y in years" :key="y" class="px-3 py-1.5 text-right font-mono text-slate-500">
+                                <td v-for="y in years" :key="y" class="px-3 py-1.5 text-right font-mono text-pic-text-muted">
                                     {{ formatNumber(child[`Venta_${y}`]) }}
                                 </td>
-                                <td class="px-3 py-1.5 text-right text-emerald-700/70 font-mono">{{ formatNumber(child.meta) }}</td>
+                                <td class="px-3 py-1.5 text-right font-mono text-pic-success/80">{{ formatNumber(child.meta) }}</td>
                                 
                                 <td class="px-3 py-1.5 text-right font-mono" :class="colorClass(child.difAnual)">{{ formatNumber(child.difAnual) }}</td>
                                 <td class="px-3 py-1.5 text-right font-mono" :class="colorClass(child.difMeta)">{{ formatNumber(child.difMeta) }}</td>
                                 <td class="px-3 py-1.5 text-right font-mono" :class="colorClass(child.crec)">{{ child.crec.toFixed(1) }}%</td>
                                 <td class="px-3 py-1.5 text-right font-mono" :class="colorClass(child.varMeta, true)">{{ child.varMeta.toFixed(1) }}%</td>
                                 
-                                <td class="px-3 py-1.5 text-right font-bold text-brand-700 bg-brand-50/20 font-mono">
+                                <td class="bg-pic-brand-soft/50 px-3 py-1.5 text-right font-mono font-bold text-pic-brand">
                                     {{ child.share.toFixed(1) }}%
                                 </td>
                             </tr>
@@ -309,27 +582,28 @@ const colorClass = (val: number, isPercent = false) => {
 
                     </template>
                 </tbody>
-                <tfoot v-if="footer" class="bg-slate-100 font-bold text-slate-800 border-t-2 border-slate-300">
+                <tfoot v-if="footer" class="border-t-2 border-pic-border bg-pic-muted-surface font-bold text-pic-text-main">
                     <tr>
-                        <td class="px-3 py-2 sticky left-0 bg-slate-100 border-r border-slate-200">TOTAL</td>
+                        <td class="sticky left-0 border-r border-pic-border bg-pic-muted-surface px-3 py-2 shadow-[4px_0_10px_rgba(15,23,42,0.06)]">TOTAL</td>
                         <td v-for="y in years" :key="y" class="px-3 py-2 text-right font-mono">{{ formatNumber(footer[`Venta_${y}`]) }}</td>
-                        <td class="px-3 py-2 text-right font-mono text-emerald-800">{{ formatNumber(footer.meta) }}</td>
+                        <td class="px-3 py-2 text-right font-mono text-pic-success">{{ formatNumber(footer.meta) }}</td>
                         <td class="px-3 py-2 text-right font-mono" :class="colorClass(footer.difAnual)">{{ formatNumber(footer.difAnual) }}</td>
                         <td class="px-3 py-2 text-right font-mono" :class="colorClass(footer.difMeta)">{{ formatNumber(footer.difMeta) }}</td>
                         <td class="px-3 py-2 text-right font-mono"  :class="colorClass(footer.crec)">{{ footer.crec.toFixed(1) }}%</td>
                         <td class="px-3 py-2 text-right font-mono" :class="colorClass(footer.varMeta, true)">{{ footer.varMeta.toFixed(1) }}%</td>
-                        <td class="px-3 py-2 text-right bg-slate-200 font-mono">100%</td>
+                        <td class="bg-pic-border/50 px-3 py-2 text-right font-mono">100%</td>
                     </tr>
                 </tfoot>
             </table>
+        </div>
         </div>
     </div>
 </template>
 
 <style scoped>
 .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: hsl(var(--pic-muted-surface)); }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: hsl(var(--pic-border)); border-radius: 4px; }
 .animate-fade-in { animation: fadeIn 0.3s ease-in; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 </style>
