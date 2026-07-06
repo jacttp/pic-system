@@ -11,6 +11,7 @@ export const useCommercialStructureStore = defineStore('commercialStructure', ()
    const isLoading = ref(false);
    const error = ref<string | null>(null);
    const rutaMOptions = ref<string[]>([]);
+   const vehiculoOptions = ref<string[]>([]);
 
    // Actions
    async function fetchItems(page = 1, limit = 20, search = '') {
@@ -72,6 +73,14 @@ export const useCommercialStructureStore = defineStore('commercialStructure', ()
       }
    }
 
+   async function fetchVehiculoOptions() {
+      try {
+         vehiculoOptions.value = await commercialStructureApi.getVehiculoOptions();
+      } catch (e) {
+         console.error(e);
+      }
+   }
+
    async function deleteItem(ruta: string) {
       try {
          await commercialStructureApi.remove(ruta);
@@ -88,11 +97,13 @@ export const useCommercialStructureStore = defineStore('commercialStructure', ()
       isLoading,
       error,
       rutaMOptions,
+      vehiculoOptions,
       fetchItems,
       fetchByRuta,
       createItem,
       updateItem,
       deleteItem,
-      fetchRutaMOptions
+      fetchRutaMOptions,
+      fetchVehiculoOptions
    };
 });

@@ -26,7 +26,9 @@ const form = ref<CommercialStructure>({
     Jefatura: '',
     Cedis: '',
     CanalC: '',
-    nivel_ruta: 1
+    nivel_ruta: 1,
+    vehiculo: '',
+    cap_max_kg: null
 });
 
 const emptyForm = (): CommercialStructure => ({
@@ -37,7 +39,9 @@ const emptyForm = (): CommercialStructure => ({
     Jefatura: '',
     Cedis: '',
     CanalC: '',
-    nivel_ruta: 1
+    nivel_ruta: 1,
+    vehiculo: '',
+    cap_max_kg: null
 });
 
 const isNew = computed(() => route.path.endsWith('/new'));
@@ -78,12 +82,16 @@ const editableFields: CommercialStructureField[] = [
     'Jefatura',
     'Cedis',
     'CanalC',
-    'nivel_ruta'
+    'nivel_ruta',
+    'vehiculo',
+    'cap_max_kg'
 ];
 
 const fieldValue = (item: CommercialStructure, field: CommercialStructureField) => {
     const value = item[field];
-    return field === 'nivel_ruta' ? Number(value ?? 1) : String(value ?? '');
+    if (field === 'nivel_ruta') return Number(value ?? 1);
+    if (field === 'cap_max_kg') return value === null || value === undefined || value === '' ? '' : Number(value);
+    return String(value ?? '');
 };
 
 const resetForm = () => {
@@ -97,7 +105,9 @@ const resetForm = () => {
 
 const normalizeRecord = (item: CommercialStructure): CommercialStructure => ({
     ...item,
-    nivel_ruta: Number(item.nivel_ruta ?? 1)
+    nivel_ruta: Number(item.nivel_ruta ?? 1),
+    vehiculo: item.vehiculo ?? '',
+    cap_max_kg: item.cap_max_kg === null || item.cap_max_kg === undefined ? null : Number(item.cap_max_kg)
 });
 
 const setActiveForm = (item: CommercialStructure) => {
@@ -168,7 +178,10 @@ const syncSelectionFromRoute = async () => {
 };
 
 onMounted(async () => {
-    await store.fetchRutaMOptions();
+    await Promise.all([
+        store.fetchRutaMOptions(),
+        store.fetchVehiculoOptions()
+    ]);
     await loadData();
     await syncSelectionFromRoute();
 });
@@ -345,7 +358,7 @@ const gerenciaColor = (name: string) => {
                         </div>
 
                         <div v-else class="overflow-x-auto">
-                            <table class="w-full min-w-[860px] border-collapse text-left">
+                            <table class="w-full min-w-[1040px] border-collapse text-left">
                                 <thead>
                                     <tr class="border-b border-slate-200 bg-slate-50">
                                         <th class="px-4 py-3 text-[11px] font-black uppercase text-slate-600">Ruta</th>
@@ -355,6 +368,8 @@ const gerenciaColor = (name: string) => {
                                         <th class="px-4 py-3 text-[11px] font-black uppercase text-slate-600">Ruta M</th>
                                         <th class="px-4 py-3 text-[11px] font-black uppercase text-slate-600">Cedis</th>
                                         <th class="px-4 py-3 text-[11px] font-black uppercase text-slate-600">Canal C</th>
+                                        <th class="px-4 py-3 text-[11px] font-black uppercase text-slate-600">Vehiculo</th>
+                                        <th class="px-4 py-3 text-right text-[11px] font-black uppercase text-slate-600">Cap. kg</th>
                                         <th class="px-4 py-3 text-right text-[11px] font-black uppercase text-slate-600">Acciones</th>
                                     </tr>
                                 </thead>
@@ -395,6 +410,10 @@ const gerenciaColor = (name: string) => {
                                             <span class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-0.5 text-[11px] font-bold text-slate-600">
                                                 {{ item.CanalC || '-' }}
                                             </span>
+                                        </td>
+                                        <td class="px-4 py-3 text-sm font-semibold text-slate-700">{{ item.vehiculo || '-' }}</td>
+                                        <td class="px-4 py-3 text-right text-sm font-black text-slate-700">
+                                            {{ item.cap_max_kg !== null && item.cap_max_kg !== undefined ? Number(item.cap_max_kg).toLocaleString() : '-' }}
                                         </td>
                                         <td class="px-4 py-3.5">
                                             <div class="flex items-center justify-end gap-1">
@@ -554,6 +573,20 @@ const gerenciaColor = (name: string) => {
                                 <div>
                                     <label class="field-label">Canal C</label>
                                     <input v-model="form.CanalC" type="text" class="field-input" :class="dirtyFieldClass('CanalC')" placeholder="Detalle" />
+                                </div>
+                                <div>
+                                    <label class="field-label">Vehiculo</label>
+                                    <div class="relative">
+                                        <select v-model="form.vehiculo" class="field-select" :class="dirtyFieldClass('vehiculo')">
+                                            <option value="" disabled>Seleccionar vehiculo...</option>
+                                            <option v-for="opt in store.vehiculoOptions" :key="opt" :value="opt">{{ opt }}</option>
+                                        </select>
+                                        <i class="fa-solid fa-chevron-down pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-slate-400"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="field-label">Capacidad maxima kg</label>
+                                    <input v-model.number="form.cap_max_kg" type="number" min="0" step="0.01" class="field-input" :class="dirtyFieldClass('cap_max_kg')" placeholder="3500" />
                                 </div>
                             </div>
                         </div>

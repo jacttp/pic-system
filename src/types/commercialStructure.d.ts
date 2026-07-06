@@ -9,6 +9,8 @@ export interface CommercialStructure {
    Cedis: string;
    CanalC: string;
    nivel_ruta: number;
+   vehiculo: string;
+   cap_max_kg: number | null;
 }
 
 export interface CommercialStructureResponse {

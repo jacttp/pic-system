@@ -8,6 +8,18 @@ import PicDataTable from './tables/PicDataTable.vue';
 import PicProjectionTable from './tables/PicProjectionTable.vue';
 import KpiCardWidget from './widgets/KpiCardWidget.vue';       
 import SimpleTableWidget from './widgets/SimpleTableWidget.vue'; 
+import type { PicPdfExportConfig, PicPrintBlockKey } from '../types/picTypes';
+
+const props = defineProps<{
+    isPrintMode?: boolean;
+    printConfig?: PicPdfExportConfig | null;
+}>();
+
+const emit = defineEmits<{
+    (e: 'update-block-spacing', blockId: PicPrintBlockKey, delta: number): void;
+    (e: 'toggle-page-break', blockId: PicPrintBlockKey): void;
+    (e: 'reset-block-spacing', blockId: PicPrintBlockKey): void;
+}>();
 
 const store = usePicFilterStore();
 const selectedYears = computed(() => store.selected.Anio.sort());
@@ -127,12 +139,32 @@ const configPromedioAnual = computed(() => {
 const removeWidget = (id: string) => {
     store.removeDynamicWidget(id);
 };
+
+const blockSpacingValue = (blockId: PicPrintBlockKey) => Number(props.printConfig?.blockSpacing?.[blockId] || 0);
+const blockStyle = (blockId: PicPrintBlockKey) => props.printConfig ? { marginTop: `calc(${blockSpacingValue(blockId)}px + var(--pic-print-page-break-offset, 0px))` } : {};
+const hasPageBreak = (blockId: PicPrintBlockKey) => Boolean(props.printConfig?.pageBreakBefore?.[blockId]);
 </script>
 
 <template>
     <div class="space-y-5 pb-20 @container md:space-y-7">
         
-        <div v-if="store.dynamicWidgets.length > 0" class="mb-8 animate-fade-in rounded-2xl border border-pic-brand-border bg-pic-brand-soft/50 p-6 shadow-inner">
+        <div
+            v-if="store.dynamicWidgets.length > 0"
+            data-pic-print-section="aiInsights"
+            data-pic-print-block="true"
+            data-pic-print-block-id="aiInsights"
+            class="pic-print-adjustable-block mb-8 animate-fade-in rounded-2xl border border-pic-brand-border bg-pic-brand-soft/50 p-6 shadow-inner"
+            :class="{ 'pic-print-page-break-before': hasPageBreak('aiInsights') }"
+            :style="blockStyle('aiInsights')"
+        >
+            <div v-if="props.printConfig" class="pic-print-block-controls">
+                <span>Insights IA</span>
+                <button type="button" title="Reducir espacio antes" @click="emit('update-block-spacing', 'aiInsights', -8)"><i class="fa-solid fa-minus"></i></button>
+                <strong>{{ blockSpacingValue('aiInsights') }}px</strong>
+                <button type="button" title="Aumentar espacio antes" @click="emit('update-block-spacing', 'aiInsights', 8)"><i class="fa-solid fa-plus"></i></button>
+                <button type="button" title="Forzar salto de pagina antes" :class="{ 'is-active': hasPageBreak('aiInsights') }" @click="emit('toggle-page-break', 'aiInsights')"><i class="fa-solid fa-file-arrow-down"></i></button>
+                <button type="button" title="Resetear este bloque" @click="emit('reset-block-spacing', 'aiInsights')"><i class="fa-solid fa-rotate-left"></i></button>
+            </div>
             <div class="mb-4 flex items-center justify-between border-b border-pic-brand-border pb-3">
                 <h3 class="flex items-center gap-2 text-sm font-bold text-pic-brand">
                     <div class="rounded-md bg-pic-surface p-1.5 text-pic-brand shadow-sm">
@@ -140,7 +172,7 @@ const removeWidget = (id: string) => {
                     </div>
                     Insights Generados por IA
                 </h3>
-                <button @click="store.clearDynamicWidgets()" class="flex items-center gap-1 text-xs font-medium text-pic-text-muted transition-colors hover:text-pic-danger">
+                <button data-pic-print-control="true" @click="store.clearDynamicWidgets()" class="flex items-center gap-1 text-xs font-medium text-pic-text-muted transition-colors hover:text-pic-danger">
                     <i class="fa-regular fa-trash-can"></i> Limpiar zona
                 </button>
             </div>
@@ -172,6 +204,7 @@ const removeWidget = (id: string) => {
                     </div>
 
                     <button 
+                        data-pic-print-control="true"
                         @click="removeWidget(widget.id)"
                         class="absolute right-3 top-3 z-20 scale-90 rounded-lg border border-pic-border bg-pic-surface p-1.5 text-pic-text-muted opacity-0 shadow-md transition-all hover:scale-100 hover:bg-pic-danger/10 hover:text-pic-danger group-hover:opacity-100"
                         title="Eliminar este elemento"
@@ -182,7 +215,22 @@ const removeWidget = (id: string) => {
             </div>
         </div>
 
-       <div class="pic-chart-row grid grid-cols-1 gap-4 xl:grid-cols-2">
+       <div
+            data-pic-print-section="kgCharts"
+            data-pic-print-block="true"
+            data-pic-print-block-id="kgCharts"
+            class="pic-print-adjustable-block pic-chart-row grid grid-cols-1 gap-4 xl:grid-cols-2"
+            :class="{ 'pic-print-page-break-before': hasPageBreak('kgCharts') }"
+            :style="blockStyle('kgCharts')"
+       >
+            <div v-if="props.printConfig" class="pic-print-block-controls">
+                <span>Graficas KG</span>
+                <button type="button" title="Reducir espacio antes" @click="emit('update-block-spacing', 'kgCharts', -8)"><i class="fa-solid fa-minus"></i></button>
+                <strong>{{ blockSpacingValue('kgCharts') }}px</strong>
+                <button type="button" title="Aumentar espacio antes" @click="emit('update-block-spacing', 'kgCharts', 8)"><i class="fa-solid fa-plus"></i></button>
+                <button type="button" title="Forzar salto de pagina antes" :class="{ 'is-active': hasPageBreak('kgCharts') }" @click="emit('toggle-page-break', 'kgCharts')"><i class="fa-solid fa-file-arrow-down"></i></button>
+                <button type="button" title="Resetear este bloque" @click="emit('reset-block-spacing', 'kgCharts')"><i class="fa-solid fa-rotate-left"></i></button>
+            </div>
             <div class="pic-chart-cell min-w-0">
                 <PicEChart
                 :option="configKilosAnual"
@@ -195,11 +243,29 @@ const removeWidget = (id: string) => {
                 :enable-switch="true" />
             </div>
         </div>
-        <PicDataTable title="Detalle Volumen (KG)" type="kilos" :processed-data="dataKilos" :years="selectedYears" />
+        <div data-pic-print-section="kgTable" data-pic-print-block="true" data-pic-print-block-id="kgTable" data-pic-print-table="true" class="pic-print-adjustable-block" :class="{ 'pic-print-page-break-before': hasPageBreak('kgTable') }" :style="blockStyle('kgTable')">
+            <div v-if="props.printConfig" class="pic-print-block-controls">
+                <span>Tabla KG</span>
+                <button type="button" title="Reducir espacio antes" @click="emit('update-block-spacing', 'kgTable', -8)"><i class="fa-solid fa-minus"></i></button>
+                <strong>{{ blockSpacingValue('kgTable') }}px</strong>
+                <button type="button" title="Aumentar espacio antes" @click="emit('update-block-spacing', 'kgTable', 8)"><i class="fa-solid fa-plus"></i></button>
+                <button type="button" title="Forzar salto de pagina antes" :class="{ 'is-active': hasPageBreak('kgTable') }" @click="emit('toggle-page-break', 'kgTable')"><i class="fa-solid fa-file-arrow-down"></i></button>
+                <button type="button" title="Resetear este bloque" @click="emit('reset-block-spacing', 'kgTable')"><i class="fa-solid fa-rotate-left"></i></button>
+            </div>
+            <PicDataTable title="Detalle Volumen (KG)" type="kilos" :processed-data="dataKilos" :years="selectedYears" />
+        </div>
 
-        <div class="my-5 border-t border-pic-border md:my-7"></div>
+        <div data-pic-print-block="true" data-pic-print-block-id="kgDivider" class="my-5 border-t border-pic-border md:my-7"></div>
 
-        <div class="pic-chart-row grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div data-pic-print-section="salesCharts" data-pic-print-block="true" data-pic-print-block-id="salesCharts" class="pic-print-adjustable-block pic-chart-row grid grid-cols-1 gap-4 xl:grid-cols-2" :class="{ 'pic-print-page-break-before': hasPageBreak('salesCharts') }" :style="blockStyle('salesCharts')">
+            <div v-if="props.printConfig" class="pic-print-block-controls">
+                <span>Graficas $</span>
+                <button type="button" title="Reducir espacio antes" @click="emit('update-block-spacing', 'salesCharts', -8)"><i class="fa-solid fa-minus"></i></button>
+                <strong>{{ blockSpacingValue('salesCharts') }}px</strong>
+                <button type="button" title="Aumentar espacio antes" @click="emit('update-block-spacing', 'salesCharts', 8)"><i class="fa-solid fa-plus"></i></button>
+                <button type="button" title="Forzar salto de pagina antes" :class="{ 'is-active': hasPageBreak('salesCharts') }" @click="emit('toggle-page-break', 'salesCharts')"><i class="fa-solid fa-file-arrow-down"></i></button>
+                <button type="button" title="Resetear este bloque" @click="emit('reset-block-spacing', 'salesCharts')"><i class="fa-solid fa-rotate-left"></i></button>
+            </div>
             <div class="pic-chart-cell min-w-0">
                 <PicEChart
                 :option="configPesosMensual"
@@ -210,11 +276,29 @@ const removeWidget = (id: string) => {
                 <PicEChart :option="configPesosAnual" title="Facturación Anual ($)" />
             </div>
         </div>
-        <PicDataTable title="Detalle Facturación ($)" type="pesos" :processed-data="dataPesos" :years="selectedYears" />
+        <div data-pic-print-section="salesTable" data-pic-print-block="true" data-pic-print-block-id="salesTable" data-pic-print-table="true" class="pic-print-adjustable-block" :class="{ 'pic-print-page-break-before': hasPageBreak('salesTable') }" :style="blockStyle('salesTable')">
+            <div v-if="props.printConfig" class="pic-print-block-controls">
+                <span>Tabla $</span>
+                <button type="button" title="Reducir espacio antes" @click="emit('update-block-spacing', 'salesTable', -8)"><i class="fa-solid fa-minus"></i></button>
+                <strong>{{ blockSpacingValue('salesTable') }}px</strong>
+                <button type="button" title="Aumentar espacio antes" @click="emit('update-block-spacing', 'salesTable', 8)"><i class="fa-solid fa-plus"></i></button>
+                <button type="button" title="Forzar salto de pagina antes" :class="{ 'is-active': hasPageBreak('salesTable') }" @click="emit('toggle-page-break', 'salesTable')"><i class="fa-solid fa-file-arrow-down"></i></button>
+                <button type="button" title="Resetear este bloque" @click="emit('reset-block-spacing', 'salesTable')"><i class="fa-solid fa-rotate-left"></i></button>
+            </div>
+            <PicDataTable title="Detalle Facturación ($)" type="pesos" :processed-data="dataPesos" :years="selectedYears" />
+        </div>
 
-        <div class="my-5 border-t border-pic-border md:my-7"></div>
+        <div data-pic-print-block="true" data-pic-print-block-id="salesDivider" class="my-5 border-t border-pic-border md:my-7"></div>
 
-        <div class="pic-chart-row grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div data-pic-print-section="averageCharts" data-pic-print-block="true" data-pic-print-block-id="averageCharts" class="pic-print-adjustable-block pic-chart-row grid grid-cols-1 gap-4 xl:grid-cols-2" :class="{ 'pic-print-page-break-before': hasPageBreak('averageCharts') }" :style="blockStyle('averageCharts')">
+            <div v-if="props.printConfig" class="pic-print-block-controls">
+                <span>Graficas promedio</span>
+                <button type="button" title="Reducir espacio antes" @click="emit('update-block-spacing', 'averageCharts', -8)"><i class="fa-solid fa-minus"></i></button>
+                <strong>{{ blockSpacingValue('averageCharts') }}px</strong>
+                <button type="button" title="Aumentar espacio antes" @click="emit('update-block-spacing', 'averageCharts', 8)"><i class="fa-solid fa-plus"></i></button>
+                <button type="button" title="Forzar salto de pagina antes" :class="{ 'is-active': hasPageBreak('averageCharts') }" @click="emit('toggle-page-break', 'averageCharts')"><i class="fa-solid fa-file-arrow-down"></i></button>
+                <button type="button" title="Resetear este bloque" @click="emit('reset-block-spacing', 'averageCharts')"><i class="fa-solid fa-rotate-left"></i></button>
+            </div>
             <div class="pic-chart-cell min-w-0">
                 <PicEChart
                 :option="configPromedioMensual"
@@ -225,13 +309,26 @@ const removeWidget = (id: string) => {
                 <PicEChart :option="configPromedioAnual" title="Precio Promedio Anual ($/KG)" />
             </div>
         </div>
-        <PicDataTable title="Detalle Precio Promedio" type="promedio" :processed-data="dataPromedio" :years="selectedYears" />
+        <div data-pic-print-section="averageTable" data-pic-print-block="true" data-pic-print-block-id="averageTable" data-pic-print-table="true" class="pic-print-adjustable-block" :class="{ 'pic-print-page-break-before': hasPageBreak('averageTable') }" :style="blockStyle('averageTable')">
+            <div v-if="props.printConfig" class="pic-print-block-controls">
+                <span>Tabla promedio</span>
+                <button type="button" title="Reducir espacio antes" @click="emit('update-block-spacing', 'averageTable', -8)"><i class="fa-solid fa-minus"></i></button>
+                <strong>{{ blockSpacingValue('averageTable') }}px</strong>
+                <button type="button" title="Aumentar espacio antes" @click="emit('update-block-spacing', 'averageTable', 8)"><i class="fa-solid fa-plus"></i></button>
+                <button type="button" title="Forzar salto de pagina antes" :class="{ 'is-active': hasPageBreak('averageTable') }" @click="emit('toggle-page-break', 'averageTable')"><i class="fa-solid fa-file-arrow-down"></i></button>
+                <button type="button" title="Resetear este bloque" @click="emit('reset-block-spacing', 'averageTable')"><i class="fa-solid fa-rotate-left"></i></button>
+            </div>
+            <PicDataTable title="Detalle Precio Promedio" type="promedio" :processed-data="dataPromedio" :years="selectedYears" />
+        </div>
 
         <div 
+            v-if="hasAnyProjectionLoaded || !props.isPrintMode"
+            data-pic-print-section="operationalBreakdown"
             class="mt-12 border-t-2 border-dashed border-pic-border pt-8"
             :data-html2canvas-ignore="!hasAnyProjectionLoaded ? 'true' : undefined"
         >
             <button 
+                data-pic-print-control="true"
                 @click="showDesglose = !showDesglose"
                 class="w-full flex justify-between items-center mb-6 group focus:outline-none"
             >
@@ -249,14 +346,14 @@ const removeWidget = (id: string) => {
                 </div>
             </button>
 
-            <div v-show="showDesglose" class="space-y-6 transition-all duration-500 ease-in-out">
-                <PicProjectionTable title="Proyección por Marcas" dimensionKey="marcas" />
-                <PicProjectionTable title="Proyección por Gerencia" dimensionKey="gerencia" />
-                <PicProjectionTable title="Proyección por Zona" dimensionKey="zona" drill-down-target="articulos" />
-                <PicProjectionTable title="Proyección por Canal" dimensionKey="canal" drill-down-target="articulos"/>
-                <PicProjectionTable title="Proyección por Familias" dimensionKey="familias" drill-down-target="articulos"/>
-                <PicProjectionTable title="Proyección por Clientes (Top 150)" dimensionKey="clientes" drill-down-target="articulos" :initial-collapsed="true"/>
-                <PicProjectionTable title="Proyección por Artículos" dimensionKey="articulos" :initial-collapsed="true"/>
+            <div v-show="showDesglose || props.isPrintMode" class="space-y-6 transition-all duration-500 ease-in-out">
+                <PicProjectionTable title="Proyección por Marcas" dimensionKey="marcas" print-block-id="operational-marcas" :is-print-mode="props.isPrintMode" :print-config="props.printConfig" @update-block-spacing="(blockId, delta) => emit('update-block-spacing', blockId, delta)" @toggle-page-break="blockId => emit('toggle-page-break', blockId)" @reset-block-spacing="blockId => emit('reset-block-spacing', blockId)" />
+                <PicProjectionTable title="Proyección por Gerencia" dimensionKey="gerencia" print-block-id="operational-gerencia" :is-print-mode="props.isPrintMode" :print-config="props.printConfig" @update-block-spacing="(blockId, delta) => emit('update-block-spacing', blockId, delta)" @toggle-page-break="blockId => emit('toggle-page-break', blockId)" @reset-block-spacing="blockId => emit('reset-block-spacing', blockId)" />
+                <PicProjectionTable title="Proyección por Zona" dimensionKey="zona" print-block-id="operational-zona" drill-down-target="articulos" :is-print-mode="props.isPrintMode" :print-config="props.printConfig" @update-block-spacing="(blockId, delta) => emit('update-block-spacing', blockId, delta)" @toggle-page-break="blockId => emit('toggle-page-break', blockId)" @reset-block-spacing="blockId => emit('reset-block-spacing', blockId)" />
+                <PicProjectionTable title="Proyección por Canal" dimensionKey="canal" print-block-id="operational-canal" drill-down-target="articulos" :is-print-mode="props.isPrintMode" :print-config="props.printConfig" @update-block-spacing="(blockId, delta) => emit('update-block-spacing', blockId, delta)" @toggle-page-break="blockId => emit('toggle-page-break', blockId)" @reset-block-spacing="blockId => emit('reset-block-spacing', blockId)" />
+                <PicProjectionTable title="Proyección por Familias" dimensionKey="familias" print-block-id="operational-familias" drill-down-target="articulos" :is-print-mode="props.isPrintMode" :print-config="props.printConfig" @update-block-spacing="(blockId, delta) => emit('update-block-spacing', blockId, delta)" @toggle-page-break="blockId => emit('toggle-page-break', blockId)" @reset-block-spacing="blockId => emit('reset-block-spacing', blockId)" />
+                <PicProjectionTable title="Proyección por Clientes (Top 150)" dimensionKey="clientes" print-block-id="operational-clientes" drill-down-target="articulos" :initial-collapsed="true" :is-print-mode="props.isPrintMode" :print-config="props.printConfig" @update-block-spacing="(blockId, delta) => emit('update-block-spacing', blockId, delta)" @toggle-page-break="blockId => emit('toggle-page-break', blockId)" @reset-block-spacing="blockId => emit('reset-block-spacing', blockId)" />
+                <PicProjectionTable title="Proyección por Artículos" dimensionKey="articulos" print-block-id="operational-articulos" :initial-collapsed="true" :is-print-mode="props.isPrintMode" :print-config="props.printConfig" @update-block-spacing="(blockId, delta) => emit('update-block-spacing', blockId, delta)" @toggle-page-break="blockId => emit('toggle-page-break', blockId)" @reset-block-spacing="blockId => emit('reset-block-spacing', blockId)" />
             </div>
         </div>
 

@@ -237,7 +237,7 @@ const handleAnalyze = () => {
                 <i class="fa-solid fa-table text-pic-text-muted"></i> {{ title }}
             </h3>
             
-            <div class="flex items-center gap-3">
+            <div data-pic-print-control="true" class="flex items-center gap-3">
                 <button 
                     @click="handleAnalyze"
                     class="flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium text-pic-text-muted transition-colors hover:bg-pic-brand-soft hover:text-pic-brand"
@@ -259,7 +259,7 @@ const handleAnalyze = () => {
             </div>
         </div>
 
-        <div class="hidden border-b border-pic-border bg-pic-surface px-4 py-3 md:block">
+        <div data-pic-print-control="true" class="hidden border-b border-pic-border bg-pic-surface px-4 py-3 md:block">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="flex flex-wrap items-center gap-2">
                     <span
@@ -293,7 +293,7 @@ const handleAnalyze = () => {
             </div>
         </div>
 
-        <div class="space-y-2.5 border-b border-pic-border bg-pic-surface p-2.5 md:hidden">
+        <div data-pic-print-control="true" class="space-y-2.5 border-b border-pic-border bg-pic-surface p-2.5 md:hidden">
             <div class="grid grid-cols-2 gap-2">
                 <div
                     v-for="item in mobileSummaryItems"

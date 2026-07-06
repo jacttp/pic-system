@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { usePicFilterStore } from '../stores/picFilterStore';
 import PicChat from '../components/PicChat.vue';
 import PicFilters from '../components/PicFilters.vue';
 import PicGrid from '../components/PicGrid.vue'; 
 import ExecutiveSummaryCard from '../components/ExecutiveSummaryCard.vue';
 import PicExportModal from '../components/modals/PicExportModal.vue';
+import type { PicPdfExportConfig, PicPrintBlockKey, PicPrintSectionKey } from '../types/picTypes';
 // import html2canvas from 'html2canvas'; // Quitamos de aquí para evitar dependencias circulares en build
 // import jsPDF from 'jspdf';
 import CacheProgress from '@/modules/Shared/components/CacheProgress.vue';
@@ -132,7 +133,165 @@ const handleGenerate = async () => {
 const reportContent = ref<HTMLElement | null>(null);
 const isExporting = ref(false);
 const showExportModal = ref(false);
+const activePrintConfig = ref<PicPdfExportConfig | null>(null);
+const exportPanelRef = ref<InstanceType<typeof PicExportModal> | null>(null);
 const PDF_EXPORT_WIDTH = 1120;
+const PDF_FORMAT_MM: Record<PicPdfExportConfig['format'], { width: number; height: number }> = {
+    a4: { width: 210, height: 297 },
+    letter: { width: 216, height: 279 },
+    legal: { width: 216, height: 356 }
+};
+
+const printModeClasses = computed(() => {
+    const config = activePrintConfig.value;
+    if (!config) return {};
+
+    const classes: Record<string, boolean> = {
+        'pic-pdf-export-mode': true,
+        'pic-pdf-grayscale': config.grayscale,
+        'pic-pdf-clean-controls': config.cleanControls,
+        'pic-pdf-avoid-breaks': config.avoidPageBreaks,
+        'pic-pdf-font-normal': config.fontScale === 'normal',
+        'pic-pdf-font-large': config.fontScale === 'large',
+        'pic-pdf-font-xlarge': config.fontScale === 'xlarge',
+        'pic-pdf-spacing-compact': config.spacing === 'compact',
+        'pic-pdf-spacing-normal': config.spacing === 'normal',
+        'pic-pdf-spacing-spacious': config.spacing === 'spacious',
+        [`pic-pdf-format-${config.format}`]: true,
+        [`pic-pdf-orientation-${config.orientation}`]: true
+    };
+
+    Object.entries(config.sections).forEach(([section, isVisible]) => {
+        classes[`pic-hide-${section}`] = !isVisible;
+    });
+
+    return classes;
+});
+
+const printPreviewStyle = computed(() => {
+    const config = activePrintConfig.value;
+    if (!config) return {};
+
+    return {
+        '--pic-preview-page-height': `${getPreviewPagePixelHeight(config)}px`,
+        '--pic-print-block-gap': `${getGlobalBlockGap(config)}px`
+    };
+});
+
+const getPrintClassList = (config: PicPdfExportConfig) => {
+    const classes = [
+        'pic-pdf-export-mode',
+        config.grayscale ? 'pic-pdf-grayscale' : '',
+        config.cleanControls ? 'pic-pdf-clean-controls' : '',
+        config.avoidPageBreaks ? 'pic-pdf-avoid-breaks' : '',
+        `pic-pdf-font-${config.fontScale}`,
+        `pic-pdf-spacing-${config.spacing}`,
+        `pic-pdf-format-${config.format}`,
+        `pic-pdf-orientation-${config.orientation}`
+    ];
+
+    Object.entries(config.sections).forEach(([section, isVisible]) => {
+        if (!isVisible) classes.push(`pic-hide-${section}`);
+    });
+
+    return classes.filter(Boolean);
+};
+
+const clonePrintConfig = (config: PicPdfExportConfig): PicPdfExportConfig => ({
+    ...config,
+    sections: { ...config.sections },
+    blockSpacing: { ...(config.blockSpacing || {}) },
+    pageBreakBefore: { ...(config.pageBreakBefore || {}) }
+});
+
+const getGlobalBlockGap = (config: PicPdfExportConfig) => {
+    const baseGap = 24;
+    return Math.max(0, Math.round(baseGap * (1 + (config.spacingPercent || 0) / 100)));
+};
+
+const getPreviewPagePixelHeight = (config: PicPdfExportConfig) => {
+    const format = PDF_FORMAT_MM[config.format];
+    const pageWidth = config.orientation === 'landscape' ? format.height : format.width;
+    const pageHeight = config.orientation === 'landscape' ? format.width : format.height;
+    const marginX = getPdfMarginX(config.margin);
+    const marginTop = config.showTitle || config.showDate ? 18 : 10;
+    const marginBottom = config.showPageNumbers ? 15 : 10;
+    const usableWidth = pageWidth - (marginX * 2);
+    const usableHeight = pageHeight - marginTop - marginBottom;
+
+    return Math.floor((PDF_EXPORT_WIDTH * usableHeight) / usableWidth);
+};
+
+const getBlockSpacingValue = (config: PicPdfExportConfig | null, blockId: PicPrintBlockKey) => {
+    return Number(config?.blockSpacing?.[blockId] || 0);
+};
+
+const getBlockPreviewStyle = (blockId: PicPrintBlockKey) => {
+    const config = activePrintConfig.value;
+    if (!config) return {};
+
+    return {
+        marginTop: `calc(${getBlockSpacingValue(config, blockId)}px + var(--pic-print-page-break-offset, 0px))`
+    };
+};
+
+const commitPrintConfig = (config: PicPdfExportConfig) => {
+    const nextConfig = clonePrintConfig(config);
+    activePrintConfig.value = nextConfig;
+    exportPanelRef.value?.replaceConfig(nextConfig);
+};
+
+const updatePrintBlockSpacing = (blockId: PicPrintBlockKey, delta: number) => {
+    const config = activePrintConfig.value;
+    if (!config) return;
+
+    const nextConfig = clonePrintConfig(config);
+    const current = getBlockSpacingValue(nextConfig, blockId);
+    nextConfig.blockSpacing[blockId] = Math.max(-24, Math.min(220, current + delta));
+    commitPrintConfig(nextConfig);
+};
+
+const resetPrintBlockSpacing = (blockId: PicPrintBlockKey) => {
+    const config = activePrintConfig.value;
+    if (!config) return;
+
+    const nextConfig = clonePrintConfig(config);
+    delete nextConfig.blockSpacing[blockId];
+    delete nextConfig.pageBreakBefore[blockId];
+    commitPrintConfig(nextConfig);
+};
+
+const togglePrintBlockPageBreak = (blockId: PicPrintBlockKey) => {
+    const config = activePrintConfig.value;
+    if (!config) return;
+
+    const nextConfig = clonePrintConfig(config);
+    nextConfig.pageBreakBefore[blockId] = !nextConfig.pageBreakBefore[blockId];
+    commitPrintConfig(nextConfig);
+};
+
+const refreshPrintPageBreakOffsets = async () => {
+    const config = activePrintConfig.value;
+    const report = reportContent.value;
+    if (!config || !report) return;
+
+    await nextTick();
+
+    const pageHeight = getPreviewPagePixelHeight(config);
+    const blocks = Array.from(report.querySelectorAll('[data-pic-print-block="true"]')) as HTMLElement[];
+    blocks.forEach(block => block.style.setProperty('--pic-print-page-break-offset', '0px'));
+
+    const reportTop = report.getBoundingClientRect().top;
+    blocks.forEach(block => {
+        const blockId = block.dataset.picPrintBlockId as PicPrintBlockKey | undefined;
+        if (!blockId || !config.pageBreakBefore?.[blockId]) return;
+
+        const blockTop = block.getBoundingClientRect().top - reportTop;
+        const currentPageRemainder = ((blockTop % pageHeight) + pageHeight) % pageHeight;
+        const offset = currentPageRemainder === 0 ? 0 : Math.ceil(pageHeight - currentPageRemainder);
+        block.style.setProperty('--pic-print-page-break-offset', `${offset}px`);
+    });
+};
 
 const waitForPdfLayout = async () => {
     await nextTick();
@@ -141,19 +300,340 @@ const waitForPdfLayout = async () => {
 };
 
 const openExportModal = () => {
-    showExportModal.value = true;
+    showExportModal.value = !showExportModal.value;
 };
+
+const handlePrintPreviewChange = (config: PicPdfExportConfig | null) => {
+    if (isExporting.value && !config) return;
+    activePrintConfig.value = config;
+};
+
+watch(activePrintConfig, () => {
+    void refreshPrintPageBreakOffsets();
+}, { deep: true, flush: 'post' });
+
+const handlePrintPreviewResize = () => {
+    void refreshPrintPageBreakOffsets();
+};
+
+onMounted(() => {
+    window.addEventListener('resize', handlePrintPreviewResize);
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('resize', handlePrintPreviewResize);
+});
 
 const getPicCssColor = (token: string, fallback: string) => {
     const value = getComputedStyle(document.documentElement).getPropertyValue(token).trim();
     return value ? `hsl(${value})` : fallback;
 };
 
-const handleExportConfirm = async (config: any) => {
+const getPdfMarginX = (margin: PicPdfExportConfig['margin']) => {
+    if (margin === 'reducido') return 6;
+    if (margin === 'ninguno') return 0;
+    return 12;
+};
+
+const getPdfContentMetrics = (pdf: any, config: PicPdfExportConfig) => {
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const marginX = getPdfMarginX(config.margin);
+    const marginTop = config.showTitle || config.showDate ? 18 : 10;
+    const marginBottom = config.showPageNumbers ? 15 : 10;
+    const usableWidth = pageWidth - (marginX * 2);
+    const usableHeight = pageHeight - marginTop - marginBottom;
+    const pagePixelHeight = Math.floor((PDF_EXPORT_WIDTH * usableHeight) / usableWidth);
+
+    return { pageWidth, pageHeight, marginX, marginTop, marginBottom, usableWidth, usableHeight, pagePixelHeight };
+};
+
+const applyPrintConfigToReport = (report: HTMLElement, config: PicPdfExportConfig) => {
+    report.style.width = `${PDF_EXPORT_WIDTH}px`;
+    report.style.maxWidth = `${PDF_EXPORT_WIDTH}px`;
+    report.style.minWidth = `${PDF_EXPORT_WIDTH}px`;
+    report.style.overflow = 'visible';
+    report.style.filter = config.grayscale ? 'grayscale(1)' : '';
+    report.style.setProperty('--pic-print-block-gap', `${getGlobalBlockGap(config)}px`);
+
+    Object.entries(config.sections).forEach(([section, isVisible]) => {
+        if (isVisible) return;
+        report.querySelectorAll(`[data-pic-print-section="${section as PicPrintSectionKey}"]`).forEach(element => {
+            (element as HTMLElement).style.display = 'none';
+        });
+    });
+
+    if (config.cleanControls) {
+        report.querySelectorAll('[data-pic-print-control="true"]').forEach(element => {
+            (element as HTMLElement).style.display = 'none';
+        });
+    }
+
+    report.querySelectorAll('.pic-print-block-controls').forEach(element => {
+        (element as HTMLElement).style.display = 'none';
+    });
+
+    report.querySelectorAll('[data-pic-print-block="true"]').forEach(element => {
+        (element as HTMLElement).style.setProperty('--pic-print-page-break-offset', '0px');
+    });
+
+    report.querySelectorAll('.pic-report-table, .pic-report-table-scroll').forEach(element => {
+        const tableElement = element as HTMLElement;
+        tableElement.style.height = 'auto';
+        tableElement.style.maxHeight = 'none';
+        tableElement.style.overflow = 'visible';
+    });
+
+    report.querySelectorAll('[data-html2canvas-ignore="true"]').forEach(element => {
+        (element as HTMLElement).style.display = 'none';
+    });
+};
+
+const copyCanvasBitmaps = (source: HTMLElement, target: HTMLElement) => {
+    const sourceCanvases = Array.from(source.querySelectorAll('canvas')) as HTMLCanvasElement[];
+    const targetCanvases = Array.from(target.querySelectorAll('canvas')) as HTMLCanvasElement[];
+
+    sourceCanvases.forEach((sourceCanvas, index) => {
+        const targetCanvas = targetCanvases[index];
+        if (!targetCanvas || sourceCanvas.width === 0 || sourceCanvas.height === 0) return;
+
+        targetCanvas.width = sourceCanvas.width;
+        targetCanvas.height = sourceCanvas.height;
+        targetCanvas.style.width = sourceCanvas.style.width || `${sourceCanvas.clientWidth}px`;
+        targetCanvas.style.height = sourceCanvas.style.height || `${sourceCanvas.clientHeight}px`;
+        targetCanvas.getContext('2d')?.drawImage(sourceCanvas, 0, 0);
+    });
+};
+
+const getVueScopeAttributeNames = (element: HTMLElement) => {
+    return Array.from(element.attributes)
+        .map(attribute => attribute.name)
+        .filter(name => name.startsWith('data-v-'));
+};
+
+const applyVueScopeAttributes = (element: HTMLElement, scopeAttributeNames: string[]) => {
+    scopeAttributeNames.forEach(attributeName => {
+        element.setAttribute(attributeName, '');
+    });
+};
+
+const createPrintPage = (pagePixelHeight: number, config: PicPdfExportConfig, scopeAttributeNames: string[]) => {
+    const page = document.createElement('section');
+    page.className = ['pic-pdf-render-page', ...getPrintClassList(config)].join(' ');
+    applyVueScopeAttributes(page, scopeAttributeNames);
+    page.style.width = `${PDF_EXPORT_WIDTH}px`;
+    page.style.minHeight = `${pagePixelHeight}px`;
+    page.style.background = getPicCssColor('--pic-background', '#f1f5f9');
+    page.style.overflow = 'hidden';
+    page.style.boxSizing = 'border-box';
+    page.style.padding = '16px';
+    page.style.setProperty('--pic-print-block-gap', `${getGlobalBlockGap(config)}px`);
+    return page;
+};
+
+const cloneTableShellWithRows = (tableBlock: HTMLElement, rows: HTMLTableRowElement[]) => {
+    const clone = tableBlock.cloneNode(true) as HTMLElement;
+    const tbody = clone.querySelector('.pic-report-table-scroll table tbody') || clone.querySelector('table:not([data-pic-print-control="true"]):not([hidden]) tbody') || clone.querySelector('tbody');
+    if (!tbody) return clone;
+
+    tbody.innerHTML = '';
+    rows.forEach(row => tbody.appendChild(row.cloneNode(true)));
+    return clone;
+};
+
+const getProjectionPrintTable = (tableBlock: HTMLElement) => {
+    return tableBlock.querySelector('.pic-report-table-scroll table') as HTMLTableElement | null;
+};
+
+const prepareProjectionPrintChunk = (chunk: HTMLElement, isLastChunk: boolean) => {
+    chunk.classList.add('pic-pdf-projection-table-chunk');
+    chunk.querySelectorAll('[data-pic-print-control="true"], .pic-print-block-controls').forEach(element => {
+        (element as HTMLElement).style.display = 'none';
+    });
+
+    if (!isLastChunk) {
+        getProjectionPrintTable(chunk)?.querySelector('tfoot')?.remove();
+    }
+
+    chunk.querySelectorAll('.sticky').forEach(element => {
+        const stickyElement = element as HTMLElement;
+        stickyElement.style.position = 'static';
+        stickyElement.style.left = 'auto';
+        stickyElement.style.top = 'auto';
+        stickyElement.style.boxShadow = 'none';
+    });
+};
+
+const cloneProjectionTableChunk = (tableBlock: HTMLElement, rows: HTMLTableRowElement[], isLastChunk: boolean) => {
+    const clone = tableBlock.cloneNode(true) as HTMLElement;
+    const table = getProjectionPrintTable(clone);
+    const tbody = table?.querySelector('tbody');
+    if (!tbody) return clone;
+
+    tbody.innerHTML = '';
+    rows.forEach(row => tbody.appendChild(row.cloneNode(true)));
+    prepareProjectionPrintChunk(clone, isLastChunk);
+    return clone;
+};
+
+const splitProjectionTableBlockByRows = (tableBlock: HTMLElement, pagePixelHeight: number, config: PicPdfExportConfig, scopeAttributeNames: string[]) => {
+    const table = getProjectionPrintTable(tableBlock);
+    const rows = Array.from(table?.querySelectorAll('tbody tr') || []) as HTMLTableRowElement[];
+    if (!rows.length) return [tableBlock];
+
+    const measuringPage = createPrintPage(pagePixelHeight, config, scopeAttributeNames);
+    measuringPage.style.position = 'absolute';
+    measuringPage.style.left = '-10000px';
+    measuringPage.style.top = '0';
+    document.body.appendChild(measuringPage);
+
+    const maxChunkHeight = pagePixelHeight - 40;
+    const rowChunks: HTMLTableRowElement[][] = [];
+    let currentRows: HTMLTableRowElement[] = [];
+
+    rows.forEach(row => {
+        const candidateRows = [...currentRows, row];
+        const candidate = cloneProjectionTableChunk(tableBlock, candidateRows, false);
+        measuringPage.innerHTML = '';
+        measuringPage.appendChild(candidate);
+
+        if (candidate.offsetHeight > maxChunkHeight && currentRows.length > 0) {
+            rowChunks.push(currentRows);
+            currentRows = [row];
+            return;
+        }
+
+        currentRows = candidateRows;
+    });
+
+    if (currentRows.length > 0) {
+        rowChunks.push(currentRows);
+    }
+
+    measuringPage.remove();
+    return rowChunks.map((rowsInChunk, index) => cloneProjectionTableChunk(tableBlock, rowsInChunk, index === rowChunks.length - 1));
+};
+
+const splitTableBlockByRows = (tableBlock: HTMLElement, pagePixelHeight: number, config: PicPdfExportConfig, scopeAttributeNames: string[]) => {
+    const table = tableBlock.querySelector('.pic-report-table-scroll table') || tableBlock.querySelector('table:not([data-pic-print-control="true"]):not([hidden])') || tableBlock.querySelector('table');
+    const rows = Array.from(table?.querySelectorAll('tbody tr') || []) as HTMLTableRowElement[];
+    if (!rows.length) return [tableBlock];
+
+    const measuringPage = createPrintPage(pagePixelHeight, config, scopeAttributeNames);
+    measuringPage.style.position = 'absolute';
+    measuringPage.style.left = '-10000px';
+    measuringPage.style.top = '0';
+    document.body.appendChild(measuringPage);
+
+    const chunks: HTMLElement[] = [];
+    let currentRows: HTMLTableRowElement[] = [];
+
+    rows.forEach(row => {
+        const candidateRows = [...currentRows, row];
+        const candidate = cloneTableShellWithRows(tableBlock, candidateRows);
+        measuringPage.innerHTML = '';
+        measuringPage.appendChild(candidate);
+
+        if (candidate.offsetHeight > pagePixelHeight && currentRows.length > 0) {
+            chunks.push(cloneTableShellWithRows(tableBlock, currentRows));
+            currentRows = [row];
+            return;
+        }
+
+        currentRows = candidateRows;
+    });
+
+    if (currentRows.length > 0) {
+        chunks.push(cloneTableShellWithRows(tableBlock, currentRows));
+    }
+
+    measuringPage.remove();
+    return chunks.length ? chunks : [tableBlock];
+};
+
+const buildPaginatedPrintPages = (sourceReport: HTMLElement, config: PicPdfExportConfig, pagePixelHeight: number) => {
+    const scopeAttributeNames = getVueScopeAttributeNames(sourceReport);
+    const staging = document.createElement('div');
+    staging.className = 'pic-pdf-render-stage';
+    applyVueScopeAttributes(staging, scopeAttributeNames);
+    staging.style.position = 'absolute';
+    staging.style.left = '-10000px';
+    staging.style.top = '0';
+    staging.style.width = `${PDF_EXPORT_WIDTH}px`;
+    staging.style.background = getPicCssColor('--pic-background', '#f1f5f9');
+    document.body.appendChild(staging);
+
+    const clonedReport = sourceReport.cloneNode(true) as HTMLElement;
+    copyCanvasBitmaps(sourceReport, clonedReport);
+    applyPrintConfigToReport(clonedReport, config);
+    staging.appendChild(clonedReport);
+
+    const blocks = Array.from(clonedReport.querySelectorAll('[data-pic-print-block="true"]')) as HTMLElement[];
+    const visibleBlocks = blocks.filter(block => block.offsetParent !== null && block.offsetHeight > 0);
+    const pageNodes: HTMLElement[] = [];
+
+    staging.innerHTML = '';
+
+    let currentPage = createPrintPage(pagePixelHeight, config, scopeAttributeNames);
+    staging.appendChild(currentPage);
+    pageNodes.push(currentPage);
+    const appliedManualBreaks = new Set<string>();
+
+    const appendPage = () => {
+        currentPage = createPrintPage(pagePixelHeight, config, scopeAttributeNames);
+        staging.appendChild(currentPage);
+        pageNodes.push(currentPage);
+    };
+
+    const appendBlock = (block: HTMLElement) => {
+        const blockId = block.dataset.picPrintBlockId as PicPrintBlockKey | undefined;
+        if (blockId) {
+            const customSpacing = getBlockSpacingValue(config, blockId);
+            if (customSpacing !== 0) {
+                block.style.marginTop = `${customSpacing}px`;
+            }
+
+            if (config.pageBreakBefore?.[blockId] && currentPage.children.length > 0 && !appliedManualBreaks.has(blockId)) {
+                appliedManualBreaks.add(blockId);
+                appendPage();
+            }
+        }
+
+        currentPage.appendChild(block);
+        if (currentPage.scrollHeight <= pagePixelHeight || currentPage.children.length === 1) return;
+
+        currentPage.removeChild(block);
+        appendPage();
+        currentPage.appendChild(block);
+    };
+
+    visibleBlocks.forEach(block => {
+        const isProjectionTable = block.matches('[data-pic-print-projection-table="true"]');
+        const shouldSplitTable = block.matches('[data-pic-print-table="true"]') && block.offsetHeight > pagePixelHeight;
+        const shouldSplitProjectionTable = isProjectionTable && block.offsetHeight > pagePixelHeight;
+        const printableBlocks = shouldSplitProjectionTable
+            ? splitProjectionTableBlockByRows(block, pagePixelHeight, config, scopeAttributeNames)
+            : shouldSplitTable
+                ? splitTableBlockByRows(block, pagePixelHeight, config, scopeAttributeNames)
+                : [block];
+        printableBlocks.forEach(printableBlock => appendBlock(printableBlock));
+    });
+
+    pageNodes.filter(page => page.children.length === 0).forEach(page => page.remove());
+
+    return {
+        staging,
+        pages: pageNodes.filter(page => page.isConnected && page.children.length > 0)
+    };
+};
+
+const handleExportConfirm = async (config: PicPdfExportConfig) => {
     if (!reportContent.value) return;
+    let staging: HTMLElement | null = null;
     
     try {
         isExporting.value = true;
+        activePrintConfig.value = config;
         await waitForPdfLayout();
         
         // Importación dinámica de librerías visuales pesadas (Evita errores de inicialización en build)
@@ -163,99 +643,96 @@ const handleExportConfirm = async (config: any) => {
         ]);
 
         const element = reportContent.value;
-        const canvas = await html2canvas.default(element, {
-            scale: 2,
-            useCORS: true,
-            logging: false,
-            width: PDF_EXPORT_WIDTH,
-            windowWidth: PDF_EXPORT_WIDTH,
-            scrollX: 0,
-            scrollY: 0,
-            backgroundColor: getPicCssColor('--pic-background', '#f1f5f9'),
-            onclone: (clonedDocument: Document) => {
-                const clonedReport = clonedDocument.querySelector('[data-pic-report-content="true"]') as HTMLElement | null;
-                if (!clonedReport) return;
-
-                clonedReport.style.width = `${PDF_EXPORT_WIDTH}px`;
-                clonedReport.style.maxWidth = `${PDF_EXPORT_WIDTH}px`;
-                clonedReport.style.minWidth = `${PDF_EXPORT_WIDTH}px`;
-                clonedReport.style.overflow = 'hidden';
-            }
-        });
-
-        const imgData = canvas.toDataURL('image/jpeg', 0.98);
         const pdf = new jsPDF({
             orientation: config.orientation as any,
             unit: 'mm',
             format: config.format
         });
 
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        
-        let marginX = 12;
-        if (config.margin === 'reducido') marginX = 6;
-        if (config.margin === 'ninguno') marginX = 0;
-        
-        const marginTop = 20; 
-        const marginBottom = config.showPageNumbers ? 15 : 10;
-        
-        const usableWidth = pageWidth - (marginX * 2);
-        const usableHeight = pageHeight - marginTop - marginBottom;
-
-        const imgWidth = usableWidth;
-        const imgHeight = (canvas.height * usableWidth) / canvas.width;
+        const {
+            pageWidth,
+            pageHeight,
+            marginX,
+            marginTop,
+            marginBottom,
+            usableWidth,
+            usableHeight,
+            pagePixelHeight
+        } = getPdfContentMetrics(pdf, config);
         
         const drawHeaderFooter = (pageNum: number) => {
             pdf.setFillColor(255, 255, 255);
             pdf.rect(0, 0, pageWidth, marginTop, 'F');
             pdf.rect(0, pageHeight - marginBottom, pageWidth, marginBottom, 'F');
 
-            pdf.setFontSize(14);
-            pdf.setTextColor(15, 23, 42); 
-            // Titulo configurado
-            const safeTitle = config.title.trim() || 'Reporte Operativo PIC';
-            pdf.text(safeTitle, marginX === 0 ? 5 : marginX, 12);
+            const headerX = marginX === 0 ? 5 : marginX;
+            const headerY = 10;
+
+            if (config.showTitle) {
+                pdf.setFont('helvetica', 'bold');
+                pdf.setFontSize(9.5);
+                pdf.setTextColor(15, 23, 42);
+                const safeTitle = config.title.trim() || 'Reporte de Venta - PIC';
+                pdf.text(safeTitle, headerX, headerY, { baseline: 'middle' });
+            }
             
             if (config.showDate) {
-                pdf.setFontSize(10);
+                pdf.setFont('helvetica', 'normal');
+                pdf.setFontSize(8);
                 pdf.setTextColor(100, 116, 139); 
-                pdf.text(`Fecha: ${new Date().toLocaleDateString()}`, pageWidth - (marginX === 0 ? 5 : marginX), 12, { align: 'right' });
+                pdf.text(`Generado ${new Date().toLocaleDateString()}`, pageWidth - headerX, headerY, { align: 'right', baseline: 'middle' });
+            }
+
+            if (config.showTitle || config.showDate) {
+                pdf.setDrawColor(226, 232, 240);
+                pdf.setLineWidth(0.15);
+                pdf.line(headerX, marginTop - 3, pageWidth - headerX, marginTop - 3);
             }
             
             if (config.showPageNumbers) {
+                pdf.setFont('helvetica', 'normal');
                 pdf.setTextColor(100, 116, 139);
-                pdf.setFontSize(9);
+                pdf.setFontSize(8);
                 pdf.text(`Página ${pageNum}`, pageWidth / 2, pageHeight - 6, { align: 'center' });
             }
         };
 
-        let heightLeft = imgHeight;
-        let positionY = 0; 
-        let pageNum = 1;
+        const paginatedReport = buildPaginatedPrintPages(element, config, pagePixelHeight);
+        staging = paginatedReport.staging;
+        const { pages } = paginatedReport;
 
-        pdf.addImage(imgData, 'JPEG', marginX, marginTop, imgWidth, imgHeight);
-        drawHeaderFooter(pageNum);
-        heightLeft -= usableHeight;
+        for (let index = 0; index < pages.length; index++) {
+            if (index > 0) pdf.addPage();
 
-        while (heightLeft > 0) {
-            positionY -= usableHeight; 
-            pdf.addPage();
-            pageNum++;
-            
-            pdf.addImage(imgData, 'JPEG', marginX, marginTop + positionY, imgWidth, imgHeight);
-            drawHeaderFooter(pageNum);
-            
-            heightLeft -= usableHeight;
+            const canvas = await html2canvas.default(pages[index], {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                width: PDF_EXPORT_WIDTH,
+                height: pagePixelHeight,
+                windowWidth: PDF_EXPORT_WIDTH,
+                windowHeight: pagePixelHeight,
+                scrollX: 0,
+                scrollY: 0,
+                backgroundColor: getPicCssColor('--pic-background', '#f1f5f9')
+            });
+
+            const imgData = canvas.toDataURL('image/jpeg', 0.98);
+            pdf.addImage(imgData, 'JPEG', marginX, marginTop, usableWidth, usableHeight);
+            drawHeaderFooter(index + 1);
         }
 
+        staging.remove();
+        staging = null;
         const dateStr = new Date().toISOString().split('T')[0];
         pdf.save(`Reporte_${dateStr}.pdf`);
     } catch (error) {
         console.error('Error al exportar a PDF:', error);
         alert('Hubo un error al generar el PDF.');
     } finally {
+        staging?.remove();
         isExporting.value = false;
+        activePrintConfig.value = showExportModal.value ? activePrintConfig.value : null;
     }
 };
 </script>
@@ -263,11 +740,6 @@ const handleExportConfirm = async (config: any) => {
 <template>
     <div class="flex h-full min-h-0 overflow-hidden bg-pic-background text-pic-text-main">
         
-        <PicExportModal 
-            v-model="showExportModal" 
-            @export="handleExportConfirm"
-        />
-
         <div class="relative flex min-h-0 flex-1 flex-col overflow-hidden">
             
             <!-- Overlay de carga -->
@@ -330,47 +802,104 @@ const handleExportConfirm = async (config: any) => {
                                 title="Configurar y Exportar PDF"
                             >
                                 <i v-if="isExporting" class="fa-solid fa-spinner fa-spin text-pic-text-muted"></i>
-                                <i v-else class="fa-solid fa-file-pdf text-pic-brand"></i>
-                                {{ isExporting ? 'Generando PDF...' : 'Exportar a PDF' }}
+                                <i v-else class="fa-solid text-pic-brand" :class="showExportModal ? 'fa-eye' : 'fa-file-pdf'"></i>
+                                {{ isExporting ? 'Generando PDF...' : (showExportModal ? 'Cerrar panel PDF' : 'Configurar PDF') }}
                             </button>
                         </div>
 
                         <PicFilters class="md:basis-full" />
                     </div>
 
-                    <div 
-                        ref="reportContent" 
-                        data-pic-report-content="true"
-                        class="-mx-1 bg-pic-background px-1 pb-4 md:-mx-4 md:px-4"
-                        :class="{ 'pic-pdf-export-mode': isExporting }"
+                    <div
+                        class="grid min-h-0 gap-5"
+                        :class="showExportModal ? 'xl:grid-cols-[minmax(0,1fr)_390px]' : 'xl:grid-cols-1'"
                     >
-                        <ExecutiveSummaryCard />
-
-                        <div class="mb-5 flex gap-2.5 overflow-x-auto pb-1 [scrollbar-width:none] md:mb-6 md:grid md:grid-cols-5 md:gap-3 md:overflow-visible">
-                            <article
-                                v-for="kpi in mobileKpis"
-                                :key="kpi.label"
-                                class="min-w-[154px] rounded-xl border border-pic-border bg-pic-surface p-3 shadow-sm md:min-w-0 md:p-4"
+                        <div
+                            class="min-w-0"
+                            :class="{ 'pic-print-preview-stage': activePrintConfig }"
+                        >
+                            <div 
+                                ref="reportContent" 
+                                data-pic-report-content="true"
+                                class="-mx-1 bg-pic-background px-1 pb-4 md:-mx-4 md:px-4"
+                                :class="printModeClasses"
+                                :style="printPreviewStyle"
                             >
-                                <div class="mb-3 flex items-start gap-2.5 md:mb-4">
-                                    <span
-                                        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg md:h-10 md:w-10"
-                                        :class="{
-                                            'bg-pic-accent-purple-soft text-pic-accent-purple': kpi.tone === 'purple',
-                                            'bg-pic-accent-blue-soft text-pic-accent-blue': kpi.tone === 'blue',
-                                            'bg-pic-accent-teal-soft text-pic-accent-teal': kpi.tone === 'teal'
-                                        }"
-                                    >
-                                        <i class="fa-solid text-sm md:text-base" :class="kpi.icon"></i>
-                                    </span>
-                                    <p class="min-w-0 text-[11px] font-semibold leading-tight text-pic-text-muted md:text-xs">{{ kpi.label }}</p>
+                                <div
+                                    data-pic-print-section="executiveSummary"
+                                    data-pic-print-block="true"
+                                    data-pic-print-block-id="executiveSummary"
+                                    class="pic-print-adjustable-block"
+                                    :class="{ 'pic-print-page-break-before': activePrintConfig?.pageBreakBefore?.executiveSummary }"
+                                    :style="getBlockPreviewStyle('executiveSummary')"
+                                >
+                                    <div v-if="activePrintConfig" class="pic-print-block-controls">
+                                        <span>Resumen</span>
+                                        <button type="button" title="Reducir espacio antes" @click="updatePrintBlockSpacing('executiveSummary', -8)"><i class="fa-solid fa-minus"></i></button>
+                                        <strong>{{ getBlockSpacingValue(activePrintConfig, 'executiveSummary') }}px</strong>
+                                        <button type="button" title="Aumentar espacio antes" @click="updatePrintBlockSpacing('executiveSummary', 8)"><i class="fa-solid fa-plus"></i></button>
+                                        <button type="button" title="Forzar salto de pagina antes" :class="{ 'is-active': activePrintConfig.pageBreakBefore?.executiveSummary }" @click="togglePrintBlockPageBreak('executiveSummary')"><i class="fa-solid fa-file-arrow-down"></i></button>
+                                        <button type="button" title="Resetear este bloque" @click="resetPrintBlockSpacing('executiveSummary')"><i class="fa-solid fa-rotate-left"></i></button>
+                                    </div>
+                                    <ExecutiveSummaryCard />
                                 </div>
-                                <p class="text-[20px] font-black leading-none tracking-tight text-pic-text-main md:text-2xl">{{ kpi.value }}</p>
-                                <p class="mt-1.5 text-[11px] font-bold leading-tight md:text-xs" :class="kpi.positive ? 'text-pic-success' : 'text-pic-danger'">{{ kpi.detail }}</p>
-                            </article>
+
+                                <div
+                                    data-pic-print-section="kpis"
+                                    data-pic-print-block="true"
+                                    data-pic-print-block-id="kpis"
+                                    class="pic-print-adjustable-block mb-5 flex gap-2.5 overflow-x-auto pb-1 [scrollbar-width:none] md:mb-6 md:grid md:grid-cols-5 md:gap-3 md:overflow-visible"
+                                    :class="{ 'pic-print-page-break-before': activePrintConfig?.pageBreakBefore?.kpis }"
+                                    :style="getBlockPreviewStyle('kpis')"
+                                >
+                                    <div v-if="activePrintConfig" class="pic-print-block-controls">
+                                        <span>KPIs</span>
+                                        <button type="button" title="Reducir espacio antes" @click="updatePrintBlockSpacing('kpis', -8)"><i class="fa-solid fa-minus"></i></button>
+                                        <strong>{{ getBlockSpacingValue(activePrintConfig, 'kpis') }}px</strong>
+                                        <button type="button" title="Aumentar espacio antes" @click="updatePrintBlockSpacing('kpis', 8)"><i class="fa-solid fa-plus"></i></button>
+                                        <button type="button" title="Forzar salto de pagina antes" :class="{ 'is-active': activePrintConfig.pageBreakBefore?.kpis }" @click="togglePrintBlockPageBreak('kpis')"><i class="fa-solid fa-file-arrow-down"></i></button>
+                                        <button type="button" title="Resetear este bloque" @click="resetPrintBlockSpacing('kpis')"><i class="fa-solid fa-rotate-left"></i></button>
+                                    </div>
+                                    <article
+                                        v-for="kpi in mobileKpis"
+                                        :key="kpi.label"
+                                        class="min-w-[154px] rounded-xl border border-pic-border bg-pic-surface p-3 shadow-sm md:min-w-0 md:p-4"
+                                    >
+                                        <div class="mb-3 flex items-start gap-2.5 md:mb-4">
+                                            <span
+                                                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg md:h-10 md:w-10"
+                                                :class="{
+                                                    'bg-pic-accent-purple-soft text-pic-accent-purple': kpi.tone === 'purple',
+                                                    'bg-pic-accent-blue-soft text-pic-accent-blue': kpi.tone === 'blue',
+                                                    'bg-pic-accent-teal-soft text-pic-accent-teal': kpi.tone === 'teal'
+                                                }"
+                                            >
+                                                <i class="fa-solid text-sm md:text-base" :class="kpi.icon"></i>
+                                            </span>
+                                            <p class="min-w-0 text-[11px] font-semibold leading-tight text-pic-text-muted md:text-xs">{{ kpi.label }}</p>
+                                        </div>
+                                        <p class="text-[20px] font-black leading-none tracking-tight text-pic-text-main md:text-2xl">{{ kpi.value }}</p>
+                                        <p class="mt-1.5 text-[11px] font-bold leading-tight md:text-xs" :class="kpi.positive ? 'text-pic-success' : 'text-pic-danger'">{{ kpi.detail }}</p>
+                                    </article>
+                                </div>
+                                
+                                <PicGrid
+                                    :is-print-mode="Boolean(activePrintConfig)"
+                                    :print-config="activePrintConfig"
+                                    @update-block-spacing="updatePrintBlockSpacing"
+                                    @toggle-page-break="togglePrintBlockPageBreak"
+                                    @reset-block-spacing="resetPrintBlockSpacing"
+                                />
+                            </div>
                         </div>
-                        
-                        <PicGrid />
+
+                        <PicExportModal 
+                            ref="exportPanelRef"
+                            v-model="showExportModal" 
+                            class="xl:sticky xl:top-0"
+                            @export="handleExportConfirm"
+                            @preview-change="handlePrintPreviewChange"
+                        />
                     </div>
                 </div>
 
@@ -388,6 +917,39 @@ const handleExportConfirm = async (config: any) => {
 </template>
 
 <style scoped>
+.pic-print-preview-stage {
+    margin: -16px;
+    max-width: 100%;
+    overflow: auto;
+    border-radius: 18px;
+    border: 1px solid hsl(var(--pic-border));
+    background:
+        linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(255,255,255,0.05) 1px, transparent 1px),
+        #5f666c;
+    background-size: 24px 24px;
+    padding: 24px;
+}
+
+.pic-print-preview-stage > [data-pic-report-content="true"] {
+    margin: 0 auto;
+    position: relative;
+    background-color: white;
+    background-image:
+        repeating-linear-gradient(
+            to bottom,
+            transparent 0,
+            transparent calc(var(--pic-preview-page-height, 1450px) - 2px),
+            rgba(37, 99, 235, 0.65) calc(var(--pic-preview-page-height, 1450px) - 2px),
+            rgba(37, 99, 235, 0.65) var(--pic-preview-page-height, 1450px)
+        );
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.32);
+}
+
+.pic-print-preview-stage > [data-pic-report-content="true"]::after {
+    content: none;
+}
+
 .pic-pdf-export-mode {
     width: 1120px;
     min-width: 1120px;
@@ -399,11 +961,215 @@ const handleExportConfirm = async (config: any) => {
     box-sizing: border-box;
 }
 
+.pic-pdf-render-stage {
+    pointer-events: none;
+}
+
+.pic-pdf-render-page {
+    display: block;
+}
+
+.pic-pdf-render-page > [data-pic-print-block="true"] + [data-pic-print-block="true"] {
+    margin-top: var(--pic-print-block-gap, 24px) !important;
+}
+
+.pic-pdf-render-page.pic-pdf-spacing-compact > [data-pic-print-block="true"] + [data-pic-print-block="true"] {
+    margin-top: var(--pic-print-block-gap, 12px) !important;
+}
+
+.pic-pdf-render-page.pic-pdf-spacing-spacious > [data-pic-print-block="true"] + [data-pic-print-block="true"] {
+    margin-top: var(--pic-print-block-gap, 34px) !important;
+}
+
+.pic-pdf-export-mode :deep([data-pic-print-block="true"] + [data-pic-print-block="true"]) {
+    margin-top: var(--pic-print-block-gap, 24px) !important;
+}
+
+.pic-print-adjustable-block {
+    position: relative;
+}
+
+.pic-print-block-controls,
+:deep(.pic-print-block-controls) {
+    position: relative;
+    z-index: 40;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    grid-column: 1 / -1;
+    justify-self: end;
+    gap: 4px;
+    width: max-content;
+    max-width: 100%;
+    margin: 0 0 10px auto;
+    border: 1px solid hsl(var(--pic-border));
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.96);
+    padding: 4px 6px;
+    color: hsl(var(--pic-text-muted));
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
+}
+
+.pic-print-block-controls span,
+:deep(.pic-print-block-controls span) {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 5px;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.pic-print-block-controls strong,
+:deep(.pic-print-block-controls strong) {
+    min-width: 34px;
+    text-align: center;
+    font-size: 10px;
+    color: hsl(var(--pic-text-main));
+}
+
+.pic-print-block-controls button,
+:deep(.pic-print-block-controls button) {
+    display: grid;
+    width: 24px;
+    height: 24px;
+    place-items: center;
+    border-radius: 999px;
+    color: hsl(var(--pic-text-muted));
+    transition: all 0.15s ease;
+}
+
+.pic-print-block-controls button:hover,
+:deep(.pic-print-block-controls button:hover),
+.pic-print-block-controls button.is-active,
+:deep(.pic-print-block-controls button.is-active) {
+    background: hsl(var(--pic-brand));
+    color: white;
+}
+
+.pic-print-page-break-before::before,
+:deep(.pic-print-page-break-before::before) {
+    content: "Salto de pagina";
+    position: relative;
+    z-index: 35;
+    display: inline-flex;
+    grid-column: 1 / -1;
+    width: max-content;
+    margin: 0 0 8px 0;
+    border-radius: 999px;
+    background: rgba(37, 99, 235, 0.12);
+    padding: 3px 8px;
+    color: hsl(var(--pic-brand));
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.pic-pdf-render-page .pic-print-page-break-before::before,
+:deep(.pic-pdf-render-page .pic-print-page-break-before::before) {
+    display: none !important;
+}
+
+.pic-pdf-format-letter.pic-pdf-orientation-portrait {
+    min-height: 1450px;
+}
+
+.pic-pdf-format-letter.pic-pdf-orientation-landscape {
+    min-height: 865px;
+}
+
+.pic-pdf-format-a4.pic-pdf-orientation-portrait {
+    min-height: 1584px;
+}
+
+.pic-pdf-format-a4.pic-pdf-orientation-landscape {
+    min-height: 793px;
+}
+
+.pic-pdf-format-legal.pic-pdf-orientation-portrait {
+    min-height: 1845px;
+}
+
+.pic-pdf-format-legal.pic-pdf-orientation-landscape {
+    min-height: 680px;
+}
+
+.pic-hide-executiveSummary :deep([data-pic-print-section="executiveSummary"]),
+.pic-hide-kpis :deep([data-pic-print-section="kpis"]),
+.pic-hide-kgCharts :deep([data-pic-print-section="kgCharts"]),
+.pic-hide-kgTable :deep([data-pic-print-section="kgTable"]),
+.pic-hide-salesCharts :deep([data-pic-print-section="salesCharts"]),
+.pic-hide-salesTable :deep([data-pic-print-section="salesTable"]),
+.pic-hide-averageCharts :deep([data-pic-print-section="averageCharts"]),
+.pic-hide-averageTable :deep([data-pic-print-section="averageTable"]),
+.pic-hide-operationalBreakdown :deep([data-pic-print-section="operationalBreakdown"]),
+.pic-hide-aiInsights :deep([data-pic-print-section="aiInsights"]) {
+    display: none !important;
+}
+
+.pic-pdf-grayscale {
+    filter: grayscale(1);
+}
+
+.pic-pdf-clean-controls :deep([data-pic-print-control="true"]) {
+    display: none !important;
+}
+
+.pic-pdf-clean-controls :deep(.fa-chevron-right),
+.pic-pdf-clean-controls :deep(.fa-chevron-down),
+.pic-pdf-clean-controls :deep(.fa-chevron-up) {
+    display: none !important;
+}
+
+.pic-pdf-avoid-breaks :deep([data-pic-print-section]),
+.pic-pdf-avoid-breaks :deep(.pic-chart-cell),
+.pic-pdf-avoid-breaks :deep(.pic-chart-card),
+.pic-pdf-avoid-breaks :deep(.pic-report-table) {
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+.pic-pdf-spacing-compact :deep(.space-y-5 > :not([hidden]) ~ :not([hidden])),
+.pic-pdf-spacing-compact :deep(.space-y-6 > :not([hidden]) ~ :not([hidden])),
+.pic-pdf-spacing-compact :deep(.space-y-7 > :not([hidden]) ~ :not([hidden])) {
+    margin-top: 12px !important;
+}
+
+.pic-pdf-spacing-spacious :deep(.space-y-5 > :not([hidden]) ~ :not([hidden])),
+.pic-pdf-spacing-spacious :deep(.space-y-6 > :not([hidden]) ~ :not([hidden])),
+.pic-pdf-spacing-spacious :deep(.space-y-7 > :not([hidden]) ~ :not([hidden])) {
+    margin-top: 34px !important;
+}
+
+.pic-pdf-spacing-compact :deep([data-pic-print-section="kpis"]) {
+    margin-bottom: 16px !important;
+}
+
+.pic-pdf-spacing-spacious :deep([data-pic-print-section="kpis"]) {
+    margin-bottom: 36px !important;
+}
+
+.pic-pdf-export-mode :deep(.pic-report-table) {
+    break-inside: avoid;
+}
+
 .pic-pdf-export-mode :deep(.pic-chart-row) {
     display: grid !important;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
     gap: 24px !important;
     width: 100% !important;
+}
+
+.pic-pdf-export-mode.pic-pdf-spacing-compact :deep(.pic-chart-row) {
+    gap: 16px !important;
+}
+
+.pic-pdf-export-mode.pic-pdf-spacing-spacious :deep(.pic-chart-row) {
+    gap: 34px !important;
 }
 
 .pic-pdf-export-mode :deep(.pic-chart-cell),
@@ -412,20 +1178,55 @@ const handleExportConfirm = async (config: any) => {
     width: 100% !important;
     min-width: 0 !important;
     max-width: 100% !important;
-    overflow: hidden !important;
     box-sizing: border-box;
+}
+
+.pic-pdf-export-mode :deep(.pic-chart-card) {
+    overflow: visible !important;
+    min-height: 420px !important;
+    padding: 22px !important;
+}
+
+.pic-pdf-export-mode :deep(.pic-chart-card > div:first-child) {
+    align-items: flex-start !important;
+    min-height: 44px !important;
+    margin-bottom: 14px !important;
+}
+
+.pic-pdf-export-mode :deep(.pic-chart-card h3) {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    align-items: flex-start !important;
+    line-height: 1.18 !important;
+    font-size: 17px !important;
+    white-space: normal !important;
+}
+
+.pic-pdf-export-mode :deep(.pic-chart-card h3 span) {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+    word-break: normal !important;
+}
+
+.pic-pdf-export-mode :deep(.pic-chart-surface) {
+    overflow: hidden !important;
 }
 
 .pic-pdf-export-mode :deep(.pic-report-table),
 .pic-pdf-export-mode :deep(.pic-report-table-scroll) {
+    display: block !important;
     width: 100% !important;
     max-width: 100% !important;
-    overflow: hidden !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
 }
 
 .pic-pdf-export-mode :deep(.pic-report-table table) {
     width: 100% !important;
-    table-layout: fixed;
+    min-width: 0 !important;
+    table-layout: auto;
 }
 
 .pic-pdf-export-mode :deep(.pic-report-table th),
@@ -437,8 +1238,35 @@ const handleExportConfirm = async (config: any) => {
     word-break: break-word;
 }
 
-.pic-pdf-export-mode :deep(button) {
-    display: none !important;
+.pic-pdf-export-mode :deep([data-pic-print-projection-table="true"] .sticky),
+.pic-pdf-render-page :deep([data-pic-print-projection-table="true"] .sticky) {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    box-shadow: none !important;
+}
+
+.pic-pdf-render-page :deep(.pic-pdf-projection-table-chunk) {
+    break-inside: avoid;
+    overflow: visible !important;
+}
+
+.pic-pdf-font-large :deep(.pic-report-table th),
+.pic-pdf-font-large :deep(.pic-report-table td) {
+    font-size: 12px !important;
+}
+
+.pic-pdf-font-xlarge :deep(.pic-report-table th),
+.pic-pdf-font-xlarge :deep(.pic-report-table td) {
+    font-size: 14px !important;
+}
+
+.pic-pdf-font-large :deep(.pic-chart-card h3) {
+    font-size: 20px !important;
+}
+
+.pic-pdf-font-xlarge :deep(.pic-chart-card h3) {
+    font-size: 23px !important;
 }
 
 .pic-report-actions :deep(.cache-progress-card) {

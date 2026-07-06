@@ -46,6 +46,7 @@ const generateSummary = async () => {
             <div class="flex items-center gap-3">
                 <button 
                     v-if="hasGenerated"
+                    data-pic-print-control="true"
                     @click="isExpanded = !isExpanded"
                     class="text-pic-nav-text-muted transition-colors hover:text-pic-nav-text"
                 >
@@ -61,6 +62,7 @@ const generateSummary = async () => {
                     Genera un análisis narrativo profesional basado en los datos actuales del reporte.
                 </p>
                 <button 
+                    data-pic-print-control="true"
                     @click="generateSummary"
                     class="flex shrink-0 items-center gap-2 rounded-xl bg-pic-brand px-6 py-3 text-base font-black text-white shadow-lg shadow-pic-brand/25 transition-all hover:-translate-y-0.5 hover:bg-pic-brand/90 md:py-2.5 md:text-sm"
                 >
@@ -78,7 +80,7 @@ const generateSummary = async () => {
                     <div v-html="summaryHtml" class="ai-content leading-relaxed text-pic-text-main"></div>
                 </div>
                 
-                <div class="mt-6 flex items-center justify-between border-t border-pic-border pt-4">
+                <div data-pic-print-control="true" class="mt-6 flex items-center justify-between border-t border-pic-border pt-4">
                     <span class="text-[10px] text-pic-text-muted">Generado con IA • Revisar antes de compartir</span>
                     <button @click="generateSummary" class="flex items-center gap-1 text-xs font-medium text-pic-brand hover:text-pic-text-main">
                         <i class="fa-solid fa-rotate-right"></i> Regenerar

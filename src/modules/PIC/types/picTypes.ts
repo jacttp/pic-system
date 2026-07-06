@@ -85,3 +85,49 @@ export interface ChatMessage {
    chartConfig?: AiQueryConfig | null;
    isTyping?: boolean; // true mientras el efecto typewriter está activo
 }
+export type PicPrintSectionKey =
+   | 'executiveSummary'
+   | 'kpis'
+   | 'kgCharts'
+   | 'kgTable'
+   | 'salesCharts'
+   | 'salesTable'
+   | 'averageCharts'
+   | 'averageTable'
+   | 'operationalBreakdown'
+   | 'aiInsights';
+
+export type PicPdfFontScale = 'normal' | 'large' | 'xlarge';
+export type PicPdfSpacing = 'compact' | 'normal' | 'spacious';
+export type PicPrintBlockKey =
+   | 'executiveSummary'
+   | 'kpis'
+   | 'aiInsights'
+   | 'kgCharts'
+   | 'kgTable'
+   | 'kgDivider'
+   | 'salesCharts'
+   | 'salesTable'
+   | 'salesDivider'
+   | 'averageCharts'
+   | 'averageTable'
+   | `operational-${string}`;
+
+export interface PicPdfExportConfig {
+   title: string;
+   format: 'a4' | 'letter' | 'legal';
+   margin: 'estandar' | 'reducido' | 'ninguno';
+   orientation: 'landscape' | 'portrait';
+   showTitle: boolean;
+   showDate: boolean;
+   showPageNumbers: boolean;
+   grayscale: boolean;
+   fontScale: PicPdfFontScale;
+   spacing: PicPdfSpacing;
+   spacingPercent: number;
+   blockSpacing: Partial<Record<PicPrintBlockKey, number>>;
+   pageBreakBefore: Partial<Record<PicPrintBlockKey, boolean>>;
+   avoidPageBreaks: boolean;
+   cleanControls: boolean;
+   sections: Record<PicPrintSectionKey, boolean>;
+}

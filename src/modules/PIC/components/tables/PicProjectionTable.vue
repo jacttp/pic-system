@@ -3,13 +3,23 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { usePicFilterStore } from '../../stores/picFilterStore';
 import { picApi } from '../../services/picApi'; 
 import { formatNumber } from '../../utils/formatters';
+import type { PicPdfExportConfig, PicPrintBlockKey } from '../../types/picTypes';
 
 const props = defineProps<{
     title: string;
     dimensionKey: string; // La dimensión de ESTA tabla (ej: 'familias')
     initialCollapsed?: boolean;
+    isPrintMode?: boolean;
+    printConfig?: PicPdfExportConfig | null;
+    printBlockId?: PicPrintBlockKey;
     // Si no se pasa esta prop, la tabla no será interactiva (caso Marcas/Gerencia)
     drillDownTarget?: string; 
+}>();
+
+const emit = defineEmits<{
+    (e: 'update-block-spacing', blockId: PicPrintBlockKey, delta: number): void;
+    (e: 'toggle-page-break', blockId: PicPrintBlockKey): void;
+    (e: 'reset-block-spacing', blockId: PicPrintBlockKey): void;
 }>();
 
 const store = usePicFilterStore();
@@ -192,6 +202,14 @@ const footer = computed(() => {
     return sums;
 });
 
+const blockSpacingValue = computed(() => {
+    if (!props.printBlockId) return 0;
+    return Number(props.printConfig?.blockSpacing?.[props.printBlockId] || 0);
+});
+
+const blockStyle = computed(() => props.printConfig && props.printBlockId ? { marginTop: `calc(${blockSpacingValue.value}px + var(--pic-print-page-break-offset, 0px))` } : {});
+const hasPageBreak = computed(() => Boolean(props.printBlockId && props.printConfig?.pageBreakBefore?.[props.printBlockId]));
+
 const summaryItems = computed(() => {
     if (!footer.value) return [];
     return [
@@ -249,9 +267,27 @@ const colorClass = (val: number, isPercent = false) => {
 
 <template>
     <div 
-        class="pic-report-table flex h-full flex-col overflow-hidden rounded-xl border border-pic-border bg-pic-surface shadow-sm transition-all duration-300"
+        v-if="tableData.length > 0 || !props.isPrintMode"
+        class="pic-report-table pic-print-adjustable-block flex h-full flex-col overflow-hidden rounded-xl border border-pic-border bg-pic-surface shadow-sm transition-all duration-300"
+        data-pic-print-block="true"
+        :data-pic-print-block-id="printBlockId"
+        data-pic-print-table="true"
+        data-pic-print-projection-table="true"
+        :class="[
+            { 'pic-print-page-break-before': hasPageBreak, 'is-print-expanded': props.isPrintMode },
+            props.isPrintMode ? '!h-auto !overflow-visible' : ''
+        ]"
+        :style="blockStyle"
         :data-html2canvas-ignore="tableData.length === 0 ? 'true' : undefined"
     >
+        <div v-if="printConfig && printBlockId" class="pic-print-block-controls">
+            <span>{{ title }}</span>
+            <button type="button" title="Reducir espacio antes" @click="emit('update-block-spacing', printBlockId, -8)"><i class="fa-solid fa-minus"></i></button>
+            <strong>{{ blockSpacingValue }}px</strong>
+            <button type="button" title="Aumentar espacio antes" @click="emit('update-block-spacing', printBlockId, 8)"><i class="fa-solid fa-plus"></i></button>
+            <button type="button" title="Forzar salto de pagina antes" :class="{ 'is-active': hasPageBreak }" @click="emit('toggle-page-break', printBlockId)"><i class="fa-solid fa-file-arrow-down"></i></button>
+            <button type="button" title="Resetear este bloque" @click="emit('reset-block-spacing', printBlockId)"><i class="fa-solid fa-rotate-left"></i></button>
+        </div>
         
         <div class="flex shrink-0 items-center justify-between border-b border-pic-border bg-pic-muted-surface px-4 py-3">
             <h3 class="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-pic-text-main">
@@ -259,7 +295,7 @@ const colorClass = (val: number, isPercent = false) => {
                 {{ title }}
             </h3>
             
-            <button v-if="tableData.length > 0" @click="isCollapsed = !isCollapsed" class="text-[10px] font-bold uppercase text-pic-text-muted hover:text-pic-brand">
+            <button data-pic-print-control="true" v-if="tableData.length > 0" @click="isCollapsed = !isCollapsed" class="text-[10px] font-bold uppercase text-pic-text-muted hover:text-pic-brand">
                 {{ isCollapsed ? 'Mostrar' : 'Ocultar' }}
             </button>
         </div>
@@ -267,6 +303,7 @@ const colorClass = (val: number, isPercent = false) => {
         <div v-if="tableData.length === 0 && !isLoading" class="flex min-h-[150px] flex-col items-center justify-center bg-pic-muted-surface/50 p-6">
             <p class="mb-3 text-xs text-pic-text-muted">Análisis disponible bajo demanda</p>
             <button 
+                data-pic-print-control="true"
                 @click="handleLoad"
                 class="flex items-center gap-2 rounded-lg border border-pic-border bg-pic-surface px-4 py-2 text-xs font-bold text-pic-text-muted shadow-sm transition-all hover:border-pic-brand hover:text-pic-brand"
             >
@@ -281,8 +318,8 @@ const colorClass = (val: number, isPercent = false) => {
             </div>
         </div>
 
-        <div v-else-if="!isCollapsed" class="animate-fade-in">
-            <div class="border-b border-pic-border bg-pic-surface px-4 py-3">
+        <div v-else-if="!isCollapsed || isPrintMode" class="animate-fade-in">
+            <div data-pic-print-control="true" class="border-b border-pic-border bg-pic-surface px-4 py-3">
                 <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div class="flex flex-wrap items-center gap-2">
                         <span
@@ -316,7 +353,7 @@ const colorClass = (val: number, isPercent = false) => {
                 </div>
             </div>
 
-            <div class="p-2.5 md:hidden">
+            <div data-pic-print-control="true" class="p-2.5 md:hidden">
                 <div v-if="isBrandProjection" class="space-y-3">
                     <article
                         v-for="row in visibleProjectionRows"
@@ -505,7 +542,13 @@ const colorClass = (val: number, isPercent = false) => {
                 </div>
             </div>
 
-            <div class="pic-report-table-scroll hidden max-h-[560px] overflow-auto custom-scrollbar md:block">
+            <div
+                class="pic-report-table-scroll hidden max-h-[560px] overflow-auto custom-scrollbar md:block"
+                :class="[
+                    { 'is-print-expanded': props.isPrintMode },
+                    props.isPrintMode ? '!block !max-h-none !overflow-visible !overflow-x-visible !overflow-y-visible' : ''
+                ]"
+            >
             <table class="w-full min-w-[980px] border-collapse text-left text-xs whitespace-nowrap">
                 <thead class="sticky top-0 z-10 bg-pic-nav font-semibold uppercase text-pic-nav-text">
                     <tr>
@@ -604,6 +647,31 @@ const colorClass = (val: number, isPercent = false) => {
 .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: hsl(var(--pic-muted-surface)); }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: hsl(var(--pic-border)); border-radius: 4px; }
+.pic-report-table.is-print-expanded {
+    height: auto !important;
+    overflow: visible !important;
+}
+
+.pic-report-table.is-print-expanded .animate-fade-in {
+    height: auto !important;
+    overflow: visible !important;
+}
+
+.pic-report-table-scroll.is-print-expanded {
+    display: block !important;
+    max-height: none !important;
+    overflow: visible !important;
+}
+
+.pic-report-table-scroll.is-print-expanded table {
+    min-width: 0 !important;
+    table-layout: auto;
+    overflow: visible !important;
+}
+
+.pic-report-table-scroll.is-print-expanded thead {
+    position: static !important;
+}
 .animate-fade-in { animation: fadeIn 0.3s ease-in; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 </style>

@@ -40,5 +40,12 @@ export const commercialStructureApi = {
          `${V2}/commercial-structure/rutam-options`
       );
       return data.success ? data.data : [];
+   },
+
+   async getVehiculoOptions(): Promise<string[]> {
+      const { data } = await api.get<{ success: boolean; data: string[] }>(
+         `${V2}/commercial-structure/vehiculo-options`
+      );
+      return data.success ? data.data : [];
    }
 };

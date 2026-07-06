@@ -22,13 +22,18 @@ const form = ref<CommercialStructure>({
     Jefatura: '',
     Cedis: '',
     CanalC: '',
-    nivel_ruta: 1
+    nivel_ruta: 1,
+    vehiculo: '',
+    cap_max_kg: null
 });
 
 const originalRuta = ref('');
 
 onMounted(async () => {
-    await store.fetchRutaMOptions();
+    await Promise.all([
+        store.fetchRutaMOptions(),
+        store.fetchVehiculoOptions()
+    ]);
     if (!isNew.value) {
         isLoading.value = true;
         const ruta = decodeURIComponent(route.params.ruta as string);
@@ -182,6 +187,20 @@ const handleCancel = () => router.push('/admin/commercial-structure');
                                     <p class="text-sm font-semibold text-slate-700 mt-0.5">{{ form.Cedis }}</p>
                                 </div>
                             </div>
+                            <div class="flex items-start gap-3 px-5 py-3" v-if="form.vehiculo">
+                                <i class="fa-solid fa-truck text-violet-500 text-xs mt-0.5 w-4"></i>
+                                <div>
+                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Vehiculo</p>
+                                    <p class="text-sm font-semibold text-slate-700 mt-0.5">{{ form.vehiculo }}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3 px-5 py-3" v-if="form.cap_max_kg !== null && form.cap_max_kg !== undefined">
+                                <i class="fa-solid fa-weight-hanging text-violet-500 text-xs mt-0.5 w-4"></i>
+                                <div>
+                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Capacidad kg</p>
+                                    <p class="text-sm font-semibold text-slate-700 mt-0.5">{{ Number(form.cap_max_kg).toLocaleString() }}</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -311,6 +330,20 @@ const handleCancel = () => router.push('/admin/commercial-structure');
                                 <div>
                                     <label class="field-label">Canal C</label>
                                     <input v-model="form.CanalC" type="text" class="field-input" placeholder="Canal comercial" />
+                                </div>
+                                <div>
+                                    <label class="field-label">Vehiculo</label>
+                                    <div class="relative">
+                                        <select v-model="form.vehiculo" class="field-select">
+                                            <option value="" disabled>Seleccionar vehiculo...</option>
+                                            <option v-for="opt in store.vehiculoOptions" :key="opt" :value="opt">{{ opt }}</option>
+                                        </select>
+                                        <i class="fa-solid fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="field-label">Capacidad maxima kg</label>
+                                    <input v-model.number="form.cap_max_kg" type="number" min="0" step="0.01" class="field-input" placeholder="Capacidad en kg" />
                                 </div>
                             </div>
                         </div>

@@ -94,6 +94,7 @@ const handleAnalyze = () => {
 
             <div class="ml-auto flex items-center gap-2">
                 <button
+                    data-pic-print-control="true"
                     @click="handleAnalyze"
                     class="flex h-7 w-7 items-center justify-center rounded-lg border border-transparent text-pic-text-muted transition-all hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand"
                     title="Analizar este gráfico con IA"
@@ -101,7 +102,7 @@ const handleAnalyze = () => {
                     <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
                 </button>
 
-                <div v-if="enableSwitch" class="flex gap-1 rounded-lg bg-pic-muted-surface p-1">
+                <div v-if="enableSwitch" data-pic-print-control="true" class="flex gap-1 rounded-lg bg-pic-muted-surface p-1">
                     <button
                         @click="currentType = 'bar'"
                         class="p-1.5 rounded transition-all text-xs flex items-center justify-center w-6 h-6"
