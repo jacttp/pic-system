@@ -136,6 +136,7 @@ const showExportModal = ref(false);
 const activePrintConfig = ref<PicPdfExportConfig | null>(null);
 const exportPanelRef = ref<InstanceType<typeof PicExportModal> | null>(null);
 const PDF_EXPORT_WIDTH = 1120;
+const PRINT_PREVIEW_PAGE_PADDING = 16;
 const PDF_FORMAT_MM: Record<PicPdfExportConfig['format'], { width: number; height: number }> = {
     a4: { width: 210, height: 297 },
     letter: { width: 216, height: 279 },
@@ -229,9 +230,11 @@ const getBlockSpacingValue = (config: PicPdfExportConfig | null, blockId: PicPri
 const getBlockPreviewStyle = (blockId: PicPrintBlockKey) => {
     const config = activePrintConfig.value;
     if (!config) return {};
+    const spacing = getBlockSpacingValue(config, blockId);
 
     return {
-        marginTop: `calc(${getBlockSpacingValue(config, blockId)}px + var(--pic-print-page-break-offset, 0px))`
+        '--pic-print-block-spacing': `${spacing}px`,
+        marginTop: `calc(${spacing}px + var(--pic-print-page-break-offset, 0px))`
     };
 };
 
@@ -279,17 +282,43 @@ const refreshPrintPageBreakOffsets = async () => {
 
     const pageHeight = getPreviewPagePixelHeight(config);
     const blocks = Array.from(report.querySelectorAll('[data-pic-print-block="true"]')) as HTMLElement[];
-    blocks.forEach(block => block.style.setProperty('--pic-print-page-break-offset', '0px'));
+    const visibleBlocks = blocks.filter(block => block.offsetParent !== null && block.offsetHeight > 0);
+    blocks.forEach(block => {
+        const blockId = block.dataset.picPrintBlockId as PicPrintBlockKey | undefined;
+        block.style.setProperty('--pic-print-block-spacing', `${blockId ? getBlockSpacingValue(config, blockId) : 0}px`);
+        block.style.setProperty('--pic-print-page-break-offset', '0px');
+    });
+
+    const getOffsetToNextPageContent = (currentPageRemainder: number) => {
+        if (currentPageRemainder <= PRINT_PREVIEW_PAGE_PADDING) {
+            return Math.max(0, PRINT_PREVIEW_PAGE_PADDING - currentPageRemainder);
+        }
+
+        return Math.ceil(pageHeight - currentPageRemainder + PRINT_PREVIEW_PAGE_PADDING);
+    };
 
     const reportTop = report.getBoundingClientRect().top;
     blocks.forEach(block => {
         const blockId = block.dataset.picPrintBlockId as PicPrintBlockKey | undefined;
-        if (!blockId || !config.pageBreakBefore?.[blockId]) return;
+        if (!blockId || block.offsetParent === null || block.offsetHeight <= 0) return;
 
         const blockTop = block.getBoundingClientRect().top - reportTop;
         const currentPageRemainder = ((blockTop % pageHeight) + pageHeight) % pageHeight;
-        const offset = currentPageRemainder === 0 ? 0 : Math.ceil(pageHeight - currentPageRemainder);
-        block.style.setProperty('--pic-print-page-break-offset', `${offset}px`);
+
+        if (config.pageBreakBefore?.[blockId]) {
+            const isFirstVisibleBlock = visibleBlocks[0] === block;
+            const offset = isFirstVisibleBlock ? 0 : getOffsetToNextPageContent(currentPageRemainder);
+            block.style.setProperty('--pic-print-page-break-offset', `${offset}px`);
+            return;
+        }
+
+        const blockHeight = block.offsetHeight;
+        const fitsCurrentPage = currentPageRemainder + blockHeight <= pageHeight;
+        const shouldAutoMove = currentPageRemainder > 24 && !fitsCurrentPage && blockHeight < pageHeight;
+
+        if (shouldAutoMove) {
+            block.style.setProperty('--pic-print-page-break-offset', `${getOffsetToNextPageContent(currentPageRemainder)}px`);
+        }
     });
 };
 
@@ -374,7 +403,9 @@ const applyPrintConfigToReport = (report: HTMLElement, config: PicPdfExportConfi
     });
 
     report.querySelectorAll('[data-pic-print-block="true"]').forEach(element => {
-        (element as HTMLElement).style.setProperty('--pic-print-page-break-offset', '0px');
+        const blockElement = element as HTMLElement;
+        blockElement.style.setProperty('--pic-print-page-break-offset', '0px');
+        blockElement.style.setProperty('--pic-print-block-spacing', '0px');
     });
 
     report.querySelectorAll('.pic-report-table, .pic-report-table-scroll').forEach(element => {
@@ -601,6 +632,7 @@ const buildPaginatedPrintPages = (sourceReport: HTMLElement, config: PicPdfExpor
         const blockId = block.dataset.picPrintBlockId as PicPrintBlockKey | undefined;
         if (blockId) {
             const customSpacing = getBlockSpacingValue(config, blockId);
+            block.style.setProperty('--pic-print-block-spacing', `${customSpacing}px`);
             if (customSpacing !== 0) {
                 block.style.marginTop = `${customSpacing}px`;
             }
@@ -947,15 +979,24 @@ const handleExportConfirm = async (config: PicPdfExportConfig) => {
     margin: 0 auto;
     position: relative;
     background-color: white;
+    isolation: isolate;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.32);
+}
+
+.pic-print-preview-stage > [data-pic-report-content="true"]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 70;
+    pointer-events: none;
     background-image:
         repeating-linear-gradient(
             to bottom,
             transparent 0,
             transparent calc(var(--pic-preview-page-height, 1450px) - 2px),
-            rgba(37, 99, 235, 0.65) calc(var(--pic-preview-page-height, 1450px) - 2px),
-            rgba(37, 99, 235, 0.65) var(--pic-preview-page-height, 1450px)
+            rgba(37, 99, 235, 0.95) calc(var(--pic-preview-page-height, 1450px) - 2px),
+            rgba(37, 99, 235, 0.95) var(--pic-preview-page-height, 1450px)
         );
-    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.32);
 }
 
 .pic-print-preview-stage > [data-pic-report-content="true"]::after {
@@ -982,19 +1023,19 @@ const handleExportConfirm = async (config: PicPdfExportConfig) => {
 }
 
 .pic-pdf-render-page > [data-pic-print-block="true"] + [data-pic-print-block="true"] {
-    margin-top: var(--pic-print-block-gap, 24px) !important;
+    margin-top: calc(var(--pic-print-block-gap, 24px) + var(--pic-print-block-spacing, 0px) + var(--pic-print-page-break-offset, 0px)) !important;
 }
 
 .pic-pdf-render-page.pic-pdf-spacing-compact > [data-pic-print-block="true"] + [data-pic-print-block="true"] {
-    margin-top: var(--pic-print-block-gap, 12px) !important;
+    margin-top: calc(var(--pic-print-block-gap, 12px) + var(--pic-print-block-spacing, 0px) + var(--pic-print-page-break-offset, 0px)) !important;
 }
 
 .pic-pdf-render-page.pic-pdf-spacing-spacious > [data-pic-print-block="true"] + [data-pic-print-block="true"] {
-    margin-top: var(--pic-print-block-gap, 34px) !important;
+    margin-top: calc(var(--pic-print-block-gap, 34px) + var(--pic-print-block-spacing, 0px) + var(--pic-print-page-break-offset, 0px)) !important;
 }
 
 .pic-pdf-export-mode :deep([data-pic-print-block="true"] + [data-pic-print-block="true"]) {
-    margin-top: var(--pic-print-block-gap, 24px) !important;
+    margin-top: calc(var(--pic-print-block-gap, 24px) + var(--pic-print-block-spacing, 0px) + var(--pic-print-page-break-offset, 0px)) !important;
 }
 
 .pic-print-adjustable-block {
@@ -1004,7 +1045,7 @@ const handleExportConfirm = async (config: PicPdfExportConfig) => {
 .pic-print-block-controls,
 :deep(.pic-print-block-controls) {
     position: relative;
-    z-index: 40;
+    z-index: 90;
     display: inline-flex;
     align-items: center;
     justify-content: flex-end;
@@ -1066,7 +1107,7 @@ const handleExportConfirm = async (config: PicPdfExportConfig) => {
 :deep(.pic-print-page-break-before::before) {
     content: "Salto de pagina";
     position: relative;
-    z-index: 35;
+    z-index: 80;
     display: inline-flex;
     grid-column: 1 / -1;
     width: max-content;
