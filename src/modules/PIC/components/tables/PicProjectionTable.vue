@@ -318,7 +318,7 @@ const colorClass = (val: number, isPercent = false) => {
             </div>
         </div>
 
-        <div v-else-if="!isCollapsed || isPrintMode" class="animate-fade-in">
+        <div v-else-if="!isCollapsed || isPrintMode" :class="{ 'animate-fade-in': !props.isPrintMode }">
             <div data-pic-print-control="true" class="border-b border-pic-border bg-pic-surface px-4 py-3">
                 <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div class="flex flex-wrap items-center gap-2">
@@ -655,6 +655,8 @@ const colorClass = (val: number, isPercent = false) => {
 .pic-report-table.is-print-expanded .animate-fade-in {
     height: auto !important;
     overflow: visible !important;
+    animation: none !important;
+    opacity: 1 !important;
 }
 
 .pic-report-table-scroll.is-print-expanded {

@@ -387,6 +387,8 @@ const applyPrintConfigToReport = (report: HTMLElement, config: PicPdfExportConfi
     report.querySelectorAll('[data-html2canvas-ignore="true"]').forEach(element => {
         (element as HTMLElement).style.display = 'none';
     });
+
+    disablePrintTransientStyles(report);
 };
 
 const copyCanvasBitmaps = (source: HTMLElement, target: HTMLElement) => {
@@ -414,6 +416,15 @@ const getVueScopeAttributeNames = (element: HTMLElement) => {
 const applyVueScopeAttributes = (element: HTMLElement, scopeAttributeNames: string[]) => {
     scopeAttributeNames.forEach(attributeName => {
         element.setAttribute(attributeName, '');
+    });
+};
+
+const disablePrintTransientStyles = (root: HTMLElement) => {
+    root.querySelectorAll('.animate-fade-in, [data-pic-print-projection-table="true"]').forEach(element => {
+        const animatedElement = element as HTMLElement;
+        animatedElement.style.animation = 'none';
+        animatedElement.style.transition = 'none';
+        animatedElement.style.opacity = '1';
     });
 };
 
@@ -447,6 +458,7 @@ const getProjectionPrintTable = (tableBlock: HTMLElement) => {
 
 const prepareProjectionPrintChunk = (chunk: HTMLElement, isLastChunk: boolean) => {
     chunk.classList.add('pic-pdf-projection-table-chunk');
+    disablePrintTransientStyles(chunk);
     chunk.querySelectorAll('[data-pic-print-control="true"], .pic-print-block-controls').forEach(element => {
         (element as HTMLElement).style.display = 'none';
     });
