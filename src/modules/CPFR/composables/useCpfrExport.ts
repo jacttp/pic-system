@@ -120,6 +120,15 @@ function groupItemsByStore(items: ExportTiendaItem[]): ExportTiendaItem[] {
     return Array.from(map.values())
 }
 
+function filterPositiveQuantityItems(items: ExportTiendaItem[]): ExportTiendaItem[] {
+    return items
+        .map(item => ({
+            ...item,
+            rows: item.rows.filter(row => Number(row.cant_pedida) > 0)
+        }))
+        .filter(item => item.rows.length > 0)
+}
+
 function downloadBlob(blob: Blob, filename: string): void {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -305,12 +314,13 @@ export function buildExportItems(dias: any[]): ExportTiendaItem[] {
 export function useCpfrExport() {
 
     function generateExcel(selectedItems: ExportTiendaItem[], dayNums: number[]): string {
+        const exportItems = filterPositiveQuantityItems(selectedItems)
         const allRows: (string | number)[][] = []
 
         // Headers
         allRows.push(['Jefatura', 'cliente', 'nombre', 'sucursal', 'fec_fin_embarque', 'num_pedido', 'cant. pedida', 'upc', 'desc'])
 
-        for (const item of selectedItems) {
+        for (const item of exportItems) {
             for (const row of item.rows) {
                 allRows.push([
                     'PIC',

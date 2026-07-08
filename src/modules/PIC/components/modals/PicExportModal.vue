@@ -2,9 +2,12 @@
 import { computed, ref, watch } from 'vue';
 import type { PicPdfExportConfig, PicPrintSectionKey } from '../../types/picTypes';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
     modelValue: boolean;
-}>();
+    previewEnabled?: boolean;
+}>(), {
+    previewEnabled: true
+});
 
 const emit = defineEmits<{
     (e: 'update:modelValue', value: boolean): void;
@@ -160,7 +163,7 @@ defineExpose({
 <template>
     <aside
         v-if="modelValue"
-        class="pic-print-panel flex max-h-[calc(100vh-140px)] min-h-[560px] flex-col overflow-hidden rounded-2xl border border-pic-border bg-pic-surface text-sm text-pic-text-main shadow-xl shadow-slate-900/10"
+        class="pic-print-panel fixed inset-x-3 bottom-4 top-24 z-[70] flex min-h-0 flex-col overflow-hidden rounded-2xl border border-pic-border bg-pic-surface text-sm text-pic-text-main shadow-2xl shadow-slate-950/20 xl:sticky xl:top-0 xl:z-auto xl:max-h-[calc(100vh-140px)] xl:min-h-[560px] xl:shadow-xl xl:shadow-slate-900/10"
     >
         <header class="shrink-0 border-b border-pic-border bg-pic-muted-surface/70 px-4 py-3">
             <div class="flex items-start justify-between gap-3">
@@ -379,11 +382,18 @@ defineExpose({
 
             <div class="mt-5 rounded-xl border border-pic-border bg-pic-muted-surface/55 p-3">
                 <div class="flex items-center justify-between gap-3">
-                    <p class="text-[11px] font-black uppercase tracking-wide text-pic-text-muted">Preview vivo</p>
+                    <p class="text-[11px] font-black uppercase tracking-wide text-pic-text-muted">
+                        {{ previewEnabled ? 'Preview vivo' : 'Preview en escritorio' }}
+                    </p>
                     <span class="rounded-full bg-pic-surface px-2 py-1 text-[10px] font-black text-pic-text-muted">{{ selectedSectionCount }} secciones</span>
                 </div>
                 <p class="mt-2 text-xs leading-relaxed text-pic-text-muted">
-                    El reporte a la izquierda refleja estos cambios en tiempo real. Las lineas y cortes reales del PDF dependen del alto final de cada bloque.
+                    <template v-if="previewEnabled">
+                        El reporte a la izquierda refleja estos cambios en tiempo real. Las lineas y cortes reales del PDF dependen del alto final de cada bloque.
+                    </template>
+                    <template v-else>
+                        En movil se omite la previsualizacion para no forzar el reporte a escala PDF. La exportacion conserva la configuracion seleccionada.
+                    </template>
                 </p>
             </div>
         </section>

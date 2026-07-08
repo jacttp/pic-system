@@ -134,6 +134,8 @@ const reportContent = ref<HTMLElement | null>(null);
 const isExporting = ref(false);
 const showExportModal = ref(false);
 const activePrintConfig = ref<PicPdfExportConfig | null>(null);
+const pendingPrintPreviewConfig = ref<PicPdfExportConfig | null>(null);
+const isPrintPreviewAvailable = ref(false);
 const exportPanelRef = ref<InstanceType<typeof PicExportModal> | null>(null);
 const PDF_EXPORT_WIDTH = 1120;
 const PRINT_PREVIEW_PAGE_PADDING = 16;
@@ -332,9 +334,19 @@ const openExportModal = () => {
     showExportModal.value = !showExportModal.value;
 };
 
+const syncPrintPreviewState = () => {
+    activePrintConfig.value = isPrintPreviewAvailable.value ? pendingPrintPreviewConfig.value : null;
+};
+
 const handlePrintPreviewChange = (config: PicPdfExportConfig | null) => {
     if (isExporting.value && !config) return;
-    activePrintConfig.value = config;
+    pendingPrintPreviewConfig.value = config;
+    syncPrintPreviewState();
+};
+
+const updatePrintPreviewAvailability = () => {
+    isPrintPreviewAvailable.value = window.matchMedia('(min-width: 1280px)').matches;
+    syncPrintPreviewState();
 };
 
 watch(activePrintConfig, () => {
@@ -342,10 +354,12 @@ watch(activePrintConfig, () => {
 }, { deep: true, flush: 'post' });
 
 const handlePrintPreviewResize = () => {
+    updatePrintPreviewAvailability();
     void refreshPrintPageBreakOffsets();
 };
 
 onMounted(() => {
+    updatePrintPreviewAvailability();
     window.addEventListener('resize', handlePrintPreviewResize);
 });
 
@@ -956,7 +970,7 @@ const handleExportConfirm = async (config: PicPdfExportConfig) => {
                         <PicExportModal 
                             ref="exportPanelRef"
                             v-model="showExportModal" 
-                            class="xl:sticky xl:top-0"
+                            :preview-enabled="isPrintPreviewAvailable"
                             @export="handleExportConfirm"
                             @preview-change="handlePrintPreviewChange"
                         />
@@ -967,7 +981,7 @@ const handleExportConfirm = async (config: PicPdfExportConfig) => {
         </div>
 
         <div v-if="reportIsActive" class="2xl:hidden">
-            <PicChat mode="mobile" />
+            <PicChat mode="mobile" :hide-launcher="showExportModal" />
         </div>
         <div class="hidden h-full 2xl:block">
             <PicChat />

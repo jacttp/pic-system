@@ -7,8 +7,10 @@ import AiModelSelector from './AiModelSelector.vue';
 
 const props = withDefaults(defineProps<{
     mode?: 'desktop' | 'mobile';
+    hideLauncher?: boolean;
 }>(), {
-    mode: 'desktop'
+    mode: 'desktop',
+    hideLauncher: false
 });
 
 const store = usePicChatStore();
@@ -56,7 +58,7 @@ const handleSend = async () => {
 
 <template>
     <button
-        v-if="isMobileMode && isCollapsed"
+        v-if="isMobileMode && isCollapsed && !hideLauncher"
         @click="isCollapsed = false"
         class="fixed bottom-5 right-5 z-[10000] flex h-14 w-14 items-center justify-center rounded-full bg-pic-brand text-white shadow-xl shadow-pic-brand/30 transition-all hover:bg-pic-brand/90 active:scale-95"
         title="Abrir Asistente IA"
@@ -186,6 +188,11 @@ const handleSend = async () => {
                         <i class="fa-solid fa-paper-plane text-xs"></i>
                     </button>
                 </div>
+
+                <p class="mt-2 flex items-start gap-1.5 px-1 text-[10px] leading-snug text-pic-text-muted/80">
+                    <i class="fa-solid fa-triangle-exclamation mt-0.5 text-[9px] text-pic-text-muted/60"></i>
+                    <span>La IA puede cometer errores. Valida los datos antes de presentarlos al cliente.</span>
+                </p>
             </div>
 
         </div>
