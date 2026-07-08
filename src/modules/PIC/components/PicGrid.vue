@@ -3,7 +3,6 @@ import { computed, ref } from 'vue'; // <--- AGREGAR ref
 import { usePicFilterStore } from '../stores/picFilterStore';
 import { processChartData, processAnnualData, getEChartConfig, CHART_COLORS, CHART_COLORS_GREEN, MONTH_NAMES } from '../utils/picUtils';
 import PicEChart from './charts/PicEChart.vue';
-import BaseChart from './charts/BaseChart.vue'; // Mantener para widgets dinámicos de IA
 import PicDataTable from './tables/PicDataTable.vue';
 import PicProjectionTable from './tables/PicProjectionTable.vue';
 import KpiCardWidget from './widgets/KpiCardWidget.vue';       
@@ -195,9 +194,9 @@ const hasPageBreak = (blockId: PicPrintBlockKey) => Boolean(props.printConfig?.p
                             :config="widget.config" 
                         />
 
-                        <BaseChart 
+                        <PicEChart 
                             v-else 
-                            :config="widget.config" 
+                            :option="widget.config" 
                             :title="widget.title" 
                             :enable-switch="widget.type !== 'pie' && widget.type !== 'doughnut'" 
                         />

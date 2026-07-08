@@ -120,7 +120,7 @@ export const picApi = {
    },
 
    // Actualiza esta función:
-   async getDataInsights(chartData: any[], promptContext: string, model: string = 'gemini'): Promise<string> {
+   async getDataInsights(chartData: any, promptContext: string, model: string = 'gemini'): Promise<string> {
       try {
          // CAMBIO: Apuntamos a /ai/insight y enviamos modelProvider
          const { data } = await api.post(`/ai/insight`, {

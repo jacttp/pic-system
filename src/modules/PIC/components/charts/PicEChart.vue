@@ -70,14 +70,23 @@ onUnmounted(() => {
 // Enviar datos simplificados al chat de IA
 const handleAnalyze = () => {
     if (!props.option) return;
+    const firstSeries = props.option.series?.[0];
+    const isPie = firstSeries?.type === 'pie';
+    const pieData = Array.isArray(firstSeries?.data) ? firstSeries.data : [];
+
     const simplified = {
-        labels: props.option.xAxis?.data || [],
-        datasets: (props.option.series || []).map((s: any) => ({
-            label: s.name,
-            data: Array.isArray(s.data)
-                ? s.data.map((d: any) => (typeof d === 'object' && d !== null ? d.value : d))
-                : []
-        }))
+        labels: isPie ? pieData.map((d: any) => d.name) : props.option.xAxis?.data || [],
+        datasets: isPie
+            ? [{
+                label: firstSeries.name,
+                data: pieData.map((d: any) => d.value)
+            }]
+            : (props.option.series || []).map((s: any) => ({
+                label: s.name,
+                data: Array.isArray(s.data)
+                    ? s.data.map((d: any) => (typeof d === 'object' && d !== null ? d.value : d))
+                    : []
+            }))
     };
     chatStore.setContext(props.title || 'Gráfico', simplified, 'chart');
 };

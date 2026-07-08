@@ -4,7 +4,7 @@ import { ref } from 'vue';
 import { picApi } from '../services/picApi';
 import type { AiQueryConfig, DynamicWidget, ChatMessage, PicChatDashboardContext } from '../types/picTypes';
 import { usePicFilterStore } from './picFilterStore';
-import { getChartConfig, getPieConfig, getSeriesColor, getMultiColors } from '../utils/picUtils';
+import { getEChartConfig, getEChartPieConfig, getSeriesColor } from '../utils/picUtils';
 
 interface ChatContext {
    id: string;
@@ -245,16 +245,7 @@ export const usePicChatStore = defineStore('picChat', () => {
 
             case 'pie':
             case 'doughnut':
-               widgetConfig = getPieConfig(
-                  labels,
-                  [{
-                     data: values,
-                     backgroundColor: getMultiColors(values.length),
-                     borderWidth: 1,
-                     borderColor: '#ffffff'
-                  }],
-                  vizType
-               );
+               widgetConfig = getEChartPieConfig(labels, values, labelMetric, vizType);
                break;
 
             case 'line':
@@ -264,16 +255,14 @@ export const usePicChatStore = defineStore('picChat', () => {
                const colorIndex = filterStore.dynamicWidgets?.length ?? 0;
                const color = getSeriesColor(colorIndex);
                const colorAlpha = color + '33'; // 20% opacidad para el fill de línea
-               widgetConfig = getChartConfig(
+               widgetConfig = getEChartConfig(
                   labels,
                   [{
                      label: labelMetric,
                      data: values,
                      backgroundColor: vizType === 'line' ? colorAlpha : color,
                      borderColor: color,
-                     fill: vizType === 'line',
                      borderRadius: 4,
-                     tension: 0.3
                   }],
                   vizType as 'bar' | 'line'
                );
@@ -297,9 +286,16 @@ export const usePicChatStore = defineStore('picChat', () => {
          // 3. Generar Insight (Micro-resumen)
          // Solo para gráficos y tablas, los KPIs suelen explicarse solos
          if (vizType !== 'kpi') {
-            const dataSample = data.slice(0, 15);
-            const promptInsight = `Describe brevemente la tendencia, valor más alto o distribución. Máx 20 palabras.`;
-            const insightText = await picApi.getDataInsights(dataSample, promptInsight, selectedModel.value);
+            const dataSample = labels.slice(0, 15).map((label, index) => ({
+               label,
+               value: values[index]
+            }));
+            const promptInsight = `Analiza solo esta visualizacion de ${labelMetric}. No menciones metricas que no esten en los datos. Max 20 palabras.`;
+            const insightText = await picApi.getDataInsights({
+               metric: labelMetric,
+               visualization: vizType,
+               data: dataSample
+            }, promptInsight, selectedModel.value);
             message.text = `${message.text}\n\n💡 ${insightText}`;
          }
 

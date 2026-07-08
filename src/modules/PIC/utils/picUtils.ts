@@ -272,6 +272,86 @@ export function getEChartConfig(labels: string[], datasets: any[], type: 'bar' |
     };
 }
 
+/**
+ * Genera configuracion ECharts para graficos circulares creados por IA.
+ */
+export function getEChartPieConfig(
+    labels: string[],
+    values: number[],
+    metricLabel: string,
+    type: 'pie' | 'doughnut' = 'doughnut'
+) {
+    const colors = getMultiColors(values.length);
+    const data = labels.map((label, index) => ({
+        name: label,
+        value: values[index] || 0,
+        itemStyle: { color: colors[index] }
+    }));
+
+    return {
+        tooltip: {
+            trigger: 'item',
+            backgroundColor: 'rgba(255,255,255,0.97)',
+            borderColor: '#e2e8f0',
+            borderWidth: 1,
+            padding: [8, 12],
+            textStyle: { color: '#1e293b', fontSize: 12 },
+            formatter: (params: any) => {
+                const raw = Number(params.value || 0);
+                const formatted = metricLabel.includes('$')
+                    ? formatCurrency(raw)
+                    : new Intl.NumberFormat('es-MX').format(Math.round(raw));
+                return `<div style="font-weight:700;margin-bottom:5px;color:#0f172a;font-size:13px">${params.name}</div>
+                    <div style="display:flex;align-items:center;gap:6px">
+                        ${params.marker}
+                        <span style="color:#64748b">${metricLabel}</span>
+                        <b style="margin-left:8px">${formatted}</b>
+                    </div>`;
+            }
+        },
+        legend: {
+            type: 'scroll',
+            orient: 'vertical',
+            right: 6,
+            top: 28,
+            bottom: 8,
+            textStyle: { color: '#64748b', fontSize: 11 },
+            icon: 'roundRect',
+            itemWidth: 10,
+            itemHeight: 7
+        },
+        series: [
+            {
+                name: metricLabel,
+                type: 'pie',
+                radius: type === 'doughnut' ? ['45%', '70%'] : '70%',
+                center: ['38%', '55%'],
+                avoidLabelOverlap: true,
+                label: {
+                    color: '#64748b',
+                    fontSize: 11,
+                    formatter: '{b}'
+                },
+                labelLine: {
+                    length: 8,
+                    length2: 6
+                },
+                emphasis: {
+                    scale: true,
+                    scaleSize: 4,
+                    itemStyle: {
+                        shadowBlur: 10,
+                        shadowColor: 'rgba(15,23,42,0.18)'
+                    }
+                },
+                data
+            }
+        ],
+        animationDuration: 600,
+        animationEasingUpdate: 'cubicOut'
+    };
+}
+
 /* Calcula la estructura completa para una tabla de datos (Filas + Totales + Comparativas)*/
 
 
