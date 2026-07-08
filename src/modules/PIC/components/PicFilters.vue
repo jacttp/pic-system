@@ -210,17 +210,21 @@ onUnmounted(() => {
                 </span>
             </button>
 
-            <button
-                @click="setCollapsed(!isCollapsed)"
-                class="inline-flex h-9 items-center gap-2 rounded-full border border-pic-brand-border bg-pic-surface px-3 text-sm font-bold text-pic-brand shadow-sm shadow-pic-brand/10 transition-all hover:-translate-y-0.5 hover:bg-pic-brand-soft md:hidden"
-                :title="isCollapsed ? 'Expandir filtros' : 'Contraer filtros'"
-            >
-                <i class="fa-solid fa-filter text-sm"></i>
-                <span>Filtros</span>
-                <span class="grid h-6 min-w-6 place-items-center rounded-full bg-pic-brand px-1.5 text-xs font-black leading-none text-white shadow-sm shadow-pic-brand/25">
-                    {{ activeFilterCount }}
-                </span>
-            </button>
+            <div class="flex items-center justify-end gap-2 md:hidden">
+                <slot name="mobile-actions"></slot>
+
+                <button
+                    @click="setCollapsed(!isCollapsed)"
+                    class="inline-flex h-9 items-center gap-2 rounded-full border border-pic-brand-border bg-pic-surface px-3 text-sm font-bold text-pic-brand shadow-sm shadow-pic-brand/10 transition-all hover:-translate-y-0.5 hover:bg-pic-brand-soft"
+                    :title="isCollapsed ? 'Expandir filtros' : 'Contraer filtros'"
+                >
+                    <i class="fa-solid fa-filter text-sm"></i>
+                    <span>Filtros</span>
+                    <span class="grid h-6 min-w-6 place-items-center rounded-full bg-pic-brand px-1.5 text-xs font-black leading-none text-white shadow-sm shadow-pic-brand/25">
+                        {{ activeFilterCount }}
+                    </span>
+                </button>
+            </div>
 
             <div class="hidden flex-wrap items-center gap-2 md:flex lg:justify-end">
                 <span

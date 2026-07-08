@@ -36,6 +36,7 @@ export interface PicFilterOptions {
 export interface AiQueryConfig {
    metric: 'VENTA_KG' | 'VENTA_$$' | 'METAS_KG';
    metricView?: 'TotalVentaKG' | 'TotalVentaPesos' | 'TotalMetasKG';
+   metricViews?: Array<'TotalVentaKG' | 'TotalVentaPesos' | 'TotalMetasKG'>;
    dimensions: string[];
    // Filtros normalizados a arrays por el backend.
    // Incluye: TRANSACCION (crítico), Año, Mes, Gerencia, Zona, Jefatura, Ruta,

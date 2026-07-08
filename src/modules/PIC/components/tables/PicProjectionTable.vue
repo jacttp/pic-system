@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { usePicFilterStore } from '../../stores/picFilterStore';
+import { usePicChatStore } from '../../stores/picChatStore';
 import { picApi } from '../../services/picApi'; 
 import { formatNumber } from '../../utils/formatters';
 import type { PicPdfExportConfig, PicPrintBlockKey } from '../../types/picTypes';
@@ -23,6 +24,7 @@ const emit = defineEmits<{
 }>();
 
 const store = usePicFilterStore();
+const chatStore = usePicChatStore();
 const isCollapsed = ref(props.initialCollapsed || false);
 const projectionSearch = ref('');
 const mobileShowAllColumns = ref(false);
@@ -263,6 +265,32 @@ const colorClass = (val: number, isPercent = false) => {
     if (isPercent) return val >= 0 ? 'text-pic-success' : 'text-pic-danger';
     return val >= 0 ? 'text-pic-success' : 'text-pic-danger';
 };
+
+const handleAnalyzeProjection = () => {
+    const contextRows = visibleProjectionRows.value.slice(0, 50).map(row => ({
+        dimension: row.Dimension,
+        ventas: years.value.reduce((acc, year) => {
+            acc[year] = row[`Venta_${year}`] || 0;
+            return acc;
+        }, {} as Record<string, number>),
+        meta: row.meta,
+        difAnual: row.difAnual,
+        difMeta: row.difMeta,
+        crecimientoPct: row.crec,
+        cumplimientoPct: row.varMeta,
+        participacionPct: row.share
+    }));
+
+    chatStore.setContext(`${props.title} (proyeccion)`, {
+        title: props.title,
+        dimension: props.dimensionKey,
+        years: years.value,
+        currentYear: currentYear.value,
+        previousYear: prevYear.value,
+        rows: contextRows,
+        totals: footer.value
+    }, 'table');
+};
 </script>
 
 <template>
@@ -295,9 +323,21 @@ const colorClass = (val: number, isPercent = false) => {
                 {{ title }}
             </h3>
             
-            <button data-pic-print-control="true" v-if="tableData.length > 0" @click="isCollapsed = !isCollapsed" class="text-[10px] font-bold uppercase text-pic-text-muted hover:text-pic-brand">
-                {{ isCollapsed ? 'Mostrar' : 'Ocultar' }}
-            </button>
+            <div data-pic-print-control="true" class="flex items-center gap-2">
+                <button
+                    v-if="tableData.length > 0"
+                    @click="handleAnalyzeProjection"
+                    class="flex items-center gap-1.5 rounded px-2 py-1 text-[10px] font-bold uppercase text-pic-text-muted transition-colors hover:bg-pic-brand-soft hover:text-pic-brand"
+                    title="Analizar esta tabla con IA"
+                >
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span class="hidden sm:inline">Analizar</span>
+                </button>
+
+                <button v-if="tableData.length > 0" @click="isCollapsed = !isCollapsed" class="text-[10px] font-bold uppercase text-pic-text-muted hover:text-pic-brand">
+                    {{ isCollapsed ? 'Mostrar' : 'Ocultar' }}
+                </button>
+            </div>
         </div>
 
         <div v-if="tableData.length === 0 && !isLoading" class="flex min-h-[150px] flex-col items-center justify-center bg-pic-muted-surface/50 p-6">

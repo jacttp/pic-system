@@ -851,7 +851,23 @@ const handleExportConfirm = async (config: PicPdfExportConfig) => {
                             </button>
                         </div>
 
-                        <PicFilters class="md:basis-full" />
+                        <PicFilters class="md:basis-full">
+                            <template #mobile-actions>
+                                <button
+                                    @click="openExportModal"
+                                    :disabled="isExporting"
+                                    class="inline-flex h-9 items-center gap-2 rounded-full border border-pic-border bg-pic-surface px-3 text-sm font-bold text-pic-text-main shadow-sm shadow-pic-brand/10 transition-all hover:-translate-y-0.5 hover:bg-pic-muted-surface disabled:cursor-not-allowed disabled:opacity-50"
+                                    title="Configurar y Exportar PDF"
+                                >
+                                    <i v-if="isExporting" class="fa-solid fa-spinner fa-spin text-pic-text-muted"></i>
+                                    <i v-else class="fa-solid text-pic-brand" :class="showExportModal ? 'fa-eye' : 'fa-file-pdf'"></i>
+                                    <span class="sr-only">
+                                        {{ isExporting ? 'Generando PDF...' : (showExportModal ? 'Cerrar panel PDF' : 'Configurar PDF') }}
+                                    </span>
+                                    <span aria-hidden="true">PDF</span>
+                                </button>
+                            </template>
+                        </PicFilters>
                     </div>
 
                     <div

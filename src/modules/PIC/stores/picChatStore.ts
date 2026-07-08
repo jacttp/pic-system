@@ -25,6 +25,12 @@ const metricLabelMap: Record<AiQueryConfig['metric'], string> = {
    METAS_KG: 'Meta (KG)'
 };
 
+const metricViewLabelMap: Record<'TotalVentaKG' | 'TotalVentaPesos' | 'TotalMetasKG', string> = {
+   TotalVentaKG: 'Venta (KG)',
+   TotalVentaPesos: 'Venta ($)',
+   TotalMetasKG: 'Meta (KG)'
+};
+
 const normalizeDimensionKey = (dimension: string) => {
    if (dimension === 'Anio' || dimension === 'A_o') return 'Año';
    return dimension;
@@ -212,6 +218,8 @@ export const usePicChatStore = defineStore('picChat', () => {
          const vizType = config.visualization || 'bar'; // Fallback por seguridad
          const dimensions = config.dimensions.map(normalizeDimensionKey);
          const metricField = config.metricView || metricViewMap[config.metric] || 'TotalMetric';
+         const metricFields = (config.metricViews?.length ? config.metricViews : [metricField])
+            .filter((field, index, fields) => fields.indexOf(field) === index);
          const labelMetric = metricLabelMap[config.metric] || config.metric;
 
          // Preparar etiquetas y valores comunes
@@ -237,9 +245,13 @@ export const usePicChatStore = defineStore('picChat', () => {
             case 'table':
                // Para tabla pasamos los datos crudos y las columnas
                widgetConfig = {
-                  columns: [...dimensions, metricField],
+                  columns: [...dimensions, ...metricFields],
                   data: data,
-                  metricLabel: labelMetric
+                  metricLabel: labelMetric,
+                  metricLabels: metricFields.reduce((acc: Record<string, string>, field) => {
+                     acc[field] = metricViewLabelMap[field as keyof typeof metricViewLabelMap] || field;
+                     return acc;
+                  }, {})
                };
                break;
 

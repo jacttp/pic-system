@@ -10,6 +10,85 @@ const props = defineProps<{
 const store = usePicChatStore();
 const isUser = computed(() => props.message.role === 'user');
 const isSystem = computed(() => props.message.role === 'system');
+const YEAR_COLUMN = 'A\u00f1o';
+
+const filterLabels: Record<string, string> = {
+    [YEAR_COLUMN]: 'Año',
+    Anio: 'Año',
+    Mes: 'Mes',
+    MesInicial: 'Desde',
+    MesFinal: 'Hasta',
+    TRANSACCION: 'Trans.',
+    Marca: 'Marca',
+    Gerencia: 'Gerencia',
+    Zona: 'Zona',
+    Jefatura: 'Jefatura',
+    Ruta: 'Ruta',
+    canal: 'Canal',
+    grupo: 'Familia',
+    Categorias: 'Cat.',
+    formatocte: 'Formato',
+    NOM_CLIENTE: 'Cliente',
+    IDCLIENTE: 'Cliente',
+    SKU_NOMBRE: 'Producto'
+};
+
+const formatFilterValue = (value: unknown) => {
+    const values = Array.isArray(value) ? value : [value];
+    const clean = values
+        .map(item => String(item ?? '').trim())
+        .filter(Boolean);
+
+    if (clean.length <= 2) return clean.join(', ');
+    return `${clean.slice(0, 2).join(', ')} +${clean.length - 2}`;
+};
+
+const filterBadges = computed(() => {
+    const filters = props.message.chartConfig?.filters || {};
+    const badges: Array<{ key: string; label: string; value: string }> = [];
+
+    if (filters.MesInicial && filters.MesFinal && !filters.Mes) {
+        badges.push({
+            key: 'MesRango',
+            label: 'Meses',
+            value: `${formatFilterValue(filters.MesInicial)}-${formatFilterValue(filters.MesFinal)}`
+        });
+    }
+
+    const orderedKeys = [
+        YEAR_COLUMN,
+        'Anio',
+        'Mes',
+        'Marca',
+        'TRANSACCION',
+        'Gerencia',
+        'Zona',
+        'Jefatura',
+        'Ruta',
+        'canal',
+        'grupo',
+        'Categorias',
+        'formatocte',
+        'NOM_CLIENTE',
+        'IDCLIENTE',
+        'SKU_NOMBRE'
+    ];
+
+    for (const key of orderedKeys) {
+        if (key === 'MesInicial' || key === 'MesFinal') continue;
+        const value = filters[key];
+        const formatted = formatFilterValue(value);
+        if (!formatted) continue;
+
+        badges.push({
+            key,
+            label: filterLabels[key] || key,
+            value: formatted
+        });
+    }
+
+    return badges.slice(0, 7);
+});
 
 const bubbleClass = computed(() => {
     if (isSystem.value) return 'w-full border border-pic-danger/25 bg-pic-danger/10 text-center text-pic-danger';
@@ -35,6 +114,19 @@ const handleVisualize = () => {
         </div>
 
         <div v-if="message.chartConfig" class="mt-2 flex flex-col gap-2 self-start w-full">
+            <div v-if="filterBadges.length" class="flex max-w-full flex-wrap gap-1.5">
+                <span class="rounded-full border border-pic-border bg-pic-surface/80 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-pic-text-muted">
+                    Filtros
+                </span>
+                <span
+                    v-for="badge in filterBadges"
+                    :key="badge.key"
+                    class="max-w-[150px] truncate rounded-full border border-pic-border bg-pic-muted-surface px-2 py-0.5 text-[9px] text-pic-text-muted"
+                    :title="`${badge.label}: ${badge.value}`"
+                >
+                    <strong class="font-bold text-pic-text-main/70">{{ badge.label }}:</strong> {{ badge.value }}
+                </span>
+            </div>
             
             <button 
                 @click="handleVisualize"
