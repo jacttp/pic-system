@@ -1,6 +1,6 @@
 /* src/modules/PIC/services/picApi.ts */
 import api from '@/api/axios';
-import type { PicFilterOptions, PicDataPoint, AiChatResponse, AiQueryConfig } from '../types/picTypes';
+import type { PicFilterOptions, PicDataPoint, AiChatResponse, AiQueryConfig, PicChatDashboardContext } from '../types/picTypes';
 
 const V2 = import.meta.env.VITE_API_V2_PATH;
 
@@ -93,7 +93,7 @@ export const picApi = {
 
 
    // --- INTELIGENCIA ARTIFICIAL (ACTUALIZADO FASE 4) ---
-   async sendChatPrompt(userPrompt: string, history: any[] = [], model: string = 'gemini'): Promise<AiChatResponse> {
+   async sendChatPrompt(userPrompt: string, history: any[] = [], model: string = 'gemini', dashboardContext?: PicChatDashboardContext): Promise<AiChatResponse> {
       console.log("📡 [Front] Enviando prompt a Smart Agent:", userPrompt);
 
       // 1. Llamada al nuevo endpoint 'Inteligente'
@@ -101,7 +101,8 @@ export const picApi = {
       const { data } = await api.post(`/ai/chat`, {
          userPrompt,
          history,
-         modelProvider: model
+         modelProvider: model,
+         dashboardContext
       });
 
       // 2. Ya no necesitamos parsear texto crudo ni limpiar ```json

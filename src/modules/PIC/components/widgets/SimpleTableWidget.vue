@@ -12,7 +12,8 @@ const props = defineProps<{
 
 // Detectar si la métrica es dinero para formatear
 const isMoney = computed(() => props.config.metricLabel.includes('$'));
-const dimensionColumns = computed(() => props.config.columns.filter(c => c !== 'TotalMetric'));
+const metricColumn = computed(() => props.config.columns[props.config.columns.length - 1] || 'TotalMetric');
+const dimensionColumns = computed(() => props.config.columns.filter(c => c !== metricColumn.value));
 const mobilePrimaryDimension = computed(() => dimensionColumns.value[0]);
 
 const formatVal = (val: number) => isMoney.value ? formatCurrency(val) : formatNumber(val);
@@ -54,7 +55,7 @@ const formatMobileVal = (val: number) => {
                             <span class="block truncate" :title="row[mobilePrimaryDimension]">{{ row[mobilePrimaryDimension] }}</span>
                         </td>
                         <td class="px-2 py-2.5 text-right font-mono font-bold tabular-nums text-pic-text-main">
-                            {{ formatMobileVal(row.TotalMetric) }}
+                            {{ formatMobileVal(row[metricColumn]) }}
                         </td>
                     </tr>
                 </tbody>
@@ -79,7 +80,7 @@ const formatMobileVal = (val: number) => {
                             {{ row[col] }}
                         </td>
                         <td class="px-4 py-2.5 text-right font-mono font-bold text-pic-text-main">
-                            {{ formatVal(row.TotalMetric) }}
+                            {{ formatVal(row[metricColumn]) }}
                         </td>
                     </tr>
                 </tbody>

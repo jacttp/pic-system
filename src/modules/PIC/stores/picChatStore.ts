@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
 import { picApi } from '../services/picApi';
-import type { AiQueryConfig, DynamicWidget, ChatMessage } from '../types/picTypes';
+import type { AiQueryConfig, DynamicWidget, ChatMessage, PicChatDashboardContext } from '../types/picTypes';
 import { usePicFilterStore } from './picFilterStore';
 import { getChartConfig, getPieConfig, getSeriesColor, getMultiColors } from '../utils/picUtils';
 
@@ -12,6 +12,23 @@ interface ChatContext {
    data: any;
    type: 'chart' | 'table';
 }
+
+const metricViewMap: Record<AiQueryConfig['metric'], 'TotalVentaKG' | 'TotalVentaPesos' | 'TotalMetasKG'> = {
+   VENTA_KG: 'TotalVentaKG',
+   'VENTA_$$': 'TotalVentaPesos',
+   METAS_KG: 'TotalMetasKG'
+};
+
+const metricLabelMap: Record<AiQueryConfig['metric'], string> = {
+   VENTA_KG: 'Venta (KG)',
+   'VENTA_$$': 'Venta ($)',
+   METAS_KG: 'Meta (KG)'
+};
+
+const normalizeDimensionKey = (dimension: string) => {
+   if (dimension === 'Anio' || dimension === 'A_o') return 'Año';
+   return dimension;
+};
 
 export const usePicChatStore = defineStore('picChat', () => {
    // --- ESTADO ---
@@ -87,6 +104,38 @@ export const usePicChatStore = defineStore('picChat', () => {
       initChat();
    }
 
+   function buildDashboardContext(): PicChatDashboardContext {
+      const filters: Record<string, any> = {};
+      const mappings: Record<string, string> = {
+         Transaccion: 'TRANSACCION',
+         FormatoCliente: 'formatocte',
+         Anio: 'Anio',
+         SKU: 'SKU_NOMBRE'
+      };
+
+      for (const [key, value] of Object.entries(filterStore.selected)) {
+         if (key === 'usarRangoMeses') continue;
+         if (Array.isArray(value) && value.length > 0) {
+            filters[mappings[key] || key] = [...value];
+         } else if (typeof value === 'string' && value) {
+            filters[mappings[key] || key] = value;
+         }
+      }
+
+      if (filterStore.selectedClients.size > 0) {
+         filters.IDCLIENTE = Array.from(filterStore.selectedClients.keys());
+      }
+
+      return {
+         filters,
+         visualContext: activeContext.value ? {
+            title: activeContext.value.title,
+            type: activeContext.value.type,
+            data: activeContext.value.data
+         } : null
+      };
+   }
+
    async function sendMessage(userText: string) {
       if (!userText.trim()) return;
 
@@ -107,50 +156,17 @@ export const usePicChatStore = defineStore('picChat', () => {
                parts: [{ text: m.text }]
             }));
 
-         // --- B. INYECTAR CONTEXTO ---
-         let promptToSend = userText;
-
-         // B1. Contexto de Filtros Activos del Dashboard
-         // Diccionario para nombres legibles (reduce tokens vs enviar keys crudos)
-         const filterLabels: Record<string, string> = {
-            canal: 'Canal', Gerencia: 'Gerencia', Jefatura: 'Jefatura',
-            Ruta: 'Ruta', Marca: 'Marca', grupo: 'Grupo/Familia',
-            Categorias: 'Categoría', SKU: 'SKU', Anio: 'Año',
-            Transaccion: 'Transacción', FormatoCliente: 'Formato Cliente',
-            MesInicial: 'Mes Inicial', MesFinal: 'Mes Final'
-         };
-
-         // Construir resumen compacto de filtros seleccionados (solo los no vacíos)
-         const activeFilters: string[] = [];
-         for (const [key, label] of Object.entries(filterLabels)) {
-            const val = filterStore.selected[key as keyof typeof filterStore.selected];
-            if (Array.isArray(val) && val.length > 0) {
-               activeFilters.push(`${label}: ${val.join(', ')}`);
-            } else if (typeof val === 'string' && val) {
-               activeFilters.push(`${label}: ${val}`);
-            }
-         }
-
-         if (activeFilters.length > 0) {
-            promptToSend = `[FILTROS ACTIVOS DEL DASHBOARD]\n${activeFilters.join('\n')}\n\n[PREGUNTA USUARIO]\n"${userText}"`;
-         }
-
-         // B2. Contexto Visual (Si el usuario seleccionó un gráfico/tabla con el botón de contexto)
-         if (activeContext.value) {
-            const contextDataStr = JSON.stringify(activeContext.value.data).slice(0, 5000);
-            promptToSend = `[FILTROS ACTIVOS DEL DASHBOARD]\n${activeFilters.length > 0 ? activeFilters.join('\n') : '(ninguno)'}\n\n[CONTEXTO VISUAL ACTIVO]\nElemento: "${activeContext.value.title}" (${activeContext.value.type}).\nDatos: ${contextDataStr}.\n\n[PREGUNTA USUARIO]\n"${userText}"`;
-         }
+         const dashboardContext = buildDashboardContext();
 
          // --- C. LLAMADA A LA API ---
-         // Enviamos el prompt actual + el historial de la conversación
-         const response = await picApi.sendChatPrompt(promptToSend, history, selectedModel.value);
+         const response = await picApi.sendChatPrompt(userText, history, selectedModel.value, dashboardContext);
 
          // --- D. PROCESAR RESPUESTA ---
          if (response.explanation) {
             if (response.queryConfig) {
                // Respuesta con gráfico: texto instantáneo + botón de visualizar
                const msgId = addMessage('assistant', response.explanation, response.queryConfig);
-               await visualizeData(msgId);
+               await visualizeData(msgId, true);
             } else {
                // Respuesta conversacional: efecto typewriter ✨
                await typewriterMessage('assistant', response.explanation);
@@ -169,12 +185,12 @@ export const usePicChatStore = defineStore('picChat', () => {
       }
    }
 
-   async function visualizeData(messageId: string) {
+   async function visualizeData(messageId: string, force = false) {
       const message = messages.value.find(m => m.id === messageId);
       if (!message || !message.chartConfig) return;
 
       // Evitar doble loading si el usuario hace clic varias veces rápido
-      if (isLoading.value) return;
+      if (isLoading.value && !force) return;
       isLoading.value = true;
 
       try {
@@ -194,19 +210,14 @@ export const usePicChatStore = defineStore('picChat', () => {
 
          const config = message.chartConfig;
          const vizType = config.visualization || 'bar'; // Fallback por seguridad
+         const dimensions = config.dimensions.map(normalizeDimensionKey);
+         const metricField = config.metricView || metricViewMap[config.metric] || 'TotalMetric';
+         const labelMetric = metricLabelMap[config.metric] || config.metric;
 
          // Preparar etiquetas y valores comunes
          // (Para tablas y KPIs se procesan distinto abajo)
-         const labels = data.map((d: any) => config.dimensions.map(dim => d[dim]).join(' - '));
-         const values = data.map((d: any) => d.TotalMetric || 0);
-
-         // Mapas de etiquetas amigables
-         const metricMap: Record<string, string> = {
-            'VENTA_KG': 'Venta (KG)',
-            'VENTA_$$': 'Venta ($)',
-            'METAS_KG': 'Meta (KG)'
-         };
-         const labelMetric = metricMap[config.metric] || config.metric;
+         const labels = data.map((d: any) => dimensions.map(dim => d[dim]).join(' - '));
+         const values = data.map((d: any) => Number(d[metricField] ?? d.TotalMetric ?? 0));
 
          let widgetConfig: any = null;
          let widgetType = vizType;
@@ -226,7 +237,7 @@ export const usePicChatStore = defineStore('picChat', () => {
             case 'table':
                // Para tabla pasamos los datos crudos y las columnas
                widgetConfig = {
-                  columns: [...config.dimensions, 'TotalMetric'], // Columnas dinámicas
+                  columns: [...dimensions, metricField],
                   data: data,
                   metricLabel: labelMetric
                };
@@ -273,7 +284,7 @@ export const usePicChatStore = defineStore('picChat', () => {
          // 2. Crear el Widget Dinámico
          const newWidget: DynamicWidget = {
             id: Date.now().toString(),
-            title: `IA: ${labelMetric} por ${config.dimensions.join(', ')}`,
+            title: config.title || `IA: ${labelMetric} por ${dimensions.join(', ')}`,
             type: widgetType, // 'bar', 'kpi', 'table', etc.
             config: widgetConfig,
             rawQuery: config,
@@ -288,7 +299,7 @@ export const usePicChatStore = defineStore('picChat', () => {
          if (vizType !== 'kpi') {
             const dataSample = data.slice(0, 15);
             const promptInsight = `Describe brevemente la tendencia, valor más alto o distribución. Máx 20 palabras.`;
-            const insightText = await picApi.getDataInsights(dataSample, promptInsight);
+            const insightText = await picApi.getDataInsights(dataSample, promptInsight, selectedModel.value);
             message.text = `${message.text}\n\n💡 ${insightText}`;
          }
 

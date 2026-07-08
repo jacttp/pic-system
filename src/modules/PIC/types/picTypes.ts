@@ -35,18 +35,42 @@ export interface PicFilterOptions {
 // Estructura de la respuesta del Chat IA (Híbrida)
 export interface AiQueryConfig {
    metric: 'VENTA_KG' | 'VENTA_$$' | 'METAS_KG';
+   metricView?: 'TotalVentaKG' | 'TotalVentaPesos' | 'TotalMetasKG';
    dimensions: string[];
    // Filtros normalizados a arrays por el backend.
    // Incluye: TRANSACCION (crítico), Año, Mes, Gerencia, Zona, Jefatura, Ruta,
    //          Marca, grupo, Categorias, SKU_NOMBRE, canal, formatocte
    filters: Record<string, string[]>;
    visualization: 'bar' | 'line' | 'pie' | 'doughnut' | 'table' | 'kpi';
+   top?: number | null;
+   title?: string;
+   source?: 'vw_pic_report' | string;
+   reasoningHint?: string;
+   diagnostics?: {
+      prompt?: string;
+      rawPlan?: any;
+      inheritedFilters?: Record<string, any>;
+      explicitFilters?: Record<string, any>;
+      effectiveFilters?: Record<string, any>;
+      notes?: string[];
+   };
 }
 
 export interface AiChatResponse {
    explanation: string;
    queryConfig: AiQueryConfig | null;
    // type?: 'text' | 'data_query'; esto si lo usas en el UI
+}
+
+export interface PicChatVisualContext {
+   title: string;
+   type: 'chart' | 'table';
+   data: any;
+}
+
+export interface PicChatDashboardContext {
+   filters: Record<string, any>;
+   visualContext?: PicChatVisualContext | null;
 }
 
 // Tipo para el estado de los filtros seleccionados en la UI

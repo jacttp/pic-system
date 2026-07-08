@@ -183,7 +183,7 @@ const hasPageBreak = (blockId: PicPrintBlockKey) => Boolean(props.printConfig?.p
                     :key="widget.id" 
                     class="pic-chart-cell group relative rounded-xl border border-pic-border bg-pic-surface p-1 shadow-sm transition-all hover:shadow-md"
                 >
-                    <div class="h-80 w-full overflow-hidden rounded-lg"> 
+                    <div class="h-[420px] w-full overflow-hidden rounded-lg md:h-[440px]"> 
                         
                         <KpiCardWidget 
                             v-if="widget.type === 'kpi'" 

@@ -118,8 +118,8 @@ const handleAnalyze = () => {
             </div>
         </div>
 
-        <div class="pic-chart-surface relative min-h-[300px] w-full min-w-0 flex-1 md:min-h-[320px] xl:min-h-[350px]">
-            <canvas ref="canvasRef"></canvas>
+        <div class="pic-chart-surface relative min-h-0 w-full min-w-0 flex-1">
+            <canvas ref="canvasRef" class="!h-full !w-full"></canvas>
         </div>
     </div>
 </template>

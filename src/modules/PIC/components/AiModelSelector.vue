@@ -9,7 +9,7 @@ const dropdownRef = ref<HTMLElement | null>(null);
 // CAMBIO 1: Reemplazamos Emojis por clases de FontAwesome
 const models = [
   { id: 'gemini', name: 'Gemini 2.5', icon: 'fa-brands fa-chrome', color: 'text-pic-accent-blue', desc: 'Rápido y preciso' },
-  { id: 'openai', name: 'GPT-4o', icon: 'fa-brands fa-openai', color: 'text-pic-success', desc: 'Mayor razonamiento' },
+  { id: 'openai', name: 'GPT-5.4', icon: 'fa-brands fa-openai', color: 'text-pic-success', desc: 'Mayor razonamiento' },
   { id: 'deepseek', name: 'DeepSeek', icon: 'fa-solid fa-robot', color: 'text-pic-accent-purple', desc: 'Open Source potente' },
   { id: 'groq', name: 'Llama 3.1 (Groq)', icon: 'fa-solid fa-bolt', color: 'text-pic-accent-orange', desc: 'Velocidad Instantánea'}
 ];
