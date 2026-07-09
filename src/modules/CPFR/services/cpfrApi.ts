@@ -120,6 +120,30 @@ export const cpfrApi = {
      * POST /api/cpfr/upload-oc  (multipart/form-data)
      * Subir OC desde archivo .xls de Soriana.
      */
+    async purgeApprovedZeroSkus(ids: number[]): Promise<{ success: boolean; requested: number; deleted: number; message?: string }> {
+        const { data } = await api.delete('/cpfr/orders/approved-zero-skus', { data: { ids } })
+        return data
+    },
+
+    async getApprovedZeroSkuCandidates(body: {
+        weeks: Array<{ anio: number; semana: number }>
+        nom_cadena: string
+    }): Promise<Array<{
+        id: number
+        id_cliente: string
+        nombre_tienda: string
+        num_pedido: string
+        sku_muliix: string
+        sku_nombre: string
+        fec_pedido_cadena: string | null
+        cantidad_base_uni: number
+        ajuste: number
+        ajuste_mix: number
+    }>> {
+        const { data } = await api.post('/cpfr/orders/approved-zero-skus/candidates', body)
+        return data.data ?? []
+    },
+
     async uploadOC(file: File, nom_cadena = 'soriana'): Promise<CpfrUploadOCResponse> {
         const form = new FormData()
         form.append('file', file)

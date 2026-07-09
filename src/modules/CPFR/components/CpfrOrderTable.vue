@@ -11,6 +11,7 @@ import type { CpfrSkuDash, CpfrStoreDash } from '../types/cpfrTypes'
 import CpfrZ8Panel from '../components/CpfrZ8Panel.vue'
 import CpfrProductBehaviorPanel from '../components/CpfrProductBehaviorPanel.vue'
 import { buildVisibleCpfrDias } from '../composables/useCpfrVisibility'
+import { cpfrApi } from '../services/cpfrApi'
 
 const showZ8Panel = ref(false)
 const selectedProductContext = ref<{ tienda: CpfrStoreDash; sku: CpfrSkuDash } | null>(null)
@@ -18,6 +19,7 @@ const selectedProductContext = ref<{ tienda: CpfrStoreDash; sku: CpfrSkuDash } |
 const store = useCpfrStore()
 const showZeroZ8 = ref(false)
 const showExpiredCloseModal = ref(false)
+const showApprovedZeroPurgeModal = ref(false)
 
 const emit = defineEmits<{
     (e: 'open-config', id_cliente: string, nombre_tienda: string): void
@@ -52,6 +54,7 @@ const availableWeeks = computed(() => {
 
 const historyWeekPickerOpen = ref(false)
 const historyWeekSearch = ref('')
+const historyZeroValidationLoading = ref(false)
 
 const filteredHistoryWeeks = computed(() => {
     const term = historyWeekSearch.value.trim().toLowerCase()
@@ -63,8 +66,9 @@ const filteredHistoryWeeks = computed(() => {
     })
 })
 
-function loadHistoryFromSelection() {
-    store.loadHistorial(store.historialSelectedWeeks, 1)
+async function loadHistoryFromSelection() {
+    await store.loadHistorial(store.historialSelectedWeeks, 1)
+    await loadHistoryApprovedZeroCandidates()
 }
 
 function changeHistoryPageSize(event: Event) {
@@ -87,6 +91,7 @@ function isHistoryWeekSelected(key: string): boolean {
 }
 
 function toggleHistoryWeek(week: { anio: number; semana: number; semana_ic: string; key: string }) {
+    historyApprovedZeroPurgeRows.value = []
     if (isHistoryWeekSelected(week.key)) {
         store.historialSelectedWeeks = store.historialSelectedWeeks.filter(w => w.key !== week.key)
     } else {
@@ -96,10 +101,12 @@ function toggleHistoryWeek(week: { anio: number; semana: number; semana_ic: stri
 
 function clearHistoryWeeks() {
     store.historialSelectedWeeks = []
+    historyApprovedZeroPurgeRows.value = []
 }
 
 function selectRecentHistoryWeeks(count: number) {
     store.historialSelectedWeeks = availableWeeks.value.slice(0, count)
+    historyApprovedZeroPurgeRows.value = []
 }
 
 watch(currentTab, (newTab) => {
@@ -933,6 +940,160 @@ const expiredCloseSummary = computed(() => ({
     skus: expiredCentralizedOCs.value.reduce((acc, oc) => acc + oc.sku_count, 0),
 }))
 
+type ApprovedZeroPurgeRow = {
+    id: number
+    id_cliente: string
+    nombre_tienda: string
+    num_pedido: string
+    sku_muliix: string
+    sku_nombre: string
+    fec_pedido_cadena: string | null
+    cantidad_base_uni: number
+    ajuste: number
+    ajuste_mix: number
+}
+
+const historyApprovedZeroPurgeRows = ref<ApprovedZeroPurgeRow[]>([])
+
+async function loadHistoryApprovedZeroCandidates() {
+    if (currentTab.value !== 'historial' || !store.historialSelectedWeeks.length) {
+        historyApprovedZeroPurgeRows.value = []
+        return
+    }
+
+    historyZeroValidationLoading.value = true
+    try {
+        const rows = await cpfrApi.getApprovedZeroSkuCandidates({
+            nom_cadena: store.nom_cadena,
+            weeks: store.historialSelectedWeeks.map(w => ({
+                anio: Number(w.anio),
+                semana: Number(w.semana),
+            })),
+        })
+
+        historyApprovedZeroPurgeRows.value = rows.map(row => ({
+            id: Number(row.id),
+            id_cliente: String(row.id_cliente || ''),
+            nombre_tienda: String(row.nombre_tienda || row.id_cliente || ''),
+            num_pedido: String(row.num_pedido || '—'),
+            sku_muliix: String(row.sku_muliix || '—'),
+            sku_nombre: String(row.sku_nombre || row.sku_muliix || 'Sin descripción'),
+            fec_pedido_cadena: row.fec_pedido_cadena || null,
+            cantidad_base_uni: Number(row.cantidad_base_uni || 0),
+            ajuste: Number(row.ajuste || 0),
+            ajuste_mix: Number(row.ajuste_mix || 0),
+        })).filter(row => Number.isInteger(row.id) && row.id > 0)
+    } catch (err) {
+        historyApprovedZeroPurgeRows.value = []
+        toast({
+            title: 'No se pudo validar historial',
+            description: 'No se pudieron consultar los renglones aprobados en cero para las semanas seleccionadas.',
+            variant: 'destructive',
+            duration: 5000,
+        })
+    } finally {
+        historyZeroValidationLoading.value = false
+    }
+}
+
+const approvedZeroPurgeRows = computed<ApprovedZeroPurgeRow[]>(() => {
+    if (currentTab.value === 'historial') return historyApprovedZeroPurgeRows.value
+    if (!isApprovedTab.value) return []
+
+    const map = new Map<number, ApprovedZeroPurgeRow>()
+    for (const dia of filteredDias.value) {
+        for (const tienda of dia.tiendas) {
+            for (const sku of tienda.skus) {
+                const id = Number(sku.pedido_generado_id)
+                if (!Number.isInteger(id) || id <= 0) continue
+                if (String(sku.estado_oc || '').toLowerCase() !== 'aprobado') continue
+                if (Math.abs(skuFinalOrderQuantity(sku)) > 0.0001) continue
+
+                map.set(id, {
+                    id,
+                    id_cliente: tienda.id_cliente,
+                    nombre_tienda: tienda.nombre_tienda,
+                    num_pedido: sku.num_pedido || '—',
+                    sku_muliix: sku.sku_muliix || sku.sku_cadena || '—',
+                    sku_nombre: sku.sku_nombre || sku.sku_cadena || 'Sin descripción',
+                    fec_pedido_cadena: sku.fec_pedido_cadena || null,
+                    cantidad_base_uni: skuBaseQuantity(sku),
+                    ajuste: skuAdjustment(sku),
+                    ajuste_mix: skuMixAdjustment(sku),
+                })
+            }
+        }
+    }
+
+    return [...map.values()].sort((a, b) => {
+        const tiendaCompare = a.nombre_tienda.localeCompare(b.nombre_tienda)
+        if (tiendaCompare !== 0) return tiendaCompare
+        const ocCompare = a.num_pedido.localeCompare(b.num_pedido)
+        if (ocCompare !== 0) return ocCompare
+        return a.sku_nombre.localeCompare(b.sku_nombre)
+    })
+})
+
+const approvedZeroPurgeSummary = computed(() => ({
+    skus: approvedZeroPurgeRows.value.length,
+    ocs: new Set(approvedZeroPurgeRows.value.map(row => `${row.id_cliente}|${row.num_pedido}`)).size,
+    stores: new Set(approvedZeroPurgeRows.value.map(row => row.id_cliente)).size,
+}))
+
+function openApprovedZeroPurgeModal() {
+    if (!approvedZeroPurgeRows.value.length) return
+    showApprovedZeroPurgeModal.value = true
+}
+
+function closeApprovedZeroPurgeModal() {
+    if (submittingOC.value === 'approved-zero-purge') return
+    showApprovedZeroPurgeModal.value = false
+}
+
+async function purgeApprovedZeroSkus() {
+    if (submittingOC.value === 'approved-zero-purge') return
+    const ids = approvedZeroPurgeRows.value.map(row => row.id)
+    if (!ids.length) return
+
+    submittingOC.value = 'approved-zero-purge'
+    try {
+        let deleted = 0
+        let requested = 0
+        for (let index = 0; index < ids.length; index += 1000) {
+            const chunk = ids.slice(index, index + 1000)
+            const result = await cpfrApi.purgeApprovedZeroSkus(chunk)
+            requested += result.requested ?? chunk.length
+            deleted += result.deleted ?? 0
+        }
+        showApprovedZeroPurgeModal.value = false
+
+        if (currentTab.value === 'historial') {
+            await store.loadHistorial(store.historialSelectedWeeks, store.historialPagination?.page ?? 1)
+            await loadHistoryApprovedZeroCandidates()
+        } else {
+            await store.loadDashboard()
+        }
+
+        const partial = deleted < requested
+        toast({
+            title: partial ? 'Purga parcial' : 'Ceros purgados',
+            description: partial
+                ? `${deleted} de ${requested} renglón(es) fueron eliminados. Los demás ya no cumplían la condición.`
+                : `${deleted} renglón(es) eliminado(s) de CPFR_PedidoGenerado.`,
+            duration: 5000,
+        })
+    } catch (err) {
+        toast({
+            title: 'Error al purgar ceros',
+            description: 'No se pudieron eliminar los renglones aprobados en cero.',
+            variant: 'destructive',
+            duration: 5000,
+        })
+    } finally {
+        submittingOC.value = null
+    }
+}
+
 async function closeExpiredCentralizedOCs() {
     if (!store.currentWeek || submittingOC.value === 'expired-centralized') return
 
@@ -1191,6 +1352,19 @@ const totalUniqueOCs = computed(() => {
             <i v-else class="fa-solid fa-lock"></i>
             Cerrar caducadas
             <span class="rounded bg-white/70 px-1.5 py-0.5 text-[9px]">{{ expiredCentralizedOCs.length }}</span>
+          </button>
+
+          <button
+            v-if="(isApprovedTab || currentTab === 'historial') && approvedZeroPurgeRows.length > 0"
+            class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="submittingOC === 'approved-zero-purge' || historyZeroValidationLoading"
+            title="Eliminar de CPFR_PedidoGenerado los SKUs aprobados cuyo total final es cero"
+            @click.stop="openApprovedZeroPurgeModal"
+          >
+            <i v-if="submittingOC === 'approved-zero-purge' || historyZeroValidationLoading" class="fa-solid fa-circle-notch fa-spin"></i>
+            <i v-else class="fa-solid fa-broom"></i>
+            Purgar ceros
+            <span class="rounded bg-white/70 px-1.5 py-0.5 text-[9px]">{{ approvedZeroPurgeRows.length }}</span>
           </button>
 
           <!-- Pestañas (Tabs) -->
@@ -2889,6 +3063,130 @@ const totalUniqueOCs = computed(() => {
         :cadena="store.nom_cadena"
         @close="closeProductPanel"
     />
+  </Teleport>
+
+  <Teleport to="body">
+    <div
+      v-if="showApprovedZeroPurgeModal"
+      class="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/35 px-4 py-6 backdrop-blur-[2px]"
+      @click.self="closeApprovedZeroPurgeModal"
+    >
+      <section class="flex max-h-[82vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-amber-200 bg-white shadow-2xl">
+        <header class="shrink-0 border-b border-amber-100 bg-amber-50 px-5 py-4">
+          <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+              <div class="mb-1 flex items-center gap-2">
+                <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500 text-white shadow-sm">
+                  <i class="fa-solid fa-broom text-[11px]"></i>
+                </span>
+                <h3 class="text-sm font-black uppercase tracking-wider text-slate-800">Purgar SKUs aprobados en cero</h3>
+              </div>
+              <p class="text-xs font-medium leading-relaxed text-slate-600">
+                Se eliminarán únicamente renglones de CPFR_PedidoGenerado que sigan aprobados y con total final cero.
+              </p>
+            </div>
+            <button
+              class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-amber-100 bg-white text-slate-400 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-60"
+              :disabled="submittingOC === 'approved-zero-purge'"
+              title="Cerrar ventana"
+              @click="closeApprovedZeroPurgeModal"
+            >
+              <i class="fa-solid fa-xmark text-[12px]"></i>
+            </button>
+          </div>
+        </header>
+
+        <div class="shrink-0 border-b border-slate-100 bg-white px-5 py-3">
+          <div class="grid grid-cols-3 gap-2">
+            <div class="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+              <p class="text-[9px] font-black uppercase tracking-wider text-slate-500">Tiendas</p>
+              <p class="mt-0.5 text-lg font-black text-slate-800">{{ approvedZeroPurgeSummary.stores }}</p>
+            </div>
+            <div class="rounded-lg border border-brand-100 bg-brand-50 px-3 py-2">
+              <p class="text-[9px] font-black uppercase tracking-wider text-brand-600">OC</p>
+              <p class="mt-0.5 text-lg font-black text-brand-700">{{ approvedZeroPurgeSummary.ocs }}</p>
+            </div>
+            <div class="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
+              <p class="text-[9px] font-black uppercase tracking-wider text-amber-700">SKUs en cero</p>
+              <p class="mt-0.5 text-lg font-black text-amber-800">{{ approvedZeroPurgeSummary.skus }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+          <div class="overflow-hidden rounded-lg border border-slate-200">
+          <table class="w-full table-fixed text-left text-[11px]">
+            <colgroup>
+              <col class="w-[13%]">
+              <col class="w-[22%]">
+              <col class="w-[29%]">
+              <col class="w-[8%]">
+              <col class="w-[8%]">
+              <col class="w-[8%]">
+              <col class="w-[12%]">
+            </colgroup>
+            <thead class="sticky top-0 z-10 border-b border-slate-200 bg-slate-100 text-[8px] uppercase tracking-wider text-slate-500">
+              <tr>
+                <th class="px-3 py-2.5 font-black">OC</th>
+                <th class="px-3 py-2.5 font-black">Tienda</th>
+                <th class="px-3 py-2.5 font-black">SKU</th>
+                <th class="px-2 py-2.5 text-right font-black">Base</th>
+                <th class="px-2 py-2.5 text-right font-black">Ajuste</th>
+                <th class="px-2 py-2.5 text-right font-black">Mix</th>
+                <th class="px-2 py-2.5 text-right font-black leading-tight text-emerald-700">Pedido aprobado</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="row in approvedZeroPurgeRows" :key="row.id" class="hover:bg-amber-50/30">
+                <td class="min-w-0 px-3 py-3">
+                  <p class="truncate font-black text-slate-800" :title="row.num_pedido">{{ row.num_pedido }}</p>
+                  <p class="mt-0.5 font-mono text-[9px] font-bold text-slate-400">{{ formatShortDate(row.fec_pedido_cadena) }}</p>
+                </td>
+                <td class="min-w-0 px-3 py-3">
+                  <p class="truncate font-bold text-slate-700" :title="row.nombre_tienda">{{ row.nombre_tienda }}</p>
+                  <p class="mt-0.5 font-mono text-[9px] font-bold text-slate-400">{{ row.id_cliente }}</p>
+                </td>
+                <td class="min-w-0 px-3 py-3">
+                  <p class="truncate font-bold text-slate-700" :title="row.sku_nombre">{{ row.sku_nombre }}</p>
+                  <p class="mt-0.5 font-mono text-[9px] font-bold text-slate-400">{{ row.sku_muliix }}</p>
+                </td>
+                <td class="px-2 py-3 text-right font-mono font-bold text-slate-600">{{ n(row.cantidad_base_uni, 0) }}</td>
+                <td class="px-2 py-3 text-right font-mono font-bold" :class="row.ajuste === 0 ? 'text-slate-400' : 'text-amber-700'">{{ formatSignedNumber(row.ajuste) }}</td>
+                <td class="px-2 py-3 text-right font-mono font-bold" :class="row.ajuste_mix === 0 ? 'text-slate-400' : 'text-emerald-700'">{{ formatSignedNumber(row.ajuste_mix) }}</td>
+                <td class="px-3 py-3 text-right font-mono font-black text-emerald-700">{{ n(row.cantidad_base_uni + row.ajuste + row.ajuste_mix, 0) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          </div>
+        </div>
+
+        <footer class="shrink-0 border-t border-slate-200 bg-slate-50 px-5 py-3">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-[11px] font-semibold text-slate-500">
+              La base de datos volverá a validar estado aprobado y total cero antes de borrar.
+            </p>
+            <div class="flex justify-end gap-2">
+              <button
+                class="h-9 rounded-lg border border-slate-200 bg-white px-4 text-[11px] font-black uppercase tracking-wider text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-60"
+                :disabled="submittingOC === 'approved-zero-purge'"
+                @click="closeApprovedZeroPurgeModal"
+              >
+                Cancelar
+              </button>
+              <button
+                class="inline-flex h-9 items-center gap-2 rounded-lg bg-amber-500 px-4 text-[11px] font-black uppercase tracking-wider text-white shadow-sm transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+                :disabled="submittingOC === 'approved-zero-purge'"
+                @click="purgeApprovedZeroSkus"
+              >
+                <i v-if="submittingOC === 'approved-zero-purge'" class="fa-solid fa-circle-notch fa-spin"></i>
+                <i v-else class="fa-solid fa-trash-can"></i>
+                Eliminar renglones
+              </button>
+            </div>
+          </div>
+        </footer>
+      </section>
+    </div>
   </Teleport>
 
   <Teleport to="body">

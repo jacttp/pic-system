@@ -35,6 +35,7 @@ export interface CpfrHistorialPagination {
 export interface CpfrSkuDash {
     // Identificación
     oc_id: number                       // PK de CPFR_OrdenCompra
+    pedido_generado_id?: number | null  // PK de CPFR_PedidoGenerado cuando existe persistencia CPFR
     sku_muliix: string | null           // null si la OC no tiene homologación
     sku_nombre: string                  // nombre del SKU (o desc_art / sku_cadena como fallback)
 
