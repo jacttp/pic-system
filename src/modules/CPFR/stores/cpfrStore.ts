@@ -19,6 +19,7 @@ import type {
     CpfrSkuOverride,
     CpfrSkuUnit,
     CpfrSkuUnitPayload,
+    CpfrHistorialPagination,
 } from '../types/cpfrTypes'
 
 export const useCpfrStore = defineStore('cpfr', () => {
@@ -45,6 +46,9 @@ export const useCpfrStore = defineStore('cpfr', () => {
     const historialError = ref<string | null>(null)
     const historialSelectedWeeks = ref<HistorialWeek[]>([])
     const historialSearch = ref('')
+    const historialPage = ref(1)
+    const historialPageSize = ref(50)
+    const historialPagination = ref<CpfrHistorialPagination | null>(null)
     const approvalIdsByOrder = reactive<Record<string, number>>({})
     const approvalLookupLoadedByStatus = reactive<Record<string, boolean>>({})
     const cpfrApprovalDetails = reactive<Record<number, any>>({})
@@ -106,16 +110,22 @@ export const useCpfrStore = defineStore('cpfr', () => {
 
         nom_cadena.value = normalized
         localStorage.setItem('cpfr_nom_cadena', normalized)
-        historialDias.value = []
-        historialLoaded.value = false
-        historialError.value = null
-        historialSelectedWeeks.value = []
-        historialSearch.value = ''
+        resetHistorialState()
         activeTab.value = 'centralizados'
         loadDashboard()
     }
 
     // ── Helpers internos ──────────────────────────────────────────────────────
+
+    function resetHistorialState() {
+        historialDias.value = []
+        historialLoaded.value = false
+        historialError.value = null
+        historialSelectedWeeks.value = []
+        historialSearch.value = ''
+        historialPage.value = 1
+        historialPagination.value = null
+    }
 
     function buildDashBody() {
         const estadoPedido =
@@ -336,7 +346,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         }
     }
 
-    async function loadHistorial(weeks = historialSelectedWeeks.value): Promise<void> {
+    async function loadHistorial(weeks = historialSelectedWeeks.value, page = 1): Promise<void> {
         if (!currentWeek.value) return
         const normalizedWeeks = weeks
             .map(w => ({
@@ -351,11 +361,14 @@ export const useCpfrStore = defineStore('cpfr', () => {
             historialDias.value = []
             historialLoaded.value = false
             historialError.value = 'Selecciona una o más semanas para cargar historial.'
+            historialPage.value = 1
+            historialPagination.value = null
             return
         }
 
         historialLoading.value = true
         historialError.value = null
+        historialPage.value = page
         try {
             const body = {
                 year: currentWeek.value!.anio,
@@ -366,10 +379,15 @@ export const useCpfrStore = defineStore('cpfr', () => {
                     ...filters,
                     estado_pedido: 'historial_finalizado' as const,
                     historial_weeks: normalizedWeeks.map(w => ({ anio: w.anio, semana: w.semana })),
+                    historial_pagination: {
+                        page,
+                        page_size: historialPageSize.value,
+                    },
                 }
             }
             const res = await cpfrApi.loadDashboard(body)
             historialDias.value = res.dias
+            historialPagination.value = res.context.historial_pagination ?? null
             historialLoaded.value = true
             historialSelectedWeeks.value = normalizedWeeks
             for (const dia of res.dias) {
@@ -382,6 +400,20 @@ export const useCpfrStore = defineStore('cpfr', () => {
             console.error('[cpfrStore.loadHistorial]', e)
         } finally {
             historialLoading.value = false
+        }
+    }
+
+    async function loadHistorialPage(page: number): Promise<void> {
+        if (!historialSelectedWeeks.value.length) return
+        const totalPages = historialPagination.value?.total_pages ?? page
+        const nextPage = Math.min(Math.max(1, page), Math.max(1, totalPages))
+        await loadHistorial(historialSelectedWeeks.value, nextPage)
+    }
+
+    async function setHistorialPageSize(size: number): Promise<void> {
+        historialPageSize.value = Math.min(100, Math.max(25, Number(size) || 50))
+        if (historialSelectedWeeks.value.length) {
+            await loadHistorial(historialSelectedWeeks.value, 1)
         }
     }
 
@@ -625,19 +657,26 @@ export const useCpfrStore = defineStore('cpfr', () => {
     // ── Filtros ───────────────────────────────────────────────────────────────
 
     function setFilter(key: keyof CpfrFilters, value: number | string | undefined) {
+        const previousValue = filters[key]
         if (value == null || value === '') {
             delete (filters as Record<string, unknown>)[key]
         } else {
             (filters as Record<string, unknown>)[key] = value
         }
+
+        if (key === 'dia' && previousValue !== value) {
+            resetHistorialState()
+        }
     }
 
     function clearFilters() {
+        const hadDia = filters.dia != null
         delete filters.dia
         delete filters.jefatura
         delete filters.id_cliente
         delete filters.nombre_tienda
         filters.semanas_sellout = 6
+        if (hadDia) resetHistorialState()
     }
 
     function toggleStatusFilter(key: keyof typeof statusFilters) {
@@ -909,12 +948,12 @@ export const useCpfrStore = defineStore('cpfr', () => {
         currentWeek, context, dias, loading, preview, error,
         z8Loading, z8Result, allCpfrWeeks, weeksLoading,
         historialDias, historialLoading, historialLoaded, historialError,
-        historialSelectedWeeks, historialSearch,
+        historialSelectedWeeks, historialSearch, historialPage, historialPageSize, historialPagination,
         approvalIdsByOrder,
         criterio_global, nom_cadena, filters, overrides, expandedStores,
         statusFilters, viewMode, activeTab, groupByOC,
         // Actions
-        init, fetchCurrentWeek, fetchAllCpfrWeeks, loadDashboard, loadHistorial, recalculate, generateZ8,
+        init, fetchCurrentWeek, fetchAllCpfrWeeks, loadDashboard, loadHistorial, loadHistorialPage, setHistorialPageSize, recalculate, generateZ8,
         adjustSku, adjustReviewSkuAdjustment, resolveApprovalIdForSku, getCachedApprovalIdForSku, updateStatus, updateStatusBulk,
         toggleStore, expandAll, collapseAll, expandAllOCs, collapseAllOCs,
         setFilter, clearFilters,

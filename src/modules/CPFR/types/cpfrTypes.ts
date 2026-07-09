@@ -19,6 +19,16 @@ export interface CpfrContext {
     criterio_global: number
     total_tiendas: number
     total_skus: number
+    historial_pagination?: CpfrHistorialPagination
+}
+
+export interface CpfrHistorialPagination {
+    page: number
+    page_size: number
+    total_pages: number
+    total_ocs: number
+    total_skus: number
+    total_piezas: number
 }
 
 /** Fila de SKU dentro de una tienda (alineado con cpfrDashController.js v2) */
@@ -127,6 +137,7 @@ export interface CpfrFilters {
     semanas_sellout?: number
     estado_pedido?: 'pendiente' | 'borrador' | 'revision' | 'aprobado' | 'cerrado' | 'all' | 'historial_finalizado'
     historial_weeks?: Array<{ anio: number; semana: number }>
+    historial_pagination?: { page: number; page_size: number }
 }
 
 // ─── Override de criterio por tienda (para /recalculate) ────────────────────

@@ -64,7 +64,12 @@ const filteredHistoryWeeks = computed(() => {
 })
 
 function loadHistoryFromSelection() {
-    store.loadHistorial(store.historialSelectedWeeks)
+    store.loadHistorial(store.historialSelectedWeeks, 1)
+}
+
+function changeHistoryPageSize(event: Event) {
+    const target = event.target as HTMLSelectElement | null
+    store.setHistorialPageSize(Number(target?.value || 50))
 }
 
 const selectedHistoryWeeksLabel = computed(() => {
@@ -1070,12 +1075,24 @@ const historialStoreGroups = computed<HistorialStoreGroup[]>(() => {
 })
 
 const historialSummary = computed(() => {
+    const pagination = store.historialPagination
+    if (pagination) {
+        return {
+            tiendas: historialStoreGroups.value.length,
+            ocs: pagination.total_ocs,
+            skus: pagination.total_skus,
+            piezas: pagination.total_piezas,
+        }
+    }
+
     const ocSet = new Set<string>()
     let skus = 0
+    let piezas = 0
 
     for (const group of historialStoreGroups.value) {
         for (const sku of group.skus) {
             skus += 1
+            piezas += skuFinalOrderQuantity(sku)
             if (sku.num_pedido) ocSet.add(`${group.id_cliente}|${sku.num_pedido}`)
         }
     }
@@ -1084,6 +1101,7 @@ const historialSummary = computed(() => {
         tiendas: historialStoreGroups.value.length,
         ocs: ocSet.size,
         skus,
+        piezas,
     }
 })
 
@@ -1131,7 +1149,8 @@ const totalUniqueOCs = computed(() => {
     <template v-else-if="store.dias.length || currentTab === 'historial'">
       
       <!-- ── Toolbar de Control de Vistas ── -->
-      <div class="shrink-0 px-4 py-2 border-b border-slate-200 bg-white/95 flex flex-wrap items-center justify-between gap-2">
+      <div class="shrink-0 px-4 py-2 border-b border-slate-200 bg-white/95 flex flex-col gap-2">
+        <div class="flex flex-col gap-2 2xl:flex-row 2xl:items-center 2xl:justify-between">
         <div class="flex min-w-0 flex-wrap items-center gap-2 text-slate-500">
           <!-- Visibilidad de Z8 en cero -->
           <div class="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm p-0.5">
@@ -1175,7 +1194,7 @@ const totalUniqueOCs = computed(() => {
           </button>
 
           <!-- Pestañas (Tabs) -->
-          <div class="flex min-w-0 items-center gap-1 bg-slate-100/50 p-0.5 rounded-lg border border-slate-200 shadow-inner">
+          <div class="flex max-w-full min-w-0 items-center gap-1 overflow-x-auto bg-slate-100/50 p-0.5 rounded-lg border border-slate-200 shadow-inner scrollbar-thin">
             <button
                v-for="t in tabs" :key="t.id"
                class="px-2.5 h-7 rounded-md font-bold text-[10px] uppercase tracking-wider transition-all whitespace-nowrap"
@@ -1197,11 +1216,47 @@ const totalUniqueOCs = computed(() => {
             </select>
           </div>
 
-          <!-- Controles exclusivos de Historial -->
-          <div v-if="currentTab === 'historial'" class="flex flex-wrap items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-200">
+        </div>
+        
+        <div class="flex flex-wrap items-center justify-start gap-2 2xl:justify-end">
+          <!-- Controles Tiendas -->
+          <div class="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm text-[10px] font-bold overflow-hidden">
+              <span class="px-2.5 h-8 bg-slate-50 text-slate-500 border-r border-slate-200 flex items-center gap-1.5">
+                  <i class="fa-solid fa-store text-slate-400"></i> Tiendas
+              </span>
+              <button @click="store.expandAll()" class="w-8 h-8 text-slate-500 hover:bg-brand-50 hover:text-brand-600 transition-colors border-r border-slate-200" title="Expandir todas las tiendas">
+                  <i class="fa-solid fa-chevron-down"></i>
+              </button>
+              <button @click="store.collapseAll()" class="w-8 h-8 text-slate-500 hover:bg-slate-50 hover:text-rose-600 transition-colors" title="Contraer todas las tiendas">
+                  <i class="fa-solid fa-chevron-up"></i>
+              </button>
+              
+          </div>
+
+          <!-- Controles OCs -->
+          <div class="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm text-[10px] font-bold overflow-hidden">
+              <span class="px-2.5 h-8 bg-slate-50 text-slate-500 border-r border-slate-200 flex items-center gap-1.5">
+                  <i class="fa-solid fa-file-invoice text-slate-400"></i> OCs
+              </span>
+              <button @click="expandAllOCsLocal" class="w-8 h-8 text-slate-500 hover:bg-brand-50 hover:text-brand-600 transition-colors border-r border-slate-200" title="Expandir todas las OCs">
+                  <i class="fa-solid fa-chevron-down"></i>
+              </button>
+              <button @click="collapseAllOCsLocal" class="w-8 h-8 text-slate-500 hover:bg-slate-50 hover:text-rose-600 transition-colors" title="Contraer todas las OCs">
+                  <i class="fa-solid fa-chevron-up"></i>
+              </button>
+          </div>
+        </div>
+      </div>
+
+        <!-- Controles exclusivos de Historial -->
+        <div
+          v-if="currentTab === 'historial'"
+          class="flex flex-col gap-2 border-t border-slate-100 pt-2 animate-in fade-in slide-in-from-top-1 duration-200 md:flex-row md:items-center md:justify-between"
+        >
+          <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <div class="relative" @click.stop>
               <button
-                class="group inline-flex h-9 min-w-[220px] items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white pl-3 pr-2 text-left shadow-sm shadow-slate-100 transition hover:border-red-100 hover:bg-red-50/20 focus:outline-none focus:ring-2 focus:ring-red-100"
+                class="group inline-flex h-9 w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white pl-3 pr-2 text-left shadow-sm shadow-slate-100 transition hover:border-red-100 hover:bg-red-50/20 focus:outline-none focus:ring-2 focus:ring-red-100 sm:w-auto sm:min-w-[220px]"
                 :class="historyWeekPickerOpen ? 'border-red-200 ring-2 ring-red-100' : ''"
                 title="Seleccionar semanas de historial"
                 @click.stop="historyWeekPickerOpen = !historyWeekPickerOpen"
@@ -1226,7 +1281,7 @@ const totalUniqueOCs = computed(() => {
 
               <div
                 v-if="historyWeekPickerOpen"
-                class="absolute left-0 top-full z-50 mt-2 w-[320px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-200/60"
+                class="absolute left-0 top-full z-50 mt-2 w-[min(320px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-200/60"
               >
                 <div class="border-b border-slate-100 bg-slate-50/80 p-3">
                   <div class="flex items-start justify-between gap-3">
@@ -1315,8 +1370,9 @@ const totalUniqueOCs = computed(() => {
                 </div>
               </div>
             </div>
+
             <button
-              class="inline-flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-3 text-[10px] font-black uppercase tracking-wider text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3 text-[10px] font-black uppercase tracking-wider text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
               :disabled="store.historialLoading || !store.historialSelectedWeeks.length"
               @click.stop="loadHistoryFromSelection"
             >
@@ -1324,51 +1380,23 @@ const totalUniqueOCs = computed(() => {
               <i v-else class="fa-solid fa-clock-rotate-left"></i>
               Cargar historial
             </button>
-            <div class="relative h-8 w-full max-w-[260px] sm:w-[240px]">
-              <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-300"></i>
-              <input
-                v-model="store.historialSearch"
-                type="text"
-                placeholder="Tienda, estado u OC"
-                class="h-full w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-8 text-xs font-semibold text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-100"
-              />
-              <button
-                v-if="store.historialSearch"
-                class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 transition-colors hover:text-slate-500"
-                @click.stop="store.historialSearch = ''"
-              >
-                <i class="fa-solid fa-xmark text-[11px]"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-        
-        <div class="flex flex-wrap items-center justify-end gap-2">
-          <!-- Controles Tiendas -->
-          <div class="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm text-[10px] font-bold overflow-hidden">
-              <span class="px-2.5 h-8 bg-slate-50 text-slate-500 border-r border-slate-200 flex items-center gap-1.5">
-                  <i class="fa-solid fa-store text-slate-400"></i> Tiendas
-              </span>
-              <button @click="store.expandAll()" class="w-8 h-8 text-slate-500 hover:bg-brand-50 hover:text-brand-600 transition-colors border-r border-slate-200" title="Expandir todas las tiendas">
-                  <i class="fa-solid fa-chevron-down"></i>
-              </button>
-              <button @click="store.collapseAll()" class="w-8 h-8 text-slate-500 hover:bg-slate-50 hover:text-rose-600 transition-colors" title="Contraer todas las tiendas">
-                  <i class="fa-solid fa-chevron-up"></i>
-              </button>
-              
           </div>
 
-          <!-- Controles OCs -->
-          <div class="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm text-[10px] font-bold overflow-hidden">
-              <span class="px-2.5 h-8 bg-slate-50 text-slate-500 border-r border-slate-200 flex items-center gap-1.5">
-                  <i class="fa-solid fa-file-invoice text-slate-400"></i> OCs
-              </span>
-              <button @click="expandAllOCsLocal" class="w-8 h-8 text-slate-500 hover:bg-brand-50 hover:text-brand-600 transition-colors border-r border-slate-200" title="Expandir todas las OCs">
-                  <i class="fa-solid fa-chevron-down"></i>
-              </button>
-              <button @click="collapseAllOCsLocal" class="w-8 h-8 text-slate-500 hover:bg-slate-50 hover:text-rose-600 transition-colors" title="Contraer todas las OCs">
-                  <i class="fa-solid fa-chevron-up"></i>
-              </button>
+          <div class="relative h-8 w-full md:w-[260px]">
+            <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-300"></i>
+            <input
+              v-model="store.historialSearch"
+              type="text"
+              placeholder="Tienda, estado u OC"
+              class="h-full w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-8 text-xs font-semibold text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-100"
+            />
+            <button
+              v-if="store.historialSearch"
+              class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 transition-colors hover:text-slate-500"
+              @click.stop="store.historialSearch = ''"
+            >
+              <i class="fa-solid fa-xmark text-[11px]"></i>
+            </button>
           </div>
         </div>
       </div>
@@ -1412,9 +1440,9 @@ const totalUniqueOCs = computed(() => {
 
         <!-- ── Vista dedicada Historial ── -->
         <div v-else-if="currentTab === 'historial'" class="min-h-full bg-slate-50/60 p-4">
-          <div class="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div class="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-4">
             <div class="rounded-lg border border-brand-100 bg-white px-4 py-3 shadow-sm">
-              <p class="text-[9px] font-black uppercase tracking-wider text-brand-500">Tiendas</p>
+              <p class="text-[9px] font-black uppercase tracking-wider text-brand-500">Tiendas página</p>
               <p class="mt-1 text-xl font-black text-slate-800">{{ historialSummary.tiendas }}</p>
             </div>
             <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
@@ -1424,6 +1452,56 @@ const totalUniqueOCs = computed(() => {
             <div class="rounded-lg border border-emerald-100 bg-white px-4 py-3 shadow-sm">
               <p class="text-[9px] font-black uppercase tracking-wider text-emerald-600">SKUs</p>
               <p class="mt-1 text-xl font-black text-slate-800">{{ historialSummary.skus }}</p>
+            </div>
+            <div class="rounded-lg border border-amber-100 bg-white px-4 py-3 shadow-sm">
+              <p class="text-[9px] font-black uppercase tracking-wider text-amber-600">Piezas</p>
+              <p class="mt-1 text-xl font-black text-slate-800">{{ n(historialSummary.piezas, 0) }}</p>
+            </div>
+          </div>
+
+          <div v-if="store.historialPagination" class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-500 shadow-sm">
+            <div class="min-w-0">
+              <p>
+                Mostrando página {{ store.historialPagination.page }} de {{ store.historialPagination.total_pages }}
+                · {{ store.historialPagination.page_size }} OC por página
+              </p>
+              <p class="mt-0.5 text-[10px] text-slate-400">
+                Total historial seleccionado: {{ n(store.historialPagination.total_ocs, 0) }} OC · {{ n(store.historialPagination.total_skus, 0) }} SKU
+              </p>
+            </div>
+
+            <div class="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm text-[10px] font-bold overflow-hidden">
+              <button
+                class="w-8 h-8 text-slate-500 hover:bg-brand-50 hover:text-brand-600 transition-colors border-r border-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
+                :disabled="store.historialLoading || store.historialPagination.page <= 1"
+                title="Página anterior"
+                @click.stop="store.loadHistorialPage(store.historialPagination.page - 1)"
+              >
+                <i class="fa-solid fa-chevron-left"></i>
+              </button>
+              <span class="px-2.5 h-8 bg-slate-50 text-slate-600 border-r border-slate-200 flex items-center gap-1.5">
+                <i class="fa-solid fa-list-ol text-slate-400"></i>
+                Pág. {{ store.historialPagination.page }}/{{ store.historialPagination.total_pages }}
+              </span>
+              <button
+                class="w-8 h-8 text-slate-500 hover:bg-brand-50 hover:text-brand-600 transition-colors border-r border-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
+                :disabled="store.historialLoading || store.historialPagination.page >= store.historialPagination.total_pages"
+                title="Página siguiente"
+                @click.stop="store.loadHistorialPage(store.historialPagination.page + 1)"
+              >
+                <i class="fa-solid fa-chevron-right"></i>
+              </button>
+              <select
+                :value="store.historialPageSize"
+                class="h-8 bg-white px-2 text-[10px] font-black text-slate-600 outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="store.historialLoading"
+                title="OC por página"
+                @change="changeHistoryPageSize"
+              >
+                <option :value="25">25 OC</option>
+                <option :value="50">50 OC</option>
+                <option :value="100">100 OC</option>
+              </select>
             </div>
           </div>
 
