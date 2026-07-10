@@ -79,6 +79,11 @@ const hubVisibilityControls = computed(() => [
         icon: 'fa-solid fa-clipboard-check',
     },
     {
+        featureKey: 'hub.quick_actions' as const,
+        settingKey: 'showQuickActions' as const,
+        icon: 'fa-solid fa-bolt',
+    },
+    {
         featureKey: 'hub.notices_panel' as const,
         settingKey: 'showNoticesPanel' as const,
         icon: 'fa-solid fa-bell',
@@ -101,7 +106,7 @@ const hubVisibilityControls = computed(() => [
     };
 }));
 
-const handleHubVisibilityToggle = (setting: 'showKpiCards' | 'showManagementTray' | 'showNoticesPanel' | 'showInfoPanel', value: boolean) => {
+const handleHubVisibilityToggle = (setting: 'showKpiCards' | 'showManagementTray' | 'showQuickActions' | 'showNoticesPanel' | 'showInfoPanel', value: boolean) => {
     if (!isAdmin.value) return;
     setupStore.updateHubDisplaySetting(setting, value);
 };

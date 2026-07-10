@@ -12,11 +12,12 @@ export const useSetupStore = defineStore('setup', () => {
    const hubConfig = ref<HubConfigResponse | null>(null);
    const isFeatureConfigLoading = ref(false);
    const HUB_DISPLAY_SETTINGS_KEY = 'pic-system:hub-display-settings';
-   type HubVisibilitySettingKey = 'showKpiCards' | 'showManagementTray' | 'showNoticesPanel' | 'showInfoPanel';
+   type HubVisibilitySettingKey = 'showKpiCards' | 'showManagementTray' | 'showQuickActions' | 'showNoticesPanel' | 'showInfoPanel';
    type HubLayoutArea = 'main' | 'sidebar';
    const DEFAULT_HUB_DISPLAY_SETTINGS = {
       showKpiCards: true,
       showManagementTray: true,
+      showQuickActions: true,
       showNoticesPanel: true,
       showInfoPanel: true,
       mainBlockOrder: ['kpi_cards', 'management_tray'] as HubMainBlockKey[],
@@ -49,6 +50,15 @@ export const useSetupStore = defineStore('setup', () => {
          MinAccessLevel: 4,
          RequiresDataScope: true,
          Description: 'Solicitudes y aprobaciones prioritarias dentro del Hub Central.',
+      },
+      {
+         FeatureKey: 'hub.quick_actions',
+         FeatureName: 'Acceso rapido',
+         Area: 'HUB',
+         IsEnabled: true,
+         MinAccessLevel: 4,
+         RequiresDataScope: true,
+         Description: 'Accesos directos a las acciones frecuentes del Hub Central.',
       },
       {
          FeatureKey: 'hub.notices_panel',
@@ -191,6 +201,7 @@ export const useSetupStore = defineStore('setup', () => {
       return {
          'hub.kpi_cards': apiVisibility?.['hub.kpi_cards'] ?? isFeatureVisible('hub.kpi_cards', hubDisplaySettings.value.showKpiCards),
          'hub.management_tray': apiVisibility?.['hub.management_tray'] ?? isFeatureVisible('hub.management_tray', hubDisplaySettings.value.showManagementTray),
+         'hub.quick_actions': apiVisibility?.['hub.quick_actions'] ?? isFeatureVisible('hub.quick_actions', hubDisplaySettings.value.showQuickActions),
          'hub.notices_panel': apiVisibility?.['hub.notices_panel'] ?? isFeatureVisible('hub.notices_panel', hubDisplaySettings.value.showNoticesPanel),
          'hub.activity_panel': apiVisibility?.['hub.activity_panel'] ?? isFeatureVisible('hub.activity_panel', hubDisplaySettings.value.showInfoPanel),
       };
@@ -297,6 +308,7 @@ export const useSetupStore = defineStore('setup', () => {
       const featureKeyBySetting: Record<HubVisibilitySettingKey, HubFeatureKey> = {
          showKpiCards: 'hub.kpi_cards',
          showManagementTray: 'hub.management_tray',
+         showQuickActions: 'hub.quick_actions',
          showNoticesPanel: 'hub.notices_panel',
          showInfoPanel: 'hub.activity_panel',
       };

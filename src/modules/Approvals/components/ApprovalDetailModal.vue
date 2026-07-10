@@ -1030,13 +1030,13 @@ const handleConfirm = async () => {
                               </div>
                            </div>
 
-                           <div class="space-y-2 bg-slate-50 p-2.5 md:hidden">
+                           <div class="space-y-2 bg-slate-50 p-2.5 xl:hidden">
                               <article
                                  v-for="(row, idx) in order.rows"
                                  :key="`${order.key}|mobile|${row.sku_muliix || row.sku_cadena || row.upc}|${idx}`"
-                                 class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+                                 class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm md:grid md:grid-cols-[minmax(0,1fr)_240px_164px]"
                               >
-                                 <div class="border-b border-slate-100 px-3 py-3">
+                                 <div class="border-b border-slate-100 px-3 py-3 md:flex md:items-center md:border-b-0 md:border-r md:py-2.5">
                                     <div class="flex items-start justify-between gap-3">
                                        <div class="min-w-0">
                                           <p class="line-clamp-2 text-[11px] font-black uppercase leading-snug text-slate-800" :title="row.desc">{{ row.desc }}</p>
@@ -1047,7 +1047,7 @@ const handleConfirm = async () => {
                                        <button
                                           v-if="rowHasMixMetadata(row)"
                                           type="button"
-                                          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border text-[11px] font-black shadow-sm transition"
+                                          class="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border text-xs font-black shadow-sm transition"
                                           :class="getRowMixButtonClass(row)"
                                           :title="getRowMixButtonTitle(row)"
                                           @click="openRowMix(row)"
@@ -1055,19 +1055,19 @@ const handleConfirm = async () => {
                                           <i v-if="getRowMixStatus(row) === 'pending'" class="fa-solid fa-triangle-exclamation"></i>
                                           <span v-else>M</span>
                                        </button>
-                                    </div>
+                                     </div>
                                  </div>
 
-                                 <div class="grid grid-cols-3 divide-x divide-slate-100 border-b border-slate-100 bg-slate-50/70 text-center">
-                                    <div class="px-1 py-2">
+                                 <div class="grid grid-cols-3 divide-x divide-slate-100 border-b border-slate-100 bg-slate-50/70 text-center md:border-b-0 md:border-r">
+                                    <div class="px-1 py-2 md:flex md:flex-col md:justify-center">
                                        <p class="text-[8px] font-black uppercase tracking-wide text-slate-400">Inv. act.</p>
                                        <p class="mt-0.5 text-[11px] font-black text-brand-700">{{ formatNumber(row.inv_actual_pz, 0) }}</p>
                                     </div>
-                                    <div class="px-1 py-2">
+                                    <div class="px-1 py-2 md:flex md:flex-col md:justify-center">
                                        <p class="text-[8px] font-black uppercase tracking-wide text-slate-400">Sell prom.</p>
                                        <p class="mt-0.5 text-[11px] font-black text-brand-700">{{ formatNumber(row.promedio_sellout_pz, 0) }}</p>
                                     </div>
-                                    <div class="px-1 py-2" :title="coberturaTooltip(row)">
+                                    <div class="px-1 py-2 md:flex md:flex-col md:justify-center" :title="coberturaTooltip(row)">
                                        <p class="text-[8px] font-black uppercase tracking-wide text-slate-400">Cobertura</p>
                                        <p class="mt-0.5 text-[11px] font-black" :class="coberturaClass(row)">
                                           <i v-if="coberturaIcon(row)" :class="coberturaIcon(row)" class="mr-0.5 text-[9px]"></i>{{ formatNumber(calcularCoberturaDinamica(row), 2) }}
@@ -1075,7 +1075,7 @@ const handleConfirm = async () => {
                                     </div>
                                  </div>
 
-                                 <div class="flex items-center justify-between gap-3 bg-brand-50/40 px-3 py-3">
+                                 <div class="flex items-center justify-between gap-3 bg-brand-50/40 px-3 py-3 md:py-2.5">
                                     <div class="min-w-0">
                                        <p class="text-[8px] font-black uppercase tracking-wide text-slate-500">Pedido final</p>
                                        <p class="mt-0.5 text-xl font-black leading-none text-brand-700">
@@ -1104,8 +1104,8 @@ const handleConfirm = async () => {
                               </article>
                            </div>
 
-                           <div class="hidden overflow-x-auto md:block">
-                              <table class="w-full min-w-[900px] table-fixed border-collapse text-[10px]">
+                           <div class="hidden xl:block">
+                              <table class="w-full table-fixed border-collapse text-[10px]">
                                  <thead>
                                     <tr class="border-b border-slate-200 bg-white text-[9px] font-black uppercase tracking-wide text-slate-600">
                                        <th class="w-[32%] px-3 py-2 text-left">SKU</th>

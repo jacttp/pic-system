@@ -46,6 +46,7 @@ onMounted(async () => {
 const dashboardModules = computed(() => setupStore.userMenu.filter(m => m.ModuleKey !== 'HUB'));
 const displayName = computed(() => profileStore.profile?.nombre || auth.user?.nombre || auth.user?.username || 'Usuario');
 const showManagementTray = computed(() => setupStore.hubFeatureVisibility['hub.management_tray']);
+const showQuickActions = computed(() => setupStore.hubFeatureVisibility['hub.quick_actions']);
 const showKpiCards = computed(() => setupStore.hubFeatureVisibility['hub.kpi_cards']);
 const showNoticesPanel = computed(() => setupStore.hubFeatureVisibility['hub.notices_panel']);
 const showActivityPanel = computed(() => setupStore.hubFeatureVisibility['hub.activity_panel']);
@@ -85,7 +86,7 @@ const hubKpiCards = computed<HubKpiCard[]>(() => [
     },
     {
         label: 'Bloques del hub',
-        value: `${activeHubFeatureCount.value}/4`,
+        value: `${activeHubFeatureCount.value}/5`,
         caption: 'Configuracion visible',
         icon: 'fa-solid fa-sliders',
         tone: 'blue',
@@ -336,7 +337,7 @@ const metricAccentClass = (tone: string) => ({
 
             <div class="grid grid-cols-1 gap-5 xl:items-start" :class="showHubAside ? 'xl:grid-cols-[minmax(0,1fr)_360px]' : ''">
                 <section class="min-w-0 space-y-5 sm:space-y-6">
-                    <section v-if="showManagementTray" class="overflow-hidden rounded-xl text-pic-text-main sm:bg-pic-nav sm:p-5 sm:text-white sm:shadow-xl sm:shadow-slate-300/30">
+                    <section v-if="showQuickActions" class="overflow-hidden rounded-xl text-pic-text-main sm:bg-pic-nav sm:p-5 sm:text-white sm:shadow-xl sm:shadow-slate-300/30">
                         <div class="mb-2 flex items-center justify-between gap-3 sm:mb-4">
                             <h2 class="text-xs font-black uppercase tracking-wide sm:text-sm">Acceso rapido</h2>
                             <router-link
