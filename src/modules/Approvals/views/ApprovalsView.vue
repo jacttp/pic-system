@@ -61,6 +61,7 @@ const filters = reactive<FilterState>({
 const showDetailModal = ref(false);
 const selectedApproval = ref<Approval | null>(null);
 const isDetailOpen = computed(() => showDetailModal.value && selectedApproval.value !== null);
+const isCompactFiltersOpen = ref(false);
 
 const statusOptions: { value: ApprovalStatus | ''; label: string }[] = [
    { value: '', label: 'Todos los estados' },
@@ -194,6 +195,13 @@ const filteredApprovals = computed(() =>
       return matchesStatus && matchesType;
    })
 );
+
+const activeFiltersCount = computed(() => Number(Boolean(filters.status)) + Number(Boolean(filters.type)));
+const compactFiltersLabel = computed(() => {
+   if (isCompactFiltersOpen.value) return 'Ocultar filtros';
+   if (activeFiltersCount.value === 0) return 'Mostrar filtros';
+   return `${activeFiltersCount.value} filtro${activeFiltersCount.value === 1 ? '' : 's'} activo${activeFiltersCount.value === 1 ? '' : 's'}`;
+});
 
 const sortedRows = computed<ApprovalRow[]>(() => {
    const rows = filteredApprovals.value.map(toApprovalRow);
@@ -505,43 +513,71 @@ function formatTime(date: Date) {
 
          <template v-if="!isDetailOpen">
             <section class="rounded-xl border border-white/10 bg-pic-nav p-3 shadow-lg shadow-slate-300/20 sm:p-4">
-               <div class="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-pic-nav-text-muted">
-                  <i class="fa-solid fa-sliders text-[9px]"></i>
-                  Filtros
+               <div class="mb-2 flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-[0.16em] text-pic-nav-text-muted">
+                  <span class="flex items-center gap-2">
+                     <i class="fa-solid fa-sliders text-[9px]"></i>
+                     Filtros
+                  </span>
+                  <button
+                     type="button"
+                     class="inline-flex h-9 items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 text-[11px] font-bold normal-case tracking-normal text-pic-nav-text transition hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-pic-brand-border xl:hidden"
+                     :aria-expanded="isCompactFiltersOpen"
+                     aria-controls="approval-filters-panel"
+                     @click="isCompactFiltersOpen = !isCompactFiltersOpen"
+                  >
+                     {{ compactFiltersLabel }}
+                     <i class="fa-solid text-[10px]" :class="isCompactFiltersOpen ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                  </button>
                </div>
-               <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(150px,190px)_minmax(150px,190px)_minmax(160px,210px)_1fr_auto] lg:gap-3">
-                  <select
-                     v-model="filters.status"
-                     class="h-11 min-w-0 rounded-lg border border-white/15 bg-white/10 px-3 text-sm font-bold text-pic-nav-text outline-none transition hover:bg-white/15 focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border [&>option]:bg-pic-surface [&>option]:text-pic-text-main"
-                     @change="applyFilters"
-                  >
-                     <option v-for="option in statusOptions" :key="option.value" :value="option.value || undefined">
-                        {{ option.label }}
-                     </option>
-                  </select>
+               <div
+                  id="approval-filters-panel"
+                  class="gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(150px,190px)_minmax(150px,190px)_minmax(160px,210px)_1fr_auto] xl:gap-3"
+                  :class="isCompactFiltersOpen ? 'grid' : 'hidden xl:grid'"
+               >
+                  <div class="min-w-0 space-y-1.5">
+                     <label for="approval-status-filter" class="block text-[10px] font-bold uppercase tracking-[0.14em] text-pic-nav-text-muted xl:hidden">Estado</label>
+                     <select
+                        id="approval-status-filter"
+                        v-model="filters.status"
+                        class="h-11 w-full min-w-0 rounded-lg border border-white/15 bg-white/10 px-3 text-sm font-bold text-pic-nav-text outline-none transition hover:bg-white/15 focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border [&>option]:bg-pic-surface [&>option]:text-pic-text-main"
+                        @change="applyFilters"
+                     >
+                        <option v-for="option in statusOptions" :key="option.value" :value="option.value || undefined">
+                           {{ option.label }}
+                        </option>
+                     </select>
+                  </div>
 
-                  <select
-                     v-model="filters.type"
-                     class="h-11 min-w-0 rounded-lg border border-white/15 bg-white/10 px-3 text-sm font-bold text-pic-nav-text outline-none transition hover:bg-white/15 focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border [&>option]:bg-pic-surface [&>option]:text-pic-text-main"
-                     @change="applyFilters"
-                  >
-                     <option v-for="option in typeOptions" :key="option.value" :value="option.value || undefined">
-                        {{ option.label }}
-                     </option>
-                  </select>
+                  <div class="min-w-0 space-y-1.5">
+                     <label for="approval-type-filter" class="block text-[10px] font-bold uppercase tracking-[0.14em] text-pic-nav-text-muted xl:hidden">Tipo de solicitud</label>
+                     <select
+                        id="approval-type-filter"
+                        v-model="filters.type"
+                        class="h-11 w-full min-w-0 rounded-lg border border-white/15 bg-white/10 px-3 text-sm font-bold text-pic-nav-text outline-none transition hover:bg-white/15 focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border [&>option]:bg-pic-surface [&>option]:text-pic-text-main"
+                        @change="applyFilters"
+                     >
+                        <option v-for="option in typeOptions" :key="option.value" :value="option.value || undefined">
+                           {{ option.label }}
+                        </option>
+                     </select>
+                  </div>
 
-                  <select
-                     v-model="sortKey"
-                     class="h-11 min-w-0 rounded-lg border border-white/15 bg-white/10 px-3 text-sm font-bold text-pic-nav-text outline-none transition hover:bg-white/15 focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border [&>option]:bg-pic-surface [&>option]:text-pic-text-main"
-                  >
-                     <option v-for="option in sortOptions" :key="option.value" :value="option.value">
-                        {{ option.label }}
-                     </option>
-                  </select>
+                  <div class="min-w-0 space-y-1.5 sm:col-span-2 xl:col-span-1">
+                     <label for="approval-sort-filter" class="block text-[10px] font-bold uppercase tracking-[0.14em] text-pic-nav-text-muted xl:hidden">Ordenar por</label>
+                     <select
+                        id="approval-sort-filter"
+                        v-model="sortKey"
+                        class="h-11 w-full min-w-0 rounded-lg border border-white/15 bg-white/10 px-3 text-sm font-bold text-pic-nav-text outline-none transition hover:bg-white/15 focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border [&>option]:bg-pic-surface [&>option]:text-pic-text-main"
+                     >
+                        <option v-for="option in sortOptions" :key="option.value" :value="option.value">
+                           {{ option.label }}
+                        </option>
+                     </select>
+                  </div>
 
-                  <div class="hidden lg:block"></div>
+                  <div class="hidden xl:block"></div>
 
-                  <div class="col-span-full grid gap-2 sm:grid-cols-2 lg:col-span-1 lg:flex lg:justify-end">
+                  <div class="col-span-full grid gap-2 sm:grid-cols-2 xl:col-span-1 xl:flex xl:justify-end">
                      <StdButton
                         variant="primary"
                         class="w-full shadow-lg shadow-pic-brand/20 hover:brightness-95 sm:w-auto"
@@ -570,6 +606,28 @@ function formatTime(date: Date) {
                      <h2 class="text-base font-black text-pic-text-main">{{ listTitle }}</h2>
                      <p class="mt-1 text-xs font-semibold text-pic-text-muted">{{ currentRangeLabel }}</p>
                   </div>
+               </div>
+
+               <div v-if="totalPages > 1" class="grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 rounded-xl border border-pic-border bg-pic-surface p-2 xl:hidden">
+                  <button
+                     type="button"
+                     class="flex h-10 w-10 items-center justify-center rounded-lg border border-pic-border text-pic-text-main transition hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand disabled:cursor-not-allowed disabled:opacity-40"
+                     :disabled="currentPage === 1"
+                     aria-label="Página anterior"
+                     @click="changePage(currentPage - 1)"
+                  >
+                     <i class="fa-solid fa-chevron-left text-xs"></i>
+                  </button>
+                  <span class="truncate text-center text-xs font-bold text-pic-text-main">Página {{ currentPage }} de {{ totalPages }}</span>
+                  <button
+                     type="button"
+                     class="flex h-10 w-10 items-center justify-center rounded-lg border border-pic-border text-pic-text-main transition hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand disabled:cursor-not-allowed disabled:opacity-40"
+                     :disabled="currentPage === totalPages"
+                     aria-label="Página siguiente"
+                     @click="changePage(currentPage + 1)"
+                  >
+                     <i class="fa-solid fa-chevron-right text-xs"></i>
+                  </button>
                </div>
 
                <div v-if="isActiveLoading" class="grid gap-3">
@@ -682,7 +740,29 @@ function formatTime(date: Date) {
                      </article>
                   </div>
 
-                  <footer class="flex flex-col gap-3 pt-1 text-sm font-medium text-pic-text-muted sm:flex-row sm:items-center sm:justify-between">
+                  <div v-if="totalPages > 1" class="grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 rounded-xl border border-pic-border bg-pic-surface p-2 xl:hidden">
+                     <button
+                        type="button"
+                        class="flex h-10 w-10 items-center justify-center rounded-lg border border-pic-border text-pic-text-main transition hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand disabled:cursor-not-allowed disabled:opacity-40"
+                        :disabled="currentPage === 1"
+                        aria-label="Página anterior"
+                        @click="changePage(currentPage - 1)"
+                     >
+                        <i class="fa-solid fa-chevron-left text-xs"></i>
+                     </button>
+                     <span class="truncate text-center text-xs font-bold text-pic-text-main">Página {{ currentPage }} de {{ totalPages }}</span>
+                     <button
+                        type="button"
+                        class="flex h-10 w-10 items-center justify-center rounded-lg border border-pic-border text-pic-text-main transition hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand disabled:cursor-not-allowed disabled:opacity-40"
+                        :disabled="currentPage === totalPages"
+                        aria-label="Página siguiente"
+                        @click="changePage(currentPage + 1)"
+                     >
+                        <i class="fa-solid fa-chevron-right text-xs"></i>
+                     </button>
+                  </div>
+
+                  <footer class="hidden gap-3 pt-1 text-sm font-medium text-pic-text-muted xl:flex xl:flex-row xl:items-center xl:justify-between">
                      <p>{{ currentRangeLabel }}</p>
 
                      <div class="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
