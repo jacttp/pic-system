@@ -827,25 +827,25 @@ const handleConfirm = async () => {
                   <div class="border-t border-white/10 px-4 py-3 sm:px-5">
                      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div class="flex items-center gap-2 text-xs text-pic-nav-text-muted">
-                           <span class="flex h-6 w-6 items-center justify-center rounded-md bg-white/5 text-pic-brand">
+                           <span class="flex h-6 w-6 items-center justify-center rounded-md bg-pic-brand text-pic-brand-border">
                               <i class="fa-solid fa-receipt text-[11px]"></i>
                            </span>
-                           <span>Vista previa</span>
+                           <span class="font-bold">Vista previa</span>
                            <span class="text-white/25">/</span>
                            <span class="font-semibold text-pic-nav-text">Template OV</span>
                         </div>
-                        <dl class="grid grid-cols-3 divide-x divide-white/10 rounded-lg border border-white/10 bg-white/[0.03] text-center">
+                        <dl class="grid grid-cols-3 divide-x divide-pic-brand-border rounded-lg border border-pic-brand-border bg-pic-brand-soft text-center">
                            <div class="min-w-[72px] px-3 py-1.5">
-                              <dd class="text-sm font-bold text-pic-nav-text">{{ cpfrStoreGroups.length }}</dd>
-                              <dt class="mt-0.5 text-[10px] text-pic-nav-text-muted">Tiendas</dt>
+                              <dd class="text-sm font-bold text-pic-brand">{{ cpfrStoreGroups.length }}</dd>
+                              <dt class="mt-0.5 font-bold text-[10px] text-pic-text-main">Tiendas</dt>
                            </div>
                            <div class="min-w-[72px] px-3 py-1.5">
-                              <dd class="text-sm font-bold text-pic-nav-text">{{ cpfrPreviewRows.length }}</dd>
-                              <dt class="mt-0.5 text-[10px] text-pic-nav-text-muted">SKU</dt>
+                              <dd class="text-sm font-bold text-pic-brand">{{ cpfrPreviewRows.length }}</dd>
+                              <dt class="mt-0.5 font-bold text-[10px] text-pic-text-main">SKU</dt>
                            </div>
                            <div class="min-w-[72px] px-3 py-1.5">
-                              <dd class="text-sm font-bold text-pic-nav-text">{{ formatNumber(cpfrStoreGroups.reduce((sum, store) => sum + store.totalKg, 0), 1) }}</dd>
-                              <dt class="mt-0.5 text-[10px] text-pic-nav-text-muted">Kg</dt>
+                              <dd class="text-sm font-bold text-pic-brand">{{ formatNumber(cpfrStoreGroups.reduce((sum, store) => sum + store.totalKg, 0), 1) }}</dd>
+                              <dt class="mt-0.5 font-bold text-[10px] text-pic-text-main">Kg</dt>
                            </div>
                         </dl>
                      </div>

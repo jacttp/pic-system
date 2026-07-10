@@ -75,21 +75,43 @@ const trayMetrics = computed<TrayMetric[]>(() => props.metrics || [
    },
 ]);
 
-const metricTone = (index: number) => ['brand', 'orange', 'blue', 'purple'][index % 4];
+const metricTone = (metric: TrayMetric, index: number) => {
+   const approvalTones: Record<string, string> = {
+      PENDING: 'blue',
+      APPROVED: 'success',
+      REJECTED: 'danger',
+      CANCELLED: 'purple',
+   };
 
-const metricToneClass = (index: number) => ({
+   return approvalTones[metric.id || ''] || ['brand', 'orange', 'blue', 'purple'][index % 4];
+};
+
+const metricToneClass = (metric: TrayMetric, index: number) => ({
    brand: 'bg-pic-brand-soft text-pic-brand',
    orange: 'bg-[hsl(var(--pic-accent-orange-soft))] text-[hsl(var(--pic-accent-orange))]',
    blue: 'bg-[hsl(var(--pic-accent-blue-soft))] text-[hsl(var(--pic-accent-blue))]',
+   success: 'bg-[hsl(var(--pic-success)/0.12)] text-pic-success',
+   danger: 'bg-[hsl(var(--pic-danger)/0.12)] text-pic-danger',
    purple: 'bg-[hsl(var(--pic-accent-purple-soft))] text-[hsl(var(--pic-accent-purple))]',
-}[metricTone(index)] || 'bg-slate-100 text-slate-500');
+}[metricTone(metric, index)] || 'bg-pic-muted-surface text-pic-text-muted');
 
-const metricTextClass = (index: number) => ({
+const metricTextClass = (metric: TrayMetric, index: number) => ({
    brand: 'text-pic-brand',
    orange: 'text-[hsl(var(--pic-accent-orange))]',
    blue: 'text-[hsl(var(--pic-accent-blue))]',
+   success: 'text-pic-success',
+   danger: 'text-pic-danger',
    purple: 'text-[hsl(var(--pic-accent-purple))]',
-}[metricTone(index)] || 'text-slate-500');
+}[metricTone(metric, index)] || 'text-pic-text-muted');
+
+const metricActiveClass = (metric: TrayMetric, index: number) => ({
+   brand: 'bg-pic-brand-soft shadow-[inset_3px_0_0_0_hsl(var(--pic-brand))]',
+   orange: 'bg-[hsl(var(--pic-accent-orange-soft))] shadow-[inset_3px_0_0_0_hsl(var(--pic-accent-orange))]',
+   blue: 'bg-[hsl(var(--pic-accent-blue-soft))] shadow-[inset_3px_0_0_0_hsl(var(--pic-accent-blue))]',
+   success: 'bg-[hsl(var(--pic-success)/0.08)] shadow-[inset_3px_0_0_0_hsl(var(--pic-success))]',
+   danger: 'bg-[hsl(var(--pic-danger)/0.08)] shadow-[inset_3px_0_0_0_hsl(var(--pic-danger))]',
+   purple: 'bg-[hsl(var(--pic-accent-purple-soft))] shadow-[inset_3px_0_0_0_hsl(var(--pic-accent-purple))]',
+}[metricTone(metric, index)] || '');
 
 const handleMetricClick = (metric: TrayMetric) => {
    emit('metricClick', metric);
@@ -111,14 +133,14 @@ onMounted(() => {
                :key="metric.id || metric.label"
                :to="metric.route || fullPanelRoute"
                class="group grid min-h-[108px] grid-cols-[40px_minmax(0,1fr)] items-center gap-3 px-3 py-3 transition hover:bg-pic-muted-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-pic-brand-border sm:min-h-[116px] sm:grid-cols-[68px_minmax(0,1fr)] sm:gap-4 sm:px-5 sm:py-4"
-               :class="metric.active ? 'bg-pic-brand-soft shadow-[inset_3px_0_0_0_hsl(var(--pic-brand))]' : ''"
+               :class="metric.active ? metricActiveClass(metric, index) : ''"
                @click="handleMetricClick(metric)"
             >
-               <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-lg shadow-sm shadow-slate-200/70 sm:h-14 sm:w-14 sm:rounded-xl sm:text-2xl sm:shadow-lg" :class="metricToneClass(index)">
+               <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-lg shadow-sm shadow-slate-200/70 sm:h-14 sm:w-14 sm:rounded-xl sm:text-2xl sm:shadow-lg" :class="metricToneClass(metric, index)">
                   <i :class="metric.icon"></i>
                </span>
                <span class="min-w-0">
-                  <span class="block text-[10px] font-bold uppercase tracking-[0.16em]" :class="metricTextClass(index)">{{ metric.label }}</span>
+                  <span class="block text-[10px] font-bold uppercase tracking-[0.16em]" :class="metricTextClass(metric, index)">{{ metric.label }}</span>
                   <span class="mt-1 block text-2xl font-black leading-none text-pic-text-main sm:text-3xl">{{ metric.value }}</span>
                   <span class="mt-1 block text-[11px] font-semibold leading-tight text-pic-text-muted sm:text-xs">{{ metric.caption }}</span>
                </span>
@@ -129,14 +151,14 @@ onMounted(() => {
                :key="metric.id || metric.label"
                type="button"
                class="group grid min-h-[108px] grid-cols-[40px_minmax(0,1fr)] items-center gap-3 px-3 py-3 text-left transition hover:bg-pic-muted-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-pic-brand-border sm:min-h-[116px] sm:grid-cols-[68px_minmax(0,1fr)] sm:gap-4 sm:px-5 sm:py-4"
-               :class="metric.active ? 'bg-pic-brand-soft shadow-[inset_3px_0_0_0_hsl(var(--pic-brand))]' : ''"
+               :class="metric.active ? metricActiveClass(metric, index) : ''"
                @click="handleMetricClick(metric)"
             >
-               <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-lg shadow-sm shadow-slate-200/70 sm:h-14 sm:w-14 sm:rounded-xl sm:text-2xl sm:shadow-lg" :class="metricToneClass(index)">
+               <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-lg shadow-sm shadow-slate-200/70 sm:h-14 sm:w-14 sm:rounded-xl sm:text-2xl sm:shadow-lg" :class="metricToneClass(metric, index)">
                   <i :class="metric.icon"></i>
                </span>
                <span class="min-w-0">
-                  <span class="block text-[10px] font-bold uppercase tracking-[0.16em]" :class="metricTextClass(index)">{{ metric.label }}</span>
+                  <span class="block text-[10px] font-bold uppercase tracking-[0.16em]" :class="metricTextClass(metric, index)">{{ metric.label }}</span>
                   <span class="mt-1 block text-2xl font-black leading-none text-pic-text-main sm:text-3xl">{{ metric.value }}</span>
                   <span class="mt-1 block text-[11px] font-semibold leading-tight text-pic-text-muted sm:text-xs">{{ metric.caption }}</span>
                </span>
