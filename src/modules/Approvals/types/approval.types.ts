@@ -49,10 +49,10 @@ export interface ApprovalFilters {
 
 // Labels y colores para UI
 export const APPROVAL_STATUS_CONFIG: Record<ApprovalStatus, { label: string; color: string; bg: string; icon: string }> = {
-   PENDING: { label: 'Pendiente', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200', icon: 'fa-solid fa-clock' },
-   APPROVED: { label: 'Aprobada', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', icon: 'fa-solid fa-circle-check' },
-   REJECTED: { label: 'Rechazada', color: 'text-red-700', bg: 'bg-red-50 border-red-200', icon: 'fa-solid fa-circle-xmark' },
-   CANCELLED: { label: 'Cancelada', color: 'text-slate-500', bg: 'bg-slate-50 border-slate-200', icon: 'fa-solid fa-ban' },
+   PENDING: { label: 'Pendiente', color: 'text-pic-brand', bg: 'bg-pic-brand-soft border-pic-brand-border', icon: 'fa-solid fa-clock' },
+   APPROVED: { label: 'Aprobada', color: 'text-pic-success', bg: 'bg-[hsl(var(--pic-success)/0.10)] border-[hsl(var(--pic-success)/0.28)]', icon: 'fa-solid fa-circle-check' },
+   REJECTED: { label: 'Rechazada', color: 'text-pic-danger', bg: 'bg-[hsl(var(--pic-danger)/0.10)] border-[hsl(var(--pic-danger)/0.32)]', icon: 'fa-solid fa-circle-xmark' },
+   CANCELLED: { label: 'Cancelada', color: 'text-pic-danger', bg: 'bg-[hsl(var(--pic-danger)/0.16)] border-[hsl(var(--pic-danger)/0.42)]', icon: 'fa-solid fa-ban' },
 }
 
 export const APPROVAL_TYPE_CONFIG: Record<string, { label: string; color: string; icon: string }> = {

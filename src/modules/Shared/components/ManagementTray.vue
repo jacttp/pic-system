@@ -75,21 +75,21 @@ const trayMetrics = computed<TrayMetric[]>(() => props.metrics || [
    },
 ]);
 
-const metricClass = (metric: TrayMetric) => [
-   metric.emphasis
-      ? 'border-brand-200 bg-brand-50/40 hover:border-brand-300'
-      : 'border-slate-200 bg-white hover:border-brand-200 hover:bg-brand-50/20',
-   metric.active ? 'border-brand-300 bg-brand-50/50 ring-1 ring-brand-100' : '',
-];
+const metricTone = (index: number) => ['brand', 'orange', 'blue', 'purple'][index % 4];
 
-const iconClass = (metric: TrayMetric) =>
-   metric.emphasis || metric.active
-      ? 'bg-white text-brand-600 ring-1 ring-brand-100'
-      : 'bg-brand-50 text-brand-600';
+const metricToneClass = (index: number) => ({
+   brand: 'bg-pic-brand-soft text-pic-brand',
+   orange: 'bg-[hsl(var(--pic-accent-orange-soft))] text-[hsl(var(--pic-accent-orange))]',
+   blue: 'bg-[hsl(var(--pic-accent-blue-soft))] text-[hsl(var(--pic-accent-blue))]',
+   purple: 'bg-[hsl(var(--pic-accent-purple-soft))] text-[hsl(var(--pic-accent-purple))]',
+}[metricTone(index)] || 'bg-slate-100 text-slate-500');
 
-const metricGridClass = computed(() =>
-   trayMetrics.value.length >= 4 ? 'md:grid-cols-2 xl:grid-cols-4' : 'md:grid-cols-3'
-);
+const metricTextClass = (index: number) => ({
+   brand: 'text-pic-brand',
+   orange: 'text-[hsl(var(--pic-accent-orange))]',
+   blue: 'text-[hsl(var(--pic-accent-blue))]',
+   purple: 'text-[hsl(var(--pic-accent-purple))]',
+}[metricTone(index)] || 'text-slate-500');
 
 const handleMetricClick = (metric: TrayMetric) => {
    emit('metricClick', metric);
@@ -104,74 +104,43 @@ onMounted(() => {
 </script>
 
 <template>
-   <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div class="p-4 sm:p-5">
-         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div class="flex min-w-0 items-start gap-3">
-               <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-brand-100">
-                  <i :class="[icon, 'text-sm']"></i>
-               </span>
-               <div class="min-w-0">
-                  <p class="text-[10px] font-black uppercase tracking-[0.2em] text-brand-500">{{ eyebrow }}</p>
-                  <h2 class="mt-0.5 text-base font-extrabold leading-tight text-slate-900 sm:text-lg">
-                     {{ title }}
-                  </h2>
-                  <p class="mt-1 max-w-3xl text-sm leading-5 text-slate-500">
-                     {{ subtitle }}
-                  </p>
-               </div>
-            </div>
-         </div>
-
-         <div class="mt-4 grid grid-cols-1 gap-3" :class="metricGridClass">
+   <section class="overflow-hidden rounded-xl border border-pic-border bg-pic-surface shadow-sm shadow-slate-100">
+      <div class="grid grid-cols-2 divide-x divide-y divide-pic-border lg:grid-cols-4 lg:divide-y-0">
             <router-link
-               v-for="metric in trayMetrics.filter(item => item.route)"
+               v-for="(metric, index) in trayMetrics.filter(item => item.route)"
                :key="metric.id || metric.label"
                :to="metric.route || fullPanelRoute"
-               class="group rounded-lg border px-4 py-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm"
-               :class="metricClass(metric)"
+               class="group grid min-h-[108px] grid-cols-[40px_minmax(0,1fr)] items-center gap-3 px-3 py-3 transition hover:bg-pic-muted-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-pic-brand-border sm:min-h-[116px] sm:grid-cols-[68px_minmax(0,1fr)] sm:gap-4 sm:px-5 sm:py-4"
+               :class="metric.active ? 'bg-pic-brand-soft shadow-[inset_3px_0_0_0_hsl(var(--pic-brand))]' : ''"
                @click="handleMetricClick(metric)"
             >
-               <div class="mb-3 flex items-center justify-between gap-3">
-                  <span
-                     class="flex h-8 w-8 items-center justify-center rounded-lg text-sm"
-                     :class="iconClass(metric)"
-                  >
-                     <i :class="metric.icon"></i>
-                  </span>
-                  <i class="fa-solid fa-arrow-right text-xs text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500"></i>
-               </div>
-               <p class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{{ metric.label }}</p>
-               <div class="mt-1 flex items-end justify-between gap-3">
-                  <p class="text-2xl font-black leading-none text-slate-950">{{ metric.value }}</p>
-                  <p class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{{ metric.caption }}</p>
-               </div>
+               <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-lg shadow-sm shadow-slate-200/70 sm:h-14 sm:w-14 sm:rounded-xl sm:text-2xl sm:shadow-lg" :class="metricToneClass(index)">
+                  <i :class="metric.icon"></i>
+               </span>
+               <span class="min-w-0">
+                  <span class="block text-[10px] font-bold uppercase tracking-[0.16em]" :class="metricTextClass(index)">{{ metric.label }}</span>
+                  <span class="mt-1 block text-2xl font-black leading-none text-pic-text-main sm:text-3xl">{{ metric.value }}</span>
+                  <span class="mt-1 block text-[11px] font-semibold leading-tight text-pic-text-muted sm:text-xs">{{ metric.caption }}</span>
+               </span>
             </router-link>
 
             <button
-               v-for="metric in trayMetrics.filter(item => !item.route)"
+               v-for="(metric, index) in trayMetrics.filter(item => !item.route)"
                :key="metric.id || metric.label"
                type="button"
-               class="group rounded-lg border px-4 py-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm"
-               :class="metricClass(metric)"
+               class="group grid min-h-[108px] grid-cols-[40px_minmax(0,1fr)] items-center gap-3 px-3 py-3 text-left transition hover:bg-pic-muted-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-pic-brand-border sm:min-h-[116px] sm:grid-cols-[68px_minmax(0,1fr)] sm:gap-4 sm:px-5 sm:py-4"
+               :class="metric.active ? 'bg-pic-brand-soft shadow-[inset_3px_0_0_0_hsl(var(--pic-brand))]' : ''"
                @click="handleMetricClick(metric)"
             >
-               <div class="mb-3 flex items-center justify-between gap-3">
-                  <span
-                     class="flex h-8 w-8 items-center justify-center rounded-lg text-sm"
-                     :class="iconClass(metric)"
-                  >
-                     <i :class="metric.icon"></i>
-                  </span>
-                  <i class="fa-solid fa-filter text-xs text-slate-300 transition group-hover:text-brand-500"></i>
-               </div>
-               <p class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{{ metric.label }}</p>
-               <div class="mt-1 flex items-end justify-between gap-3">
-                  <p class="text-2xl font-black leading-none text-slate-950">{{ metric.value }}</p>
-                  <p class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{{ metric.caption }}</p>
-               </div>
+               <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-lg shadow-sm shadow-slate-200/70 sm:h-14 sm:w-14 sm:rounded-xl sm:text-2xl sm:shadow-lg" :class="metricToneClass(index)">
+                  <i :class="metric.icon"></i>
+               </span>
+               <span class="min-w-0">
+                  <span class="block text-[10px] font-bold uppercase tracking-[0.16em]" :class="metricTextClass(index)">{{ metric.label }}</span>
+                  <span class="mt-1 block text-2xl font-black leading-none text-pic-text-main sm:text-3xl">{{ metric.value }}</span>
+                  <span class="mt-1 block text-[11px] font-semibold leading-tight text-pic-text-muted sm:text-xs">{{ metric.caption }}</span>
+               </span>
             </button>
-         </div>
       </div>
    </section>
 </template>

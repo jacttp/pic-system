@@ -9,6 +9,7 @@ import type { Approval, ApprovalStatus, ApprovalType } from '../types/approval.t
 import { APPROVAL_STATUS_CONFIG, APPROVAL_TYPE_CONFIG } from '../types/approval.types';
 import ApprovalDetailModal from '../components/ApprovalDetailModal.vue';
 import ManagementTray from '@/modules/Shared/components/ManagementTray.vue';
+import StdButton from '@/modules/Shared/components/std/StdButton.vue';
 
 type SortKey = 'recent' | 'oldest' | 'status';
 
@@ -24,14 +25,11 @@ interface ApprovalRow {
    statusIcon: string
    requestedDate: string
    requestedTime: string
-   meta: string
    storeName: string
    orderLabel: string
    embarqueLabel: string
-   embarqueToneClass: string
+   embarqueTone: 'neutral' | 'warning' | 'danger'
    embarqueStatusLabel: string
-   actionLabel: string
-   actionClass: string
    canResolve: boolean
 }
 
@@ -115,6 +113,7 @@ const statusCounts = computed<Record<ApprovalStatus, number>>(() => ({
    REJECTED: unifiedApprovals.value.filter(approval => approval.status === 'REJECTED').length,
    CANCELLED: unifiedApprovals.value.filter(approval => approval.status === 'CANCELLED').length,
 }));
+
 const allCancelledCount = computed(() =>
    unifiedApprovals.value.filter(approval => approval.status === 'CANCELLED').length
 );
@@ -333,14 +332,11 @@ function toApprovalRow(approval: Approval): ApprovalRow {
       statusIcon: statusConfig.icon,
       requestedDate: formatDate(requestedAt),
       requestedTime: formatTime(requestedAt),
-      meta: buildMeta(approval),
       storeName: buildStoreName(approval),
       orderLabel: buildOrderLabel(approval),
       embarqueLabel: embarque.label,
-      embarqueToneClass: embarque.toneClass,
+      embarqueTone: embarque.tone,
       embarqueStatusLabel: embarque.statusLabel,
-      actionLabel: actionLabel(approval.status),
-      actionClass: actionButtonClass(approval.status),
       canResolve: approval.status === 'PENDING' && (isSuperAdmin.value || isAssigned),
    };
 }
@@ -373,7 +369,21 @@ function buildEmbarqueInfo(approval: Approval) {
       return {
          label: 'Sin fecha',
          statusLabel: 'No registrada',
-         toneClass: 'border-pic-border bg-pic-muted-surface text-pic-text-muted',
+         tone: 'neutral' as const,
+      };
+   }
+
+   if (approval.status !== 'PENDING') {
+      const statusLabels: Record<Exclude<ApprovalStatus, 'PENDING'>, string> = {
+         APPROVED: 'Solicitud aprobada',
+         REJECTED: 'Solicitud rechazada',
+         CANCELLED: 'Solicitud cancelada',
+      };
+
+      return {
+         label: formatFullDate(date),
+         statusLabel: statusLabels[approval.status],
+         tone: 'neutral' as const,
       };
    }
 
@@ -385,7 +395,7 @@ function buildEmbarqueInfo(approval: Approval) {
       return {
          label: formatFullDate(date),
          statusLabel: `Vencio hace ${Math.abs(diffDays)} dia${Math.abs(diffDays) === 1 ? '' : 's'}`,
-         toneClass: 'border-[hsl(var(--pic-danger)/0.30)] bg-[hsl(var(--pic-danger)/0.08)] text-pic-danger',
+         tone: 'danger' as const,
       };
    }
 
@@ -393,64 +403,51 @@ function buildEmbarqueInfo(approval: Approval) {
       return {
          label: formatFullDate(date),
          statusLabel: 'Vence hoy',
-         toneClass: 'border-[hsl(var(--pic-danger)/0.30)] bg-[hsl(var(--pic-danger)/0.08)] text-pic-danger',
+         tone: 'danger' as const,
       };
    }
 
    return {
       label: formatFullDate(date),
       statusLabel: `Faltan ${diffDays} dia${diffDays === 1 ? '' : 's'}`,
-      toneClass: diffDays <= 2
-         ? 'border-[hsl(var(--pic-danger)/0.30)] bg-[hsl(var(--pic-danger)/0.08)] text-pic-danger'
-         : diffDays <= 7
-            ? 'border-[hsl(var(--pic-warning)/0.36)] bg-[hsl(var(--pic-warning)/0.10)] text-pic-warning'
-            : 'border-[hsl(var(--pic-warning)/0.24)] bg-[hsl(var(--pic-warning)/0.07)] text-pic-warning',
+      tone: diffDays <= 2 ? 'danger' as const : diffDays <= 7 ? 'warning' as const : 'neutral' as const,
    };
 }
 
-function buildMeta(approval: Approval) {
-   const payload = approval.payload || {};
-   const week = readPayloadValue(payload, ['semana_ic', 'semana', 'week']);
-   const order = Array.isArray(payload.num_pedidos)
-      ? payload.num_pedidos.map(item => String(item)).join(', ')
-      : readPayloadValue(payload, ['num_pedido', 'pedido', 'orderId', 'id']);
-   const skuCount = readPayloadValue(payload, ['sku_count', 'skus', 'totalSkus', 'total_skus']);
-   const pieces = readPayloadValue(payload, ['piezas', 'totalPzas', 'pieces', 'total_pzas_sugeridas']);
-   const segments = [
-      week ? `Sem. ${week}` : '',
-      order ? `Pedido #${order}` : '',
-      skuCount ? `${skuCount} SKUs` : '',
-      pieces ? `${pieces} Pzas` : '',
-   ].filter(Boolean);
+function embarqueToneClass(tone: ApprovalRow['embarqueTone']) {
+   const classes = {
+      neutral: 'bg-pic-muted-surface text-pic-text-muted',
+      warning: 'bg-[hsl(var(--pic-warning)/0.12)] text-pic-warning',
+      danger: 'bg-[hsl(var(--pic-danger)/0.12)] text-pic-danger',
+   };
 
-   return segments.length > 0 ? segments.join(' - ') : approval.description;
+   return classes[tone];
+}
+
+function embarqueStatusClass(tone: ApprovalRow['embarqueTone']) {
+   const classes = {
+      neutral: 'text-pic-text-muted',
+      warning: 'text-pic-warning',
+      danger: 'text-pic-danger',
+   };
+
+   return classes[tone];
+}
+
+function approvalStatusClass(status: ApprovalStatus) {
+   const classes: Record<ApprovalStatus, string> = {
+      PENDING: 'border-pic-brand-border bg-pic-brand-soft text-pic-brand',
+      APPROVED: 'border-[hsl(var(--pic-success)/0.28)] bg-[hsl(var(--pic-success)/0.10)] text-pic-success',
+      REJECTED: 'border-[hsl(var(--pic-danger)/0.32)] bg-[hsl(var(--pic-danger)/0.10)] text-pic-danger',
+      CANCELLED: 'border-[hsl(var(--pic-danger)/0.42)] bg-[hsl(var(--pic-danger)/0.16)] text-pic-danger',
+   };
+
+   return classes[status];
 }
 
 function readPayloadValue(payload: Record<string, unknown>, keys: string[]) {
    const key = keys.find(item => payload[item] !== undefined && payload[item] !== null && payload[item] !== '');
    return key ? String(payload[key]) : '';
-}
-
-function actionLabel(status: ApprovalStatus) {
-   const labels: Record<ApprovalStatus, string> = {
-      PENDING: 'Pendiente',
-      APPROVED: 'Aprobada',
-      REJECTED: 'Rechazada',
-      CANCELLED: 'Cancelada',
-   };
-
-   return labels[status];
-}
-
-function actionButtonClass(status: ApprovalStatus) {
-   const classes: Record<ApprovalStatus, string> = {
-      PENDING: 'border-pic-border bg-pic-muted-surface text-pic-text-main hover:border-slate-300 hover:bg-slate-100',
-      APPROVED: 'border-pic-border bg-pic-muted-surface text-pic-text-main hover:border-slate-300 hover:bg-slate-100',
-      REJECTED: 'border-pic-border bg-pic-muted-surface text-pic-text-main hover:border-slate-300 hover:bg-slate-100',
-      CANCELLED: 'border-pic-border bg-pic-muted-surface text-pic-text-main hover:border-slate-300 hover:bg-slate-100',
-   };
-
-   return classes[status];
 }
 
 function parseDateValue(value: string) {
@@ -493,9 +490,10 @@ function formatTime(date: Date) {
 </script>
 
 <template>
-   <div class="min-h-full bg-slate-50 px-3 py-4 sm:px-5 lg:px-8 lg:py-7">
+   <div class="min-h-full bg-pic-background px-3 py-4 sm:px-5 lg:px-8 lg:py-7">
       <div class="mx-auto max-w-[1360px] space-y-4 sm:space-y-5">
          <ManagementTray
+            v-if="!isDetailOpen"
             eyebrow="Bandeja de gestion"
             title="Aprobaciones CPFR y solicitudes internas"
             subtitle="Accesos directos al panel de aprobaciones para revisar pendientes, seguimiento e historial."
@@ -506,11 +504,15 @@ function formatTime(date: Date) {
          />
 
          <template v-if="!isDetailOpen">
-            <section class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-               <div class="grid gap-3 lg:grid-cols-[minmax(150px,190px)_minmax(150px,190px)_minmax(160px,210px)_1fr_auto]">
+            <section class="rounded-xl border border-white/10 bg-pic-nav p-3 shadow-lg shadow-slate-300/20 sm:p-4">
+               <div class="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-pic-nav-text-muted">
+                  <i class="fa-solid fa-sliders text-[9px]"></i>
+                  Filtros
+               </div>
+               <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(150px,190px)_minmax(150px,190px)_minmax(160px,210px)_1fr_auto] lg:gap-3">
                   <select
                      v-model="filters.status"
-                     class="h-11 rounded-lg border border-pic-border bg-pic-surface px-3 text-sm font-bold text-pic-text-main outline-none transition focus:border-pic-brand focus:ring-4 focus:ring-pic-brand-border"
+                     class="h-11 min-w-0 rounded-lg border border-white/15 bg-white/10 px-3 text-sm font-bold text-pic-nav-text outline-none transition hover:bg-white/15 focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border [&>option]:bg-pic-surface [&>option]:text-pic-text-main"
                      @change="applyFilters"
                   >
                      <option v-for="option in statusOptions" :key="option.value" :value="option.value || undefined">
@@ -520,7 +522,7 @@ function formatTime(date: Date) {
 
                   <select
                      v-model="filters.type"
-                     class="h-11 rounded-lg border border-pic-border bg-pic-surface px-3 text-sm font-bold text-pic-text-main outline-none transition focus:border-pic-brand focus:ring-4 focus:ring-pic-brand-border"
+                     class="h-11 min-w-0 rounded-lg border border-white/15 bg-white/10 px-3 text-sm font-bold text-pic-nav-text outline-none transition hover:bg-white/15 focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border [&>option]:bg-pic-surface [&>option]:text-pic-text-main"
                      @change="applyFilters"
                   >
                      <option v-for="option in typeOptions" :key="option.value" :value="option.value || undefined">
@@ -530,7 +532,7 @@ function formatTime(date: Date) {
 
                   <select
                      v-model="sortKey"
-                     class="h-11 rounded-lg border border-pic-border bg-pic-surface px-3 text-sm font-bold text-pic-text-main outline-none transition focus:border-pic-brand focus:ring-4 focus:ring-pic-brand-border"
+                     class="h-11 min-w-0 rounded-lg border border-white/15 bg-white/10 px-3 text-sm font-bold text-pic-nav-text outline-none transition hover:bg-white/15 focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border [&>option]:bg-pic-surface [&>option]:text-pic-text-main"
                   >
                      <option v-for="option in sortOptions" :key="option.value" :value="option.value">
                         {{ option.label }}
@@ -539,39 +541,39 @@ function formatTime(date: Date) {
 
                   <div class="hidden lg:block"></div>
 
-                  <div class="grid gap-2 sm:grid-cols-2 lg:flex lg:justify-end">
-                     <button
-                        type="button"
-                        class="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-pic-border bg-pic-surface px-4 text-sm font-black text-pic-text-main transition hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand"
+                  <div class="col-span-full grid gap-2 sm:grid-cols-2 lg:col-span-1 lg:flex lg:justify-end">
+                     <StdButton
+                        variant="primary"
+                        class="w-full shadow-lg shadow-pic-brand/20 hover:brightness-95 sm:w-auto"
+                        icon="fa-solid fa-sliders"
                         @click="clearFilters"
                      >
-                        <i class="fa-solid fa-sliders"></i>
                         Limpiar
-                     </button>
+                     </StdButton>
 
-                     <button
+                     <StdButton
                         v-if="canBulkDeleteCancelled"
-                        type="button"
-                        class="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[hsl(var(--pic-danger)/0.28)] bg-white px-4 text-sm font-black text-pic-danger transition hover:bg-[hsl(var(--pic-danger)/0.08)]"
+                        variant="danger"
+                        class="w-full bg-pic-surface sm:w-auto"
+                        icon="fa-solid fa-xmark"
                         @click="handleDeleteAllCancelled"
                      >
-                        <i class="fa-solid fa-xmark"></i>
                         Canceladas ({{ allCancelledCount }})
-                     </button>
+                     </StdButton>
                   </div>
                </div>
             </section>
 
-            <section class="space-y-3">
+            <section class="space-y-3 sm:space-y-4">
                <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                   <div>
-                     <h2 class="text-base font-black text-slate-950">{{ listTitle }}</h2>
-                     <p class="mt-1 text-xs font-semibold text-slate-500">{{ currentRangeLabel }}</p>
+                     <h2 class="text-base font-black text-pic-text-main">{{ listTitle }}</h2>
+                     <p class="mt-1 text-xs font-semibold text-pic-text-muted">{{ currentRangeLabel }}</p>
                   </div>
                </div>
 
                <div v-if="isActiveLoading" class="grid gap-3">
-                  <div v-for="index in 5" :key="index" class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <div v-for="index in 5" :key="index" class="rounded-xl border border-pic-border bg-pic-surface p-4 shadow-sm sm:p-5">
                      <div class="flex gap-3">
                         <div class="h-10 w-10 animate-pulse rounded-lg bg-slate-100"></div>
                         <div class="min-w-0 flex-1 space-y-3">
@@ -585,7 +587,7 @@ function formatTime(date: Date) {
 
                <div
                   v-else-if="approvalsStore.error"
-                  class="rounded-lg border border-[hsl(var(--pic-danger)/0.28)] bg-[hsl(var(--pic-danger)/0.08)] p-8 text-center text-pic-danger shadow-sm"
+                  class="rounded-xl border border-[hsl(var(--pic-danger)/0.28)] bg-[hsl(var(--pic-danger)/0.08)] p-8 text-center text-pic-danger shadow-sm"
                >
                   <i class="fa-solid fa-circle-exclamation text-2xl"></i>
                   <p class="mt-3 text-sm font-bold">{{ approvalsStore.error }}</p>
@@ -596,108 +598,97 @@ function formatTime(date: Date) {
 
                <div
                   v-else-if="unifiedApprovals.length === 0 || sortedRows.length === 0"
-                  class="rounded-lg border border-slate-200 bg-white p-10 text-center shadow-sm"
+                  class="rounded-xl border border-pic-border bg-pic-surface p-8 text-center shadow-sm sm:p-10"
                >
-                  <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-pic-brand-soft text-pic-brand">
+                  <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-pic-brand-soft text-pic-brand shadow-sm">
                      <i class="fa-solid fa-inbox text-2xl"></i>
                   </div>
-                  <h3 class="mt-4 text-lg font-black text-slate-800">Sin solicitudes</h3>
-                  <p class="mt-1 text-sm font-medium text-slate-500">{{ emptyMessage }}</p>
+                  <h3 class="mt-4 text-lg font-black text-pic-text-main">Sin solicitudes</h3>
+                  <p class="mt-1 text-sm font-medium text-pic-text-muted">{{ emptyMessage }}</p>
                </div>
 
                <template v-else>
-                  <div class="grid gap-3">
+                  <div class="grid gap-3 sm:gap-4">
                      <article
                         v-for="row in tableRows"
                         :key="row.approval.id"
-                        class="group rounded-lg border border-slate-200 bg-white shadow-sm transition hover:border-slate-300 hover:shadow-md"
+                        class="group overflow-hidden rounded-xl border border-pic-border bg-pic-surface shadow-sm transition hover:border-pic-brand-border hover:shadow-md"
                      >
-                        <div class="grid gap-0 lg:grid-cols-[1fr_240px]">
-                           <button
-                              type="button"
-                              class="min-w-0 p-4 text-left sm:p-5"
-                              @click="handleView(row.approval.id)"
-                           >
-                              <div class="flex min-w-0 items-start gap-3">
-                                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 ring-1 ring-slate-200">
-                                    <i :class="row.typeIcon"></i>
-                                 </span>
-                                 <span class="min-w-0 flex-1">
-                                    <span class="flex flex-wrap items-center gap-2">
-                                       <span class="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] font-black uppercase leading-none" :class="row.embarqueToneClass">
-                                          <i class="fa-regular fa-calendar-check"></i>
-                                          Fin embarque: {{ row.embarqueLabel }}
-                                       </span>
-                                    </span>
-
-                                    <span class="mt-3 block text-base font-black leading-6 text-slate-950 group-hover:text-slate-950">
-                                       {{ row.storeName }}
-                                    </span>
-                                    <span class="mt-1 block break-words text-sm font-semibold leading-5 text-slate-500">
-                                       {{ row.approval.title }}
-                                    </span>
-                                 </span>
-                              </div>
-
-                              <div class="mt-4 grid gap-3 text-xs sm:grid-cols-2 xl:grid-cols-5">
-                                 <div class="rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
-                                    <p class="font-black uppercase tracking-[0.14em] text-slate-400">Pedido</p>
-                                    <p class="mt-1 truncate font-black text-slate-800">{{ row.orderLabel }}</p>
-                                 </div>
-                                 <div class="rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
-                                    <p class="font-black uppercase tracking-[0.14em] text-slate-400">Detalle</p>
-                                    <p class="mt-1 truncate font-bold text-slate-700">{{ row.meta }}</p>
-                                 </div>
-                                 <div class="rounded-lg border px-3 py-2" :class="row.embarqueToneClass">
-                                    <p class="font-black uppercase tracking-[0.14em]">Fin de embarque</p>
-                                    <p class="mt-1 truncate font-black">{{ row.embarqueLabel }}</p>
-                                    <p class="mt-0.5 truncate font-semibold normal-case tracking-normal">{{ row.embarqueStatusLabel }}</p>
-                                 </div>
-                                 <div class="rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
-                                    <p class="font-black uppercase tracking-[0.14em] text-slate-400">Solicitante</p>
-                                    <p class="mt-1 truncate font-bold text-slate-700">{{ row.approval.requestedBy }}</p>
-                                 </div>
-                                 <div class="rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
-                                    <p class="font-black uppercase tracking-[0.14em] text-slate-400">Fecha</p>
-                                    <p class="mt-1 truncate font-bold text-slate-700">{{ row.requestedDate }}, {{ row.requestedTime }}</p>
-                                 </div>
-                              </div>
-                           </button>
-
-                           <div class="flex items-center gap-2 border-t border-slate-100 px-4 pb-4 lg:flex-col lg:items-stretch lg:justify-center lg:border-l lg:border-t-0 lg:p-4">
+                        <div class="p-4 sm:p-5">
+                           <div class="flex items-start justify-between gap-3">
                               <button
                                  type="button"
-                                 class="group/action inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-black transition lg:flex-none"
-                                 :class="row.canResolve ? 'border-pic-border bg-white text-pic-text-main hover:border-slate-300 hover:bg-slate-100' : row.actionClass"
+                                 class="flex min-w-0 flex-1 items-start gap-3 text-left outline-none"
                                  @click="handleView(row.approval.id)"
                               >
-                                 <i :class="[row.canResolve ? 'fa-solid fa-check' : row.statusIcon, row.canResolve ? '' : 'group-hover/action:hidden']" class="text-xs"></i>
-                                 <i v-if="!row.canResolve" class="fa-solid fa-eye hidden text-xs group-hover/action:inline-block"></i>
-                                 <span :class="row.canResolve ? '' : 'group-hover/action:hidden'">{{ row.canResolve ? 'Resolver' : row.actionLabel }}</span>
-                                 <span v-if="!row.canResolve" class="hidden group-hover/action:inline">Revisar</span>
+                                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-pic-brand-soft text-pic-brand ring-1 ring-pic-brand-border transition-colors group-hover:bg-pic-brand group-hover:text-white">
+                                    <i :class="row.typeIcon"></i>
+                                 </span>
+                                 <span class="min-w-0">
+                                    <span class="block text-[10px] font-bold text-pic-text-muted">{{ row.approval.type === 'CPFR_ORDER' ? 'Pedido CPFR' : 'Solicitud' }}</span>
+                                    <span class="mt-0.5 block text-base font-black leading-5 text-pic-text-main sm:text-lg">{{ row.storeName }}</span>
+                                    <span class="mt-1 block break-words text-xs font-semibold leading-5 text-pic-text-muted">OC {{ row.orderLabel }}</span>
+                                 </span>
                               </button>
+                              <span class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold" :class="approvalStatusClass(row.approval.status)">
+                                 <i :class="row.statusIcon" class="text-[10px]"></i>
+                                 {{ row.statusLabel }}
+                              </span>
+                           </div>
 
-                              <button
-                                 v-if="canDeleteCancelled(row.approval)"
-                                 type="button"
-                                 class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-pic-border bg-white text-pic-text-muted transition hover:border-slate-300 hover:bg-slate-100 hover:text-pic-text-main"
-                                 title="Borrar solicitud cancelada"
-                                 @click="handleDeleteCancelled(row.approval, $event)"
-                              >
-                                 <i class="fa-solid fa-xmark"></i>
-                              </button>
+                           <div class="mt-4 grid gap-2 border-t border-pic-border pt-3 sm:grid-cols-3 sm:gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_148px]">
+                              <div class="flex min-w-0 items-center gap-2.5 rounded-lg bg-pic-muted-surface px-3 py-2.5">
+                                 <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" :class="embarqueToneClass(row.embarqueTone)">
+                                    <i class="fa-regular fa-calendar-check text-xs"></i>
+                                 </span>
+                                 <span class="min-w-0">
+                                    <span class="block text-[10px] font-medium text-pic-text-muted">Embarque</span>
+                                    <span class="block truncate text-xs font-bold text-pic-text-main">{{ row.embarqueLabel }}</span>
+                                    <span class="block truncate text-[11px]" :class="embarqueStatusClass(row.embarqueTone)">{{ row.embarqueStatusLabel }}</span>
+                                 </span>
+                              </div>
+                              <div class="min-w-0 rounded-lg bg-pic-muted-surface px-3 py-2.5">
+                                 <span class="block text-[10px] font-medium text-pic-text-muted">Solicitante</span>
+                                 <span class="mt-1 block truncate text-xs font-bold text-pic-text-main">{{ row.approval.requestedBy }}</span>
+                              </div>
+                              <div class="min-w-0 rounded-lg bg-pic-muted-surface px-3 py-2.5">
+                                 <span class="block text-[10px] font-medium text-pic-text-muted">Creada</span>
+                                 <span class="mt-1 block truncate text-xs font-bold text-pic-text-main">{{ row.requestedDate }}, {{ row.requestedTime }}</span>
+                              </div>
+                              <div class="flex items-center gap-2 sm:col-span-3 lg:col-span-1 lg:justify-end">
+                                 <button
+                                    type="button"
+                                    class="inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-black transition focus:outline-none focus:ring-2 focus:ring-pic-brand-border lg:flex-none lg:min-w-[132px]"
+                                    :class="row.canResolve
+                                       ? 'border-pic-brand bg-pic-brand text-white shadow-sm shadow-pic-brand/20 hover:brightness-95'
+                                       : 'border-white/10 bg-pic-nav text-pic-nav-text shadow-sm hover:bg-pic-nav/90'"
+                                    @click="handleView(row.approval.id)"
+                                 >
+                                    <i :class="row.canResolve ? 'fa-solid fa-check' : 'fa-regular fa-eye'" class="text-xs"></i>
+                                    {{ row.canResolve ? 'Resolver' : 'Revisar' }}
+                                 </button>
+                                 <button
+                                    v-if="canDeleteCancelled(row.approval)"
+                                    type="button"
+                                    class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[hsl(var(--pic-danger)/0.28)] bg-pic-surface text-pic-danger transition hover:border-[hsl(var(--pic-danger)/0.42)] hover:bg-[hsl(var(--pic-danger)/0.08)] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--pic-danger)/0.22)]"
+                                    title="Borrar solicitud cancelada"
+                                    @click="handleDeleteCancelled(row.approval, $event)"
+                                 >
+                                    <i class="fa-solid fa-xmark"></i>
+                                 </button>
+                              </div>
                            </div>
                         </div>
                      </article>
                   </div>
 
-                  <footer class="flex flex-col gap-3 pt-1 text-sm font-medium text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                  <footer class="flex flex-col gap-3 pt-1 text-sm font-medium text-pic-text-muted sm:flex-row sm:items-center sm:justify-between">
                      <p>{{ currentRangeLabel }}</p>
 
-                     <div class="flex items-center gap-2 overflow-x-auto">
+                     <div class="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
                         <button
                            type="button"
-                           class="h-10 rounded-lg border border-slate-200 bg-white px-4 font-bold text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-50"
+                           class="h-10 shrink-0 rounded-lg border border-pic-border bg-pic-surface px-4 font-bold text-pic-text-main transition hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand disabled:cursor-not-allowed disabled:opacity-50"
                            :disabled="currentPage === 1"
                            @click="changePage(currentPage - 1)"
                         >
@@ -707,28 +698,28 @@ function formatTime(date: Date) {
                            v-for="page in visiblePages"
                            :key="page"
                            type="button"
-                           class="h-10 min-w-10 rounded-lg border px-3 font-black transition"
+                           class="h-10 min-w-10 shrink-0 rounded-lg border px-3 font-black transition focus:outline-none focus:ring-2 focus:ring-pic-brand-border"
                            :class="page === currentPage
-                              ? 'border-pic-brand bg-white text-pic-brand'
-                              : 'border-slate-200 bg-white text-slate-700 hover:border-pic-brand-border'"
+                              ? 'border-pic-brand bg-pic-brand text-white'
+                              : 'border-pic-border bg-pic-surface text-pic-text-main hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand'"
                            @click="changePage(page)"
                         >
                            {{ page }}
                         </button>
-                        <span v-if="totalPages > visiblePages[visiblePages.length - 1]" class="px-2 font-black text-slate-400">
+                        <span v-if="totalPages > visiblePages[visiblePages.length - 1]" class="px-2 font-black text-pic-text-muted">
                            ...
                         </span>
                         <button
                            v-if="totalPages > visiblePages[visiblePages.length - 1]"
                            type="button"
-                           class="h-10 min-w-10 rounded-lg border border-slate-200 bg-white px-3 font-black text-slate-700 transition hover:border-pic-brand-border"
+                           class="h-10 min-w-10 shrink-0 rounded-lg border border-pic-border bg-pic-surface px-3 font-black text-pic-text-main transition hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand"
                            @click="changePage(totalPages)"
                         >
                            {{ totalPages }}
                         </button>
                         <button
                            type="button"
-                           class="h-10 rounded-lg border border-slate-200 bg-white px-4 font-bold text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-50"
+                           class="h-10 shrink-0 rounded-lg border border-pic-border bg-pic-surface px-4 font-bold text-pic-text-main transition hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand disabled:cursor-not-allowed disabled:opacity-50"
                            :disabled="currentPage === totalPages"
                            @click="changePage(currentPage + 1)"
                         >

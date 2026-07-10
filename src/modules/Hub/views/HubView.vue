@@ -110,19 +110,19 @@ const hubKpiCards = computed<HubKpiCard[]>(() => [
 
 const hubMetrics = computed<HubMetric[]>(() => [
     {
-        label: 'Por resolver',
-        value: formatCount(approvalsStore.assignedPendingCount),
-        caption: approvalsStore.isLoadingAssigned ? 'Cargando' : 'Asignadas',
-        icon: 'fa-solid fa-clipboard-list',
-        tone: 'brand',
-    },
-    {
         label: 'Mis solicitudes',
         value: formatCount(myPendingCount.value),
         caption: approvalsStore.isLoading ? 'Cargando' : 'Pendientes',
         icon: 'fa-solid fa-paper-plane',
         tone: 'orange',
     },
+    {
+        label: 'Por resolver',
+        value: formatCount(approvalsStore.assignedPendingCount),
+        caption: approvalsStore.isLoadingAssigned ? 'Cargando' : 'Asignadas',
+        icon: 'fa-solid fa-clipboard-list',
+        tone: 'brand',
+    },    
     {
         label: 'Resueltas recientes',
         value: formatCount(resolvedRecentCount.value),

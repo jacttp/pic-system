@@ -737,7 +737,7 @@ const handleConfirm = async () => {
       <div class="space-y-4">
 
          <!-- Header visual -->
-         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+         <div v-if="approval.type !== 'CPFR_ORDER'" class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div class="flex items-center gap-3">
                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-50" :class="typeConfig.color">
                   <i :class="typeConfig.icon" class="text-sm"></i>
@@ -798,20 +798,59 @@ const handleConfirm = async () => {
 
          <!-- Payload CPFR_ORDER: pedido + template OV -->
          <div v-if="approval.type === 'CPFR_ORDER' && approval.payload" class="space-y-4">
+            <div>
+               <button
+                  type="button"
+                  class="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-pic-border bg-pic-surface px-3.5 text-sm font-bold text-pic-text-main shadow-sm transition hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand"
+                  @click="closeModal"
+               >
+                  <i class="fa-solid fa-arrow-left text-xs"></i>
+                  Volver a solicitudes
+               </button>
+            </div>
+
             <section class="space-y-3">
-               <div class="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white px-3 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-4">
-                  <h4 class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-600">
-                     <i class="fa-solid fa-receipt text-brand-500"></i>
-                     Vista Previa | Template OV
-                  </h4>
-                  <div class="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-wide text-slate-500">
-                     <span><b class="text-brand-700">{{ cpfrStoreGroups.length }}</b> tienda{{ cpfrStoreGroups.length === 1 ? '' : 's' }}</span>
-                     <span class="text-slate-300">|</span>
-                     <span><b class="text-brand-700">{{ cpfrPreviewRows.length }}</b> SKU</span>
-                     <span class="text-slate-300">|</span>
-                     <span><b class="text-brand-700">{{ formatNumber(cpfrStoreGroups.reduce((sum, store) => sum + store.totalKg, 0), 1) }}</b> KG</span>
+               <section class="overflow-hidden rounded-xl border border-white/10 bg-pic-nav text-pic-nav-text shadow-sm">
+                  <div class="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                     <div class="flex min-w-0 items-start gap-3.5">
+                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-pic-brand-soft text-pic-brand ring-1 ring-pic-brand-border">
+                           <i :class="typeConfig.icon" class="text-base"></i>
+                        </div>
+                        <div class="min-w-0 pt-0.5">
+                           <p class="text-[11px] font-semibold text-pic-nav-text-muted">{{ typeConfig.label }}</p>
+                           <h3 class="mt-0.5 break-words text-sm font-bold leading-5 text-pic-nav-text sm:text-base md:text-lg">OV {{ cpfrNumPedido }}</h3>
+                        </div>
+                     </div>
+                     <ApprovalStatusBadge :status="approval.status" dark />
                   </div>
-               </div>
+
+                  <div class="border-t border-white/10 px-4 py-3 sm:px-5">
+                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex items-center gap-2 text-xs text-pic-nav-text-muted">
+                           <span class="flex h-6 w-6 items-center justify-center rounded-md bg-white/5 text-pic-brand">
+                              <i class="fa-solid fa-receipt text-[11px]"></i>
+                           </span>
+                           <span>Vista previa</span>
+                           <span class="text-white/25">/</span>
+                           <span class="font-semibold text-pic-nav-text">Template OV</span>
+                        </div>
+                        <dl class="grid grid-cols-3 divide-x divide-white/10 rounded-lg border border-white/10 bg-white/[0.03] text-center">
+                           <div class="min-w-[72px] px-3 py-1.5">
+                              <dd class="text-sm font-bold text-pic-nav-text">{{ cpfrStoreGroups.length }}</dd>
+                              <dt class="mt-0.5 text-[10px] text-pic-nav-text-muted">Tiendas</dt>
+                           </div>
+                           <div class="min-w-[72px] px-3 py-1.5">
+                              <dd class="text-sm font-bold text-pic-nav-text">{{ cpfrPreviewRows.length }}</dd>
+                              <dt class="mt-0.5 text-[10px] text-pic-nav-text-muted">SKU</dt>
+                           </div>
+                           <div class="min-w-[72px] px-3 py-1.5">
+                              <dd class="text-sm font-bold text-pic-nav-text">{{ formatNumber(cpfrStoreGroups.reduce((sum, store) => sum + store.totalKg, 0), 1) }}</dd>
+                              <dt class="mt-0.5 text-[10px] text-pic-nav-text-muted">Kg</dt>
+                           </div>
+                        </dl>
+                     </div>
+                  </div>
+               </section>
 
                <div v-if="isLoadingCpfrDetail" class="flex items-center gap-2 px-4 py-3 text-xs font-semibold text-slate-500">
                   <i class="fa-solid fa-circle-notch fa-spin text-brand-500"></i>
@@ -976,22 +1015,96 @@ const handleConfirm = async () => {
 
                      <div class="space-y-3 px-3 pb-4 sm:px-4 sm:pb-5">
                         <section v-for="order in storeGroup.orders" :key="order.key" class="overflow-hidden rounded-lg border border-slate-100 bg-white">
-                           <div class="relative overflow-hidden rounded-t-lg bg-brand-600 px-4 py-3 text-white">
-                              <div class="absolute inset-y-0 right-0 w-[128px] skew-x-[-18deg] bg-amber-500 origin-bottom"></div>
+                           <div class="relative overflow-hidden rounded-t-lg bg-brand-600 px-3 py-3 text-white sm:px-4">
+                              <div class="absolute inset-y-0 right-0 hidden w-[128px] origin-bottom skew-x-[-18deg] bg-amber-500 sm:block"></div>
                               <div class="relative flex items-center justify-between gap-4">
                                  <div class="min-w-0">
                                     <p class="truncate text-[11px] font-black uppercase tracking-wide">OC {{ order.num_pedido }}</p>
-                                    <p class="mt-1 truncate text-[9px] font-black text-white">
-                                       SEM {{ order.semana_ic || '-' }} | Pedido {{ order.fec_pedido_cadena || '-' }} | Fin emb. {{ order.fec_fin_embarque || '-' }} | {{ order.rows.length }} SKU
+                                    <p class="mt-1 text-[9px] font-black leading-relaxed text-brand-100 sm:truncate sm:text-white">
+                                       SEM {{ order.semana_ic || '-' }} <span class="hidden sm:inline">| Pedido {{ order.fec_pedido_cadena || '-' }} | Fin emb. {{ order.fec_fin_embarque || '-' }} |</span> {{ order.rows.length }} SKU
                                     </p>
                                  </div>
-                                 <p class="shrink-0 text-right text-[10px] font-black text-white">
-                                    {{ formatNumber(order.totalPz, 0) }} pz | {{ formatNumber(order.totalKg, 1) }} kg
+                                 <p class="shrink-0 rounded-md bg-white/15 px-2 py-1 text-right text-[10px] font-black text-white sm:bg-transparent sm:px-0 sm:py-0">
+                                    {{ formatNumber(order.totalPz, 0) }} pz <span class="hidden sm:inline">| {{ formatNumber(order.totalKg, 1) }} kg</span>
                                  </p>
                               </div>
                            </div>
 
-                           <div class="overflow-x-auto">
+                           <div class="space-y-2 bg-slate-50 p-2.5 md:hidden">
+                              <article
+                                 v-for="(row, idx) in order.rows"
+                                 :key="`${order.key}|mobile|${row.sku_muliix || row.sku_cadena || row.upc}|${idx}`"
+                                 class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+                              >
+                                 <div class="border-b border-slate-100 px-3 py-3">
+                                    <div class="flex items-start justify-between gap-3">
+                                       <div class="min-w-0">
+                                          <p class="line-clamp-2 text-[11px] font-black uppercase leading-snug text-slate-800" :title="row.desc">{{ row.desc }}</p>
+                                          <p class="mt-1 truncate font-mono text-[9px] font-bold text-slate-400">
+                                             SKU {{ row.sku_muliix || row.sku_cadena || row.upc || '-' }}
+                                          </p>
+                                       </div>
+                                       <button
+                                          v-if="rowHasMixMetadata(row)"
+                                          type="button"
+                                          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border text-[11px] font-black shadow-sm transition"
+                                          :class="getRowMixButtonClass(row)"
+                                          :title="getRowMixButtonTitle(row)"
+                                          @click="openRowMix(row)"
+                                       >
+                                          <i v-if="getRowMixStatus(row) === 'pending'" class="fa-solid fa-triangle-exclamation"></i>
+                                          <span v-else>M</span>
+                                       </button>
+                                    </div>
+                                 </div>
+
+                                 <div class="grid grid-cols-3 divide-x divide-slate-100 border-b border-slate-100 bg-slate-50/70 text-center">
+                                    <div class="px-1 py-2">
+                                       <p class="text-[8px] font-black uppercase tracking-wide text-slate-400">Inv. act.</p>
+                                       <p class="mt-0.5 text-[11px] font-black text-brand-700">{{ formatNumber(row.inv_actual_pz, 0) }}</p>
+                                    </div>
+                                    <div class="px-1 py-2">
+                                       <p class="text-[8px] font-black uppercase tracking-wide text-slate-400">Sell prom.</p>
+                                       <p class="mt-0.5 text-[11px] font-black text-brand-700">{{ formatNumber(row.promedio_sellout_pz, 0) }}</p>
+                                    </div>
+                                    <div class="px-1 py-2" :title="coberturaTooltip(row)">
+                                       <p class="text-[8px] font-black uppercase tracking-wide text-slate-400">Cobertura</p>
+                                       <p class="mt-0.5 text-[11px] font-black" :class="coberturaClass(row)">
+                                          <i v-if="coberturaIcon(row)" :class="coberturaIcon(row)" class="mr-0.5 text-[9px]"></i>{{ formatNumber(calcularCoberturaDinamica(row), 2) }}
+                                       </p>
+                                    </div>
+                                 </div>
+
+                                 <div class="flex items-center justify-between gap-3 bg-brand-50/40 px-3 py-3">
+                                    <div class="min-w-0">
+                                       <p class="text-[8px] font-black uppercase tracking-wide text-slate-500">Pedido final</p>
+                                       <p class="mt-0.5 text-xl font-black leading-none text-brand-700">
+                                          <i v-if="isRowAdjusting(row)" class="fa-solid fa-circle-notch fa-spin text-sm"></i>
+                                          <span v-else>{{ formatNumber(row.cant_pedida, 0) }}</span><span class="ml-1 text-[10px]">pz</span>
+                                       </p>
+                                    </div>
+                                    <div v-if="canShowCpfrStepper" class="flex h-11 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                                       <button
+                                          type="button"
+                                          class="flex h-11 w-11 items-center justify-center text-slate-600 transition active:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-35"
+                                          :title="isMixPairRow(row) ? 'Renglon generado por mix' : 'Disminuir pedido'"
+                                          :disabled="isMixPairRow(row) || isRowAdjusting(row) || !row.sku_muliix || !canDecreaseCpfrRow(row)"
+                                          @click="handleAdjustPedido(row, -1)"
+                                       ><i class="fa-solid fa-minus text-xs"></i></button>
+                                       <button
+                                          type="button"
+                                          class="flex h-11 w-11 items-center justify-center border-l border-slate-200 text-slate-600 transition active:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-35"
+                                          :title="isMixPairRow(row) ? 'Renglon generado por mix' : 'Regresar hacia pedido base'"
+                                          :disabled="isMixPairRow(row) || isRowAdjusting(row) || !row.sku_muliix || !canIncreaseCpfrRow(row)"
+                                          @click="handleAdjustPedido(row, 1)"
+                                       ><i class="fa-solid fa-plus text-xs"></i></button>
+                                    </div>
+                                    <span v-else class="text-[10px] font-black uppercase text-emerald-700">{{ isMixPairRow(row) ? 'Generado por mix' : 'Sin edición' }}</span>
+                                 </div>
+                              </article>
+                           </div>
+
+                           <div class="hidden overflow-x-auto md:block">
                               <table class="w-full min-w-[900px] table-fixed border-collapse text-[10px]">
                                  <thead>
                                     <tr class="border-b border-slate-200 bg-white text-[9px] font-black uppercase tracking-wide text-slate-600">
