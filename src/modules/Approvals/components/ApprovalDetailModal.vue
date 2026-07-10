@@ -1047,13 +1047,13 @@ const handleConfirm = async () => {
                                        <button
                                           v-if="rowHasMixMetadata(row)"
                                           type="button"
-                                          class="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border text-xs font-black shadow-sm transition"
+                                          class="inline-flex h-11 min-w-[58px] shrink-0 items-center justify-center gap-1.5 rounded-md border px-3 text-xs font-black shadow-sm transition"
                                           :class="getRowMixButtonClass(row)"
                                           :title="getRowMixButtonTitle(row)"
                                           @click="openRowMix(row)"
                                        >
-                                          <i v-if="getRowMixStatus(row) === 'pending'" class="fa-solid fa-triangle-exclamation"></i>
-                                          <span v-else>M</span>
+                                          <span>Mix</span>
+                                          <i v-if="getRowMixStatus(row) === 'pending'" class="fa-solid fa-triangle-exclamation text-[11px]"></i>
                                        </button>
                                      </div>
                                  </div>
@@ -1108,14 +1108,14 @@ const handleConfirm = async () => {
                               <table class="w-full table-fixed border-collapse text-[10px]">
                                  <thead>
                                     <tr class="border-b border-slate-200 bg-white text-[9px] font-black uppercase tracking-wide text-slate-600">
-                                       <th class="w-[32%] px-3 py-2 text-left">SKU</th>
+                                       <th class="w-[26%] px-3 py-2 text-left">SKU</th>
                                        <th class="w-[10%] px-3 py-2 text-right">Inv. Act.</th>
                                        <th class="w-[10%] px-3 py-2 text-right">Sell Prom.</th>
                                        <th class="w-[10%] px-3 py-2 text-right">Cob. S.</th>
                                        <th class="w-[9%] px-3 py-2 text-right">Base</th>
                                        <th class="w-[9%] px-3 py-2 text-right">Ajuste</th>
                                        <th class="w-[8%] px-3 py-2 text-right">Mix</th>
-                                       <th class="w-[12%] px-3 py-2 text-right">Pedido</th>
+                                       <th class="w-[18%] px-3 py-2 text-right">Pedido</th>
                                     </tr>
                                  </thead>
                                  <tbody class="divide-y divide-dashed divide-slate-200">
@@ -1193,15 +1193,15 @@ const handleConfirm = async () => {
                                              <button
                                                 v-if="rowHasMixMetadata(row)"
                                                 type="button"
-                                                class="flex h-8 w-7 shrink-0 items-center justify-center rounded-md border text-[10px] font-black shadow-sm transition"
+                                                class="inline-flex h-8 min-w-[50px] shrink-0 items-center justify-center gap-1 rounded-md border px-2 text-[10px] font-black shadow-sm transition"
                                                 :class="getRowMixButtonClass(row)"
                                                 :title="getRowMixButtonTitle(row)"
                                                 @click="openRowMix(row)"
                                              >
+                                                <span>Mix</span>
                                                 <i v-if="getRowMixStatus(row) === 'pending'" class="fa-solid fa-triangle-exclamation text-[10px]"></i>
-                                                <span v-else>M</span>
                                              </button>
-                                             <span v-else class="h-8 w-7 shrink-0" aria-hidden="true"></span>
+                                             <span v-else class="h-8 min-w-[50px] shrink-0" aria-hidden="true"></span>
                                           </div>
                                           <p v-else class="text-right font-black" :class="isMixPairRow(row) ? 'text-emerald-700' : 'text-brand-700'">
                                              {{ formatNumber(row.cant_pedida, 0) }} pz
