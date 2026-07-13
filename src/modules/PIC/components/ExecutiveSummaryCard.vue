@@ -4,7 +4,7 @@ import { usePicFilterStore } from '../stores/picFilterStore';
 import { picApi } from '../services/picApi';
 
 const store = usePicFilterStore();
-const summaryHtml = ref('');
+const summaryText = ref('');
 const isLoading = ref(false);
 const isExpanded = ref(true);
 const hasGenerated = ref(false);
@@ -15,11 +15,11 @@ const generateSummary = async () => {
     isLoading.value = true;
     isExpanded.value = true;
     try {
-        const result = await picApi.getExecutiveSummary(store.reportData);
-        summaryHtml.value = result;
+        const result = await picApi.getOpenAiExecutiveSummary(store.reportData);
+        summaryText.value = result;
         hasGenerated.value = true;
     } catch (e) {
-        summaryHtml.value = '<p class="text-pic-danger">No se pudo generar el resumen ejecutivo en este momento.</p>';
+        summaryText.value = 'No se pudo generar el resumen ejecutivo en este momento.';
     } finally {
         isLoading.value = false;
     }
@@ -77,7 +77,7 @@ const generateSummary = async () => {
 
             <div v-if="hasGenerated && !isLoading" class="animate-fade-in rounded-xl bg-pic-surface p-5 text-pic-text-main md:p-8">
                 <div class="prose prose-sm prose-slate max-w-none">
-                    <div v-html="summaryHtml" class="ai-content leading-relaxed text-pic-text-main"></div>
+                    <div class="whitespace-pre-line leading-relaxed text-pic-text-main">{{ summaryText }}</div>
                 </div>
                 
                 <div data-pic-print-control="true" class="mt-6 flex items-center justify-between border-t border-pic-border pt-4">
@@ -92,10 +92,3 @@ const generateSummary = async () => {
     </div>
 </template>
 
-<style>
-/* Estilos para el contenido HTML inyectado por la IA */
-.ai-content p { margin-bottom: 1rem; }
-.ai-content strong { color: hsl(var(--pic-text-main)); font-weight: 700; }
-.ai-content ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; }
-.ai-content li { margin-bottom: 0.5rem; }
-</style>

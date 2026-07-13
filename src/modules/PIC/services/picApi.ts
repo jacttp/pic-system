@@ -135,7 +135,8 @@ export const picApi = {
       }
    },
 
-   async getExecutiveSummary(reportData: any[]): Promise<string> {
+   // Compatibilidad temporal para consumidores que todavía usen el endpoint legado de Gemini.
+   async getLegacyGeminiExecutiveSummary(reportData: any[]): Promise<string> {
       // 1. Pre-procesamiento ligero para no enviar MBs de datos a la IA
       // Agrupamos solo los totales anuales y por mes para reducir tokens
       const summaryData = reportData.reduce((acc, row) => {
@@ -173,6 +174,40 @@ export const picApi = {
       const { data } = await api.post(`/gemini-insight`, {
          userPrompt: context,
          chartData: summaryData // Enviamos data reducida
+      });
+
+      return data.insight;
+   },
+
+   async getOpenAiExecutiveSummary(reportData: any[]): Promise<string> {
+      const byPeriod = new Map<string, { year: string; month: number; volumeKg: number; metaKg: number }>();
+
+      for (const row of reportData) {
+         const year = String(row.Anio ?? row['Año'] ?? 'Sin año');
+         const month = Number(row.Mes) || 0;
+         const key = `${year}-${month}`;
+         const period = byPeriod.get(key) || { year, month, volumeKg: 0, metaKg: 0 };
+         period.volumeKg += Number(row.TotalVentaKG) || 0;
+         period.metaKg += Number(row.TotalMetasKG) || 0;
+         byPeriod.set(key, period);
+      }
+
+      const chartData = [...byPeriod.values()]
+         .sort((a, b) => Number(a.year) - Number(b.year) || a.month - b.month)
+         .map(period => ({
+            ...period,
+            volumeKg: Math.round(period.volumeKg),
+            metaKg: Math.round(period.metaKg),
+            cumplimientoPct: period.metaKg > 0
+               ? Number(((period.volumeKg / period.metaKg) * 100).toFixed(1))
+               : null
+         }));
+
+      const { data } = await api.post(`/ai/insight`, {
+         chartData,
+         modelProvider: 'openai',
+         mode: 'executive_summary',
+         userPrompt: 'Genera el resumen ejecutivo del reporte actual.'
       });
 
       return data.insight;
