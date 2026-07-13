@@ -286,11 +286,25 @@ const storesMap = computed(() => {
     return map
 })
 
-// ── Main Combined Action ──────────────────────────────────────────────────────
-const processing = ref(false)
+// ── Export actions ────────────────────────────────────────────────────────────
 const pdfProcessing = ref(false)
-const pdfOnlyTabs = computed(() => panelTab.value === 'sin_embarcar' || panelTab.value === 'historial')
-const canApproveExport = computed(() => panelTab.value !== 'aprobada' && !pdfOnlyTabs.value)
+const canDownloadExcel = computed(() => panelTab.value === 'aprobada')
+const excelRestrictionMessage = 'No se incluyen OC o SKUs que actualmente estén en Revisión o Borrador. El Excel final solo puede descargarse desde la pestaña Aprobados.'
+
+function handleExcelExport() {
+    if (!canDownloadExcel.value) {
+        toast({ title: 'Exportación no disponible', description: excelRestrictionMessage, variant: 'destructive' })
+        return
+    }
+
+    if (includedItems.value.length === 0) {
+        toast({ title: 'Atención', description: 'No hay pedidos aprobados incluidos para exportar.', variant: 'destructive' })
+        return
+    }
+
+    const filename = generateExcel(includedItems.value, Array.from(selectedDays.value))
+    toast({ title: 'Documento generado', description: filename })
+}
 
 async function handlePdfExport() {
     if (includedItems.value.length === 0) {
@@ -315,45 +329,6 @@ async function handlePdfExport() {
     }
 }
 
-async function handleAprobarExportar() {
-    if (includedItems.value.length === 0) {
-        toast({ title: 'Atención', description: 'No hay pedidos incluidos para exportar.', variant: 'destructive' })
-        return
-    }
-
-    processing.value = true
-    try {
-        // 1. Export Excel
-        const filename = generateExcel(includedItems.value, Array.from(selectedDays.value))
-        toast({ title: '✅ Documento generado', description: filename })
-
-        // 2. Update status in background
-        await updateStatusesSilently()
-        
-        toast({ title: 'Proceso completado', description: 'Excel descargado y estados actualizados.' })
-        
-        // 3. Close panel. The store was already updated locally by updateStatus.
-        emit('close')
-
-    } catch (e) {
-        console.error('[CpfrExportPanel]', e)
-        toast({ title: 'Error', description: 'Ocurrió un error en el proceso.', variant: 'destructive' })
-    } finally {
-        processing.value = false
-    }
-}
-
-async function updateStatusesSilently() {
-    if (!store.currentWeek) return
-    for (const item of includedItems.value) {
-        await store.updateStatus({
-            num_pedido: item.num_pedido,
-            year: store.currentWeek.anio,
-            week: store.currentWeek.semana,
-            estado: 'aprobado',
-        })
-    }
-}
 </script>
 
 <template>
@@ -372,8 +347,8 @@ async function updateStatusesSilently() {
                 <i class="fa-solid fa-file-invoice text-lg"></i>
             </div>
             <div>
-                <h2 class="text-sm font-black text-slate-800 tracking-tight uppercase">Template OV & Aprobación</h2>
-                <p class="text-[11px] text-slate-500 font-medium">Gestionar propuesta de exportación y actualización de estados masivos</p>
+                <h2 class="text-sm font-black text-slate-800 tracking-tight uppercase">Template OV</h2>
+                <p class="text-[11px] text-slate-500 font-medium">Exportación final de órdenes de compra aprobadas</p>
             </div>
         </div>
         
@@ -647,6 +622,14 @@ async function updateStatusesSilently() {
 
             <!-- Footer con Acciones (Double buttons) -->
             <footer class="p-5 border-t border-slate-100 bg-slate-50 flex flex-col gap-3 shrink-0">
+                <div
+                    v-if="!canDownloadExcel"
+                    class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] leading-relaxed text-amber-800"
+                    role="alert"
+                >
+                    <i class="fa-solid fa-triangle-exclamation mr-1.5 text-amber-600"></i>
+                    {{ excelRestrictionMessage }}
+                </div>
                 <div class="space-y-1">
                     <div class="flex items-center justify-between text-[11px]">
                          <span class="font-black text-slate-700 uppercase tracking-tighter">{{ includedItems.length }} PEDIDOS</span>
@@ -662,14 +645,10 @@ async function updateStatusesSilently() {
                 </div>
 
                 <div class="space-y-2">
-                    <!-- Botón 1: Solo descargar -->
                     <button
-                        v-if="!pdfOnlyTabs"
-                        @click="() => {
-                            const filename = generateExcel(includedItems, Array.from(selectedDays))
-                            toast({ title: '✅ Documento generado', description: filename })
-                        }"
-                        :disabled="processing || pdfProcessing || includedItems.length === 0"
+                        @click="handleExcelExport"
+                        :disabled="!canDownloadExcel || pdfProcessing || includedItems.length === 0"
+                        :title="canDownloadExcel ? 'Descargar Excel de OC aprobadas' : excelRestrictionMessage"
                         class="w-full h-9 border-2 border-brand-600 text-brand-700 hover:bg-brand-50 disabled:bg-slate-50 disabled:text-slate-300 disabled:border-slate-200 rounded-xl font-black text-[11px] transition-all flex items-center justify-center gap-2 group"
                     >
                         <i class="fa-solid fa-file-excel transition-transform group-hover:scale-110"></i>
@@ -678,7 +657,7 @@ async function updateStatusesSilently() {
 
                     <button
                         @click="handlePdfExport"
-                        :disabled="processing || pdfProcessing || includedItems.length === 0"
+                        :disabled="pdfProcessing || includedItems.length === 0"
                         class="w-full h-9 border-2 border-rose-600 text-rose-700 hover:bg-rose-50 disabled:bg-slate-50 disabled:text-slate-300 disabled:border-slate-200 rounded-xl font-black text-[11px] transition-all flex items-center justify-center gap-2 group"
                     >
                         <i v-if="pdfProcessing" class="fa-solid fa-circle-notch fa-spin"></i>
@@ -686,19 +665,6 @@ async function updateStatusesSilently() {
                         DESCARGAR PDFS POR TIENDA
                     </button>
 
-                    <!-- Botón 2: Descargar & Aprobar (Solo en tabs de gestión actual) -->
-                    <button
-                        v-if="canApproveExport"
-                        @click="handleAprobarExportar"
-                        :disabled="processing || pdfProcessing || includedItems.length === 0"
-                        class="w-full h-11 bg-brand-600 hover:bg-brand-700 disabled:bg-slate-300 text-white rounded-xl shadow-lg shadow-brand-900/10 transition-all flex flex-col items-center justify-center group"
-                    >
-                        <div class="flex items-center gap-2 font-black text-[11px] tracking-tight">
-                            <i v-if="processing" class="fa-solid fa-circle-notch fa-spin"></i>
-                            <i v-else class="fa-solid fa-check-double scale-110"></i>
-                            DESCARGAR & APROBAR OC
-                        </div>
-                    </button>
                 </div>
             </footer>
         </div>
