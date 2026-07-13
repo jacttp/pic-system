@@ -127,6 +127,7 @@ const adjustingSkuKey = ref<string | null>(null)
 
 function startEdit(sku: CpfrSkuDash) {
     if (currentTab.value !== 'centralizados') return;
+    if (sku.no_resurtible_adjusted) return;
     if (!sku.sku_muliix) return;
     editingId.value = sku.sku_muliix
     editValue.value = sku.pedido_sugerido_pz_red
@@ -2209,6 +2210,16 @@ const totalUniqueOCs = computed(() => {
                                 :class="escenarioCls(sku.escenario, sku.num_pedido)"
                                 :title="sku.escenario === 'B' ? 'Pedido recalculado' : ''"
                               >{{ escenarioText(sku.escenario, sku.num_pedido) }}</span>
+                              <button
+                                v-if="sku.no_resurtible_adjusted"
+                                type="button"
+                                class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-violet-200 bg-violet-50 text-violet-700 transition-colors hover:bg-violet-100 focus:outline-none focus:ring-2 focus:ring-violet-300"
+                                title="Sugerencia CPRF anulada: este SKU está marcado como NoResurtible para la tienda."
+                                aria-label="Sugerencia anulada por permiso NoResurtible"
+                                @click.stop
+                              >
+                                <i class="fa-solid fa-triangle-exclamation text-[9px]"></i>
+                              </button>
                               <span class="truncate">{{ sku.sku_nombre }}</span>
                             </div>
                           </td>
@@ -2308,15 +2319,17 @@ const totalUniqueOCs = computed(() => {
                             </div>
                             <button
                               v-else-if="currentTab === 'centralizados'"
-                              class="w-full text-right bg-white border border-slate-200 hover:border-brand-400 hover:shadow-sm rounded-md px-2 py-1 flex items-center justify-between transition-all"
+                              class="w-full text-right bg-white border border-slate-200 hover:border-brand-400 hover:shadow-sm rounded-md px-2 py-1 flex items-center justify-between transition-all disabled:cursor-not-allowed disabled:border-violet-200 disabled:bg-violet-50 disabled:shadow-none"
                               :class="{ 'ring-2 ring-emerald-400 border-transparent bg-emerald-50': savedId === sku.sku_muliix }"
                               :title="esSinSellout(sku)
                                 ? '⚠️ Sin sellout promedio — producto nuevo o sin histórico. Se usa el pedido cadena como referencia.'
                                 : 'Clic para editar cantidad'"
+                              :disabled="sku.no_resurtible_adjusted"
                               @click="startEdit(sku)"
                             >
                               <span class="flex items-center gap-1">
-                                <i v-if="esSinSellout(sku)" class="fa-solid fa-seedling text-[10px] text-amber-500" title="Sin sellout promedio"></i>
+                                <i v-if="sku.no_resurtible_adjusted" class="fa-solid fa-ban text-[10px] text-violet-600"></i>
+                                <i v-else-if="esSinSellout(sku)" class="fa-solid fa-seedling text-[10px] text-amber-500" title="Sin sellout promedio"></i>
                                 <i v-else class="fa-solid fa-pen text-[10px] text-slate-300 group-hover/cell:text-brand-500 transition-colors"></i>
                               </span>
                               <span class="text-[12px] font-bold text-slate-800" :class="{ 'text-brand-700': sku.pedido_sugerido_pz_red > 0 }">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
@@ -2414,6 +2427,16 @@ const totalUniqueOCs = computed(() => {
                                 :class="escenarioCls(sku.escenario, sku.num_pedido)"
                                 :title="sku.escenario === 'B' ? 'Pedido recalculado' : ''"
                               >{{ escenarioText(sku.escenario, sku.num_pedido) }}</span>
+                              <button
+                                v-if="sku.no_resurtible_adjusted"
+                                type="button"
+                                class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-violet-200 bg-violet-50 text-violet-700 transition-colors hover:bg-violet-100 focus:outline-none focus:ring-2 focus:ring-violet-300"
+                                title="Sugerencia CPRF anulada: este SKU está marcado como NoResurtible para la tienda."
+                                aria-label="Sugerencia anulada por permiso NoResurtible"
+                                @click.stop
+                              >
+                                <i class="fa-solid fa-triangle-exclamation text-[9px]"></i>
+                              </button>
                               <span class="truncate">{{ sku.sku_nombre }}</span>
                             </div>
                             
@@ -2537,15 +2560,17 @@ const totalUniqueOCs = computed(() => {
                           </div>
                           <button
                             v-else-if="currentTab === 'centralizados'"
-                            class="w-full text-right bg-white border border-slate-200 hover:border-brand-400 hover:shadow-sm rounded-md px-2 py-1 flex items-center justify-between transition-all"
+                            class="w-full text-right bg-white border border-slate-200 hover:border-brand-400 hover:shadow-sm rounded-md px-2 py-1 flex items-center justify-between transition-all disabled:cursor-not-allowed disabled:border-violet-200 disabled:bg-violet-50 disabled:shadow-none"
                             :class="{ 'ring-2 ring-emerald-400 border-transparent bg-emerald-50': savedId === sku.sku_muliix }"
                             :title="esSinSellout(sku)
                               ? '⚠️ Sin sellout promedio — producto nuevo o sin histórico. Se usa el pedido cadena como referencia.'
                               : 'Clic para editar cantidad'"
+                            :disabled="sku.no_resurtible_adjusted"
                             @click="startEdit(sku)"
                           >
                             <span class="flex items-center gap-1">
-                              <i v-if="esSinSellout(sku)" class="fa-solid fa-seedling text-[10px] text-amber-500" title="Sin sellout promedio"></i>
+                              <i v-if="sku.no_resurtible_adjusted" class="fa-solid fa-ban text-[10px] text-violet-600"></i>
+                              <i v-else-if="esSinSellout(sku)" class="fa-solid fa-seedling text-[10px] text-amber-500" title="Sin sellout promedio"></i>
                               <i v-else class="fa-solid fa-pen text-[10px] text-slate-300 group-hover/cell:text-brand-500 transition-colors"></i>
                             </span>
                             <span class="text-[12px] font-bold text-slate-800" :class="{ 'text-brand-700': sku.pedido_sugerido_pz_red > 0 }">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
@@ -2830,7 +2855,19 @@ const totalUniqueOCs = computed(() => {
                                             
                                             <!-- Info Principal SKU (Nombre y detalles debajo) -->
                                             <div class="min-w-0 flex-1 cursor-pointer rounded-lg p-1 -m-1 transition-colors hover:bg-brand-50/60" @click.stop="openProductPanel(tienda, sku)">
-                                                <h4 class="text-[12px] font-black text-slate-800 leading-tight truncate mb-1" :title="sku.sku_nombre">{{ sku.sku_nombre }}</h4>
+                                                <div class="mb-1 flex min-w-0 items-center gap-1.5">
+                                                    <h4 class="truncate text-[12px] font-black leading-tight text-slate-800" :title="sku.sku_nombre">{{ sku.sku_nombre }}</h4>
+                                                    <button
+                                                      v-if="sku.no_resurtible_adjusted"
+                                                      type="button"
+                                                      class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-violet-200 bg-violet-50 text-violet-700"
+                                                      title="Sugerencia CPRF anulada: este SKU está marcado como NoResurtible para la tienda."
+                                                      aria-label="Sugerencia anulada por permiso NoResurtible"
+                                                      @click.stop
+                                                    >
+                                                      <i class="fa-solid fa-triangle-exclamation text-[9px]"></i>
+                                                    </button>
+                                                </div>
                                                 <div class="flex flex-wrap items-center gap-2.5">
                                                     <span class="text-[8px] font-black px-1 py-0.5 rounded border uppercase shadow-xs bg-white" :class="escenarioCls(sku.escenario)">
                                                         {{ sku.escenario || '—' }}
@@ -2938,8 +2975,9 @@ const totalUniqueOCs = computed(() => {
                                                                   <i :class="saving ? 'fa-solid fa-circle-notch fa-spin text-[10px]' : 'fa-solid fa-check text-[11px]'"></i>
                                                                 </button>
                                                             </div>
-                                                            <button v-else-if="currentTab === 'centralizados'" @click="startEdit(sku)" class="h-7 w-[70px] bg-white border border-slate-200 hover:border-brand-400 rounded-lg flex items-center justify-center gap-1 transition-all group/edit" :class="{ 'ring-2 ring-emerald-400 border-transparent bg-emerald-50': savedId === sku.sku_muliix }">
-                                                                <i v-if="esSinSellout(sku)" class="fa-solid fa-seedling text-[8px] text-amber-500 shrink-0"></i>
+                                                            <button v-else-if="currentTab === 'centralizados'" :disabled="sku.no_resurtible_adjusted" @click="startEdit(sku)" class="h-7 w-[70px] bg-white border border-slate-200 hover:border-brand-400 rounded-lg flex items-center justify-center gap-1 transition-all group/edit disabled:cursor-not-allowed disabled:border-violet-200 disabled:bg-violet-50" :class="{ 'ring-2 ring-emerald-400 border-transparent bg-emerald-50': savedId === sku.sku_muliix }" :title="sku.no_resurtible_adjusted ? 'Sugerencia CPRF anulada: este SKU está marcado como NoResurtible para la tienda.' : 'Clic para editar cantidad'">
+                                                                <i v-if="sku.no_resurtible_adjusted" class="fa-solid fa-ban text-[8px] text-violet-600 shrink-0"></i>
+                                                                <i v-else-if="esSinSellout(sku)" class="fa-solid fa-seedling text-[8px] text-amber-500 shrink-0"></i>
                                                                 <span class="text-[12px] font-black truncate" :class="sku.pedido_sugerido_pz_red > 0 ? 'text-brand-700' : 'text-slate-800'">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>
                                                             </button>
                                                             <span

@@ -41,6 +41,8 @@ export interface CpfrSkuDash {
 
     // Datos de la OC
     num_pedido: string | null
+    permiso_oc_catalogo?: string | null
+    no_resurtible_adjusted?: boolean // el permiso NoResurtible mantiene la sugerencia bloqueada en cero
     sku_cadena: string | null           // identificador interno cadena (DESC_ART en Soriana)
     upc_cadena: string | null           // código EAN/UPC de la cadena
     cant_pedida: number                 // cantidad pedida por la cadena (antes pedido_cadena_pz)
