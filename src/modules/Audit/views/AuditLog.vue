@@ -13,6 +13,7 @@ const columns = [
     { key: 'Nombre_Reporte', label: 'Acción / Evento', class: 'font-medium text-slate-700' },
     { key: 'Numero_empleado', label: 'Usuario' },
     { key: 'Fecha_Registro', label: 'Fecha', class: 'font-mono text-xs text-slate-500' },
+    { key: 'Alcance', label: 'Alcance CPFR', class: 'text-xs' },
     { key: 'Detalles', label: 'Detalle', class: 'text-right' }
 ];
 
@@ -25,6 +26,17 @@ const formatDate = (dateStr: string) => {
 const openDetail = (detail: string) => {
     selectedDetail.value = detail || 'Sin detalles adicionales.';
     showDetailModal.value = true;
+};
+
+const getCpfrExportSummary = (detail: string | undefined) => {
+    if (!detail) return null;
+    try {
+        const parsed = JSON.parse(detail);
+        if (parsed?.tipo !== 'CPFR_EXCEL_FINAL' || !parsed.resumen) return null;
+        return parsed.resumen as { ocs: number; tiendas: number; skus: number };
+    } catch {
+        return null;
+    }
 };
 </script>
 
@@ -56,6 +68,18 @@ const openDetail = (detail: string) => {
             <!-- Fecha Formateada -->
             <template #cell-Fecha_Registro="{ value }">
                 {{ formatDate(String(value)) }}
+            </template>
+
+            <template #cell-Alcance="{ item }">
+                <template v-if="getCpfrExportSummary(item.Detalles)">
+                    <div class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
+                        <i class="fa-solid fa-file-excel"></i>
+                        {{ getCpfrExportSummary(item.Detalles)?.ocs }} OC ·
+                        {{ getCpfrExportSummary(item.Detalles)?.tiendas }} tiendas ·
+                        {{ getCpfrExportSummary(item.Detalles)?.skus }} SKU
+                    </div>
+                </template>
+                <span v-else class="text-slate-300">—</span>
             </template>
 
             <!-- Botón Ver Detalle -->

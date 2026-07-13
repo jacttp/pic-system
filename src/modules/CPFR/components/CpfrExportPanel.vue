@@ -7,6 +7,8 @@ import type { ExportRow, ExportTiendaItem } from '../composables/useCpfrExport'
 import type { CpfrDiaDash } from '../types/cpfrTypes'
 import { buildVisibleCpfrDias, normalizeCpfrOrderState } from '../composables/useCpfrVisibility'
 import { toast } from '@/components/ui/toast/use-toast'
+import { auditApi } from '@/modules/Audit/services/auditApi'
+import type { CpfrExcelExportAuditDetail } from '@/types/audit'
 
 const emit = defineEmits<{
     (e: 'close'): void
@@ -266,6 +268,11 @@ const totalRows     = computed(() => includedItems.value.reduce((a, i) => a + i.
 const totalCantidad = computed(() => includedItems.value.reduce((a, i) => a + i.rows.reduce((b, r) => b + r.cant_pedida, 0), 0))
 const totalKg       = computed(() => includedItems.value.reduce((a, i) => a + sumKg(i.rows), 0))
 
+const excelExportItems = computed<ExportTiendaItem[]>(() => includedItems.value
+    .map(item => ({ ...item, rows: item.rows.filter(row => Number(row.cant_pedida) > 0) }))
+    .filter(item => item.rows.length > 0)
+)
+
 function sumPz(rows: ExportRow[]): number {
     return rows.reduce((total, row) => total + row.cant_pedida, 0)
 }
@@ -288,22 +295,81 @@ const storesMap = computed(() => {
 
 // ── Export actions ────────────────────────────────────────────────────────────
 const pdfProcessing = ref(false)
+const excelProcessing = ref(false)
 const canDownloadExcel = computed(() => panelTab.value === 'aprobada')
 const excelRestrictionMessage = 'No se incluyen OC o SKUs que actualmente estén en Revisión o Borrador. El Excel final solo puede descargarse desde la pestaña Aprobados.'
 
-function handleExcelExport() {
+function buildExcelAuditDetail(filename: string, downloadedAt: Date): CpfrExcelExportAuditDetail {
+    const exportedItems = excelExportItems.value
+    const orderDetails = exportedItems.map(item => ({
+        numero: item.num_pedido || 'SIN FOLIO',
+        tienda: { id: item.id_cliente, nombre: item.nombre_tienda },
+        dia: item.dayNum,
+        semana: item.semana_ic,
+        anio: item.anio,
+        skus: item.rows.length,
+        piezas: sumPz(item.rows),
+        kilogramos: sumKg(item.rows)
+    }))
+
+    return {
+        tipo: 'CPFR_EXCEL_FINAL',
+        fecha_descarga: downloadedAt.toISOString(),
+        archivo: filename,
+        cadena: store.nom_cadena,
+        pestaña: 'aprobada',
+        estado_incluido: 'aprobado',
+        dias: Array.from(selectedDays.value).sort((a, b) => a - b).map(numero => ({
+            numero,
+            nombre: DAY_NAMES[numero] || `Día ${numero}`
+        })),
+        semanas: [...new Set(exportedItems
+            .filter(item => item.anio && item.semana_ic)
+            .map(item => `${item.anio}-${item.semana_ic}`))],
+        resumen: {
+            tiendas: new Set(exportedItems.map(item => item.id_cliente)).size,
+            ocs: exportedItems.length,
+            skus: exportedItems.reduce((total, item) => total + item.rows.length, 0),
+            piezas: exportedItems.reduce((total, item) => total + sumPz(item.rows), 0),
+            kilogramos: exportedItems.reduce((total, item) => total + sumKg(item.rows), 0)
+        },
+        ocs: orderDetails
+    }
+}
+
+async function handleExcelExport() {
     if (!canDownloadExcel.value) {
         toast({ title: 'Exportación no disponible', description: excelRestrictionMessage, variant: 'destructive' })
         return
     }
 
-    if (includedItems.value.length === 0) {
+    if (excelExportItems.value.length === 0) {
         toast({ title: 'Atención', description: 'No hay pedidos aprobados incluidos para exportar.', variant: 'destructive' })
         return
     }
 
-    const filename = generateExcel(includedItems.value, Array.from(selectedDays.value))
-    toast({ title: 'Documento generado', description: filename })
+    excelProcessing.value = true
+    try {
+        const downloadedAt = new Date()
+        const filename = generateExcel(excelExportItems.value, Array.from(selectedDays.value))
+        toast({ title: 'Documento generado', description: filename })
+
+        try {
+            await auditApi.createCpfrExcelExportLog(buildExcelAuditDetail(filename, downloadedAt))
+        } catch (error) {
+            console.error('[CpfrExportPanel.audit]', error)
+            toast({
+                title: 'Archivo descargado sin bitácora',
+                description: 'No se pudo registrar esta descarga en Auditoría. Intenta descargarlo de nuevo para dejar evidencia.',
+                variant: 'destructive'
+            })
+        }
+    } catch (error) {
+        console.error('[CpfrExportPanel.excel]', error)
+        toast({ title: 'Error', description: 'No se pudo generar el Excel.', variant: 'destructive' })
+    } finally {
+        excelProcessing.value = false
+    }
 }
 
 async function handlePdfExport() {
@@ -640,19 +706,20 @@ async function handlePdfExport() {
                          </span>
                     </div>
                     <p class="text-[9px] font-mono text-brand-600 font-bold truncate p-1.5 bg-brand-50 rounded-lg border border-brand-100 text-center">
-                        {{ selectedDays.size > 1 ? 'MIX' : DAY_CODES[Array.from(selectedDays)[0]] }}_{{ new Date().toISOString().slice(0,10).replace(/-/g,'') }}.xlsx
+                        {{ selectedDays.size > 1 ? 'MIX' : DAY_CODES[Array.from(selectedDays)[0] ?? 1] }}_{{ new Date().toISOString().slice(0,10).replace(/-/g,'') }}.xlsx
                     </p>
                 </div>
 
                 <div class="space-y-2">
                     <button
                         @click="handleExcelExport"
-                        :disabled="!canDownloadExcel || pdfProcessing || includedItems.length === 0"
+                        :disabled="!canDownloadExcel || excelProcessing || pdfProcessing || excelExportItems.length === 0"
                         :title="canDownloadExcel ? 'Descargar Excel de OC aprobadas' : excelRestrictionMessage"
                         class="w-full h-9 border-2 border-brand-600 text-brand-700 hover:bg-brand-50 disabled:bg-slate-50 disabled:text-slate-300 disabled:border-slate-200 rounded-xl font-black text-[11px] transition-all flex items-center justify-center gap-2 group"
                     >
-                        <i class="fa-solid fa-file-excel transition-transform group-hover:scale-110"></i>
-                        DESCARGAR EXCEL
+                        <i v-if="excelProcessing" class="fa-solid fa-circle-notch fa-spin"></i>
+                        <i v-else class="fa-solid fa-file-excel transition-transform group-hover:scale-110"></i>
+                        {{ excelProcessing ? 'REGISTRANDO...' : 'DESCARGAR EXCEL' }}
                     </button>
 
                     <button
