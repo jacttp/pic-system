@@ -8,11 +8,15 @@ export interface StdTableColumn {
   sortable?: boolean;
 }
 
+type StdTableAction = 'view' | 'edit';
+
 interface Props {
   columns: StdTableColumn[];
   rows: Record<string, unknown>[];
   loading?: boolean;
   selectable?: boolean;
+  showActions?: boolean;
+  actions?: StdTableAction[];
   selectedKeys?: Array<string | number>;
   rowKey?: string;
   sortKey?: string;
@@ -24,6 +28,8 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
   selectable: false,
+  showActions: true,
+  actions: () => ['view', 'edit'],
   rowKey: 'id',
   selectedKeys: () => [],
   emptyTitle: 'Sin resultados',
@@ -107,7 +113,7 @@ const handleSelect = (row: Record<string, unknown>) => {
                 </button>
                 <span v-else>{{ column.label }}</span>
               </th>
-              <th class="w-24 px-4 py-3 text-right text-slate-300">Acciones</th>
+              <th v-if="showActions" class="w-24 px-4 py-3 text-right text-slate-300">Acciones</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 text-sm">
@@ -135,12 +141,12 @@ const handleSelect = (row: Record<string, unknown>) => {
                   {{ row[column.key] }}
                 </slot>
               </td>
-              <td class="px-4 py-3 text-right">
+              <td v-if="showActions" class="px-4 py-3 text-right">
                 <div class="inline-flex items-center gap-1">
-                  <button type="button" class="h-8 w-8 rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-pic-brand" @click="emit('row-action', 'view', row)">
+                  <button v-if="actions.includes('view')" type="button" class="h-8 w-8 rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-pic-brand" @click="emit('row-action', 'view', row)">
                     <i class="fa-regular fa-eye"></i>
                   </button>
-                  <button type="button" class="h-8 w-8 rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-pic-brand" @click="emit('row-action', 'edit', row)">
+                  <button v-if="actions.includes('edit')" type="button" class="h-8 w-8 rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-pic-brand" @click="emit('row-action', 'edit', row)">
                     <i class="fa-solid fa-pen"></i>
                   </button>
                 </div>
@@ -175,6 +181,14 @@ const handleSelect = (row: Record<string, unknown>) => {
               <p class="text-[10px] font-black uppercase text-slate-500">{{ column.label }}</p>
               <p class="mt-1 text-xs font-black text-slate-900">{{ row[column.key] }}</p>
             </div>
+          </div>
+          <div v-if="showActions" class="mt-3 flex justify-end gap-1 border-t border-slate-100 pt-2">
+            <button v-if="actions.includes('view')" type="button" class="h-8 w-8 rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-pic-brand" @click="emit('row-action', 'view', row)">
+              <i class="fa-regular fa-eye"></i>
+            </button>
+            <button v-if="actions.includes('edit')" type="button" class="h-8 w-8 rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-pic-brand" @click="emit('row-action', 'edit', row)">
+              <i class="fa-solid fa-pen"></i>
+            </button>
           </div>
         </article>
       </div>

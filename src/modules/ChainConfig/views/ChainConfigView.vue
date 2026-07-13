@@ -37,18 +37,28 @@ onMounted(() => {
                   </div>
                </div>
 
-               <div class="grid grid-cols-3 gap-3 min-w-full xl:min-w-[420px]">
-                  <div class="rounded-lg border border-slate-100 bg-slate-50 p-3">
-                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tiendas</p>
-                     <p class="text-xl font-black text-slate-800">{{ store.storeConfigs.length }}</p>
-                  </div>
-                  <div class="rounded-lg border border-slate-100 bg-slate-50 p-3">
-                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">SKUs</p>
-                     <p class="text-xl font-black text-slate-800">{{ store.skuUnits.length }}</p>
-                  </div>
-                  <div class="rounded-lg border border-slate-100 bg-slate-50 p-3">
-                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mapeos</p>
-                     <p class="text-xl font-black text-slate-800">{{ store.skuMappings.length }}</p>
+               <div class="flex flex-col gap-3 min-w-full xl:min-w-[420px]">
+                  <a
+                     href="http://localhost:5173/admin/cpfr"
+                     class="inline-flex items-center justify-center gap-2 self-start xl:self-end rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+                  >
+                     <i class="fa-solid fa-arrow-left"></i>
+                     Ir a CPFR
+                  </a>
+
+                  <div class="grid grid-cols-3 gap-3">
+                     <div class="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tiendas</p>
+                        <p class="text-xl font-black text-slate-800">{{ store.storeConfigs.length }}</p>
+                     </div>
+                     <div class="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">SKUs</p>
+                        <p class="text-xl font-black text-slate-800">{{ store.skuUnits.length }}</p>
+                     </div>
+                     <div class="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mapeos</p>
+                        <p class="text-xl font-black text-slate-800">{{ store.skuMappings.length }}</p>
+                     </div>
                   </div>
                </div>
             </div>
