@@ -69,10 +69,10 @@ export const userApi = {
       return data.data;
    },
 
-   async getAssignedStoreDetails(filters: Record<string, string[]>): Promise<AssignedStoreDetail[]> {
+   async getAssignedStoreDetails(scopeUserId: number): Promise<AssignedStoreDetail[]> {
       const { data } = await api.post<{ success: boolean; data: AssignedStoreDetail[] }>(
          `/filters/assigned-store-details`,
-         { filters }
+         { scopeUserId }
       );
       return data.data;
    },

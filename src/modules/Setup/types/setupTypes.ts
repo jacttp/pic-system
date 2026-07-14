@@ -8,12 +8,18 @@ export interface SystemModule {
    Description?: string;
    IconColor?: string;
    BgColor?: string;
+   UsesCustomColors?: boolean;
+   ModuleColorPreset?: 'orange' | 'blue' | 'purple' | 'teal' | 'yellow';
    MinRoleLevel: number;
    IsActive: boolean;
    DisplayOrder: number;
    Category: 'Analítica' | 'Gestión' | 'Sistema' | 'Otro';
    DevStatus?: 'Finished' | 'Maintaining' | 'Development';
    Scope?: string;
+}
+
+export interface ModuleColorOverrides {
+   enabledModuleIds: number[];
 }
 
 export type DevStatus = 'Finished' | 'Maintaining' | 'Development';

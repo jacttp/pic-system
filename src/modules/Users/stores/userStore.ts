@@ -221,6 +221,7 @@ export const useUserStore = defineStore('users', () => {
       }
 
       if (user.TipoUser === 'Jefe') {
+         if (isScopedValue(user.Gerencia)) filters.Gerencia = [user.Gerencia];
          if (isScopedValue(user.jefatura)) filters.Jefatura = [user.jefatura];
          return filters;
       }
@@ -232,7 +233,7 @@ export const useUserStore = defineStore('users', () => {
       return filters;
    }
 
-   function getAssignedStoreScopeError(user: UserFull, filters: Record<string, string[]>) {
+   /* Alcance validado por el backend con datos vigentes de UsuariosPicTest.
       if (user.TipoUser === 'SuperAdmin') return null;
       if (user.TipoUser === 'Gerente' && !filters.Gerencia) {
          return 'El gerente no tiene una gerencia asignada para resolver sus tiendas.';
@@ -246,21 +247,15 @@ export const useUserStore = defineStore('users', () => {
       return null;
    }
 
+   */
    async function fetchAssignedStores(user: UserFull) {
-      const filters = buildAssignedStoreFilters(user);
-      const scopeError = getAssignedStoreScopeError(user, filters);
-
-      if (scopeError) {
-         assignedStores.value[user.IdUser] = [];
-         assignedStoresError.value[user.IdUser] = scopeError;
-         return;
-      }
-
       assignedStoresLoading.value[user.IdUser] = true;
       assignedStoresError.value[user.IdUser] = null;
 
       try {
-         assignedStores.value[user.IdUser] = await userApi.getAssignedStoreDetails(filters);
+         // El backend toma Gerencia/Jefatura/Zona vigentes desde UsuariosPicTest.
+         // No se confía en el objeto local, que puede estar desactualizado.
+         assignedStores.value[user.IdUser] = await userApi.getAssignedStoreDetails(user.IdUser);
       } catch (e: any) {
          console.error('Error al cargar tiendas asignadas:', e);
          assignedStores.value[user.IdUser] = [];

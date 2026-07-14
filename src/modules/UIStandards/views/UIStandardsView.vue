@@ -233,7 +233,7 @@ const tokenGroups = computed(() => [
 const activePaletteTokens = computed(() => activePalette.value.tokens);
 const activePalettePreviewTokens = computed(() =>
   uiThemeTokenDefinitions.filter((token) =>
-    ['--pic-brand', '--pic-nav', '--pic-accent-orange', '--pic-accent-blue', '--pic-accent-purple', '--pic-accent-teal'].includes(token.token)
+    ['--pic-brand', '--pic-nav', '--pic-module', '--pic-accent-orange', '--pic-accent-blue', '--pic-accent-purple', '--pic-accent-teal'].includes(token.token)
   )
 );
 const activePaletteStatusLabel = computed(() => {

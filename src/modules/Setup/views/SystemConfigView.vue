@@ -4,6 +4,7 @@ import { useSetupStore } from '../stores/setupStores';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import type { SystemModule, DevStatus, HubFeatureKey, HubMainBlockKey, HubSidebarBlockKey } from '../types/setupTypes';
 import NewModuleModal from '../components/NewModuleModal.vue';
+import { getModuleColorPresetId, MODULE_COLOR_PRESETS } from '@/modules/Shared/design/moduleStyles';
 
 const setupStore = useSetupStore();
 const authStore = useAuthStore();
@@ -18,7 +19,12 @@ const form = ref<Partial<SystemModule>>({});
 
 const showNewModal = ref(false);
 
-onMounted(() => {
+onMounted(async () => {
+    if (setupStore.modules.length === 0) {
+        await setupStore.fetchModules();
+    } else {
+        await setupStore.fetchModuleColorOverrides();
+    }
     setupStore.fetchFeatureFlags();
 });
 
@@ -29,7 +35,11 @@ const handleCreateModule = async (payload: Omit<SystemModule, 'ModuleId'>) => {
 
 const openEdit = (mod: SystemModule) => {
     editingModule.value = mod;
-    form.value = { ...mod };
+    form.value = {
+        ...mod,
+        UsesCustomColors: setupStore.hasModuleColorOverride(mod.ModuleId),
+        ModuleColorPreset: getModuleColorPresetId(mod),
+    };
     showModal.value = true;
 };
 
@@ -41,8 +51,15 @@ const closeEdit = () => {
 
 const saveEdit = async () => {
     if (editingModule.value && form.value) {
-        await setupStore.updateModule(editingModule.value.ModuleId, form.value);
-        closeEdit();
+        const { UsesCustomColors, ModuleColorPreset, ...moduleChanges } = form.value;
+        const moduleSaved = await setupStore.updateModule(editingModule.value.ModuleId, moduleChanges);
+        if (!moduleSaved) return;
+
+        const overrideSaved = await setupStore.setModuleColorOverride(
+            editingModule.value.ModuleId,
+            Boolean(UsesCustomColors)
+        );
+        if (overrideSaved) closeEdit();
     }
 };
 
@@ -185,29 +202,15 @@ const moveLayoutItem = (area: HubLayoutArea, key: HubMainBlockKey | HubSidebarBl
     setupStore.updateHubLayoutOrder(area, key, currentIndex + direction);
 };
 
-// Custom Dropdown Logic
-const activeDropdown = ref<string | null>(null);
-const toggleDropdown = (id: string) => {
-    if (activeDropdown.value === id) activeDropdown.value = null;
-    else activeDropdown.value = id;
+const selectModuleColorPreset = (event: Event) => {
+    const presetId = (event.target as HTMLSelectElement).value;
+    const preset = MODULE_COLOR_PRESETS.find(item => item.id === presetId);
+    if (!preset || !form.value) return;
+
+    form.value.ModuleColorPreset = preset.id;
+    form.value.IconColor = preset.color;
+    form.value.BgColor = preset.bg;
 };
-
-const selectColor = (field: 'IconColor' | 'BgColor', value: string) => {
-    if (form.value) form.value[field] = value;
-    activeDropdown.value = null;
-};
-
-const PRESET_ICON_COLORS = [
-    'text-brand-600', 'text-orange-500', 'text-emerald-500', 'text-purple-500', 
-    'text-rose-800', 'text-indigo-500', 'text-lime-600', 'text-teal-600', 
-    'text-pink-500', 'text-slate-500'
-];
-
-const PRESET_BG_COLORS = [
-    'bg-brand-50', 'bg-orange-50', 'bg-emerald-50', 'bg-purple-50', 
-    'bg-fuchsia-50', 'bg-slate-100', 'bg-lime-50', 'bg-teal-50', 
-    'bg-pink-50', 'bg-slate-50'
-];
 </script>
 
 <template>
@@ -583,76 +586,48 @@ const PRESET_BG_COLORS = [
                     ></textarea>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Color Icono (Tailwind)</label>
-                        <div class="relative">
-                            <div class="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-lg focus-within:ring-2 focus-within:ring-brand-500 bg-white transition-all">
-                                <div :class="[form.IconColor || 'text-slate-500']" class="text-lg w-6 flex justify-center shrink-0">
-                                    <i :class="form.Icon"></i>
-                                </div>
-                                <input 
-                                    v-model="form.IconColor" 
-                                    placeholder="text-brand-600"
-                                    class="w-full bg-transparent focus:outline-none text-xs font-mono"
-                                    @focus="activeDropdown = 'icon'"
-                                >
-                                <button @click="toggleDropdown('icon')" type="button" class="text-slate-400 hover:text-slate-600">
-                                    <i class="fa-solid fa-chevron-down text-[10px]"></i>
-                                </button>
-                            </div>
-
-                            <!-- Custom Dropdown -->
-                            <div v-if="activeDropdown === 'icon'" class="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg p-2 grid grid-cols-5 gap-1 animate-in fade-in slide-in-from-top-1">
-                                <button 
-                                    v-for="color in PRESET_ICON_COLORS" 
-                                    :key="color"
-                                    type="button"
-                                    @click="selectColor('IconColor', color)"
-                                    class="w-8 h-8 rounded flex items-center justify-center hover:bg-slate-50 border border-slate-100 transition-colors"
-                                    :title="color"
-                                >
-                                    <i :class="['fa-solid fa-circle', color]"></i>
-                                </button>
-                                <div class="col-span-full border-t border-slate-100 mt-1 pt-1 text-[10px] text-slate-400 text-center">O escribe arriba</div>
-                            </div>
+                <section class="rounded-xl border border-pic-border bg-pic-muted-surface p-4">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p class="text-xs font-black uppercase tracking-wide text-pic-text-main">Color de tarjeta</p>
+                            <p class="mt-1 text-xs font-medium leading-5 text-pic-text-muted">
+                                Por defecto usa el tema global. Activa una excepción solo cuando este módulo necesite distinguirse.
+                            </p>
                         </div>
+                        <button
+                            type="button"
+                            class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-pic-brand-border"
+                            :class="form.UsesCustomColors ? 'bg-pic-brand' : 'bg-slate-300'"
+                            :aria-pressed="Boolean(form.UsesCustomColors)"
+                            @click="form.UsesCustomColors = !form.UsesCustomColors"
+                        >
+                            <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform" :class="form.UsesCustomColors ? 'translate-x-6' : 'translate-x-1'"></span>
+                        </button>
                     </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Color Fondo (Tailwind)</label>
-                        <div class="relative">
-                            <div class="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-lg focus-within:ring-2 focus-within:ring-brand-500 bg-white transition-all">
-                                <div :class="[form.BgColor || 'bg-slate-50']" class="w-6 h-6 rounded border border-slate-100 shrink-0"></div>
-                                <input 
-                                    v-model="form.BgColor" 
-                                    placeholder="bg-brand-50"
-                                    class="w-full bg-transparent focus:outline-none text-xs font-mono"
-                                    @focus="activeDropdown = 'bg'"
-                                >
-                                <button @click="toggleDropdown('bg')" type="button" class="text-slate-400 hover:text-slate-600">
-                                    <i class="fa-solid fa-chevron-down text-[10px]"></i>
-                                </button>
-                            </div>
 
-                            <!-- Custom Dropdown -->
-                            <div v-if="activeDropdown === 'bg'" class="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg p-2 grid grid-cols-5 gap-1 animate-in fade-in slide-in-from-top-1">
-                                <button 
-                                    v-for="color in PRESET_BG_COLORS" 
-                                    :key="color"
-                                    type="button"
-                                    @click="selectColor('BgColor', color)"
-                                    class="w-8 h-8 rounded border border-slate-200 hover:border-brand-500 transition-all"
-                                    :class="color"
-                                    :title="color"
-                                ></button>
-                                <div class="col-span-full border-t border-slate-100 mt-1 pt-1 text-[10px] text-slate-400 text-center">O escribe arriba</div>
-                            </div>
+                    <div v-if="form.UsesCustomColors" class="mt-4 border-t border-pic-border pt-4">
+                        <label class="block text-xs font-bold uppercase tracking-wide text-pic-text-muted">Estilo individual</label>
+                        <div class="mt-2 flex items-center gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" :class="form.BgColor || 'bg-pic-module-soft'">
+                                <i :class="[form.Icon || 'fa-solid fa-cube', form.IconColor || 'text-pic-module']"></i>
+                            </span>
+                            <select
+                                class="h-10 min-w-0 flex-1 rounded-lg border border-pic-border bg-pic-surface px-3 text-sm font-semibold text-pic-text-main outline-none transition focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border"
+                                :value="form.ModuleColorPreset || ''"
+                                @change="selectModuleColorPreset"
+                            >
+                                <option value="" disabled>Selecciona un estilo</option>
+                                <option v-for="preset in MODULE_COLOR_PRESETS" :key="preset.id" :value="preset.id">{{ preset.label }}</option>
+                            </select>
                         </div>
+                        <p class="mt-2 text-[11px] font-medium text-pic-text-muted">
+                            El color sólido se aplica al icono y título; su par suave al fondo del icono y franja de navegación.
+                        </p>
                     </div>
-                </div>
-
-                <!-- Click outside listener for dropdowns -->
-                <div v-if="activeDropdown" class="fixed inset-0 z-40" @click="activeDropdown = null"></div>
+                    <p v-else class="mt-3 text-[11px] font-semibold text-pic-brand">
+                        Este módulo usa <span class="font-mono">--pic-module</span> y <span class="font-mono">--pic-module-soft</span>.
+                    </p>
+                </section>
 
             </div>
 

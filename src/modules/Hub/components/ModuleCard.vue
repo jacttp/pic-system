@@ -5,73 +5,75 @@ import { computed } from 'vue';
 const props = defineProps<{
     title: string;
     description: string;
-    icon: string; // Clase de FontAwesome (ej: "fa-solid fa-users")
-    to?: string;  // Ruta interna
-    href?: string; // Ruta externa (Legacy)
+    icon: string;
+    to?: string;
+    href?: string;
     active?: boolean;
-    colorClass?: string; // Clase de color para el icono (ej: "text-blue-600")
-    bgClass?: string;    // Clase de fondo para el icono (ej: "bg-blue-50")
+    colorClass?: string;
+    bgClass?: string;
+    accentClass?: string;
 }>();
 
-// Decidir si es un link externo o interno
 const isExternal = computed(() => !!props.href);
+const linkLabel = computed(() => `Abrir módulo: ${props.title}`);
 </script>
 
 <template>
-    <!-- Opción A: Link Externo (Dashboard Legacy) -->
-    <a 
-        v-if="isExternal" 
-        :href="href" 
+    <a
+        v-if="isExternal"
+        :href="href"
         target="_blank"
-        class="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 transition-all duration-300 cursor-pointer group relative overflow-hidden block"
+        rel="noopener noreferrer"
+        :aria-label="linkLabel"
+        class="group flex min-h-[270px] flex-col overflow-hidden rounded-2xl border border-pic-border bg-pic-surface shadow-sm transition duration-200 hover:-translate-y-1 hover:border-pic-brand-border hover:shadow-lg hover:shadow-slate-300/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pic-brand-border"
     >
-        <div class="absolute top-0 left-0 w-1 h-full bg-brand-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-        
-        <div 
-            class="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform"
-            :class="[bgClass || 'bg-slate-50', colorClass || 'text-slate-500']"
-        >
-            <i :class="icon"></i>
+        <div class="flex flex-1 flex-col items-center justify-center px-5 pb-6 pt-7 text-center sm:px-6 sm:pt-8">
+            <span
+                class="flex h-16 w-16 items-center justify-center rounded-2xl text-3xl shadow-sm transition duration-200 group-hover:scale-105 sm:h-20 sm:w-20 sm:text-4xl"
+                :class="[bgClass || 'bg-pic-module-soft', colorClass || 'text-pic-module']"
+            >
+                <i :class="icon"></i>
+            </span>
+            <h3 class="mt-5 text-lg font-black leading-tight transition-colors sm:text-xl" :class="colorClass || 'text-pic-module'">
+                {{ title }}
+            </h3>
+            <p class="mt-2 max-w-[17rem] text-sm font-medium leading-5 text-pic-text-muted sm:text-[15px]">
+                {{ description }}
+            </p>
         </div>
-        
-        <h3 class="text-lg font-bold text-slate-800 mb-2 group-hover:text-brand-600 transition-colors">
-            {{ title }}
-        </h3>
-        <p class="text-sm text-slate-500 mb-6 leading-relaxed">
-            {{ description }}
-        </p>
-        
-        <div class="flex items-center justify-end pt-4 border-t border-slate-50">
-            <span class="text-xs text-slate-300 group-hover:text-brand-500 font-medium flex items-center gap-1 transition-colors">
-                Abrir <i class="fa-solid fa-arrow-up-right-from-square"></i>
+
+        <div class="flex h-14 shrink-0 items-center justify-end border-t border-pic-border px-5 transition-colors sm:px-6" :class="accentClass || bgClass || 'bg-pic-module-soft'">
+            <span class="flex h-8 w-8 items-center justify-center rounded-full transition duration-200 group-hover:translate-x-0.5 group-hover:bg-pic-surface" :class="colorClass || 'text-pic-module'">
+                <i class="fa-solid fa-chevron-right text-sm"></i>
             </span>
         </div>
     </a>
 
-    <!-- Opción B: Router Link (Módulos Vue) -->
-    <router-link 
-        v-else 
+    <router-link
+        v-else
         :to="to || '#'"
-        class="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 transition-all duration-300 cursor-pointer group relative overflow-hidden block"
+        :aria-label="linkLabel"
+        class="group flex min-h-[270px] flex-col overflow-hidden rounded-2xl border border-pic-border bg-pic-surface shadow-sm transition duration-200 hover:-translate-y-1 hover:border-pic-brand-border hover:shadow-lg hover:shadow-slate-300/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pic-brand-border"
     >
-        <div class="absolute top-0 left-0 w-1 h-full bg-brand-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-        
-        <div 
-            class="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform"
-            :class="[bgClass || 'bg-slate-50', colorClass || 'text-slate-500']"
-        >
-            <i :class="icon"></i>
+        <div class="flex flex-1 flex-col items-center justify-center px-5 pb-6 pt-7 text-center sm:px-6 sm:pt-8">
+            <span
+                class="flex h-16 w-16 items-center justify-center rounded-2xl text-3xl shadow-sm transition duration-200 group-hover:scale-105 sm:h-20 sm:w-20 sm:text-4xl"
+                :class="[bgClass || 'bg-pic-module-soft', colorClass || 'text-pic-module']"
+            >
+                <i :class="icon"></i>
+            </span>
+            <h3 class="mt-5 text-lg font-black leading-tight transition-colors sm:text-xl" :class="colorClass || 'text-pic-module'">
+                {{ title }}
+            </h3>
+            <p class="mt-2 max-w-[17rem] text-sm font-medium leading-5 text-pic-text-muted sm:text-[15px]">
+                {{ description }}
+            </p>
         </div>
-        
-        <h3 class="text-lg font-bold text-slate-800 mb-2 group-hover:text-brand-600 transition-colors">
-            {{ title }}
-        </h3>
-        <p class="text-sm text-slate-500 mb-6 leading-relaxed">
-            {{ description }}
-        </p>
-        
-        <div class="flex items-center justify-end pt-4 border-t border-slate-50">
-            <i class="fa-solid fa-arrow-right text-slate-300 group-hover:text-brand-500 transition-colors"></i>
+
+        <div class="flex h-14 shrink-0 items-center justify-end border-t border-pic-border px-5 transition-colors sm:px-6" :class="accentClass || bgClass || 'bg-pic-module-soft'">
+            <span class="flex h-8 w-8 items-center justify-center rounded-full transition duration-200 group-hover:translate-x-0.5 group-hover:bg-pic-surface" :class="colorClass || 'text-pic-module'">
+                <i class="fa-solid fa-chevron-right text-sm"></i>
+            </span>
         </div>
     </router-link>
 </template>

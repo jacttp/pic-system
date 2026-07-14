@@ -18,38 +18,13 @@ const form = ref<Omit<SystemModule, 'ModuleId'>>({
     IsActive: true,
     DevStatus: 'Development',
     Scope: 'Global',
-    Description: '',
-    IconColor: 'text-slate-500',
-    BgColor: 'bg-slate-50'
+    Description: ''
 });
 
 const handleSave = () => {
     emit('save', form.value);
 };
 
-// Custom Dropdown Logic
-const activeDropdown = ref<string | null>(null);
-const toggleDropdown = (id: string) => {
-    if (activeDropdown.value === id) activeDropdown.value = null;
-    else activeDropdown.value = id;
-};
-
-const selectColor = (field: 'IconColor' | 'BgColor', value: string) => {
-    if (form.value) form.value[field] = value;
-    activeDropdown.value = null;
-};
-
-const PRESET_ICON_COLORS = [
-    'text-brand-600', 'text-orange-500', 'text-emerald-500', 'text-purple-500', 
-    'text-rose-800', 'text-indigo-500', 'text-lime-600', 'text-teal-600', 
-    'text-pink-500', 'text-slate-500'
-];
-
-const PRESET_BG_COLORS = [
-    'bg-brand-50', 'bg-orange-50', 'bg-emerald-50', 'bg-purple-50', 
-    'bg-fuchsia-50', 'bg-slate-100', 'bg-lime-50', 'bg-teal-50', 
-    'bg-pink-50', 'bg-slate-50'
-];
 </script>
 
 <template>
@@ -127,76 +102,9 @@ const PRESET_BG_COLORS = [
                     ></textarea>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Color Icono (Tailwind)</label>
-                        <div class="relative">
-                            <div class="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-lg focus-within:ring-2 focus-within:ring-brand-500 bg-white transition-all">
-                                <div :class="[form.IconColor || 'text-slate-500']" class="text-xl w-6 flex justify-center shrink-0">
-                                    <i :class="form.Icon"></i>
-                                </div>
-                                <input 
-                                    v-model="form.IconColor" 
-                                    placeholder="text-brand-600"
-                                    class="w-full bg-transparent focus:outline-none text-xs font-mono"
-                                    @focus="activeDropdown = 'new-icon'"
-                                >
-                                <button @click="toggleDropdown('new-icon')" type="button" class="text-slate-400 hover:text-slate-600">
-                                    <i class="fa-solid fa-chevron-down text-[10px]"></i>
-                                </button>
-                            </div>
-
-                            <!-- Custom Dropdown -->
-                            <div v-if="activeDropdown === 'new-icon'" class="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg p-2 grid grid-cols-5 gap-1 animate-in fade-in slide-in-from-top-1">
-                                <button 
-                                    v-for="color in PRESET_ICON_COLORS" 
-                                    :key="color"
-                                    type="button"
-                                    @click="selectColor('IconColor', color)"
-                                    class="w-8 h-8 rounded flex items-center justify-center hover:bg-slate-50 border border-slate-100 transition-colors"
-                                    :title="color"
-                                >
-                                    <i :class="['fa-solid fa-circle', color]"></i>
-                                </button>
-                                <div class="col-span-full border-t border-slate-100 mt-1 pt-1 text-[10px] text-slate-400 text-center">O escribe arriba</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Color Fondo (Tailwind)</label>
-                        <div class="relative">
-                            <div class="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-lg focus-within:ring-2 focus-within:ring-brand-500 bg-white transition-all">
-                                <div :class="[form.BgColor || 'bg-slate-50']" class="w-6 h-6 rounded border border-slate-100 shrink-0"></div>
-                                <input 
-                                    v-model="form.BgColor" 
-                                    placeholder="bg-brand-50"
-                                    class="w-full bg-transparent focus:outline-none text-xs font-mono"
-                                    @focus="activeDropdown = 'new-bg'"
-                                >
-                                <button @click="toggleDropdown('new-bg')" type="button" class="text-slate-400 hover:text-slate-600">
-                                    <i class="fa-solid fa-chevron-down text-[10px]"></i>
-                                </button>
-                            </div>
-
-                            <!-- Custom Dropdown -->
-                            <div v-if="activeDropdown === 'new-bg'" class="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg p-2 grid grid-cols-5 gap-1 animate-in fade-in slide-in-from-top-1">
-                                <button 
-                                    v-for="color in PRESET_BG_COLORS" 
-                                    :key="color"
-                                    type="button"
-                                    @click="selectColor('BgColor', color)"
-                                    class="w-8 h-8 rounded border border-slate-200 hover:border-brand-500 transition-all"
-                                    :class="color"
-                                    :title="color"
-                                ></button>
-                                <div class="col-span-full border-t border-slate-100 mt-1 pt-1 text-[10px] text-slate-400 text-center">O escribe arriba</div>
-                            </div>
-                        </div>
-                    </div>
+                <div class="rounded-xl border border-pic-border bg-pic-muted-surface p-4 text-xs font-medium leading-5 text-pic-text-muted">
+                    Los módulos nuevos usan el estilo global del Hub. Después de crearlo puedes activar un color individual desde la edición del módulo.
                 </div>
-
-                <!-- Click outside listener for dropdowns -->
-                <div v-if="activeDropdown" class="fixed inset-0 z-40" @click="activeDropdown = null"></div>
                 
                 <div class="grid grid-cols-3 gap-4">
                     <div>

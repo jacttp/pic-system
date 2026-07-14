@@ -2,11 +2,12 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import setupApi from '../services/setupApi';
-import type { HubConfigResponse, HubFeatureKey, HubMainBlockKey, HubSidebarBlockKey, SystemFeatureFlag, SystemModule } from '../types/setupTypes';
+import type { HubConfigResponse, HubFeatureKey, HubMainBlockKey, HubSidebarBlockKey, ModuleColorOverrides, SystemFeatureFlag, SystemModule } from '../types/setupTypes';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 
 export const useSetupStore = defineStore('setup', () => {
    const modules = ref<SystemModule[]>([]);
+   const moduleColorOverrides = ref<ModuleColorOverrides>({ enabledModuleIds: [] });
    const isLoading = ref(false);
    const featureFlags = ref<SystemFeatureFlag[]>([]);
    const hubConfig = ref<HubConfigResponse | null>(null);
@@ -129,16 +130,51 @@ export const useSetupStore = defineStore('setup', () => {
    async function fetchModules() {
       isLoading.value = true;
       try {
-         modules.value = await setupApi.getModules();
+         const [fetchedModules, overrides] = await Promise.all([
+            setupApi.getModules(),
+            setupApi.getModuleColorOverrides(),
+         ]);
+         modules.value = fetchedModules;
+         moduleColorOverrides.value = overrides;
       } catch (error) {
          console.warn("⚠️ API Backend no disponible. Usando datos Mock para 'Setup'.");
          modules.value = MOCK_MODULES;
+         moduleColorOverrides.value = { enabledModuleIds: [] };
       } finally {
          isLoading.value = false;
       }
    }
 
    // 2. Computed: Menú filtrado para el usuario actual
+   async function fetchModuleColorOverrides() {
+      try {
+         moduleColorOverrides.value = await setupApi.getModuleColorOverrides();
+      } catch (error) {
+         console.warn('[Setup] No se pudo cargar la configuracion de colores individuales.', error);
+         moduleColorOverrides.value = { enabledModuleIds: [] };
+      }
+   }
+
+   const hasModuleColorOverride = (moduleId: number) => moduleColorOverrides.value.enabledModuleIds.includes(moduleId);
+
+   async function setModuleColorOverride(moduleId: number, enabled: boolean) {
+      const previous = [...moduleColorOverrides.value.enabledModuleIds];
+      const enabledModuleIds = enabled
+         ? [...new Set([...previous, moduleId])]
+         : previous.filter(id => id !== moduleId);
+
+      moduleColorOverrides.value = { enabledModuleIds };
+
+      try {
+         moduleColorOverrides.value = await setupApi.updateModuleColorOverrides({ enabledModuleIds });
+         return true;
+      } catch (error) {
+         console.error('[Setup] Error actualizando override de color de modulo.', error);
+         moduleColorOverrides.value = { enabledModuleIds: previous };
+         return false;
+      }
+   }
+
    const userMenu = computed(() => {
       const authStore = useAuthStore();
       const userLevel = authStore.userLevel;
@@ -384,6 +420,7 @@ export const useSetupStore = defineStore('setup', () => {
 
    return {
       modules,
+      moduleColorOverrides,
       isLoading,
       featureFlags,
       normalizedFeatureFlags,
@@ -394,10 +431,13 @@ export const useSetupStore = defineStore('setup', () => {
       userMenu,
       groupedMenu,
       fetchModules,
+      fetchModuleColorOverrides,
       fetchHubConfig,
       fetchFeatureFlags,
       toggleModuleStatus,
       updateModule,
+      hasModuleColorOverride,
+      setModuleColorOverride,
       createModule,
       updateHubDisplaySetting,
       updateHubLayoutOrder,

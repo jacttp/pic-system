@@ -30,6 +30,7 @@ export interface PicFilterOptions {
    anios: string[];
    transacciones: string[];
    formatosCliente: string[];
+   estatusCliente: string[];
 }
 
 // Estructura de la respuesta del Chat IA (Híbrida)

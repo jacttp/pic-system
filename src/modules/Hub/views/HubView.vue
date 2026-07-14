@@ -7,6 +7,7 @@ import { useProfileStore } from '@/modules/UserProfile/stores/profileStore';
 import { useApprovalsStore } from '@/modules/Approvals/stores/approvalsStore';
 import { getModuleVisualStyle } from '@/modules/Shared/design/moduleStyles';
 import CacheProgress from '@/modules/Shared/components/CacheProgress.vue';
+import ModuleCard from '../components/ModuleCard.vue';
 import NoticesPanel from '../components/NoticesPanel.vue';
 
 interface HubMetric {
@@ -36,6 +37,8 @@ const approvalsStore = useApprovalsStore();
 onMounted(async () => {
     if (setupStore.modules.length === 0) {
         await setupStore.fetchModules();
+    } else {
+        await setupStore.fetchModuleColorOverrides();
     }
 
     await setupStore.fetchHubConfig();
@@ -378,43 +381,27 @@ const metricAccentClass = (tone: string) => ({
                             </span>
                         </div>
 
-                        <div v-if="setupStore.isLoading" class="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 2xl:grid-cols-4">
-                            <div v-for="i in 8" :key="i" class="h-24 animate-pulse rounded-lg border border-pic-border bg-white p-3 shadow-sm sm:h-40 sm:p-5">
-                                <div class="mb-5 h-11 w-11 rounded-lg bg-slate-100"></div>
-                                <div class="mb-3 h-5 w-2/3 rounded bg-slate-100"></div>
-                                <div class="mb-2 h-3 w-full rounded bg-slate-100"></div>
-                                <div class="h-3 w-4/5 rounded bg-slate-100"></div>
+                        <div v-if="setupStore.isLoading" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                            <div v-for="i in 8" :key="i" class="min-h-[270px] animate-pulse rounded-2xl border border-pic-border bg-pic-surface p-6 shadow-sm">
+                                <div class="mx-auto mb-6 h-20 w-20 rounded-2xl bg-pic-muted-surface"></div>
+                                <div class="mx-auto mb-3 h-5 w-2/3 rounded bg-pic-muted-surface"></div>
+                                <div class="mx-auto mb-2 h-3 w-full rounded bg-pic-muted-surface"></div>
+                                <div class="mx-auto h-3 w-4/5 rounded bg-pic-muted-surface"></div>
                             </div>
                         </div>
 
-                        <div v-else class="grid grid-cols-2 gap-2 fade-in sm:gap-3 lg:grid-cols-3 2xl:grid-cols-4">
-                            <router-link
+                        <div v-else class="grid grid-cols-1 gap-3 fade-in sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                            <ModuleCard
                                 v-for="mod in dashboardModules"
                                 :key="mod.ModuleId"
+                                :title="mod.Label"
+                                :description="getModuleVisualStyle(mod).desc"
+                                :icon="mod.Icon"
                                 :to="mod.Route"
-                                class="group relative min-h-[86px] overflow-hidden rounded-lg border border-pic-border bg-white p-2.5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-pic-brand-border hover:shadow-md sm:min-h-40 sm:p-5"
-                            >
-                                <span class="absolute inset-x-0 bottom-0 h-0.5 sm:h-1" :class="getModuleVisualStyle(mod).accent"></span>
-                                <div class="grid grid-cols-[34px_minmax(0,1fr)] gap-2 pr-4 sm:grid-cols-[58px_minmax(0,1fr)] sm:gap-4 sm:pb-8 sm:pr-0">
-                                    <div
-                                        class="flex h-8 w-8 items-center justify-center rounded-lg text-sm transition group-hover:scale-105 sm:h-14 sm:w-14 sm:rounded-xl sm:text-2xl"
-                                        :class="[getModuleVisualStyle(mod).bg, getModuleVisualStyle(mod).color]"
-                                    >
-                                        <i :class="mod.Icon"></i>
-                                    </div>
-                                    <div class="min-w-0">
-                                        <h3 class="line-clamp-2 text-[11px] font-black leading-tight text-pic-text-main transition group-hover:text-pic-brand sm:truncate sm:text-base">
-                                            {{ mod.Label }}
-                                        </h3>
-                                        <p class="mt-1 line-clamp-2 text-[10px] font-semibold leading-3 text-pic-text-muted sm:mt-2 sm:line-clamp-3 sm:text-sm sm:leading-5">
-                                            {{ getModuleVisualStyle(mod).desc }}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-pic-brand sm:bottom-5 sm:right-5 sm:top-auto sm:translate-y-0">
-                                    <i class="fa-solid fa-chevron-right text-xs sm:text-sm"></i>
-                                </div>
-                            </router-link>
+                                :color-class="getModuleVisualStyle(mod, setupStore.hasModuleColorOverride(mod.ModuleId)).color"
+                                :bg-class="getModuleVisualStyle(mod, setupStore.hasModuleColorOverride(mod.ModuleId)).bg"
+                                :accent-class="getModuleVisualStyle(mod, setupStore.hasModuleColorOverride(mod.ModuleId)).accent"
+                            />
 
                             <div v-if="setupStore.userMenu.length === 0" class="col-span-full rounded-lg border border-dashed border-pic-border bg-white py-12 text-center text-pic-text-muted">
                                 <i class="fa-regular fa-folder-open mb-4 text-4xl"></i>

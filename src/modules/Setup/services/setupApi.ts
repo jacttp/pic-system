@@ -1,6 +1,6 @@
 /* src/modules/Setup/services/setupApi.ts */
 import api from '@/api/axios';
-import type { HubConfigResponse, HubFeatureKey, SystemFeatureFlag, SystemModule } from '../types/setupTypes';
+import type { HubConfigResponse, HubFeatureKey, ModuleColorOverrides, SystemFeatureFlag, SystemModule } from '../types/setupTypes';
 import type { UiThemeCatalog } from '@/modules/Shared/design/uiTheme';
 
 const V2 = import.meta.env.VITE_API_V2_PATH;
@@ -37,6 +37,16 @@ export default {
     */
    async updateModule(moduleId: number, payload: Partial<SystemModule>): Promise<void> {
       await api.patch(`${V2}/setup/modules/${moduleId}`, payload);
+   },
+
+   async getModuleColorOverrides(): Promise<ModuleColorOverrides> {
+      const { data } = await api.get<{ success: boolean; data: ModuleColorOverrides }>(`${V2}/setup/module-color-overrides`);
+      return data.data;
+   },
+
+   async updateModuleColorOverrides(payload: ModuleColorOverrides): Promise<ModuleColorOverrides> {
+      const { data } = await api.put<{ success: boolean; data: ModuleColorOverrides }>(`${V2}/setup/module-color-overrides`, payload);
+      return data.data;
    },
 
    async getHubConfig(): Promise<HubConfigResponse> {

@@ -11,7 +11,8 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       marcas: [],
       anios: [],
       transacciones: [],
-      formatosCliente: []
+      formatosCliente: [],
+      estatusCliente: []
    });
 
    // Opciones dependientes (se llenan dinámicamente)
@@ -45,6 +46,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       Anio: [] as string[],
       Transaccion: ['Venta', 'Metas', 'NC'], // Default legacy
       FormatoCliente: [] as string[],
+      TipoCLI: [] as string[],
       MesInicial: '1',
       MesFinal: String(new Date().getMonth() + 1),
       usarRangoMeses: true
@@ -506,6 +508,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
       selected.Categorias = [];
       selected.SKU = [];
       selected.FormatoCliente = [];
+      selected.TipoCLI = [];
 
       // 2. Restaurar Defaults
       selected.Transaccion = ['Venta', 'Metas', 'NC'];

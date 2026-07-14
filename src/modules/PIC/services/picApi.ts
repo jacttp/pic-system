@@ -14,7 +14,8 @@ export const picApi = {
          api.get<string[]>('/filters/marcas'),
          api.get<string[]>('/filters/anios'),
          api.get<string[]>('/filters/transacciones'),
-         api.get<string[]>('/filters/formato-cliente')
+         api.get<string[]>('/filters/formato-cliente'),
+         api.get<string[]>('/filters/status-cliente')
       ]);
 
       // Helper: extrae data si fulfilled, array vacío si rejected
@@ -24,7 +25,7 @@ export const picApi = {
          return [];
       };
 
-      const labels = ['canales', 'gerencias', 'marcas', 'anios', 'transacciones', 'formatosCliente'];
+      const labels = ['canales', 'gerencias', 'marcas', 'anios', 'transacciones', 'formatosCliente', 'estatusCliente'];
       const failedFilters = results
          .map((r, i) => r.status === 'rejected' ? labels[i] : null)
          .filter(Boolean);
@@ -40,6 +41,7 @@ export const picApi = {
          anios: extract(results[3], 'anios'),
          transacciones: extract(results[4], 'transacciones'),
          formatosCliente: extract(results[5], 'formatosCliente'),
+         estatusCliente: extract(results[6], 'estatusCliente'),
          _failedFilters: failedFilters as string[] // Flag interno para retry
       } as PicFilterOptions & { _failedFilters?: string[] };
    },

@@ -25,6 +25,8 @@ export default {
 					brand: 'hsl(var(--pic-brand))',
 					'brand-soft': 'hsl(var(--pic-brand-soft))',
 					'brand-border': 'hsl(var(--pic-brand-border))',
+					module: 'hsl(var(--pic-module))',
+					'module-soft': 'hsl(var(--pic-module-soft))',
 					surface: 'hsl(var(--pic-surface))',
 					background: 'hsl(var(--pic-background))',
 					'muted-surface': 'hsl(var(--pic-muted-surface))',

@@ -180,6 +180,8 @@ const activityItems = computed(() => {
 
 watch(activeTab, async tab => {
    if (tab === 'tiendas' && currentUser.value) {
+      await profileStore.fetchProfile();
+      if (!currentUser.value) return;
       await userStore.fetchAssignedStores(currentUser.value);
    }
 });

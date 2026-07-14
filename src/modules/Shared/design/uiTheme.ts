@@ -39,6 +39,8 @@ export const uiThemeTokenDefinitions: UiThemeTokenDefinition[] = [
   { token: '--pic-warning', label: 'Warning', usage: 'Advertencias operativas', group: 'state' },
   { token: '--pic-danger', label: 'Danger', usage: 'Errores y acciones destructivas', group: 'state' },
   { token: '--pic-info', label: 'Info', usage: 'Mensajes informativos y ayuda contextual', group: 'state' },
+  { token: '--pic-module', label: 'Módulo global', usage: 'Icono, título y flecha de todas las tarjetas de módulo', group: 'module' },
+  { token: '--pic-module-soft', label: 'Módulo global suave', usage: 'Fondo del icono y franja inferior de las tarjetas de módulo', group: 'module' },
   { token: '--pic-accent-orange', label: 'Modulo naranja', usage: 'Segmentacion, cargas y acciones secundarias', group: 'module' },
   { token: '--pic-accent-orange-soft', label: 'Modulo naranja suave', usage: 'Fondos de icono y hover naranja', group: 'module' },
   { token: '--pic-accent-blue', label: 'Modulo azul', usage: 'Usuarios, productos y consultas', group: 'module' },
@@ -84,6 +86,8 @@ export const defaultUiThemeCatalog: UiThemeCatalog = {
         '--pic-warning': '32 95% 44%',
         '--pic-danger': '0 72% 51%',
         '--pic-info': '221 83% 53%',
+        '--pic-module': '357 84% 45%',
+        '--pic-module-soft': '0 86% 97%',
         '--pic-accent-orange': '25 95% 53%',
         '--pic-accent-orange-soft': '26 100% 94%',
         '--pic-accent-blue': '221 83% 58%',
@@ -124,6 +128,8 @@ export const defaultUiThemeCatalog: UiThemeCatalog = {
         '--pic-warning': '32 95% 44%',
         '--pic-danger': '0 72% 51%',
         '--pic-info': '199 89% 48%',
+        '--pic-module': '214 90% 45%',
+        '--pic-module-soft': '214 100% 97%',
         '--pic-accent-orange': '25 95% 53%',
         '--pic-accent-orange-soft': '26 100% 94%',
         '--pic-accent-blue': '221 83% 58%',
@@ -164,6 +170,8 @@ export const defaultUiThemeCatalog: UiThemeCatalog = {
         '--pic-warning': '32 95% 44%',
         '--pic-danger': '0 72% 51%',
         '--pic-info': '199 89% 48%',
+        '--pic-module': '174 72% 32%',
+        '--pic-module-soft': '166 76% 97%',
         '--pic-accent-orange': '25 95% 53%',
         '--pic-accent-orange-soft': '26 100% 94%',
         '--pic-accent-blue': '221 83% 58%',
@@ -190,7 +198,14 @@ export const cloneUiThemeCatalog = (catalog: UiThemeCatalog = defaultUiThemeCata
   activePaletteId: catalog.activePaletteId,
   palettes: catalog.palettes.map((palette) => ({
     ...palette,
-      tokens: { ...defaultUiThemeCatalog.palettes[0]!.tokens, ...palette.tokens },
+    // Las paletas guardadas antes de estos tokens conservan su apariencia:
+    // inicialmente, el color de módulo hereda su marca hasta que se edite de forma independiente.
+    tokens: {
+      ...defaultUiThemeCatalog.palettes[0]!.tokens,
+      ...palette.tokens,
+      '--pic-module': palette.tokens['--pic-module'] || palette.tokens['--pic-brand'] || defaultUiThemeCatalog.palettes[0]!.tokens['--pic-module'],
+      '--pic-module-soft': palette.tokens['--pic-module-soft'] || palette.tokens['--pic-brand-soft'] || defaultUiThemeCatalog.palettes[0]!.tokens['--pic-module-soft'],
+    },
   })),
 });
 

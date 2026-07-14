@@ -29,6 +29,7 @@ const filterGroups = [
     'Jefatura',
     'Ruta',
     'FormatoCliente',
+    'TipoCLI',
     'Marca',
     'grupo',
     'Categorias',
@@ -375,6 +376,7 @@ onUnmounted(() => {
                             </div>
 
                             <FilterDropdown density="compact" label="Formato Cliente" :options="store.options.formatosCliente" v-model="store.selected.FormatoCliente" @open-change="handleDropdownOpen" />
+                            <FilterDropdown density="compact" label="Status Cliente" :options="store.options.estatusCliente" v-model="store.selected.TipoCLI" @open-change="handleDropdownOpen" />
                         </div>
                     </section>
 
