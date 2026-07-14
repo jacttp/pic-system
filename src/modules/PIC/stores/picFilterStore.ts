@@ -74,7 +74,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
 
    const dynamicWidgets = ref<DynamicWidget[]>([]);
 
-   // Control de acceso por rol (poblado en initFilters desde GerenciaUsuarios)
+   // Control de acceso por rol (poblado desde el contexto autenticado de PIC)
    const isGerenciaLocked = ref(false);
    const isJefaturaLocked = ref(false);
    // Valores bloqueados: se usan en resetFilters para no borrarlos
@@ -225,7 +225,7 @@ export const usePicFilterStore = defineStore('picFilter', () => {
 
    /**
     * Aplica restricciones de acceso basadas en el contexto del usuario autenticado.
-    * Consulta GerenciaUsuarios via /filters/my-context.
+    * Consulta el contexto autenticado via /filters/my-context.
     * Se llama siempre al montar PicFilters, independientemente de filtersReady.
     */
    async function applyUserContext() {
@@ -241,14 +241,15 @@ export const usePicFilterStore = defineStore('picFilter', () => {
             selected.Gerencia = [userContext.gerencia];
             // Cargar las jefaturas de su gerencia
             await handleGerenciaChange();
+         }
 
-            if (userContext.jefatura) {
-               lockedJefatura.value = userContext.jefatura;
-               isJefaturaLocked.value = true;
-               selected.Jefatura = [userContext.jefatura];
-               // Cargar las rutas de su jefatura
-               await handleJefaturaChange();
-            }
+         if (userContext.jefatura) {
+            lockedJefatura.value = userContext.jefatura;
+            isJefaturaLocked.value = true;
+            selected.Jefatura = [userContext.jefatura];
+            // Cargar las rutas de su jefatura. Esto también cubre el caso
+            // válido de una Jefatura sin Gerencia comercial asignada.
+            await handleJefaturaChange();
          }
       } catch (err: any) {
          console.warn('[Store] No se pudo aplicar contexto de usuario, sin restricciones:', err.message);

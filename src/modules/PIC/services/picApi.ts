@@ -50,7 +50,7 @@ export const picApi = {
    },
 
    /**
-    * Obtiene el contexto de acceso del usuario autenticado desde GerenciaUsuarios.
+    * Obtiene el contexto de acceso del usuario autenticado para PIC.
     * - gerencia/jefatura = null => sin restricción en esa dimensión
     * - gerencia/jefatura = string => valor real a pre-seleccionar y bloquear
     */
