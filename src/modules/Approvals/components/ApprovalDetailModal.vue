@@ -80,6 +80,7 @@ interface CpfrMixGroup {
    total_kg: number
    total_diff_kg: number
    ratio_diff_kg: number
+   pair_exists: boolean
    applied: boolean
 }
 
@@ -126,8 +127,11 @@ const isApplyingMix = ref(false);
 const cpfrMixError = ref('');
 const cpfrMixPreview = ref<{ has_mix: boolean; pending_count: number; groups: CpfrMixGroup[] } | null>(null);
 const mixOverrides = reactive<Record<string, { mixbase: number; mixpar: number }>>({});
+const mixPieceOverrides = reactive<Record<string, { base?: number; pair?: number }>>({});
 const mixDefaultRatios = reactive<Record<string, { mixbase: number; mixpar: number }>>({});
+const dirtyMixKeys = ref<Set<string>>(new Set());
 const selectedMixRowKey = ref('');
+const confirmedMixKey = ref('');
 let mixPreviewTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Reset al abrir
@@ -141,7 +145,10 @@ watch(() => props.modelValue, (open) => {
       cpfrMixPreview.value = null;
       selectedMixRowKey.value = '';
       Object.keys(mixOverrides).forEach(key => delete mixOverrides[key]);
+      Object.keys(mixPieceOverrides).forEach(key => delete mixPieceOverrides[key]);
       Object.keys(mixDefaultRatios).forEach(key => delete mixDefaultRatios[key]);
+      dirtyMixKeys.value = new Set();
+      confirmedMixKey.value = '';
    }
 });
 
@@ -154,7 +161,10 @@ watch(
       cpfrMixError.value = '';
       selectedMixRowKey.value = '';
       Object.keys(mixOverrides).forEach(key => delete mixOverrides[key]);
+      Object.keys(mixPieceOverrides).forEach(key => delete mixPieceOverrides[key]);
       Object.keys(mixDefaultRatios).forEach(key => delete mixDefaultRatios[key]);
+      dirtyMixKeys.value = new Set();
+      confirmedMixKey.value = '';
 
       if (!open || !id || type !== 'CPFR_ORDER') return;
 
@@ -289,6 +299,10 @@ const cpfrMixGroupsByRowKey = computed(() => {
    for (const group of cpfrMixGroups.value) {
       groups.set(getMixKey(group), group);
    }
+   for (const group of cpfrMixGroups.value) {
+      const pairKey = `${group.source_type}|${group.num_pedido}|${group.pair_sku}`;
+      if (!groups.has(pairKey)) groups.set(pairKey, group);
+   }
    return groups;
 });
 const selectedMixGroup = computed(() => {
@@ -296,39 +310,57 @@ const selectedMixGroup = computed(() => {
    return cpfrMixGroupsByRowKey.value.get(selectedMixRowKey.value) || null;
 });
 
-const rowHasMixMetadata = (row: CpfrPreviewRow) => Boolean(row.par_muliix);
 const isMixPairRow = (row: CpfrPreviewRow) => String(row.permiso_oc || '').toLowerCase() === 'mix';
 const canShowCpfrStepper = computed(() => canEditCpfrOrder.value);
 const getMixRowKey = (row: CpfrPreviewRow) => `${row.source_type}|${row.num_pedido}|${row.sku_muliix}`;
 const getRowMixGroup = (row: CpfrPreviewRow) => cpfrMixGroupsByRowKey.value.get(getMixRowKey(row)) || null;
+const rowHasMixMetadata = (row: CpfrPreviewRow) => Boolean(row.par_muliix) || Boolean(getRowMixGroup(row));
+const isMixAdjustmentLocked = (row: CpfrPreviewRow) =>
+   isMixPairRow(row) || Boolean(getRowMixGroup(row)?.pair_exists);
 const groupPreKg = (group: CpfrMixGroup) => Number(group.pre_mix_quantity || 0) * Number(group.base_unit_kg || 0);
 const groupMixPieces = (group: CpfrMixGroup) => Number(group.base_final_pieces || 0) + Number(group.pair_final_pieces || 0);
 const groupMixKg = (group: CpfrMixGroup) => Number(group.base_final_kg || 0) + Number(group.pair_final_kg || 0);
+const groupFinalPercentage = (group: CpfrMixGroup, field: 'base' | 'pair') => {
+   const totalKg = groupMixKg(group);
+   const productKg = Number(field === 'base' ? group.base_final_kg : group.pair_final_kg) || 0;
+   return totalKg > 0 ? Math.round((productKg / totalKg) * 100) : 0;
+};
+const isInitialMix = (group: CpfrMixGroup) => !Boolean(group.pair_exists);
+const isMixGroupDirty = (group: CpfrMixGroup) => dirtyMixKeys.value.has(getMixKey(group));
+const isMixGroupApplied = (group: CpfrMixGroup) => Boolean(group.applied) && !isMixGroupDirty(group);
+const canApplySelectedMix = computed(() => {
+   const group = selectedMixGroup.value;
+   return Boolean(
+      group
+      && confirmedMixKey.value !== getMixKey(group)
+      && (isInitialMix(group) || isMixGroupDirty(group))
+   );
+});
 const groupMixDiffPieces = (group: CpfrMixGroup) => groupMixPieces(group) - Number(group.pre_mix_quantity || 0);
 const getRowMixStatus = (row: CpfrPreviewRow): 'applied' | 'pending' | 'missing' => {
    const group = getRowMixGroup(row);
    if (!group) return 'missing';
-   return group.applied ? 'applied' : 'pending';
+   return isMixGroupApplied(group) ? 'applied' : 'pending';
 };
 const getRowMixButtonClass = (row: CpfrPreviewRow) => {
-   const status = getRowMixStatus(row);
-   if (status === 'applied') return 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100';
-   if (status === 'pending') return 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100';
+   if (getRowMixStatus(row) !== 'missing') return 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100';
    return 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50';
 };
 const getRowMixButtonTitle = (row: CpfrPreviewRow) => {
    const status = getRowMixStatus(row);
    if (status === 'applied') return 'Mix aplicado';
-   if (status === 'pending') return 'Mix actualizado pendiente de guardar';
+   if (status === 'pending') return 'Abrir mix de producto';
    return 'Revisar mix de producto';
 };
 const openRowMix = (row: CpfrPreviewRow) => {
-   const key = getMixRowKey(row);
+   const group = getRowMixGroup(row);
+   const key = group ? getMixKey(group) : getMixRowKey(row);
+   confirmedMixKey.value = '';
    const defaults = mixDefaultRatios[key];
    if (defaults) {
       mixOverrides[key] = { ...defaults };
+      delete mixPieceOverrides[key];
       selectedMixRowKey.value = key;
-      scheduleCpfrMixPreview(0);
       return;
    }
    selectedMixRowKey.value = key;
@@ -338,27 +370,50 @@ const closeRowMix = () => {
       clearTimeout(mixPreviewTimer);
       mixPreviewTimer = null;
    }
+   confirmedMixKey.value = '';
    selectedMixRowKey.value = '';
 };
 
-const normalizeMixRatio = (value: unknown) => {
-   const numeric = Number(value);
-   if (!Number.isFinite(numeric)) return 0;
-   const bounded = Math.min(1, Math.max(0, numeric));
-   return Number((Math.round(bounded * 10) / 10).toFixed(1));
+const getMixPieceValue = (group: CpfrMixGroup, field: 'base' | 'pair') => {
+   const key = getMixKey(group);
+   const override = mixPieceOverrides[key]?.[field];
+   if (Number.isFinite(override)) return Number(override);
+   return field === 'base' ? Number(group.base_final_pieces || 0) : Number(group.pair_final_pieces || 0);
 };
 
-function setMixRatio(group: CpfrMixGroup, field: 'mixbase' | 'mixpar', value: unknown) {
+const getMixPieceStep = (group: CpfrMixGroup, field: 'base' | 'pair') =>
+   Math.max(1, Number(field === 'base' ? group.base_bag : group.pair_bag) || 1);
+
+function setMixPieces(group: CpfrMixGroup, field: 'base' | 'pair', value: unknown) {
+   const pieces = Number(value);
+   const totalKg = Number(group.total_kg || 0);
+   const unitKg = Number(field === 'base' ? group.base_unit_kg : group.pair_unit_kg);
+
+   if (!Number.isFinite(pieces) || pieces < 0 || totalKg <= 0 || unitKg <= 0) {
+      cpfrMixError.value = 'Indica una cantidad de piezas válida para recalcular el mix.';
+      return;
+   }
+
+   const requestedShare = (pieces * unitKg) / totalKg;
+   if (requestedShare < 0 || requestedShare > 1) {
+      cpfrMixError.value = 'Las piezas seleccionadas superan la cantidad disponible para el mix.';
+      return;
+   }
+
    const key = getMixKey(group);
-   const changed = normalizeMixRatio(value);
-   mixOverrides[key] = field === 'mixbase'
-      ? { mixbase: changed, mixpar: normalizeMixRatio(1 - changed) }
-      : { mixbase: normalizeMixRatio(1 - changed), mixpar: changed };
+   const nextDirty = new Set(dirtyMixKeys.value);
+   nextDirty.add(key);
+   dirtyMixKeys.value = nextDirty;
+   mixPieceOverrides[key] = field === 'base' ? { base: pieces } : { pair: pieces };
+   mixOverrides[key] = field === 'base'
+      ? { mixbase: requestedShare, mixpar: 1 - requestedShare }
+      : { mixbase: 1 - requestedShare, mixpar: requestedShare };
+   cpfrMixError.value = '';
    scheduleCpfrMixPreview();
 }
 
-function handleMixRatioInput(group: CpfrMixGroup, field: 'mixbase' | 'mixpar', event: Event) {
-   setMixRatio(group, field, (event.target as HTMLInputElement).value);
+function handleMixPiecesInput(group: CpfrMixGroup, field: 'base' | 'pair', event: Event) {
+   setMixPieces(group, field, (event.target as HTMLInputElement).value);
 }
 
 function scheduleCpfrMixPreview(delay = 250) {
@@ -376,6 +431,7 @@ async function recalculateCpfrMix() {
    try {
       const preview = await approvalsApi.recalculateCpfrMixPreview(props.approval.id, mixOverridePayload.value);
       cpfrMixPreview.value = preview;
+      Object.keys(mixPieceOverrides).forEach(key => delete mixPieceOverrides[key]);
       syncMixOverrides(preview.groups || []);
    } catch (e: any) {
       cpfrMixError.value = e.response?.data?.message || 'No se pudo recalcular el mix.';
@@ -390,8 +446,15 @@ async function applyCpfrMix() {
    cpfrMixError.value = '';
    try {
       await approvalsApi.applyCpfrMix(props.approval.id, mixOverridePayload.value);
+      const selectedKey = selectedMixGroup.value ? getMixKey(selectedMixGroup.value) : selectedMixRowKey.value;
+      Object.keys(mixOverrides).forEach(key => delete mixOverrides[key]);
+      Object.keys(mixPieceOverrides).forEach(key => delete mixPieceOverrides[key]);
+      Object.keys(mixDefaultRatios).forEach(key => delete mixDefaultRatios[key]);
+      dirtyMixKeys.value = new Set();
       await refreshCpfrDetail();
       await loadCpfrMixPreview(props.approval.id);
+      selectedMixRowKey.value = selectedKey;
+      confirmedMixKey.value = selectedKey;
    } catch (e: any) {
       cpfrMixError.value = e.response?.data?.message || 'No se pudo aplicar el mix.';
    } finally {
@@ -930,37 +993,31 @@ const handleConfirm = async () => {
                               {{ group.applied ? 'Aplicado' : 'Pendiente' }}
                            </span>
                         </div>
-                        <div v-if="mixOverrides[getMixKey(group)]" class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                           <label class="text-[9px] font-black uppercase tracking-wide text-slate-500">
-                              Base
+                        <div v-if="mixOverrides[getMixKey(group)]" class="mt-3 grid grid-cols-2 gap-2">
+                           <label class="rounded-md border border-brand-100 bg-brand-50/40 px-2 py-1.5 text-[9px] font-black uppercase tracking-wide text-slate-500">
+                              Base final
                               <input
-                                 v-model.number="mixOverrides[getMixKey(group)].mixbase"
+                                 :value="getMixPieceValue(group, 'base')"
                                  type="number"
                                  min="0"
-                                 step="0.01"
-                                 class="mt-1 h-8 w-full rounded-md border border-slate-200 px-2 text-right text-[11px] font-bold text-slate-700"
+                                 :step="getMixPieceStep(group, 'base')"
+                                 class="mt-1 h-8 w-full rounded-md border border-brand-200 bg-white px-2 text-right text-[11px] font-black text-brand-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
                                  :disabled="!canEditCpfrOrder"
+                                 @input="handleMixPiecesInput(group, 'base', $event)"
                               >
                            </label>
-                           <label class="text-[9px] font-black uppercase tracking-wide text-slate-500">
-                              Par
+                           <label class="rounded-md border border-emerald-100 bg-emerald-50/50 px-2 py-1.5 text-[9px] font-black uppercase tracking-wide text-slate-500">
+                              Par final
                               <input
-                                 v-model.number="mixOverrides[getMixKey(group)].mixpar"
+                                 :value="getMixPieceValue(group, 'pair')"
                                  type="number"
                                  min="0"
-                                 step="0.01"
-                                 class="mt-1 h-8 w-full rounded-md border border-slate-200 px-2 text-right text-[11px] font-bold text-slate-700"
+                                 :step="getMixPieceStep(group, 'pair')"
+                                 class="mt-1 h-8 w-full rounded-md border border-emerald-200 bg-white px-2 text-right text-[11px] font-black text-emerald-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                                  :disabled="!canEditCpfrOrder"
+                                 @input="handleMixPiecesInput(group, 'pair', $event)"
                               >
                            </label>
-                           <div class="rounded-md bg-slate-50 px-2 py-1.5 text-right">
-                              <p class="text-[8px] font-black uppercase text-slate-400">Base final</p>
-                              <p class="text-[11px] font-black text-slate-700">{{ formatNumber(group.base_final_pieces, 0) }} pz</p>
-                           </div>
-                           <div class="rounded-md bg-slate-50 px-2 py-1.5 text-right">
-                              <p class="text-[8px] font-black uppercase text-slate-400">Par final</p>
-                              <p class="text-[11px] font-black text-slate-700">{{ formatNumber(group.pair_final_pieces, 0) }} pz</p>
-                           </div>
                         </div>
                         <div class="mt-2 grid grid-cols-3 gap-2 text-right text-[10px] font-bold">
                            <span class="rounded bg-slate-50 px-2 py-1 text-slate-500">Pre {{ formatNumber(group.pre_mix_quantity, 0) }} pz</span>
@@ -1053,7 +1110,6 @@ const handleConfirm = async () => {
                                           @click="openRowMix(row)"
                                        >
                                           <span>Mix</span>
-                                          <i v-if="getRowMixStatus(row) === 'pending'" class="fa-solid fa-triangle-exclamation text-[11px]"></i>
                                        </button>
                                      </div>
                                  </div>
@@ -1087,15 +1143,15 @@ const handleConfirm = async () => {
                                        <button
                                           type="button"
                                           class="flex h-11 w-11 items-center justify-center text-slate-600 transition active:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-35"
-                                          :title="isMixPairRow(row) ? 'Renglon generado por mix' : 'Disminuir pedido'"
-                                          :disabled="isMixPairRow(row) || isRowAdjusting(row) || !row.sku_muliix || !canDecreaseCpfrRow(row)"
+                                          :title="isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Disminuir pedido'"
+                                          :disabled="isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canDecreaseCpfrRow(row)"
                                           @click="handleAdjustPedido(row, -1)"
                                        ><i class="fa-solid fa-minus text-xs"></i></button>
                                        <button
                                           type="button"
                                           class="flex h-11 w-11 items-center justify-center border-l border-slate-200 text-slate-600 transition active:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-35"
-                                          :title="isMixPairRow(row) ? 'Renglon generado por mix' : 'Regresar hacia pedido base'"
-                                          :disabled="isMixPairRow(row) || isRowAdjusting(row) || !row.sku_muliix || !canIncreaseCpfrRow(row)"
+                                          :title="isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Regresar hacia pedido base'"
+                                          :disabled="isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canIncreaseCpfrRow(row)"
                                           @click="handleAdjustPedido(row, 1)"
                                        ><i class="fa-solid fa-plus text-xs"></i></button>
                                     </div>
@@ -1108,14 +1164,11 @@ const handleConfirm = async () => {
                               <table class="w-full table-fixed border-collapse text-[10px]">
                                  <thead>
                                     <tr class="border-b border-slate-200 bg-white text-[9px] font-black uppercase tracking-wide text-slate-600">
-                                       <th class="w-[26%] px-3 py-2 text-left">SKU</th>
-                                       <th class="w-[10%] px-3 py-2 text-right">Inv. Act.</th>
-                                       <th class="w-[10%] px-3 py-2 text-right">Sell Prom.</th>
-                                       <th class="w-[10%] px-3 py-2 text-right">Cob. S.</th>
-                                       <th class="w-[9%] px-3 py-2 text-right">Base</th>
-                                       <th class="w-[9%] px-3 py-2 text-right">Ajuste</th>
-                                       <th class="w-[8%] px-3 py-2 text-right">Mix</th>
-                                       <th class="w-[18%] px-3 py-2 text-right">Pedido</th>
+                                       <th class="w-[40%] px-3 py-2 text-left">SKU</th>
+                                       <th class="w-[14%] px-3 py-2 text-right">Inv. Act.</th>
+                                       <th class="w-[14%] px-3 py-2 text-right">Sell Prom.</th>
+                                       <th class="w-[14%] px-3 py-2 text-right">Cob. S.</th>
+                                       <th class="w-[18%] px-3 py-2 text-right">Pedido final</th>
                                     </tr>
                                  </thead>
                                  <tbody class="divide-y divide-dashed divide-slate-200">
@@ -1142,49 +1195,34 @@ const handleConfirm = async () => {
                                              {{ formatNumber(calcularCoberturaDinamica(row), 2) }}
                                           </span>
                                        </td>
-                                       <td class="px-3 py-2 text-right font-black text-slate-700">{{ formatNumber(row.cantidad_base_uni, 0) }}</td>
-                                       <td
-                                          class="px-3 py-2 text-right font-black"
-                                          :class="row.ajusteValido ? (row.ajuste === 0 ? 'text-slate-400' : 'text-amber-700') : 'text-red-700'"
-                                          :title="row.ajusteValido ? 'Ajuste sobre cantidad base' : 'El ajuste no respeta el multiplo pzas_bolsa'"
-                                       >
-                                          {{ row.ajuste > 0 ? '+' : '' }}{{ formatNumber(row.ajuste, 0) }}
-                                       </td>
-                                       <td
-                                          class="px-3 py-2 text-right font-black"
-                                          :class="row.ajuste_mix === 0 ? 'text-slate-400' : 'text-emerald-700'"
-                                          title="Ajuste por balanceo mix"
-                                       >
-                                          {{ row.ajuste_mix > 0 ? '+' : '' }}{{ formatNumber(row.ajuste_mix, 0) }}
-                                       </td>
                                        <td class="px-3 py-2">
                                           <div
                                              v-if="canShowCpfrStepper"
-                                             class="ml-auto flex items-center justify-end gap-1.5"
+                                             class="ml-auto flex items-center justify-end gap-2"
                                           >
-                                             <div class="flex w-[116px] items-center justify-end overflow-hidden rounded-lg border border-slate-200 bg-white">
+                                             <div class="flex h-9 w-[128px] items-center justify-end overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
                                                 <button
                                                    type="button"
-                                                   class="flex h-8 w-8 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
-                                                   :title="isMixPairRow(row) ? 'Renglon generado por mix' : 'Disminuir pedido'"
-                                                   :disabled="isMixPairRow(row) || isRowAdjusting(row) || !row.sku_muliix || !canDecreaseCpfrRow(row)"
+                                                   class="flex h-9 w-9 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
+                                                   :title="isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Disminuir pedido'"
+                                                   :disabled="isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canDecreaseCpfrRow(row)"
                                                    @click="handleAdjustPedido(row, -1)"
                                                 >
                                                    <i class="fa-solid fa-minus text-[10px]"></i>
                                                 </button>
                                                 <span
-                                                   class="flex h-8 min-w-0 flex-1 items-center justify-center border-x border-slate-200 px-2 text-center font-black"
-                                                   :class="isMixPairRow(row) ? 'bg-slate-50 text-slate-500' : 'text-brand-700'"
-                                                   :title="isMixPairRow(row) ? 'Renglon generado por mix; ajusta el SKU base' : 'Pedido final'"
+                                                   class="flex h-9 min-w-0 flex-1 items-center justify-center border-x border-slate-200 bg-brand-50/40 px-2 text-center font-black"
+                                                   :class="isMixAdjustmentLocked(row) ? 'bg-slate-50 text-slate-500' : 'text-brand-700'"
+                                                   :title="isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Pedido final'"
                                                 >
                                                    <i v-if="isRowAdjusting(row)" class="fa-solid fa-circle-notch fa-spin text-[10px]"></i>
                                                    <span v-else>{{ formatNumber(row.cant_pedida, 0) }}</span>
                                                 </span>
                                                 <button
                                                    type="button"
-                                                   class="flex h-8 w-8 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
-                                                   :title="isMixPairRow(row) ? 'Renglon generado por mix' : 'Regresar hacia pedido base'"
-                                                   :disabled="isMixPairRow(row) || isRowAdjusting(row) || !row.sku_muliix || !canIncreaseCpfrRow(row)"
+                                                   class="flex h-9 w-9 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
+                                                   :title="isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Regresar hacia pedido base'"
+                                                   :disabled="isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canIncreaseCpfrRow(row)"
                                                    @click="handleAdjustPedido(row, 1)"
                                                 >
                                                    <i class="fa-solid fa-plus text-[10px]"></i>
@@ -1193,13 +1231,12 @@ const handleConfirm = async () => {
                                              <button
                                                 v-if="rowHasMixMetadata(row)"
                                                 type="button"
-                                                class="inline-flex h-8 min-w-[50px] shrink-0 items-center justify-center gap-1 rounded-md border px-2 text-[10px] font-black shadow-sm transition"
+                                                class="inline-flex h-9 min-w-[54px] shrink-0 items-center justify-center gap-1 rounded-md border px-2 text-[10px] font-black shadow-sm transition"
                                                 :class="getRowMixButtonClass(row)"
                                                 :title="getRowMixButtonTitle(row)"
                                                 @click="openRowMix(row)"
                                              >
                                                 <span>Mix</span>
-                                                <i v-if="getRowMixStatus(row) === 'pending'" class="fa-solid fa-triangle-exclamation text-[10px]"></i>
                                              </button>
                                              <span v-else class="h-8 min-w-[50px] shrink-0" aria-hidden="true"></span>
                                           </div>
@@ -1471,10 +1508,21 @@ const handleConfirm = async () => {
                <div class="min-w-0">
                   <h4 class="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-emerald-800">
                      <i class="fa-solid fa-scale-balanced text-emerald-600"></i>
-                     Mix de producto
+                     Mix del Producto
                   </h4>
-                  <p class="mt-1 text-[11px] font-semibold text-slate-500">
-                     Pedido final = sugerido + ajuste + mix. Por guardar: {{ pendingCpfrMixCount }}
+                  <p v-if="selectedMixGroup" class="mt-1 truncate text-[13px] font-black text-slate-800" :title="`${selectedMixGroup.base_name} / ${selectedMixGroup.pair_name}`">
+                     {{ selectedMixGroup.base_name }} / {{ selectedMixGroup.pair_name }}
+                  </p>
+                  <span
+                     v-if="selectedMixGroup"
+                     class="mt-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide"
+                     :class="isMixGroupApplied(selectedMixGroup) ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
+                  >
+                     <i class="fa-solid" :class="isMixGroupApplied(selectedMixGroup) ? 'fa-check' : 'fa-circle-play'"></i>
+                     {{ isMixGroupApplied(selectedMixGroup) ? 'Aplicado' : 'Sin aplicar' }}
+                  </span>
+                  <p v-if="selectedMixGroup" class="mt-1 font-mono text-[9px] font-bold text-slate-400">
+                     {{ selectedMixGroup.source_type === 'ocz8' ? 'Z8' : 'OC' }} {{ selectedMixGroup.num_pedido }} · {{ selectedMixGroup.base_sku }} → {{ selectedMixGroup.pair_sku }}
                   </p>
                </div>
                <button
@@ -1500,96 +1548,90 @@ const handleConfirm = async () => {
                </div>
 
                <article v-if="selectedMixGroup" class="rounded-lg border border-emerald-100 bg-white p-3">
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div class="flex items-start justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5">
                      <div class="min-w-0">
-                        <p class="truncate text-sm font-black text-slate-800" :title="`${selectedMixGroup.base_name} / ${selectedMixGroup.pair_name}`">
-                           {{ selectedMixGroup.base_name }} / {{ selectedMixGroup.pair_name }}
-                        </p>
-                        <p class="mt-1 font-mono text-[10px] font-bold text-slate-400">
-                           {{ selectedMixGroup.source_type === 'ocz8' ? 'Z8' : 'OC' }} {{ selectedMixGroup.num_pedido }} | {{ selectedMixGroup.base_sku }} -> {{ selectedMixGroup.pair_sku }}
-                        </p>
+                        <p class="text-[8px] font-black uppercase tracking-widest text-slate-400">Cantidad original pedida</p>
+                        <p class="mt-1 truncate text-[11px] font-black text-slate-700" :title="selectedMixGroup.base_name">{{ selectedMixGroup.base_name }}</p>
+                        <p class="mt-0.5 font-mono text-[9px] font-bold text-slate-400">SKU {{ selectedMixGroup.base_sku }}</p>
                      </div>
-                     <div
-                        class="flex w-fit shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-[9px] font-black uppercase tracking-wide"
-                        :class="selectedMixGroup.applied ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
-                     >
-                        <i class="fa-solid" :class="selectedMixGroup.applied ? 'fa-check' : 'fa-floppy-disk'"></i>
-                        {{ selectedMixGroup.applied ? 'Guardado' : 'Sin guardar' }}
+                     <div class="shrink-0 text-right">
+                        <p class="text-[16px] font-black leading-none text-slate-800">{{ formatNumber(selectedMixGroup.pre_mix_quantity, 0) }} <span class="text-[9px] text-slate-500">pzas</span></p>
+                        <p class="mt-1 text-[9px] font-bold text-slate-400">{{ formatNumber(groupPreKg(selectedMixGroup), 2) }} kg</p>
                      </div>
                   </div>
                   <div
-                     v-if="!selectedMixGroup.applied"
+                     v-if="isInitialMix(selectedMixGroup)"
                      class="mt-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-bold text-amber-800"
                   >
-                     <i class="fa-solid fa-floppy-disk mt-0.5 text-amber-600"></i>
-                     <span>El cálculo mostrado ya usa el ajuste actual. Solo falta guardar este mix para actualizar los renglones base y par.</span>
+                     <i class="fa-solid fa-circle-play mt-0.5 text-amber-600"></i>
+                     <span>El mix aún no se ha aplicado. Revisa las piezas finales y presiona Aplicar mix para generar el producto par.</span>
+                  </div>
+                  <div
+                     v-else-if="!isMixGroupApplied(selectedMixGroup)"
+                     class="mt-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-bold text-amber-800"
+                  >
+                     <i class="fa-solid fa-circle-play mt-0.5 text-amber-600"></i>
+                     <span>Las piezas fueron modificadas. Presiona Aplicar mix para actualizar los renglones base y par.</span>
                   </div>
                   <div
                      v-else
                      class="mt-3 flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-bold text-emerald-800"
                   >
                      <i class="fa-solid fa-check mt-0.5 text-emerald-600"></i>
-                     <span>Mix guardado. Base y par ya coinciden con el ajuste actual.</span>
+                     <span>Mix aplicado. Base y par ya coinciden con las piezas guardadas.</span>
                   </div>
                   <div v-if="isLoadingMixPreview" class="mt-3 flex items-center gap-2 rounded-md border border-emerald-100 bg-emerald-50 px-2 py-1.5 text-[10px] font-bold text-emerald-700">
                      <i class="fa-solid fa-circle-notch fa-spin"></i>
                      Actualizando preview...
                   </div>
 
-                  <div v-if="mixOverrides[getMixKey(selectedMixGroup)]" class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                     <label class="text-[9px] font-black uppercase tracking-wide text-slate-500">
-                        Base
+                  <div v-if="mixOverrides[getMixKey(selectedMixGroup)]" class="mt-3 grid grid-cols-2 gap-2">
+                     <label class="rounded-md border border-brand-100 bg-brand-50/40 px-2 py-1.5 text-[9px] font-black uppercase tracking-wide text-slate-500">
+                        Base final <span class="normal-case text-brand-600">~{{ groupFinalPercentage(selectedMixGroup, 'base') }}%</span>
+                        <span class="mt-0.5 block truncate text-[9px] normal-case tracking-normal text-slate-600" :title="selectedMixGroup.base_name">{{ selectedMixGroup.base_name }}</span>
                         <input
-                           :value="mixOverrides[getMixKey(selectedMixGroup)].mixbase"
+                           :value="getMixPieceValue(selectedMixGroup, 'base')"
                            type="number"
                            min="0"
-                           max="1"
-                           step="0.1"
-                           class="mt-1 h-8 w-full rounded-md border border-slate-200 px-2 text-right text-[11px] font-bold text-slate-700"
-                           :disabled="!canEditCpfrOrder"
-                           @input="handleMixRatioInput(selectedMixGroup, 'mixbase', $event)"
+                           :step="getMixPieceStep(selectedMixGroup, 'base')"
+                           class="mt-1 h-9 w-full rounded-md border border-brand-200 bg-white px-2 text-right text-[12px] font-black text-brand-700 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+                           :disabled="!canEditCpfrOrder || confirmedMixKey === getMixKey(selectedMixGroup)"
+                           @input="handleMixPiecesInput(selectedMixGroup, 'base', $event)"
                         >
+                        <span class="mt-1 block text-[8px] font-bold normal-case tracking-normal text-slate-400">Pzas. El par se ajusta automáticamente.</span>
                      </label>
-                     <label class="text-[9px] font-black uppercase tracking-wide text-slate-500">
-                        Par
+                     <label class="rounded-md border border-emerald-100 bg-emerald-50/50 px-2 py-1.5 text-[9px] font-black uppercase tracking-wide text-slate-500">
+                        Par final <span class="normal-case text-emerald-600">~{{ groupFinalPercentage(selectedMixGroup, 'pair') }}%</span>
+                        <span class="mt-0.5 block truncate text-[9px] normal-case tracking-normal text-slate-600" :title="selectedMixGroup.pair_name">{{ selectedMixGroup.pair_name }}</span>
                         <input
-                           :value="mixOverrides[getMixKey(selectedMixGroup)].mixpar"
+                           :value="getMixPieceValue(selectedMixGroup, 'pair')"
                            type="number"
                            min="0"
-                           max="1"
-                           step="0.1"
-                           class="mt-1 h-8 w-full rounded-md border border-slate-200 px-2 text-right text-[11px] font-bold text-slate-700"
-                           :disabled="!canEditCpfrOrder"
-                           @input="handleMixRatioInput(selectedMixGroup, 'mixpar', $event)"
+                           :step="getMixPieceStep(selectedMixGroup, 'pair')"
+                           class="mt-1 h-9 w-full rounded-md border border-emerald-200 bg-white px-2 text-right text-[12px] font-black text-emerald-700 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                           :disabled="!canEditCpfrOrder || confirmedMixKey === getMixKey(selectedMixGroup)"
+                           @input="handleMixPiecesInput(selectedMixGroup, 'pair', $event)"
                         >
+                        <span class="mt-1 block text-[8px] font-bold normal-case tracking-normal text-slate-400">Pzas. La base se ajusta automáticamente.</span>
                      </label>
-                     <div class="rounded-md bg-slate-50 px-2 py-1.5 text-right">
-                        <p class="text-[8px] font-black uppercase text-slate-400">Base final</p>
-                        <p class="text-[11px] font-black text-slate-700">{{ formatNumber(selectedMixGroup.base_final_pieces, 0) }} pz</p>
-                        <p class="text-[9px] font-bold text-slate-400">{{ formatNumber(selectedMixGroup.base_final_kg, 2) }} kg</p>
-                     </div>
-                     <div class="rounded-md bg-slate-50 px-2 py-1.5 text-right">
-                        <p class="text-[8px] font-black uppercase text-slate-400">Par final</p>
-                        <p class="text-[11px] font-black text-slate-700">{{ formatNumber(selectedMixGroup.pair_final_pieces, 0) }} pz</p>
-                        <p class="text-[9px] font-bold text-slate-400">{{ formatNumber(selectedMixGroup.pair_final_kg, 2) }} kg</p>
-                     </div>
                   </div>
 
-                  <div class="mt-3 grid gap-2 text-right text-[10px] font-bold sm:grid-cols-3">
-                     <div class="rounded-md bg-slate-50 px-2 py-1.5 text-slate-600">
-                        <p class="text-[8px] font-black uppercase tracking-wide text-slate-400">Pre</p>
-                        <p>Piezas pre: {{ formatNumber(selectedMixGroup.pre_mix_quantity, 0) }}</p>
-                        <p class="text-[9px] text-slate-400">Kg pre: {{ formatNumber(groupPreKg(selectedMixGroup), 2) }}</p>
+                  <div class="mt-3 grid gap-2 text-[10px] font-bold sm:grid-cols-3">
+                     <div class="rounded-md bg-slate-50 px-2 py-2 text-slate-600">
+                        <p class="text-[8px] font-black uppercase tracking-wide text-slate-400">Original</p>
+                        <p class="mt-1 truncate font-mono text-[8px] text-slate-500">{{ selectedMixGroup.base_sku }}</p>
+                        <p class="mt-1 text-right">{{ formatNumber(selectedMixGroup.pre_mix_quantity, 0) }} pzas <span class="text-slate-400">· {{ formatNumber(groupPreKg(selectedMixGroup), 2) }} kg</span></p>
                      </div>
-                     <div class="rounded-md bg-emerald-50 px-2 py-1.5 text-emerald-700">
+                     <div class="rounded-md bg-emerald-50 px-2 py-2 text-emerald-700">
                         <p class="text-[8px] font-black uppercase tracking-wide text-emerald-500">Mix</p>
-                        <p>Piezas mix: {{ formatNumber(groupMixPieces(selectedMixGroup), 0) }}</p>
-                        <p class="text-[9px] text-emerald-600">Kg mix: {{ formatNumber(groupMixKg(selectedMixGroup), 2) }}</p>
+                        <p class="mt-1 flex justify-between gap-2 text-[9px]"><span class="truncate font-mono text-emerald-600">{{ selectedMixGroup.base_sku }}</span><span class="shrink-0">{{ formatNumber(selectedMixGroup.base_final_pieces, 0) }} pzas · {{ formatNumber(selectedMixGroup.base_final_kg, 2) }} kg</span></p>
+                        <p class="mt-1 flex justify-between gap-2 text-[9px]"><span class="truncate font-mono text-emerald-600">{{ selectedMixGroup.pair_sku }}</span><span class="shrink-0">{{ formatNumber(selectedMixGroup.pair_final_pieces, 0) }} pzas · {{ formatNumber(selectedMixGroup.pair_final_kg, 2) }} kg</span></p>
+                        <p class="mt-1 border-t border-emerald-200 pt-1 text-right text-[9px] font-black">Total: {{ formatNumber(groupMixPieces(selectedMixGroup), 0) }} pzas · {{ formatNumber(groupMixKg(selectedMixGroup), 2) }} kg</p>
                      </div>
-                     <div class="rounded-md bg-amber-50 px-2 py-1.5 text-amber-700">
-                        <p class="text-[8px] font-black uppercase tracking-wide text-amber-500">Dif</p>
-                        <p>Dif pz: {{ groupMixDiffPieces(selectedMixGroup) >= 0 ? '+' : '' }}{{ formatNumber(groupMixDiffPieces(selectedMixGroup), 0) }}</p>
-                        <p class="text-[9px] text-amber-600">Dif kg: {{ formatNumber(selectedMixGroup.total_diff_kg, 2) }}</p>
+                     <div class="rounded-md bg-amber-50/60 px-2 py-2 text-amber-700">
+                        <p class="text-[8px] font-black uppercase tracking-wide text-amber-500">Diferencia</p>
+                        <p class="mt-2 text-right text-[10px]">{{ groupMixDiffPieces(selectedMixGroup) >= 0 ? '+' : '' }}{{ formatNumber(groupMixDiffPieces(selectedMixGroup), 0) }} pzas</p>
+                        <p class="mt-1 text-right text-[9px] font-medium text-amber-600">{{ formatNumber(selectedMixGroup.total_diff_kg, 2) }} kg</p>
                      </div>
                   </div>
                </article>
@@ -1597,13 +1639,17 @@ const handleConfirm = async () => {
 
             <footer v-if="canEditCpfrOrder" class="flex flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                <div class="min-h-5 text-[10px] font-bold">
-                  <span v-if="selectedMixGroup?.applied" class="inline-flex items-center gap-1.5 text-emerald-700">
+                  <span v-if="selectedMixGroup && isMixGroupApplied(selectedMixGroup)" class="inline-flex items-center gap-1.5 text-emerald-700">
                      <i class="fa-solid fa-check-circle"></i>
-                     Mix guardado correctamente
+                     Mix aplicado correctamente
+                  </span>
+                  <span v-else-if="selectedMixGroup && isInitialMix(selectedMixGroup)" class="inline-flex items-center gap-1.5 text-amber-700">
+                     <i class="fa-solid fa-circle-play"></i>
+                     Listo para aplicar mix
                   </span>
                   <span v-else-if="selectedMixGroup" class="inline-flex items-center gap-1.5 text-amber-700">
-                     <i class="fa-solid fa-floppy-disk"></i>
-                     Cambios listos para guardar
+                     <i class="fa-solid fa-circle-play"></i>
+                     Cambios listos para aplicar
                   </span>
                </div>
                <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -1615,17 +1661,17 @@ const handleConfirm = async () => {
                      Cerrar
                   </button>
                <button
-                  v-if="selectedMixGroup && !selectedMixGroup.applied"
+                  v-if="selectedMixGroup"
                   type="button"
                   class="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 text-[11px] font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  :disabled="isLoadingMixPreview || isApplyingMix"
+                  :disabled="isLoadingMixPreview || isApplyingMix || !canApplySelectedMix"
                   @click="applyCpfrMix"
                >
                   <i
                      class="fa-solid text-[10px]"
-                     :class="isApplyingMix ? 'fa-circle-notch fa-spin' : 'fa-floppy-disk'"
+                     :class="isApplyingMix ? 'fa-circle-notch fa-spin' : (isMixGroupApplied(selectedMixGroup) ? 'fa-check' : 'fa-circle-play')"
                   ></i>
-                  {{ isApplyingMix ? 'Guardando...' : 'Guardar mix actualizado' }}
+                  {{ isApplyingMix ? 'Aplicando...' : 'Aplicar mix' }}
                </button>
                </div>
             </footer>

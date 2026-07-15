@@ -381,16 +381,16 @@ const metricAccentClass = (tone: string) => ({
                             </span>
                         </div>
 
-                        <div v-if="setupStore.isLoading" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                            <div v-for="i in 8" :key="i" class="min-h-[270px] animate-pulse rounded-2xl border border-pic-border bg-pic-surface p-6 shadow-sm">
-                                <div class="mx-auto mb-6 h-20 w-20 rounded-2xl bg-pic-muted-surface"></div>
+                        <div v-if="setupStore.isLoading" class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 2xl:grid-cols-4">
+                            <div v-for="i in 8" :key="i" class="min-h-[242px] animate-pulse rounded-xl border border-pic-border bg-pic-surface p-6 shadow-sm sm:min-h-[252px]">
+                                <div class="mx-auto mb-5 h-16 w-16 rounded-2xl bg-pic-muted-surface sm:h-20 sm:w-20"></div>
                                 <div class="mx-auto mb-3 h-5 w-2/3 rounded bg-pic-muted-surface"></div>
                                 <div class="mx-auto mb-2 h-3 w-full rounded bg-pic-muted-surface"></div>
                                 <div class="mx-auto h-3 w-4/5 rounded bg-pic-muted-surface"></div>
                             </div>
                         </div>
 
-                        <div v-else class="grid grid-cols-1 gap-3 fade-in sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                        <div v-else class="grid grid-cols-1 gap-4 fade-in sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 2xl:grid-cols-4">
                             <ModuleCard
                                 v-for="mod in dashboardModules"
                                 :key="mod.ModuleId"

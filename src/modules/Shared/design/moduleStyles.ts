@@ -15,7 +15,7 @@ export interface ModuleColorPreset {
 
 export const GLOBAL_MODULE_CARD_STYLE: Pick<ModuleVisualStyle, 'color' | 'bg' | 'accent'> = {
   color: 'text-pic-module',
-  bg: 'bg-pic-module-soft',
+  bg: 'bg-pic-module-bg',
   accent: 'bg-pic-module-soft',
 };
 

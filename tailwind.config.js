@@ -26,6 +26,7 @@ export default {
 					'brand-soft': 'hsl(var(--pic-brand-soft))',
 					'brand-border': 'hsl(var(--pic-brand-border))',
 					module: 'hsl(var(--pic-module))',
+					'module-bg': 'hsl(var(--pic-module-bg))',
 					'module-soft': 'hsl(var(--pic-module-soft))',
 					surface: 'hsl(var(--pic-surface))',
 					background: 'hsl(var(--pic-background))',
@@ -103,11 +104,8 @@ export default {
 				}
 			},
 			fontFamily: {
-				sans: [
-					'Inter',
-					'system-ui',
-					'sans-serif'
-				]
+				sans: ['var(--pic-font-sans)'],
+				mono: ['var(--pic-font-mono)']
 			},
 			containers: {
 				'2xs': '16rem',

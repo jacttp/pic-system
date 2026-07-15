@@ -7,8 +7,17 @@ export interface UiThemePalette {
 }
 
 export interface UiThemeCatalog {
+  schemaVersion: 1;
   activePaletteId: string;
   palettes: UiThemePalette[];
+}
+
+export interface UiThemeCatalogResult {
+  catalog: UiThemeCatalog;
+  persisted: boolean;
+  fallback: boolean;
+  updatedAt: string | null;
+  updatedBy: number | null;
 }
 
 export interface UiThemeTokenDefinition {
@@ -40,7 +49,8 @@ export const uiThemeTokenDefinitions: UiThemeTokenDefinition[] = [
   { token: '--pic-danger', label: 'Danger', usage: 'Errores y acciones destructivas', group: 'state' },
   { token: '--pic-info', label: 'Info', usage: 'Mensajes informativos y ayuda contextual', group: 'state' },
   { token: '--pic-module', label: 'Módulo global', usage: 'Icono, título y flecha de todas las tarjetas de módulo', group: 'module' },
-  { token: '--pic-module-soft', label: 'Módulo global suave', usage: 'Fondo del icono y franja inferior de las tarjetas de módulo', group: 'module' },
+  { token: '--pic-module-bg', label: 'Fondo de icono de módulo', usage: 'Fondo del icono de todas las tarjetas de módulo', group: 'module' },
+  { token: '--pic-module-soft', label: 'Franja de módulo', usage: 'Franja inferior de todas las tarjetas de módulo', group: 'module' },
   { token: '--pic-accent-orange', label: 'Modulo naranja', usage: 'Segmentacion, cargas y acciones secundarias', group: 'module' },
   { token: '--pic-accent-orange-soft', label: 'Modulo naranja suave', usage: 'Fondos de icono y hover naranja', group: 'module' },
   { token: '--pic-accent-blue', label: 'Modulo azul', usage: 'Usuarios, productos y consultas', group: 'module' },
@@ -61,6 +71,7 @@ export const uiThemeTokenDefinitions: UiThemeTokenDefinition[] = [
 export const editableUiThemeTokens = uiThemeTokenDefinitions.map((item) => item.token);
 
 export const defaultUiThemeCatalog: UiThemeCatalog = {
+  schemaVersion: 1,
   activePaletteId: 'pic-red',
   palettes: [
     {
@@ -87,6 +98,7 @@ export const defaultUiThemeCatalog: UiThemeCatalog = {
         '--pic-danger': '0 72% 51%',
         '--pic-info': '221 83% 53%',
         '--pic-module': '357 84% 45%',
+        '--pic-module-bg': '0 86% 97%',
         '--pic-module-soft': '0 86% 97%',
         '--pic-accent-orange': '25 95% 53%',
         '--pic-accent-orange-soft': '26 100% 94%',
@@ -129,6 +141,7 @@ export const defaultUiThemeCatalog: UiThemeCatalog = {
         '--pic-danger': '0 72% 51%',
         '--pic-info': '199 89% 48%',
         '--pic-module': '214 90% 45%',
+        '--pic-module-bg': '214 100% 97%',
         '--pic-module-soft': '214 100% 97%',
         '--pic-accent-orange': '25 95% 53%',
         '--pic-accent-orange-soft': '26 100% 94%',
@@ -171,6 +184,7 @@ export const defaultUiThemeCatalog: UiThemeCatalog = {
         '--pic-danger': '0 72% 51%',
         '--pic-info': '199 89% 48%',
         '--pic-module': '174 72% 32%',
+        '--pic-module-bg': '166 76% 97%',
         '--pic-module-soft': '166 76% 97%',
         '--pic-accent-orange': '25 95% 53%',
         '--pic-accent-orange-soft': '26 100% 94%',
@@ -195,6 +209,7 @@ export const defaultUiThemeCatalog: UiThemeCatalog = {
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 export const cloneUiThemeCatalog = (catalog: UiThemeCatalog = defaultUiThemeCatalog): UiThemeCatalog => ({
+  schemaVersion: 1,
   activePaletteId: catalog.activePaletteId,
   palettes: catalog.palettes.map((palette) => ({
     ...palette,
@@ -204,6 +219,7 @@ export const cloneUiThemeCatalog = (catalog: UiThemeCatalog = defaultUiThemeCata
       ...defaultUiThemeCatalog.palettes[0]!.tokens,
       ...palette.tokens,
       '--pic-module': palette.tokens['--pic-module'] || palette.tokens['--pic-brand'] || defaultUiThemeCatalog.palettes[0]!.tokens['--pic-module'],
+      '--pic-module-bg': palette.tokens['--pic-module-bg'] || palette.tokens['--pic-module-soft'] || palette.tokens['--pic-brand-soft'] || defaultUiThemeCatalog.palettes[0]!.tokens['--pic-module-bg'],
       '--pic-module-soft': palette.tokens['--pic-module-soft'] || palette.tokens['--pic-brand-soft'] || defaultUiThemeCatalog.palettes[0]!.tokens['--pic-module-soft'],
     },
   })),

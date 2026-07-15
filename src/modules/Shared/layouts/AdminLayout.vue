@@ -30,7 +30,7 @@ let notifPoll: ReturnType<typeof setInterval> | null = null;
 onMounted(async () => {
    isCollapsed.value = localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === 'true';
    loadSidebarCategoryState();
-   uiThemeStore.loadThemeCatalog();
+   void uiThemeStore.loadThemeCatalog();
    await setupStore.fetchModules();
    setupStore.fetchHubConfig();
    profileStore.fetchProfile();

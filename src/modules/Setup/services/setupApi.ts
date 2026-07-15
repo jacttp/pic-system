@@ -1,7 +1,7 @@
 /* src/modules/Setup/services/setupApi.ts */
 import api from '@/api/axios';
 import type { HubConfigResponse, HubFeatureKey, ModuleColorOverrides, SystemFeatureFlag, SystemModule } from '../types/setupTypes';
-import type { UiThemeCatalog } from '@/modules/Shared/design/uiTheme';
+import type { UiThemeCatalog, UiThemeCatalogResult } from '@/modules/Shared/design/uiTheme';
 
 const V2 = import.meta.env.VITE_API_V2_PATH;
 
@@ -59,14 +59,40 @@ export default {
       return data.data;
    },
 
-   async getUiThemeCatalog(): Promise<{ catalog: UiThemeCatalog; fallback: boolean }> {
-      const { data } = await api.get<{ success: boolean; data: UiThemeCatalog; fallback?: boolean }>(`${V2}/setup/ui-theme-catalog`);
-      return { catalog: data.data, fallback: Boolean(data.fallback) };
+   async getUiThemeCatalog(): Promise<UiThemeCatalogResult> {
+      const { data } = await api.get<{
+         success: boolean;
+         data: UiThemeCatalog;
+         persisted?: boolean;
+         fallback?: boolean;
+         updatedAt?: string | null;
+         updatedBy?: number | null;
+      }>(`${V2}/setup/ui-theme-catalog`);
+      return {
+         catalog: data.data,
+         persisted: Boolean(data.persisted),
+         fallback: Boolean(data.fallback),
+         updatedAt: data.updatedAt || null,
+         updatedBy: data.updatedBy ?? null,
+      };
    },
 
-   async updateUiThemeCatalog(payload: UiThemeCatalog): Promise<UiThemeCatalog> {
-      const { data } = await api.put<{ success: boolean; data: UiThemeCatalog }>(`${V2}/setup/ui-theme-catalog`, payload);
-      return data.data;
+   async updateUiThemeCatalog(payload: UiThemeCatalog): Promise<UiThemeCatalogResult> {
+      const { data } = await api.put<{
+         success: boolean;
+         data: UiThemeCatalog;
+         persisted: boolean;
+         fallback?: boolean;
+         updatedAt?: string | null;
+         updatedBy?: number | null;
+      }>(`${V2}/setup/ui-theme-catalog`, payload);
+      return {
+         catalog: data.data,
+         persisted: Boolean(data.persisted),
+         fallback: Boolean(data.fallback),
+         updatedAt: data.updatedAt || null,
+         updatedBy: data.updatedBy ?? null,
+      };
    },
 
    async updateFeatureFlag(featureKey: HubFeatureKey, payload: Partial<SystemFeatureFlag>): Promise<void> {

@@ -40,12 +40,42 @@ const {
   activePalette,
   isLoading: isThemeLoading,
   isSaving: isThemeSaving,
+  isDirty: isThemeDirty,
+  isPersisted: isThemePersisted,
   isUsingFallback: isThemeFallback,
   lastError: themeError,
+  updatedAt: themeUpdatedAt,
+  updatedBy: themeUpdatedBy,
 } = storeToRefs(uiThemeStore);
 
 const segments = ['Dia', 'Semana', 'Mes', 'Ano'];
 const tabs = ['Catalogo', 'Tokens', 'Patrones'];
+const typographySpecimens = [
+  {
+    name: 'Inter',
+    family: "'Inter', system-ui, sans-serif",
+    role: 'Fuente activa',
+    description: 'La referencia actual: compacta, neutra y legible en tablas, filtros y tarjetas operativas.',
+    specimen: 'Bandeja de gestión',
+    active: true,
+  },
+  {
+    name: 'Manrope',
+    family: "'Manrope', system-ui, sans-serif",
+    role: 'Alternativa de interfaz',
+    description: 'Más redondeada y abierta; conserva densidad, pero da mayor suavidad a títulos y navegación.',
+    specimen: 'Módulos principales',
+    active: false,
+  },
+  {
+    name: 'DM Sans',
+    family: "'DM Sans', system-ui, sans-serif",
+    role: 'Alternativa editorial',
+    description: 'Un poco más expresiva en encabezados, con buena lectura para texto de apoyo y metadatos.',
+    specimen: 'Resumen operativo',
+    active: false,
+  },
+];
 const weekDays = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 const monthCalendarDays = [
   null,
@@ -202,7 +232,10 @@ const navigationGroups = computed(() => {
   const groups = [
     {
       title: 'Configuracion',
-      links: [{ id: 'configuration', title: 'Configuracion UI' }],
+      links: [
+        { id: 'configuration', title: 'Configuracion UI' },
+        { id: 'typography', title: 'Tipografia' },
+      ],
     },
     {
       title: 'Catalogo',
@@ -233,14 +266,36 @@ const tokenGroups = computed(() => [
 const activePaletteTokens = computed(() => activePalette.value.tokens);
 const activePalettePreviewTokens = computed(() =>
   uiThemeTokenDefinitions.filter((token) =>
-    ['--pic-brand', '--pic-nav', '--pic-module', '--pic-accent-orange', '--pic-accent-blue', '--pic-accent-purple', '--pic-accent-teal'].includes(token.token)
+    ['--pic-brand', '--pic-nav', '--pic-module', '--pic-module-bg', '--pic-accent-orange', '--pic-accent-blue', '--pic-accent-purple', '--pic-accent-teal'].includes(token.token)
   )
 );
 const activePaletteStatusLabel = computed(() => {
-  if (isThemeSaving.value) return 'Guardando...';
-  if (isThemeFallback.value) return 'Fallback local';
-  return 'Guardado global';
+  if (themeError.value) return 'Error de persistencia';
+  if (isThemeSaving.value) return 'Guardando automáticamente...';
+  if (isThemeLoading.value) return 'Cargando servidor...';
+  if (isThemeDirty.value) return 'Pendiente de sincronizar';
+  if (isThemeFallback.value || !isThemePersisted.value) return 'Configuración predeterminada';
+  return 'Guardado en servidor';
 });
+const activePaletteStatusClass = computed(() => {
+  if (themeError.value) return 'border-[hsl(var(--pic-danger)/0.28)] bg-[hsl(var(--pic-danger)/0.08)] text-pic-danger';
+  if (isThemeSaving.value || isThemeLoading.value) return 'border-pic-brand-border bg-pic-brand-soft text-pic-brand';
+  if (isThemeDirty.value) return 'border-[hsl(var(--pic-warning)/0.30)] bg-[hsl(var(--pic-warning)/0.10)] text-pic-warning';
+  if (isThemeFallback.value || !isThemePersisted.value) return 'border-pic-border bg-pic-muted-surface text-pic-text-muted';
+  return 'border-[hsl(var(--pic-success)/0.28)] bg-[hsl(var(--pic-success)/0.10)] text-pic-success';
+});
+const lastThemeSaveLabel = computed(() => {
+  if (!themeUpdatedAt.value) return null;
+  const date = new Date(themeUpdatedAt.value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const formatted = new Intl.DateTimeFormat('es-MX', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date);
+  return themeUpdatedBy.value ? `${formatted} · usuario #${themeUpdatedBy.value}` : formatted;
+});
+const isThemeBusy = computed(() => isThemeLoading.value || isThemeSaving.value);
 const tableSelectionLabel = computed(() => `${selectedRows.value.length} seleccionados`);
 
 const getComponent = (id: string) => componentExamples.find((item) => item.id === id)!;
@@ -315,9 +370,6 @@ const handleDeletePalette = () => {
   uiThemeStore.deletePalette(activePaletteId.value);
 };
 
-const handleApplyPalette = () => {
-  uiThemeStore.applyPalette(activePalette.value);
-};
 </script>
 
 <template>
@@ -374,6 +426,7 @@ const handleApplyPalette = () => {
                     type="button"
                     class="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand"
                     title="Crear paleta"
+                    :disabled="isThemeBusy"
                     @click="handleCreatePalette"
                   >
                     <i class="fa-solid fa-plus text-xs"></i>
@@ -387,6 +440,7 @@ const handleApplyPalette = () => {
                     type="button"
                     class="group w-full rounded-lg border px-3 py-3 text-left transition hover:bg-slate-50"
                     :class="palette.id === activePaletteId ? 'border-pic-brand-border bg-pic-brand-soft shadow-[inset_4px_0_0_0_hsl(var(--pic-brand))]' : 'border-slate-200 bg-white'"
+                    :disabled="isThemeBusy"
                     @click="uiThemeStore.setActivePalette(palette.id)"
                   >
                     <div class="mb-2 flex items-center gap-1.5">
@@ -419,6 +473,7 @@ const handleApplyPalette = () => {
                       <input
                         :value="activePalette.name"
                         type="text"
+                        :disabled="isThemeBusy"
                         class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition hover:bg-slate-50 focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border"
                         @input="handlePaletteNameInput"
                       />
@@ -428,6 +483,7 @@ const handleApplyPalette = () => {
                       <textarea
                         :value="activePalette.description"
                         rows="2"
+                        :disabled="isThemeBusy"
                         class="min-h-[72px] w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold leading-5 text-slate-600 outline-none transition hover:bg-slate-50 focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border"
                         @input="handlePaletteDescriptionInput"
                       ></textarea>
@@ -436,22 +492,25 @@ const handleApplyPalette = () => {
 
                   <div class="mt-3 flex flex-col gap-3 border-t border-slate-100 pt-3 xl:flex-row xl:items-center xl:justify-between">
                     <div class="flex flex-wrap items-center gap-2">
-                      <span class="inline-flex h-7 items-center rounded-lg border border-pic-brand-border bg-pic-brand-soft px-2.5 text-[10px] font-black uppercase text-pic-brand">
+                      <span class="inline-flex h-7 items-center rounded-lg border px-2.5 text-[10px] font-black uppercase" :class="activePaletteStatusClass">
                         {{ activePaletteStatusLabel }}
                       </span>
-                      <span v-if="themeError" class="inline-flex h-7 items-center rounded-lg border border-red-200 bg-red-50 px-2.5 text-[10px] font-black uppercase text-red-700">
+                      <span v-if="themeError" class="inline-flex min-h-7 items-center rounded-lg border border-[hsl(var(--pic-danger)/0.28)] bg-[hsl(var(--pic-danger)/0.08)] px-2.5 py-1 text-[10px] font-black text-pic-danger">
                         {{ themeError }}
                       </span>
                       <span class="font-mono text-[10px] font-bold text-slate-400">{{ activePalette.id }}</span>
+                      <span v-if="lastThemeSaveLabel && !isThemeDirty" class="text-[10px] font-semibold text-pic-text-muted">
+                        {{ lastThemeSaveLabel }}
+                      </span>
+                      <span class="text-[10px] font-medium text-pic-text-muted">Guardado automático</span>
                     </div>
 
                     <div class="flex flex-wrap gap-2 xl:justify-end">
-                      <StdButton size="sm" icon="fa-solid fa-wand-magic-sparkles" @click="handleApplyPalette">Aplicar sin guardar</StdButton>
-                      <StdButton size="sm" icon="fa-solid fa-copy" @click="handleDuplicatePalette">Duplicar</StdButton>
-                      <StdButton size="sm" icon="fa-solid fa-rotate-left" :disabled="isThemeLoading" @click="uiThemeStore.loadThemeCatalog()">Restaurar cambios</StdButton>
-                      <StdButton size="sm" variant="danger" icon="fa-solid fa-trash" :disabled="activePalette.isSystem" @click="handleDeletePalette">Eliminar</StdButton>
-                      <StdButton size="sm" variant="primary" icon="fa-solid fa-floppy-disk" :disabled="isThemeSaving" @click="uiThemeStore.saveThemeCatalog()">
-                        {{ isThemeSaving ? 'Guardando' : 'Guardar paleta' }}
+                      <StdButton size="sm" icon="fa-solid fa-copy" :disabled="isThemeBusy" @click="handleDuplicatePalette">Duplicar</StdButton>
+                      <StdButton size="sm" icon="fa-solid fa-rotate-left" :disabled="isThemeLoading || isThemeSaving || !isThemeDirty" @click="uiThemeStore.restoreThemeCatalog()">Restaurar cambios</StdButton>
+                      <StdButton size="sm" variant="danger" icon="fa-solid fa-trash" :disabled="isThemeBusy || activePalette.isSystem" @click="handleDeletePalette">Eliminar</StdButton>
+                      <StdButton size="sm" variant="primary" icon="fa-solid fa-floppy-disk" :disabled="isThemeSaving || isThemeLoading || (!isThemeDirty && isThemePersisted)" @click="uiThemeStore.saveThemeCatalog()">
+                        {{ isThemeSaving ? 'Guardando' : 'Guardar ahora' }}
                       </StdButton>
                     </div>
                   </div>
@@ -484,6 +543,7 @@ const handleApplyPalette = () => {
                         <div class="flex min-w-0 items-center gap-3">
                           <input
                             type="color"
+                            :disabled="isThemeBusy"
                             class="h-10 w-10 shrink-0 cursor-pointer rounded-lg border border-slate-200 bg-white p-1 shadow-sm transition hover:border-pic-brand-border focus:outline-none focus:ring-2 focus:ring-pic-brand-border"
                             :value="getTokenHex(token.token)"
                             :aria-label="`Cambiar ${token.label}`"
@@ -501,6 +561,7 @@ const handleApplyPalette = () => {
                             :id="`hex-${token.token}`"
                             type="text"
                             maxlength="7"
+                            :disabled="isThemeBusy"
                             class="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 font-mono text-[11px] font-black uppercase text-slate-700 outline-none transition hover:bg-slate-50 focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border"
                             :value="getTokenHex(token.token)"
                             @change="handleTokenHexInput(token.token, $event)"
@@ -549,6 +610,52 @@ const handleApplyPalette = () => {
                   </div>
                 </div>
               </div>
+            </div>
+          </StdSection>
+
+          <StdSection
+            id="typography"
+            title="Tipografia del producto"
+            eyebrow="Sistema tipografico"
+            description="Muestrario para decidir una sola familia de interfaz. Inter es la fuente activa; las alternativas se muestran para comparar antes de hacer una migracion global."
+            icon="fa-solid fa-font"
+          >
+            <div class="rounded-xl border border-pic-border bg-pic-muted-surface p-4 sm:p-5">
+              <div class="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <div>
+                  <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-pic-text-muted">Regla vigente</p>
+                  <p class="mt-1 text-sm font-bold tracking-tight text-pic-text-main">Una fuente sans para interfaz; monoespaciada solo para datos técnicos.</p>
+                </div>
+                <p class="text-xs font-medium leading-5 text-pic-text-muted">
+                  Usa <code class="font-mono text-[11px] font-semibold text-pic-text-main">font-sans</code> para contenido operativo y
+                  <code class="font-mono text-[11px] font-semibold text-pic-text-main">font-mono</code> para IDs, códigos y cifras alineadas.
+                  Las familias se concentran en <code class="font-mono text-[11px] font-semibold text-pic-text-main">style.css</code> y Tailwind.
+                </p>
+              </div>
+            </div>
+
+            <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+              <article
+                v-for="typeface in typographySpecimens"
+                :key="typeface.name"
+                class="rounded-xl border bg-pic-surface p-4 shadow-sm transition hover:shadow-md sm:p-5"
+                :class="typeface.active ? 'border-pic-brand-border shadow-[inset_3px_0_0_0_hsl(var(--pic-brand))]' : 'border-pic-border'"
+                :style="{ fontFamily: typeface.family }"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-pic-text-muted">{{ typeface.role }}</p>
+                    <h3 class="mt-1 text-xl font-bold tracking-tight text-pic-text-main">{{ typeface.name }}</h3>
+                  </div>
+                  <span v-if="typeface.active" class="rounded-full border border-pic-brand-border bg-pic-brand-soft px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-pic-brand">Activa</span>
+                </div>
+                <div class="mt-5 border-y border-pic-border py-4">
+                  <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-pic-module">{{ typeface.specimen }}</p>
+                  <p class="mt-1 text-2xl font-bold leading-none tracking-tight text-pic-text-main">42 pendientes</p>
+                  <p class="mt-2 text-sm font-medium leading-5 text-pic-text-muted">Prioriza la lectura, el escaneo y la decisión sin añadir ruido visual.</p>
+                </div>
+                <p class="mt-4 text-xs font-medium leading-5 text-pic-text-muted">{{ typeface.description }}</p>
+              </article>
             </div>
           </StdSection>
 

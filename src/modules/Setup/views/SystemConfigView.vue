@@ -608,7 +608,7 @@ const selectModuleColorPreset = (event: Event) => {
                     <div v-if="form.UsesCustomColors" class="mt-4 border-t border-pic-border pt-4">
                         <label class="block text-xs font-bold uppercase tracking-wide text-pic-text-muted">Estilo individual</label>
                         <div class="mt-2 flex items-center gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" :class="form.BgColor || 'bg-pic-module-soft'">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" :class="form.BgColor || 'bg-pic-module-bg'">
                                 <i :class="[form.Icon || 'fa-solid fa-cube', form.IconColor || 'text-pic-module']"></i>
                             </span>
                             <select
@@ -625,7 +625,7 @@ const selectModuleColorPreset = (event: Event) => {
                         </p>
                     </div>
                     <p v-else class="mt-3 text-[11px] font-semibold text-pic-brand">
-                        Este módulo usa <span class="font-mono">--pic-module</span> y <span class="font-mono">--pic-module-soft</span>.
+                        Este módulo usa <span class="font-mono">--pic-module</span>, <span class="font-mono">--pic-module-bg</span> y <span class="font-mono">--pic-module-soft</span>.
                     </p>
                 </section>
 
