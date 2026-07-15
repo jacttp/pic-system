@@ -21,6 +21,7 @@ const props = defineProps<{
 const store = useCpfrStore()
 const { generateExcel, generateStorePdfs } = useCpfrExport()
 const panelTab = computed(() => props.tab || store.activeTab)
+const isCentralizedReview = computed(() => panelTab.value === 'centralizados')
 
 // ── Day Labels ────────────────────────────────────────────────────────────────
 const DAY_LABELS: Record<number, string> = { 1: 'L', 2: 'M', 3: 'X', 4: 'J', 5: 'V', 6: 'S', 7: 'D' }
@@ -273,6 +274,21 @@ const excelExportItems = computed<ExportTiendaItem[]>(() => includedItems.value
     .filter(item => item.rows.length > 0)
 )
 
+// El estado se persiste por OC. Las exclusiones de tienda u OC determinan el
+// alcance; excluir un SKU no puede enviar solo una parte de su pedido.
+const reviewOrderNumbers = computed(() => {
+    if (!isCentralizedReview.value) return []
+
+    const orderNumbers = new Set<string>()
+    for (const item of filteredItems.value) {
+        if (excludedStores.value.has(item.id_cliente) || excludedOCs.value.has(itemKey(item))) continue
+        const orderState = normalizeCpfrOrderState(item.estado_oc)
+        if (orderState !== 'pendiente' && orderState !== 'borrador') continue
+        if (item.num_pedido) orderNumbers.add(item.num_pedido)
+    }
+    return [...orderNumbers]
+})
+
 function sumPz(rows: ExportRow[]): number {
     return rows.reduce((total, row) => total + row.cant_pedida, 0)
 }
@@ -296,6 +312,7 @@ const storesMap = computed(() => {
 // ── Export actions ────────────────────────────────────────────────────────────
 const pdfProcessing = ref(false)
 const excelProcessing = ref(false)
+const reviewProcessing = ref(false)
 const canDownloadExcel = computed(() => panelTab.value === 'aprobada')
 const excelRestrictionMessage = 'No se incluyen OC o SKUs que actualmente estén en Revisión o Borrador. El Excel final solo puede descargarse desde la pestaña Aprobados.'
 
@@ -372,6 +389,46 @@ async function handleExcelExport() {
     }
 }
 
+async function handleReviewSubmission() {
+    if (!store.currentWeek) {
+        toast({ title: 'Contexto no disponible', description: 'No se pudo identificar la semana activa.', variant: 'destructive' })
+        return
+    }
+
+    if (reviewOrderNumbers.value.length === 0) {
+        toast({ title: 'Atención', description: 'No hay OCs pendientes o en borrador incluidas para enviar a revisión.', variant: 'destructive' })
+        return
+    }
+
+    reviewProcessing.value = true
+    try {
+        const result = await store.updateStatusBulk({
+            num_pedidos: reviewOrderNumbers.value,
+            year: store.currentWeek.anio,
+            week: store.currentWeek.semana,
+            estado: 'revision',
+        })
+
+        if (!result.ok) {
+            toast({ title: 'Error al enviar a revisión', description: 'No se pudieron actualizar las OCs seleccionadas. Intenta de nuevo.', variant: 'destructive' })
+            return
+        }
+
+        const updatedOrders = result.updatedOrders ?? reviewOrderNumbers.value.length
+        toast({
+            title: 'OCs enviadas a revisión',
+            description: result.approvalId
+                ? `${updatedOrders} OC(s) enviadas en la solicitud de aprobación #${result.approvalId}.`
+                : `${updatedOrders} OC(s) enviadas a revisión.`,
+            duration: 5000,
+        })
+        await store.loadDashboard()
+        emit('close')
+    } finally {
+        reviewProcessing.value = false
+    }
+}
+
 async function handlePdfExport() {
     if (includedItems.value.length === 0) {
         toast({ title: 'Atencion', description: 'No hay pedidos incluidos para generar PDF.', variant: 'destructive' })
@@ -380,7 +437,7 @@ async function handlePdfExport() {
 
     pdfProcessing.value = true
     try {
-        const result = await generateStorePdfs(includedItems.value, Array.from(selectedDays.value))
+        const result = await generateStorePdfs(includedItems.value, Array.from(selectedDays.value), panelTab.value)
         toast({
             title: result.zipped ? 'ZIP generado' : 'PDF generado',
             description: result.zipped
@@ -413,8 +470,14 @@ async function handlePdfExport() {
                 <i class="fa-solid fa-file-invoice text-lg"></i>
             </div>
             <div>
-                <h2 class="text-sm font-black text-slate-800 tracking-tight uppercase">Template OV</h2>
-                <p class="text-[11px] text-slate-500 font-medium">Exportación final de órdenes de compra aprobadas</p>
+                <h2 class="text-sm font-black text-slate-800 tracking-tight uppercase">
+                    {{ isCentralizedReview ? 'Revisión de pedidos' : 'Template OV' }}
+                </h2>
+                <p class="text-[11px] text-slate-500 font-medium">
+                    {{ isCentralizedReview
+                        ? 'Selecciona las órdenes de compra que se enviarán a revisión'
+                        : 'Exportación final de órdenes de compra aprobadas' }}
+                </p>
             </div>
         </div>
         
@@ -689,7 +752,7 @@ async function handlePdfExport() {
             <!-- Footer con Acciones (Double buttons) -->
             <footer class="p-5 border-t border-slate-100 bg-slate-50 flex flex-col gap-3 shrink-0">
                 <div
-                    v-if="!canDownloadExcel"
+                    v-if="!canDownloadExcel && !isCentralizedReview"
                     class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] leading-relaxed text-amber-800"
                     role="alert"
                 >
@@ -698,20 +761,43 @@ async function handlePdfExport() {
                 </div>
                 <div class="space-y-1">
                     <div class="flex items-center justify-between text-[11px]">
-                         <span class="font-black text-slate-700 uppercase tracking-tighter">{{ includedItems.length }} PEDIDOS</span>
+                         <span class="font-black text-slate-700 uppercase tracking-tighter">
+                            {{ isCentralizedReview ? reviewOrderNumbers.length : includedItems.length }} PEDIDOS
+                         </span>
                          <span class="font-black text-brand-700">
                             {{ totalCantidad.toLocaleString('es-MX') }} <small class="text-brand-500 font-bold">PZ</small>
                             <span class="mx-1 text-slate-300">|</span>
                             {{ totalKg.toLocaleString('es-MX', { maximumFractionDigits: 1 }) }} <small class="text-brand-500 font-bold">KG</small>
                          </span>
                     </div>
-                    <p class="text-[9px] font-mono text-brand-600 font-bold truncate p-1.5 bg-brand-50 rounded-lg border border-brand-100 text-center">
+                    <p
+                        class="text-[9px] font-mono text-brand-600 font-bold truncate p-1.5 bg-brand-50 rounded-lg border border-brand-100 text-center"
+                        :title="isCentralizedReview ? 'Las OCs incluidas se enviarán completas a revisión.' : undefined"
+                    >
+                        <template v-if="isCentralizedReview">
+                            {{ reviewOrderNumbers.length }} OC(S) INCLUIDA(S) PARA REVISIÓN
+                        </template>
+                        <template v-else>
                         {{ selectedDays.size > 1 ? 'MIX' : DAY_CODES[Array.from(selectedDays)[0] ?? 1] }}_{{ new Date().toISOString().slice(0,10).replace(/-/g,'') }}.xlsx
+                        </template>
                     </p>
                 </div>
 
                 <div class="space-y-2">
                     <button
+                        v-if="isCentralizedReview"
+                        @click="handleReviewSubmission"
+                        :disabled="reviewProcessing || pdfProcessing || reviewOrderNumbers.length === 0"
+                        title="Enviar las OCs incluidas al flujo de revisión"
+                        class="w-full h-9 border-2 border-indigo-600 text-indigo-700 hover:bg-indigo-50 disabled:bg-slate-50 disabled:text-slate-300 disabled:border-slate-200 rounded-xl font-black text-[11px] transition-all flex items-center justify-center gap-2 group"
+                    >
+                        <i v-if="reviewProcessing" class="fa-solid fa-circle-notch fa-spin"></i>
+                        <i v-else class="fa-solid fa-paper-plane transition-transform group-hover:translate-x-0.5"></i>
+                        {{ reviewProcessing ? 'ENVIANDO...' : 'ENVIAR A REVISIÓN' }}
+                    </button>
+
+                    <button
+                        v-else
                         @click="handleExcelExport"
                         :disabled="!canDownloadExcel || excelProcessing || pdfProcessing || excelExportItems.length === 0"
                         :title="canDownloadExcel ? 'Descargar Excel de OC aprobadas' : excelRestrictionMessage"

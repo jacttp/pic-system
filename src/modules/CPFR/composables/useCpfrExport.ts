@@ -367,7 +367,11 @@ export function useCpfrExport() {
         return filename
     }
 
-    async function generateStorePdfs(selectedItems: ExportTiendaItem[], dayNums: number[]): Promise<ExportPdfResult> {
+    async function generateStorePdfs(
+        selectedItems: ExportTiendaItem[],
+        dayNums: number[],
+        tab?: string
+    ): Promise<ExportPdfResult> {
         const { default: jsPDF } = await import('jspdf')
         const now = new Date()
         const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '')
@@ -382,6 +386,11 @@ export function useCpfrExport() {
         const slate = { r: 45, g: 55, b: 72 }
         const muted = { r: 100, g: 116, b: 139 }
         const lightLine = { r: 224, g: 224, b: 224 }
+        const orderStatusLegend = tab === 'centralizados'
+            ? 'Estado del pedido: NO APROBADO'
+            : tab === 'revision'
+                ? 'Estado del pedido: EN REVISIÓN'
+                : null
 
         for (const storeItem of groupItemsByStore(selectedItems)) {
             const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' })
@@ -456,6 +465,12 @@ export function useCpfrExport() {
             pdf.setFont('helvetica', 'bold')
             pdf.setFontSize(7)
             pdf.text(`Generado ${now.toLocaleDateString('es-MX')} | Dia ${dayCode} | Sucursal ${sucursal}`, margin + 13, y + 7)
+            if (orderStatusLegend) {
+                setText(redDark)
+                pdf.setFont('helvetica', 'bold')
+                pdf.setFontSize(6.6)
+                pdf.text(orderStatusLegend, pageWidth - margin - 4, y + 7, { align: 'right' })
+            }
             pdf.setDrawColor(muted.r, muted.g, muted.b)
             pdf.setLineWidth(0.35)
             pdf.roundedRect(margin + 4, y + 2.8, 5, 5, 0.7, 0.7, 'S')

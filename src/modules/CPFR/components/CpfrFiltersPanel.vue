@@ -226,8 +226,13 @@ async function triggerGenerateZ8() {
             </button>
           </div>
 
-          <button @click.stop="emit('open-export')" class="h-[34px] px-3 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-[11px] font-bold shadow-sm shadow-brand-500/25 transition-all" title="Generar exportacion">
-            <i class="fa-solid fa-wand-magic-sparkles mr-1.5"></i>Generar
+          <button
+            @click.stop="emit('open-export')"
+            class="h-[34px] px-3 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-[11px] font-bold shadow-sm shadow-brand-500/25 transition-all"
+            :title="canRunCentralizedActions ? 'Revisar pedidos centralizados seleccionados' : 'Generar exportación'"
+          >
+            <i class="fa-solid mr-1.5" :class="canRunCentralizedActions ? 'fa-clipboard-check' : 'fa-wand-magic-sparkles'"></i>
+            {{ canRunCentralizedActions ? 'Revisar' : 'Generar' }}
           </button>
         </div>
       </div>
