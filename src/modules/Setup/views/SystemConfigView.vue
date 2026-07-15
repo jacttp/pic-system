@@ -4,7 +4,10 @@ import { useSetupStore } from '../stores/setupStores';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import type { SystemModule, DevStatus, HubFeatureKey, HubMainBlockKey, HubSidebarBlockKey } from '../types/setupTypes';
 import NewModuleModal from '../components/NewModuleModal.vue';
-import { getModuleColorPresetId, MODULE_COLOR_PRESETS } from '@/modules/Shared/design/moduleStyles';
+import {
+    getModuleColorPresetId,
+    MODULE_COLOR_PRESETS,
+} from '@/modules/Shared/design/moduleStyles';
 
 const setupStore = useSetupStore();
 const authStore = useAuthStore();
@@ -202,10 +205,10 @@ const moveLayoutItem = (area: HubLayoutArea, key: HubMainBlockKey | HubSidebarBl
     setupStore.updateHubLayoutOrder(area, key, currentIndex + direction);
 };
 
-const selectModuleColorPreset = (event: Event) => {
-    const presetId = (event.target as HTMLSelectElement).value;
+const applyModuleColorPreset = (presetId: string) => {
+    if (!form.value) return;
     const preset = MODULE_COLOR_PRESETS.find(item => item.id === presetId);
-    if (!preset || !form.value) return;
+    if (!preset) return;
 
     form.value.ModuleColorPreset = preset.id;
     form.value.IconColor = preset.color;
@@ -524,17 +527,18 @@ const selectModuleColorPreset = (event: Event) => {
     </div>
 
     <!-- EDIT MODAL -->
-    <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md animate-in fade-in zoom-in duration-200">
+    <Teleport to="body">
+    <div v-if="showModal" class="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+        <div class="max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-xl animate-in fade-in zoom-in duration-200">
             
-            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+            <div class="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-3 sm:px-6 sm:py-4">
                 <h3 class="font-bold text-lg text-slate-800">Editar Módulo</h3>
                 <button @click="closeEdit" class="text-slate-400 hover:text-red-500">
                     <i class="fa-solid fa-xmark text-xl"></i>
                 </button>
             </div>
 
-            <div class="p-6 space-y-4">
+            <div class="space-y-4 p-5 sm:p-6">
                 
                 <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nombre (Label)</label>
@@ -606,32 +610,43 @@ const selectModuleColorPreset = (event: Event) => {
                     </div>
 
                     <div v-if="form.UsesCustomColors" class="mt-4 border-t border-pic-border pt-4">
-                        <label class="block text-xs font-bold uppercase tracking-wide text-pic-text-muted">Estilo individual</label>
+                        <label class="block text-xs font-bold uppercase tracking-wide text-pic-text-muted">Acento de módulo</label>
                         <div class="mt-2 flex items-center gap-3">
                             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" :class="form.BgColor || 'bg-pic-module-bg'">
                                 <i :class="[form.Icon || 'fa-solid fa-cube', form.IconColor || 'text-pic-module']"></i>
                             </span>
-                            <select
-                                class="h-10 min-w-0 flex-1 rounded-lg border border-pic-border bg-pic-surface px-3 text-sm font-semibold text-pic-text-main outline-none transition focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border"
-                                :value="form.ModuleColorPreset || ''"
-                                @change="selectModuleColorPreset"
+                            <p class="text-xs font-semibold text-pic-text-muted">Selecciona uno de los acentos configurados en UI Standards.</p>
+                        </div>
+                        <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5" role="radiogroup" aria-label="Combinaciones de acento de módulo">
+                            <button
+                                v-for="preset in MODULE_COLOR_PRESETS"
+                                :key="preset.id"
+                                type="button"
+                                class="group flex min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-center transition focus:outline-none focus:ring-2 focus:ring-pic-brand-border"
+                                :class="form.ModuleColorPreset === preset.id
+                                    ? 'border-pic-brand bg-pic-surface shadow-sm ring-1 ring-pic-brand-border'
+                                    : 'border-pic-border bg-pic-surface hover:border-pic-brand-border hover:bg-pic-muted-surface'"
+                                :aria-pressed="form.ModuleColorPreset === preset.id"
+                                @click="applyModuleColorPreset(preset.id)"
                             >
-                                <option value="" disabled>Selecciona un estilo</option>
-                                <option v-for="preset in MODULE_COLOR_PRESETS" :key="preset.id" :value="preset.id">{{ preset.label }}</option>
-                            </select>
+                                <span class="flex h-8 w-8 items-center justify-center rounded-lg" :class="preset.bg">
+                                    <i :class="[form.Icon || 'fa-solid fa-cube', preset.color]"></i>
+                                </span>
+                                <span class="text-[10px] font-bold leading-none text-pic-text-main">{{ preset.label }}</span>
+                            </button>
                         </div>
                         <p class="mt-2 text-[11px] font-medium text-pic-text-muted">
-                            El color sólido se aplica al icono y título; su par suave al fondo del icono y franja de navegación.
+                            Cada combinación usa su par sólido y suave de <span class="font-semibold text-pic-text-main">Acentos de módulo</span>, configurables en UI Standards. El título conserva el token global de texto de la Tarjeta Hub.
                         </p>
                     </div>
                     <p v-else class="mt-3 text-[11px] font-semibold text-pic-brand">
-                        Este módulo usa <span class="font-mono">--pic-module</span>, <span class="font-mono">--pic-module-bg</span> y <span class="font-mono">--pic-module-soft</span>.
+                        Este módulo usa <span class="font-mono">--pic-module</span>, <span class="font-mono">--pic-module-bg</span>, <span class="font-mono">--pic-module-text</span> y <span class="font-mono">--pic-module-soft</span>.
                     </p>
                 </section>
 
             </div>
 
-            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+            <div class="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 px-5 py-3 sm:px-6 sm:py-4">
                 <button @click="closeEdit" class="px-4 py-2 text-slate-500 font-medium hover:bg-slate-100 rounded-lg transition-colors">
                     Cancelar
                 </button>
@@ -642,6 +657,7 @@ const selectModuleColorPreset = (event: Event) => {
 
         </div>
     </div>
+    </Teleport>
 
     <!-- CREATE MODAL -->
     <NewModuleModal

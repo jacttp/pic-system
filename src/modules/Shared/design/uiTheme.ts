@@ -24,7 +24,7 @@ export interface UiThemeTokenDefinition {
   token: string;
   label: string;
   usage: string;
-  group: 'base' | 'navigation' | 'state' | 'module' | 'chart';
+  group: 'base' | 'navigation' | 'state' | 'hub' | 'module' | 'chart';
 }
 
 export const UI_THEME_CATALOG_STORAGE_KEY = 'pic-system:ui-theme-catalog';
@@ -48,9 +48,10 @@ export const uiThemeTokenDefinitions: UiThemeTokenDefinition[] = [
   { token: '--pic-warning', label: 'Warning', usage: 'Advertencias operativas', group: 'state' },
   { token: '--pic-danger', label: 'Danger', usage: 'Errores y acciones destructivas', group: 'state' },
   { token: '--pic-info', label: 'Info', usage: 'Mensajes informativos y ayuda contextual', group: 'state' },
-  { token: '--pic-module', label: 'Módulo global', usage: 'Icono, título y flecha de todas las tarjetas de módulo', group: 'module' },
-  { token: '--pic-module-bg', label: 'Fondo de icono de módulo', usage: 'Fondo del icono de todas las tarjetas de módulo', group: 'module' },
-  { token: '--pic-module-soft', label: 'Franja de módulo', usage: 'Franja inferior de todas las tarjetas de módulo', group: 'module' },
+  { token: '--pic-module', label: 'Icono de módulo', usage: 'Figura sólida del icono de las tarjetas del Hub', group: 'hub' },
+  { token: '--pic-module-bg', label: 'Fondo de icono', usage: 'Marco/fondo del icono de las tarjetas del Hub', group: 'hub' },
+  { token: '--pic-module-text', label: 'Texto y acción', usage: 'Título y flecha de acceso; debe conservar contraste legible', group: 'hub' },
+  { token: '--pic-module-soft', label: 'Franja inferior', usage: 'Superficie de la acción inferior de las tarjetas del Hub', group: 'hub' },
   { token: '--pic-accent-orange', label: 'Modulo naranja', usage: 'Segmentacion, cargas y acciones secundarias', group: 'module' },
   { token: '--pic-accent-orange-soft', label: 'Modulo naranja suave', usage: 'Fondos de icono y hover naranja', group: 'module' },
   { token: '--pic-accent-blue', label: 'Modulo azul', usage: 'Usuarios, productos y consultas', group: 'module' },
@@ -99,6 +100,7 @@ export const defaultUiThemeCatalog: UiThemeCatalog = {
         '--pic-info': '221 83% 53%',
         '--pic-module': '357 84% 45%',
         '--pic-module-bg': '0 86% 97%',
+        '--pic-module-text': '224 39% 12%',
         '--pic-module-soft': '0 86% 97%',
         '--pic-accent-orange': '25 95% 53%',
         '--pic-accent-orange-soft': '26 100% 94%',
@@ -142,6 +144,7 @@ export const defaultUiThemeCatalog: UiThemeCatalog = {
         '--pic-info': '199 89% 48%',
         '--pic-module': '214 90% 45%',
         '--pic-module-bg': '214 100% 97%',
+        '--pic-module-text': '222 47% 11%',
         '--pic-module-soft': '214 100% 97%',
         '--pic-accent-orange': '25 95% 53%',
         '--pic-accent-orange-soft': '26 100% 94%',
@@ -185,6 +188,7 @@ export const defaultUiThemeCatalog: UiThemeCatalog = {
         '--pic-info': '199 89% 48%',
         '--pic-module': '174 72% 32%',
         '--pic-module-bg': '166 76% 97%',
+        '--pic-module-text': '222 47% 11%',
         '--pic-module-soft': '166 76% 97%',
         '--pic-accent-orange': '25 95% 53%',
         '--pic-accent-orange-soft': '26 100% 94%',
@@ -220,6 +224,7 @@ export const cloneUiThemeCatalog = (catalog: UiThemeCatalog = defaultUiThemeCata
       ...palette.tokens,
       '--pic-module': palette.tokens['--pic-module'] || palette.tokens['--pic-brand'] || defaultUiThemeCatalog.palettes[0]!.tokens['--pic-module'],
       '--pic-module-bg': palette.tokens['--pic-module-bg'] || palette.tokens['--pic-module-soft'] || palette.tokens['--pic-brand-soft'] || defaultUiThemeCatalog.palettes[0]!.tokens['--pic-module-bg'],
+      '--pic-module-text': palette.tokens['--pic-module-text'] || palette.tokens['--pic-text-main'] || defaultUiThemeCatalog.palettes[0]!.tokens['--pic-module-text'],
       '--pic-module-soft': palette.tokens['--pic-module-soft'] || palette.tokens['--pic-brand-soft'] || defaultUiThemeCatalog.palettes[0]!.tokens['--pic-module-soft'],
     },
   })),

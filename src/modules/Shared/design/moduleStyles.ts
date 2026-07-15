@@ -20,6 +20,8 @@ export const GLOBAL_MODULE_CARD_STYLE: Pick<ModuleVisualStyle, 'color' | 'bg' | 
 };
 
 export const MODULE_COLOR_PRESETS: ModuleColorPreset[] = [
+  // Referencias semanticas a los pares editables de "Acentos de modulo" en UI Standards.
+  // Sus valores reales cambian con la paleta activa, por eso Setup persiste las clases, no HEX fijos.
   { id: 'orange', label: 'Naranja', color: 'text-pic-accent-orange', bg: 'bg-pic-accent-orange-soft' },
   { id: 'blue', label: 'Azul', color: 'text-pic-accent-blue', bg: 'bg-pic-accent-blue-soft' },
   { id: 'purple', label: 'Morado', color: 'text-pic-accent-purple', bg: 'bg-pic-accent-purple-soft' },

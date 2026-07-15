@@ -46,6 +46,7 @@ body {
     --pic-brand-border: 0 96% 89%;
     --pic-module: 357 84% 45%;
     --pic-module-bg: 0 86% 97%;
+    --pic-module-text: 224 39% 12%;
     --pic-module-soft: 0 86% 97%;
     --pic-surface: 0 0% 100%;
     --pic-background: 216 33% 97%;
@@ -111,6 +112,7 @@ body {
     --pic-brand-border: 357 45% 24%;
     --pic-module: 357 78% 58%;
     --pic-module-bg: 357 40% 12%;
+    --pic-module-text: 210 40% 98%;
     --pic-module-soft: 357 40% 12%;
     --pic-surface: 222 47% 8%;
     --pic-background: 222 47% 5%;

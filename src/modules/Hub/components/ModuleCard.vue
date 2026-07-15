@@ -34,7 +34,7 @@ const linkLabel = computed(() => `Abrir módulo: ${props.title}`);
             >
                 <i :class="icon"></i>
             </span>
-            <h3 class="mt-4 font-sans text-base font-bold leading-tight tracking-tight transition-colors sm:text-lg" :class="colorClass || 'text-pic-module'">
+            <h3 class="mt-4 font-sans text-base font-bold leading-tight tracking-tight text-pic-module-text transition-colors sm:text-lg">
                 {{ title }}
             </h3>
             <p class="mt-1.5 max-w-[18rem] font-sans text-[13px] font-medium leading-[1.35] text-pic-text-muted sm:text-sm">
@@ -43,7 +43,7 @@ const linkLabel = computed(() => `Abrir módulo: ${props.title}`);
         </div>
 
         <div class="flex h-10 shrink-0 items-center justify-end border-t border-pic-border px-4 transition-colors sm:px-5" :class="accentClass || bgClass || 'bg-pic-module-soft'">
-            <span class="flex h-7 w-7 items-center justify-center rounded-md transition duration-200 group-hover:translate-x-0.5 group-hover:bg-pic-surface" :class="colorClass || 'text-pic-module'">
+            <span class="flex h-7 w-7 items-center justify-center rounded-md text-pic-module-text transition duration-200 group-hover:translate-x-0.5 group-hover:bg-[hsl(var(--pic-module-text)/0.08)]">
                 <i class="fa-solid fa-chevron-right text-xs"></i>
             </span>
         </div>
@@ -62,7 +62,7 @@ const linkLabel = computed(() => `Abrir módulo: ${props.title}`);
             >
                 <i :class="icon"></i>
             </span>
-            <h3 class="mt-4 font-sans text-base font-bold leading-tight tracking-tight transition-colors sm:text-lg" :class="colorClass || 'text-pic-module'">
+            <h3 class="mt-4 font-sans text-base font-bold leading-tight tracking-tight text-pic-module-text transition-colors sm:text-lg">
                 {{ title }}
             </h3>
             <p class="mt-1.5 max-w-[18rem] font-sans text-[13px] font-medium leading-[1.35] text-pic-text-muted sm:text-sm">
@@ -71,7 +71,7 @@ const linkLabel = computed(() => `Abrir módulo: ${props.title}`);
         </div>
 
         <div class="flex h-10 shrink-0 items-center justify-end border-t border-pic-border px-4 transition-colors sm:px-5" :class="accentClass || bgClass || 'bg-pic-module-soft'">
-            <span class="flex h-7 w-7 items-center justify-center rounded-md transition duration-200 group-hover:translate-x-0.5 group-hover:bg-pic-surface" :class="colorClass || 'text-pic-module'">
+            <span class="flex h-7 w-7 items-center justify-center rounded-md text-pic-module-text transition duration-200 group-hover:translate-x-0.5 group-hover:bg-[hsl(var(--pic-module-text)/0.08)]">
                 <i class="fa-solid fa-chevron-right text-xs"></i>
             </span>
         </div>
