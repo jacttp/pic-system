@@ -12,6 +12,8 @@ import type {
   SimilarConceptsResult,
   ArticleSuggestion,
   BulkSuggestionProgress,
+  BatchPreview,
+  BatchReviewResult,
 } from '../types/articleClassificationTypes';
 
 const EMPTY_SUMMARY: ClassificationSummary = {
@@ -41,6 +43,16 @@ const EMPTY_BULK_PROGRESS: BulkSuggestionProgress = {
   failed: 0,
   activeConceptIds: [],
   failures: [],
+};
+
+const EMPTY_BATCH_PREVIEW: BatchPreview = {
+  pending: 0,
+  reservedByOther: 0,
+  eligible: 0,
+  proposalsAvailable: 0,
+  readyToApprove: 0,
+  invalidDrafts: 0,
+  missingSuggestion: 0,
 };
 
 const BULK_CONCURRENCY = 2;
@@ -75,6 +87,10 @@ export const useArticleClassificationStore = defineStore('article-classification
   const catalogsLoading = ref(false);
   const catalogsError = ref<string | null>(null);
   const bulkProgress = ref<BulkSuggestionProgress>({ ...EMPTY_BULK_PROGRESS });
+  const batchPreview = ref<BatchPreview>({ ...EMPTY_BATCH_PREVIEW });
+  const batchPreviewLoading = ref(false);
+  const batchRunning = ref(false);
+  const batchResult = ref<BatchReviewResult | null>(null);
   const error = ref<string | null>(null);
 
   const totalPages = computed(() => Math.max(1, Math.ceil(total.value / limit.value)));
@@ -125,9 +141,21 @@ export const useArticleClassificationStore = defineStore('article-classification
   async function initialize() {
     error.value = null;
     try {
-      await Promise.all([fetchQueue(), fetchSummary(), fetchCatalogs()]);
+      await Promise.all([fetchQueue(), fetchSummary(), fetchCatalogs(), fetchBatchPreview()]);
     } catch (requestError) {
       error.value = errorMessage(requestError, 'No fue posible iniciar el modulo.');
+    }
+  }
+
+  async function fetchBatchPreview() {
+    batchPreviewLoading.value = true;
+    try {
+      batchPreview.value = await articleClassificationApi.getBatchPreview();
+    } catch (requestError) {
+      error.value = errorMessage(requestError, 'No fue posible cargar el estado del lote.');
+      throw requestError;
+    } finally {
+      batchPreviewLoading.value = false;
     }
   }
 
@@ -204,7 +232,7 @@ export const useArticleClassificationStore = defineStore('article-classification
       selected.value = null;
       neighbors.value = null;
       suggestion.value = null;
-      await Promise.all([fetchQueue(), fetchSummary()]);
+      await Promise.all([fetchQueue(), fetchSummary(), fetchBatchPreview()]);
     } catch (requestError) {
       error.value = errorMessage(requestError, 'No fue posible guardar la clasificacion.');
       throw requestError;
@@ -222,7 +250,7 @@ export const useArticleClassificationStore = defineStore('article-classification
       selected.value = null;
       neighbors.value = null;
       suggestion.value = null;
-      await Promise.all([fetchQueue(), fetchSummary()]);
+      await Promise.all([fetchQueue(), fetchSummary(), fetchBatchPreview()]);
     } catch (requestError) {
       error.value = errorMessage(requestError, 'No fue posible posponer el concepto.');
       throw requestError;
@@ -234,10 +262,71 @@ export const useArticleClassificationStore = defineStore('article-classification
   async function refresh() {
     error.value = null;
     try {
-      await Promise.all([fetchQueue(), fetchSummary()]);
+      await Promise.all([fetchQueue(), fetchSummary(), fetchBatchPreview()]);
     } catch (requestError) {
       error.value = errorMessage(requestError, 'No fue posible actualizar la bandeja.');
       throw requestError;
+    }
+  }
+
+  async function saveDraft(values: ClassificationValues) {
+    if (!selected.value || saving.value) return;
+    saving.value = true;
+    error.value = null;
+    try {
+      await articleClassificationApi.saveDraft(selected.value.ConceptId, {
+        sourceVersion: selected.value.SourceVersion,
+        values,
+        suggestionId: suggestion.value?.suggestionId || null,
+        draftRevision: selected.value.draft?.revision || 0,
+      });
+      selected.value = await articleClassificationApi.getDetail(selected.value.ConceptId);
+      await fetchBatchPreview();
+    } catch (requestError) {
+      error.value = errorMessage(requestError, 'No fue posible guardar el borrador.');
+      throw requestError;
+    } finally {
+      saving.value = false;
+    }
+  }
+
+  async function applyBatchSuggestions() {
+    if (batchRunning.value) return;
+    batchRunning.value = true;
+    error.value = null;
+    try {
+      const result = await articleClassificationApi.applyBatchSuggestions();
+      batchPreview.value = result.preview;
+      if (selected.value) selected.value = await articleClassificationApi.getDetail(selected.value.ConceptId);
+      return result.applied;
+    } catch (requestError) {
+      error.value = errorMessage(requestError, 'No fue posible aplicar las propuestas al lote.');
+      throw requestError;
+    } finally {
+      batchRunning.value = false;
+    }
+  }
+
+  async function reviewBatch() {
+    if (batchRunning.value) return null;
+    batchRunning.value = true;
+    batchResult.value = null;
+    error.value = null;
+    try {
+      const result = await articleClassificationApi.reviewBatch();
+      batchResult.value = result;
+      if (selected.value) {
+        selected.value = null;
+        neighbors.value = null;
+        suggestion.value = null;
+      }
+      await Promise.all([fetchQueue(), fetchSummary(), fetchBatchPreview()]);
+      return result;
+    } catch (requestError) {
+      error.value = errorMessage(requestError, 'No fue posible aprobar el lote.');
+      throw requestError;
+    } finally {
+      batchRunning.value = false;
     }
   }
 
@@ -393,7 +482,7 @@ export const useArticleClassificationStore = defineStore('article-classification
       bulkProgress.value.running = false;
       bulkProgress.value.activeConceptIds = [];
       try {
-        await Promise.all([fetchQueue(), fetchSummary()]);
+        await Promise.all([fetchQueue(), fetchSummary(), fetchBatchPreview()]);
       } catch (requestError) {
         error.value = errorMessage(requestError, 'Las propuestas terminaron, pero no se pudo actualizar la bandeja.');
       }
@@ -421,9 +510,9 @@ export const useArticleClassificationStore = defineStore('article-classification
     queue, summary, catalogs, catalogMetadata, catalogsGeneratedAt, selected, neighbors, suggestion, neighborDimensions, page, limit, total, search, status,
     queueLoading, detailLoading, neighborsLoading, neighborsError, suggestionLoading, suggestionError,
     catalogsLoading, catalogsError,
-    bulkProgress, saving, error, totalPages,
+    bulkProgress, batchPreview, batchPreviewLoading, batchRunning, batchResult, saving, error, totalPages,
     initialize, fetchQueue, fetchSummary, openConcept, releaseCurrent, renewCurrentClaim,
-    saveReview, skipCurrent, refresh, fetchNeighbors, setNeighborDimensions, fetchSuggestion,
+    saveReview, saveDraft, skipCurrent, refresh, fetchBatchPreview, applyBatchSuggestions, reviewBatch, fetchNeighbors, setNeighborDimensions, fetchSuggestion,
     generateSuggestion, generateAllSuggestions, setSearch, setStatus, setPage,
   };
 });

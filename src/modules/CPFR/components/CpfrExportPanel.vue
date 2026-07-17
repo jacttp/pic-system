@@ -418,7 +418,9 @@ async function handleReviewSubmission() {
         toast({
             title: 'OCs enviadas a revisión',
             description: result.approvalId
-                ? `${updatedOrders} OC(s) enviadas en la solicitud de aprobación #${result.approvalId}.`
+                ? result.approvalCount && result.approvalCount > 1
+                    ? `${updatedOrders} OC(s) distribuidas en ${result.approvalCount} solicitudes de aprobación por tienda.`
+                    : `${updatedOrders} OC(s) enviadas en la solicitud de aprobación #${result.approvalId}.`
                 : `${updatedOrders} OC(s) enviadas a revisión.`,
             duration: 5000,
         })

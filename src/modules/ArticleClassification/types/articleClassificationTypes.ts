@@ -67,7 +67,22 @@ export interface ClassificationAuditEntry {
 
 export interface ClassificationDetail extends ClassificationQueueItem, ClassificationValues {
   ClaimedAt: string | null;
+  draft: ClassificationDraft | null;
+  draftState: DraftState;
   history: ClassificationAuditEntry[];
+}
+
+export type DraftState = 'NO_SUGGESTION' | 'SUGGESTION_AVAILABLE' | 'DRAFT_APPLIED' | 'DRAFT_EDITED' | 'DRAFT_INVALID';
+
+export interface ClassificationDraft {
+  suggestionId: number | null;
+  values: ClassificationValues;
+  isValid: boolean;
+  validation: Record<string, unknown> | null;
+  updatedByUserId: number | null;
+  updatedByUsername: string | null;
+  updatedAt: string | null;
+  revision: number;
 }
 
 export interface ClassificationSummary {
@@ -108,6 +123,33 @@ export interface ReviewPayload {
   sourceVersion: string;
   values: ClassificationValues;
   suggestionId: number | null;
+}
+
+export interface DraftPayload extends ReviewPayload {
+  draftRevision: number;
+}
+
+export interface BatchPreview {
+  pending: number;
+  reservedByOther: number;
+  eligible: number;
+  proposalsAvailable: number;
+  readyToApprove: number;
+  invalidDrafts: number;
+  missingSuggestion: number;
+}
+
+export interface BatchResultItem {
+  conceptId: number;
+  message?: string;
+  correlationId?: string;
+}
+
+export interface BatchReviewResult {
+  saved: BatchResultItem[];
+  failed: BatchResultItem[];
+  conflicted: BatchResultItem[];
+  resolvedExternally: BatchResultItem[];
 }
 
 export type SuggestionDecision = 'INFERRED' | 'COPIED_FROM_REFERENCE' | 'NOT_APPLICABLE' | 'UNKNOWN';

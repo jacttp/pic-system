@@ -109,7 +109,7 @@ export const cpfrApi = {
         return data
     },
 
-    async updateStatusBulk(body: CpfrBulkUpdateStatusBody): Promise<{ success: boolean; approval_id?: number | null; updated_orders?: number }> {
+    async updateStatusBulk(body: CpfrBulkUpdateStatusBody): Promise<{ success: boolean; approval_id?: number | null; approval_ids?: number[]; updated_orders?: number }> {
         const { data } = await api.patch('/cpfr/orders/status/bulk', body)
         return data
     },

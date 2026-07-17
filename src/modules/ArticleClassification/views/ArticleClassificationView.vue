@@ -6,6 +6,7 @@ import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import StdAlert from '@/modules/Shared/components/std/StdAlert.vue';
 import StdButton from '@/modules/Shared/components/std/StdButton.vue';
 import StdPageHeader from '@/modules/Shared/components/std/StdPageHeader.vue';
+import ModalDialog from '@/modules/Shared/components/ModalDialog.vue';
 import ClassificationFieldsForm from '../components/ClassificationFieldsForm.vue';
 import ClassificationHistory from '../components/ClassificationHistory.vue';
 import ClassificationQueue from '../components/ClassificationQueue.vue';
@@ -21,20 +22,21 @@ const { toast } = useToast();
 const {
   queue, summary, catalogs, catalogMetadata, selected, neighbors, suggestion, neighborDimensions, page, total, search, status, totalPages,
   queueLoading, detailLoading, neighborsLoading, neighborsError, suggestionLoading, suggestionError,
-  catalogsLoading, catalogsError, bulkProgress, saving, error,
+  catalogsLoading, catalogsError, bulkProgress, batchPreview, batchPreviewLoading, batchRunning, batchResult, saving, error,
 } = storeToRefs(store);
 
 const mobilePane = ref<'queue' | 'detail'>('queue');
 const showUserGuide = ref(false);
+const showBatchApproval = ref(false);
 let claimRenewalTimer: ReturnType<typeof setInterval> | null = null;
 const currentUserId = computed(() => authStore.user?.id == null ? null : Number(authStore.user.id));
 
-const metrics = computed(() => [
-  { label: 'Sin tomar', value: summary.value.pending, icon: 'fa-regular fa-clock' },
-  { label: 'En revisión', value: summary.value.inReview, icon: 'fa-solid fa-hand' },
-  { label: 'Pospuestos', value: summary.value.skipped, icon: 'fa-solid fa-forward' },
-  { label: 'Aprobados', value: summary.value.approved, icon: 'fa-solid fa-circle-check' },
-]);
+const batchSkippedCount = computed(() => (
+  batchPreview.value.reservedByOther
+  + batchPreview.value.invalidDrafts
+  + batchPreview.value.missingSuggestion
+  + batchPreview.value.proposalsAvailable
+));
 
 onMounted(() => {
   void store.initialize();
@@ -66,6 +68,15 @@ const handleSave = async (values: ClassificationValues) => {
     toast({ title: 'Clasificacion guardada', description: 'El concepto salio de la bandeja pendiente.' });
   } catch {
     toast({ title: 'No se guardo la clasificacion', description: error.value || 'Revisa los datos e intenta otra vez.' });
+  }
+};
+
+const handleSaveDraft = async (values: ClassificationValues) => {
+  try {
+    await store.saveDraft(values);
+    toast({ title: 'Borrador guardado', description: 'Aún no se creó ningún artículo en ArticulosIC.' });
+  } catch {
+    toast({ title: 'No se guardó el borrador', description: error.value || 'Recarga el concepto e intenta nuevamente.' });
   }
 };
 
@@ -129,6 +140,32 @@ const handleGenerateAllSuggestions = async () => {
     toast({ title: 'No se pudo iniciar el lote', description: error.value || 'Revisa la conexion e intenta nuevamente.' });
   }
 };
+
+const handleApplyBatch = async () => {
+  try {
+    const applied = await store.applyBatchSuggestions();
+    toast({
+      title: 'Propuestas preparadas',
+      description: applied ? `${applied} borradores listos para revisión y aprobación.` : 'No había propuestas nuevas por aplicar.',
+    });
+  } catch {
+    toast({ title: 'No se aplicaron las propuestas', description: error.value || 'Intenta nuevamente.' });
+  }
+};
+
+const handleReviewBatch = async () => {
+  try {
+    const result = await store.reviewBatch();
+    showBatchApproval.value = false;
+    if (!result) return;
+    toast({
+      title: 'Lote procesado',
+      description: `${result.saved.length} guardados, ${result.failed.length + result.conflicted.length} pendientes y ${result.resolvedExternally.length} resueltos externamente.`,
+    });
+  } catch {
+    toast({ title: 'No se pudo aprobar el lote', description: error.value || 'Los conceptos pendientes no se modificaron.' });
+  }
+};
 </script>
 
 <template>
@@ -172,12 +209,40 @@ const handleGenerateAllSuggestions = async () => {
 
       <ClassificationUserGuideModal v-model="showUserGuide" />
 
-      <section class="grid grid-cols-2 overflow-hidden rounded-xl border border-pic-border bg-pic-surface shadow-sm sm:grid-cols-4" aria-label="Resumen de la bandeja">
-        <article v-for="metric in metrics" :key="metric.label" class="flex items-center gap-2 border-b border-r border-pic-border px-3 py-2.5 last:border-r-0 sm:border-b-0">
-          <i :class="metric.icon" class="w-4 text-center text-xs text-pic-brand" aria-hidden="true"></i>
-          <p class="text-lg font-bold leading-none tabular-nums text-pic-text-main">{{ metric.value }}</p>
-          <p class="min-w-0 truncate text-[9px] font-bold uppercase tracking-wide text-pic-text-muted">{{ metric.label }}</p>
-        </article>
+      <section class="overflow-hidden rounded-xl border border-pic-brand-border bg-pic-surface shadow-sm" aria-label="Acciones para toda la bandeja">
+        <div class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div>
+            <p class="text-[10px] font-black uppercase tracking-[0.16em] text-pic-brand">Revisión por lote</p>
+            <p class="mt-1 text-sm font-black text-pic-text-main">
+              {{ batchPreview.readyToApprove }} borradores listos para crear artículos
+            </p>
+            <p class="mt-1 text-xs font-semibold leading-5 text-pic-text-muted">
+              {{ batchPreview.proposalsAvailable }} propuestas disponibles · {{ batchPreview.missingSuggestion }} sin propuesta · {{ batchPreview.reservedByOther }} reservados por otra persona.
+            </p>
+          </div>
+          <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <StdButton
+              size="sm"
+              icon="fa-solid fa-layer-group"
+              :disabled="batchRunning || batchPreviewLoading || batchPreview.proposalsAvailable === 0"
+              @click="handleApplyBatch"
+            >
+              Aplicar propuestas a todos
+            </StdButton>
+            <StdButton
+              size="sm"
+              variant="primary"
+              :icon="batchRunning ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-check-double'"
+              :disabled="batchRunning || batchPreviewLoading || batchPreview.readyToApprove === 0"
+              @click="showBatchApproval = true"
+            >
+              Aprobar y guardar todos
+            </StdButton>
+          </div>
+        </div>
+        <div v-if="batchResult" class="border-t border-pic-brand-border bg-pic-brand-soft/40 px-4 py-2.5 text-xs font-semibold text-pic-text-main">
+          Último lote: {{ batchResult.saved.length }} guardados, {{ batchResult.failed.length }} fallidos, {{ batchResult.conflicted.length }} en conflicto y {{ batchResult.resolvedExternally.length }} resueltos externamente.
+        </div>
       </section>
 
       <StdAlert
@@ -229,6 +294,7 @@ const handleGenerateAllSuggestions = async () => {
             :suggestion-loading="suggestionLoading"
             :suggestion-error="suggestionError"
             @save="handleSave"
+            @save-draft="handleSaveDraft"
             @skip="handleSkip"
             @back="handleBack"
             @generate-suggestion="handleGenerateSuggestion"
@@ -277,6 +343,32 @@ const handleGenerateAllSuggestions = async () => {
           </ul>
         </aside>
       </section>
+
+      <ModalDialog v-model="showBatchApproval" title="Aprobar y guardar todos" size="lg">
+        <div class="space-y-4">
+          <div class="rounded-lg border border-pic-brand-border bg-pic-brand-soft p-4">
+            <p class="text-[10px] font-black uppercase tracking-[0.14em] text-pic-brand">Confirmación de lote</p>
+            <p class="mt-2 text-sm font-bold leading-5 text-pic-text-main">
+              Se crearán {{ batchPreview.readyToApprove }} filas en ArticulosIC, una por cada borrador válido.
+            </p>
+          </div>
+          <dl class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div class="rounded-lg border border-pic-border p-3 text-center"><dt class="text-[9px] font-bold uppercase text-pic-text-muted">Listos</dt><dd class="mt-1 text-lg font-black text-pic-brand">{{ batchPreview.readyToApprove }}</dd></div>
+            <div class="rounded-lg border border-pic-border p-3 text-center"><dt class="text-[9px] font-bold uppercase text-pic-text-muted">Sin propuesta</dt><dd class="mt-1 text-lg font-black text-pic-text-main">{{ batchPreview.missingSuggestion }}</dd></div>
+            <div class="rounded-lg border border-pic-border p-3 text-center"><dt class="text-[9px] font-bold uppercase text-pic-text-muted">Inválidos</dt><dd class="mt-1 text-lg font-black text-pic-warning">{{ batchPreview.invalidDrafts }}</dd></div>
+            <div class="rounded-lg border border-pic-border p-3 text-center"><dt class="text-[9px] font-bold uppercase text-pic-text-muted">Omitidos</dt><dd class="mt-1 text-lg font-black text-pic-text-main">{{ batchSkippedCount }}</dd></div>
+          </dl>
+          <p class="text-xs font-semibold leading-5 text-pic-text-muted">
+            Cada concepto se valida y guarda por separado. Un conflicto o fallo queda pendiente para revisión manual y no revierte los registros ya creados.
+          </p>
+        </div>
+        <template #footer>
+          <div class="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <StdButton :disabled="batchRunning" @click="showBatchApproval = false">Cancelar</StdButton>
+            <StdButton variant="primary" icon="fa-solid fa-check-double" :disabled="batchRunning" @click="handleReviewBatch">Confirmar y crear artículos</StdButton>
+          </div>
+        </template>
+      </ModalDialog>
     </div>
   </main>
 </template>

@@ -53,6 +53,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 const emit = defineEmits<{
   (event: 'save', values: ClassificationValues): void;
+  (event: 'save-draft', values: ClassificationValues): void;
   (event: 'skip', reason: string): void;
   (event: 'back'): void;
   (event: 'generate-suggestion'): void;
@@ -106,7 +107,7 @@ const showApprovalConfirmation = ref(false);
 
 const hydrate = () => {
   const next = {} as ClassificationValues;
-  FIELD_KEYS.forEach(field => { next[field] = props.detail[field] ?? null; });
+  FIELD_KEYS.forEach(field => { next[field] = props.detail.draft?.values?.[field] ?? props.detail[field] ?? null; });
   Object.assign(form, next);
   original.value = { ...next };
   showSkip.value = false;
@@ -279,8 +280,9 @@ const copySource = async () => {
         </p>
         <div class="flex shrink-0 gap-2">
           <StdButton size="sm" icon="fa-solid fa-forward" :disabled="saving" @click="showSkip = true">Posponer</StdButton>
+          <StdButton size="sm" icon="fa-regular fa-floppy-disk" :disabled="!canSave" @click="emit('save-draft', { ...form })">Guardar borrador</StdButton>
           <StdButton type="submit" size="sm" variant="primary" :icon="saving ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-check'" :disabled="!canSave">
-            Aprobar y guardar
+            Aprobar y guardar este
           </StdButton>
         </div>
       </div>

@@ -697,7 +697,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         statusFilters.searchSku = ''
     }
 
-    async function updateStatusBulk(body: CpfrBulkUpdateStatusBody): Promise<{ ok: boolean; approvalId?: number; updatedOrders?: number }> {
+    async function updateStatusBulk(body: CpfrBulkUpdateStatusBody): Promise<{ ok: boolean; approvalId?: number; approvalCount?: number; updatedOrders?: number }> {
         try {
             const res = await cpfrApi.updateStatusBulk(body)
             const nums = new Set(body.num_pedidos)
@@ -721,7 +721,12 @@ export const useCpfrStore = defineStore('cpfr', () => {
                     }
                 }
             }
-            return { ok: true, approvalId: res.approval_id ?? undefined, updatedOrders: res.updated_orders ?? body.num_pedidos.length }
+            return {
+                ok: true,
+                approvalId: res.approval_id ?? undefined,
+                approvalCount: res.approval_ids?.length ?? (res.approval_id ? 1 : 0),
+                updatedOrders: res.updated_orders ?? body.num_pedidos.length,
+            }
         } catch (e: any) {
             console.error('[cpfrStore.updateStatusBulk]', e)
             return { ok: false }

@@ -11,6 +11,9 @@ import type {
   ArticleSuggestion,
   SimilarConceptsResult,
   ClassificationQueueItem,
+  BatchPreview,
+  BatchReviewResult,
+  DraftPayload,
 } from '../types/articleClassificationTypes';
 
 const V2 = import.meta.env.VITE_API_V2_PATH;
@@ -72,6 +75,21 @@ export const articleClassificationApi = {
     };
   },
 
+  async getBatchPreview(): Promise<BatchPreview> {
+    const { data } = await api.get<ApiEnvelope<BatchPreview>>(`${BASE}/batch/preview`);
+    return data.data;
+  },
+
+  async applyBatchSuggestions(): Promise<{ applied: number; preview: BatchPreview }> {
+    const { data } = await api.post<ApiEnvelope<{ applied: number; preview: BatchPreview }>>(`${BASE}/batch/apply-suggestions`);
+    return data.data;
+  },
+
+  async reviewBatch(): Promise<BatchReviewResult> {
+    const { data } = await api.post<ApiEnvelope<BatchReviewResult>>(`${BASE}/batch/review`);
+    return data.data;
+  },
+
   async getDetail(conceptId: number): Promise<ClassificationDetail> {
     const { data } = await api.get<ApiEnvelope<ClassificationDetail>>(`${BASE}/${conceptId}`);
     return normalizeDetail(data.data);
@@ -103,6 +121,14 @@ export const articleClassificationApi = {
 
   async releaseClaim(conceptId: number): Promise<void> {
     await api.delete(`${BASE}/${conceptId}/claim`);
+  },
+
+  async saveDraft(conceptId: number, payload: DraftPayload): Promise<void> {
+    await api.put(`${BASE}/${conceptId}/draft`, payload);
+  },
+
+  async deleteDraft(conceptId: number, draftRevision: number): Promise<void> {
+    await api.delete(`${BASE}/${conceptId}/draft`, { data: { draftRevision } });
   },
 
   async review(conceptId: number, payload: ReviewPayload): Promise<void> {
