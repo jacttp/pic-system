@@ -153,6 +153,17 @@ const router = createRouter({
                   title: 'UI Standards'
                }
             },
+            {
+               path: 'article-classification',
+               name: 'article-classification',
+               component: () => import('@/modules/ArticleClassification/views/ArticleClassificationView.vue'),
+               meta: {
+                  requiresAuth: true,
+                  minRoleLevel: 3,
+                  moduleKey: 'ARTICLE_CLASSIFICATION',
+                  title: 'Clasificacion de articulos'
+               }
+            },
             // NUEVA RUTA: Módulo PIC (Fase 2)
             {
                path: 'pic',

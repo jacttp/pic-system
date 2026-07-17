@@ -179,6 +179,13 @@ export const MODULE_VISUAL_STYLES: Record<string, ModuleVisualStyle> = {
     accent: 'bg-[hsl(var(--pic-accent-yellow))]',
     desc: 'Asocia SKUs internos con cadenas, conversiones y parametros operativos CPFR.',
   },
+  ARTICLE_CLASSIFICATION: {
+    color: 'text-[hsl(var(--pic-accent-teal))]',
+    bg: 'bg-[hsl(var(--pic-accent-teal-soft))]',
+    border: 'border-[hsl(var(--pic-accent-teal))]',
+    accent: 'bg-[hsl(var(--pic-accent-teal))]',
+    desc: 'Clasifica conceptos nuevos de ArticulosIC con revision humana y trazabilidad.',
+  },
   UPLOAD_OC: {
     color: 'text-[hsl(var(--pic-accent-orange))]',
     bg: 'bg-[hsl(var(--pic-accent-orange-soft))]',
