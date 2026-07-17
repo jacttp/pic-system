@@ -141,10 +141,18 @@ export const useArticleClassificationStore = defineStore('article-classification
       if (selected.value) await releaseCurrent();
       await articleClassificationApi.claim(conceptId);
       claimed = true;
-      selected.value = await articleClassificationApi.getDetail(conceptId);
+      const detail = await articleClassificationApi.getDetail(conceptId);
+      selected.value = detail;
+      // Preserve the queue order and its scroll position while reflecting the claim locally.
+      // A server reload sorts claimed items first, which makes the selected row jump to the top.
+      queue.value = queue.value.map((item) =>
+        item.ConceptId === conceptId
+          ? { ...item, WorkflowStatus: detail.WorkflowStatus, ClaimedByUserId: detail.ClaimedByUserId, ClaimedByUsername: detail.ClaimedByUsername }
+          : item,
+      );
       void fetchNeighbors();
       void fetchSuggestion();
-      await Promise.all([fetchQueue(), fetchSummary()]);
+      await fetchSummary();
     } catch (requestError) {
       if (claimed && !selected.value) {
         try { await articleClassificationApi.releaseClaim(conceptId); } catch { /* Expirara de forma segura. */ }

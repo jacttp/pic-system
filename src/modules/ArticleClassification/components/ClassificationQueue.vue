@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import type {
   ClassificationQueueItem,
   QueueStatusFilter,
@@ -33,6 +33,8 @@ const emit = defineEmits<{
 }>();
 
 const localSearch = ref(props.search);
+const queueScroller = ref<HTMLElement | null>(null);
+const pendingScrollTop = ref<number | null>(null);
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
 watch(() => props.search, value => { localSearch.value = value; });
@@ -42,24 +44,65 @@ watch(localSearch, value => {
 });
 onBeforeUnmount(() => { if (searchTimer) clearTimeout(searchTimer); });
 
+const handleSelect = (conceptId: number) => {
+  pendingScrollTop.value = queueScroller.value?.scrollTop ?? null;
+  emit('select', conceptId);
+};
+
+watch(() => props.selectedId, async (selectedId) => {
+  if (!selectedId || pendingScrollTop.value === null) return;
+
+  const scrollTop = pendingScrollTop.value;
+  await nextTick();
+  requestAnimationFrame(() => {
+    if (queueScroller.value) queueScroller.value.scrollTop = scrollTop;
+    pendingScrollTop.value = null;
+  });
+});
+
 const decoratedItems = computed(() => props.items.map(item => {
   const isMine = item.WorkflowStatus === 'IN_REVIEW' && item.ClaimedByUserId === props.currentUserId;
   const statusMeta = {
-    PENDING: { label: 'Pendiente', classes: 'bg-[hsl(var(--pic-warning)/0.08)] text-pic-warning border-[hsl(var(--pic-warning)/0.28)]', icon: 'fa-regular fa-clock' },
+    PENDING: {
+      label: 'Pendiente',
+      classes: 'border-[hsl(var(--pic-warning)/0.32)] bg-pic-surface text-pic-warning',
+      icon: 'fa-regular fa-clock',
+    },
     IN_REVIEW: isMine
-      ? { label: 'En tus manos', classes: 'bg-pic-brand-soft text-pic-brand border-pic-brand-border', icon: 'fa-solid fa-hand' }
-      : { label: 'En revision', classes: 'bg-[hsl(var(--pic-info)/0.08)] text-pic-info border-[hsl(var(--pic-info)/0.28)]', icon: 'fa-solid fa-user-lock' },
-    SKIPPED: { label: 'Pospuesto', classes: 'bg-slate-100 text-slate-600 border-slate-200', icon: 'fa-solid fa-forward' },
-    APPROVED: { label: 'Aprobado', classes: 'bg-[hsl(var(--pic-success)/0.08)] text-pic-success border-[hsl(var(--pic-success)/0.28)]', icon: 'fa-solid fa-check' },
+      ? {
+          label: 'En tus manos',
+          classes: 'border-pic-brand-border bg-pic-surface text-pic-brand',
+          icon: 'fa-solid fa-hand',
+        }
+      : {
+          label: 'En revisión',
+          classes: 'border-[hsl(var(--pic-info)/0.32)] bg-pic-surface text-pic-info',
+          icon: 'fa-solid fa-user-lock',
+        },
+    SKIPPED: {
+      label: 'Pospuesto',
+      classes: 'border-pic-border bg-pic-surface text-pic-text-muted',
+      icon: 'fa-solid fa-forward',
+    },
+    APPROVED: {
+      label: 'Aprobado',
+      classes: 'border-[hsl(var(--pic-success)/0.32)] bg-pic-surface text-pic-success',
+      icon: 'fa-solid fa-check',
+    },
   }[item.WorkflowStatus];
 
-  return { ...item, statusMeta, isMine };
+  return {
+    ...item,
+    statusMeta,
+    isMine,
+    isSelected: props.selectedId === item.ConceptId,
+  };
 }));
 
 const statusOptions: Array<{ value: QueueStatusFilter; label: string }> = [
   { value: 'ALL', label: 'Todos los pendientes' },
   { value: 'PENDING', label: 'Sin tomar' },
-  { value: 'IN_REVIEW', label: 'En revision' },
+  { value: 'IN_REVIEW', label: 'En revisión' },
   { value: 'SKIPPED', label: 'Pospuestos' },
 ];
 
@@ -67,97 +110,175 @@ const skeletons = computed(() => Array.from({ length: 6 }, (_, index) => index))
 </script>
 
 <template>
-  <aside class="flex min-h-[520px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:h-[calc(100vh-235px)] lg:min-h-[560px]">
-    <div class="border-b border-slate-200 bg-slate-900 px-4 py-4 text-white">
-      <div class="flex items-center justify-between gap-3">
-        <div>
-          <p class="text-[9px] font-black uppercase tracking-[0.22em] text-slate-400">Bandeja operativa</p>
-          <h2 class="mt-1 text-sm font-black">Conceptos por resolver</h2>
+  <aside
+    aria-label="Bandeja de conceptos por resolver"
+    class="flex min-h-[520px] flex-col overflow-hidden rounded-xl border border-pic-border bg-pic-surface shadow-sm lg:h-[calc(100vh-235px)] lg:min-h-[560px]"
+  >
+    <header class="border-b border-pic-border bg-pic-muted-surface p-3">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="text-[9px] font-semibold uppercase tracking-[0.12em] text-pic-brand">
+            Bandeja operativa
+          </p>
+          <h2 class="mt-0.5 text-sm font-semibold tracking-tight text-pic-text-main">
+            Conceptos por resolver
+          </h2>
         </div>
-        <span class="rounded-lg border border-white/10 bg-white/10 px-2.5 py-1 text-xs font-black tabular-nums">
+        <span class="inline-flex min-w-8 items-center justify-center rounded-md bg-pic-brand px-2 py-1 text-[10px] font-semibold tabular-nums text-white">
           {{ total }}
         </span>
       </div>
-      <div class="relative mt-3">
-        <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400"></i>
+
+      <label class="relative mt-3 block">
+        <span class="sr-only">Buscar en SKUMuliix</span>
+        <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-pic-text-muted" aria-hidden="true"></i>
         <input
           v-model="localSearch"
           type="search"
-          placeholder="Buscar en SKUMuliix..."
-          class="h-9 w-full rounded-lg border border-white/10 bg-white/10 pl-9 pr-3 text-xs font-semibold text-white outline-none placeholder:text-slate-400 focus:border-pic-brand focus:bg-white/15 focus:ring-2 focus:ring-pic-brand/20"
+          placeholder="Buscar en SKUMuliix…"
+          class="h-9 w-full rounded-lg border border-pic-border bg-pic-surface pl-9 pr-3 text-xs font-medium text-pic-text-main outline-none transition placeholder:text-pic-text-muted hover:bg-pic-brand-soft focus:border-pic-brand focus:bg-pic-surface focus:ring-2 focus:ring-pic-brand-border"
         >
-      </div>
-    </div>
+      </label>
 
-    <div class="border-b border-slate-200 bg-slate-50 px-3 py-2.5">
-      <select
-        :value="status"
-        class="h-8 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-black text-slate-600 outline-none focus:border-pic-brand"
-        @change="emit('status', ($event.target as HTMLSelectElement).value as QueueStatusFilter)"
-      >
-        <option v-for="option in statusOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-      </select>
-    </div>
+      <label class="mt-2 block">
+        <span class="sr-only">Filtrar por estado</span>
+        <select
+          :value="status"
+          class="h-8 w-full rounded-lg border border-pic-border bg-pic-surface px-2.5 text-[11px] font-semibold text-pic-text-main outline-none transition hover:bg-pic-brand-soft focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border"
+          @change="emit('status', ($event.target as HTMLSelectElement).value as QueueStatusFilter)"
+        >
+          <option v-for="option in statusOptions" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </option>
+        </select>
+      </label>
+    </header>
 
-    <div class="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
-      <div v-if="loading" class="divide-y divide-slate-100">
-        <div v-for="skeleton in skeletons" :key="skeleton" class="animate-pulse px-4 py-4">
-          <div class="h-3 w-24 rounded bg-slate-100"></div>
-          <div class="mt-3 h-4 w-full rounded bg-slate-100"></div>
-          <div class="mt-2 h-4 w-4/5 rounded bg-slate-100"></div>
+    <div ref="queueScroller" class="custom-scrollbar min-h-0 flex-1 overflow-y-auto bg-pic-surface">
+      <div v-if="loading" class="divide-y divide-pic-border" role="status" aria-live="polite">
+        <span class="sr-only">Cargando conceptos</span>
+        <div v-for="skeleton in skeletons" :key="skeleton" class="animate-pulse px-3 py-3.5">
+          <div class="flex items-start gap-2.5">
+            <div class="h-7 w-7 shrink-0 rounded-md bg-[hsl(var(--pic-text-muted)/0.12)]"></div>
+            <div class="min-w-0 flex-1">
+              <div class="h-3 w-full rounded bg-[hsl(var(--pic-text-muted)/0.12)]"></div>
+              <div class="mt-2 h-3 w-4/5 rounded bg-[hsl(var(--pic-text-muted)/0.10)]"></div>
+              <div class="mt-3 h-6 w-24 rounded-md bg-[hsl(var(--pic-text-muted)/0.10)]"></div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div v-else-if="decoratedItems.length === 0" class="flex h-full min-h-72 flex-col items-center justify-center px-6 text-center">
-        <span class="flex h-12 w-12 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-slate-400">
-          <i class="fa-solid fa-inbox"></i>
+      <div v-else-if="decoratedItems.length === 0" class="flex h-full min-h-72 flex-col items-center justify-center px-6 text-center" role="status">
+        <span class="flex h-11 w-11 items-center justify-center rounded-lg bg-pic-muted-surface text-pic-text-muted">
+          <i class="fa-solid fa-inbox" aria-hidden="true"></i>
         </span>
-        <p class="mt-3 text-sm font-black text-slate-800">Bandeja despejada</p>
-        <p class="mt-1 text-xs font-semibold leading-5 text-slate-500">No hay conceptos para este filtro.</p>
+        <p class="mt-3 text-sm font-semibold text-pic-text-main">Bandeja despejada</p>
+        <p class="mt-1 text-xs font-normal leading-5 text-pic-text-muted">No hay conceptos para este filtro.</p>
       </div>
 
-      <div v-else class="divide-y divide-slate-100">
+      <div v-else class="divide-y divide-pic-border">
         <button
           v-for="item in decoratedItems"
           :key="item.ConceptId"
           type="button"
-          class="group relative w-full px-4 py-3.5 text-left transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-70"
-          :class="selectedId === item.ConceptId ? 'bg-pic-brand-soft shadow-[inset_4px_0_0_0_hsl(var(--pic-brand))] hover:bg-pic-brand-soft' : ''"
+          class="group relative w-full p-3 text-left transition hover:bg-pic-brand-soft focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-pic-brand-border disabled:cursor-wait disabled:opacity-70"
+          :class="item.isSelected ? 'bg-pic-brand-soft shadow-[inset_3px_0_0_0_hsl(var(--pic-brand))] hover:bg-pic-brand-soft' : ''"
           :disabled="disabled"
-          @click="emit('select', item.ConceptId)"
+          :aria-current="item.isSelected ? 'true' : undefined"
+          @click="handleSelect(item.ConceptId)"
         >
-          <div class="flex items-center justify-between gap-2">
-            <span class="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[9px] font-black uppercase tracking-wide" :class="item.statusMeta.classes">
-              <i :class="item.statusMeta.icon"></i>
-              {{ item.statusMeta.label }}
+          <div class="flex items-start gap-2.5">
+            <span
+              class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border text-[10px] font-semibold tabular-nums transition-colors"
+              :class="item.isSelected
+                ? 'border-pic-brand bg-pic-brand text-white'
+                : 'border-pic-brand-border bg-pic-surface text-pic-brand group-hover:border-pic-brand group-hover:bg-pic-brand group-hover:text-white'"
+            >
+              {{ item.ConceptId }}
             </span>
-            <span class="font-mono text-[10px] font-bold text-slate-400">#{{ item.ConceptId }}</span>
+
+            <div class="min-w-0 flex-1">
+              <p class="line-clamp-3 text-xs font-semibold leading-[1.4] text-pic-text-main">
+                {{ item.SKUMuliix }}
+              </p>
+
+              <div class="mt-2 flex min-w-0 flex-wrap items-center gap-2">
+                <span
+                  class="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[9px] font-semibold"
+                  :class="item.statusMeta.classes"
+                >
+                  <i :class="item.statusMeta.icon" aria-hidden="true"></i>
+                  {{ item.statusMeta.label }}
+                </span>
+              </div>
+
+              <p v-if="item.ClaimedByUsername && !item.isMine" class="mt-2 truncate text-[10px] font-normal text-pic-info">
+                <i class="fa-solid fa-user-lock mr-1" aria-hidden="true"></i>{{ item.ClaimedByUsername }}
+              </p>
+              <p v-else-if="item.SkipReason" class="mt-2 line-clamp-2 text-[10px] font-normal leading-4 text-pic-text-muted">
+                <i class="fa-solid fa-forward mr-1" aria-hidden="true"></i>{{ item.SkipReason }}
+              </p>
+            </div>
+
+            <i
+              class="fa-solid fa-chevron-right mt-1 text-[9px] text-pic-text-muted transition-colors group-hover:text-pic-brand"
+              :class="item.isSelected ? 'text-pic-brand' : ''"
+              aria-hidden="true"
+            ></i>
           </div>
-          <p class="mt-2 line-clamp-3 text-xs font-black leading-5 text-slate-800">{{ item.SKUMuliix }}</p>
-          <p v-if="item.ClaimedByUsername && !item.isMine" class="mt-2 truncate text-[10px] font-bold text-pic-info">
-            <i class="fa-solid fa-user-lock mr-1"></i>{{ item.ClaimedByUsername }}
-          </p>
-          <p v-else-if="item.SkipReason" class="mt-2 line-clamp-1 text-[10px] font-bold text-slate-500">
-            <i class="fa-solid fa-forward mr-1"></i>{{ item.SkipReason }}
-          </p>
         </button>
       </div>
     </div>
 
-    <div class="flex items-center justify-between border-t border-slate-200 bg-white px-3 py-2.5">
-      <button type="button" class="h-8 w-8 rounded-lg border border-slate-200 text-slate-500 transition hover:border-pic-brand-border hover:text-pic-brand disabled:opacity-30" :disabled="page <= 1 || loading" @click="emit('page', page - 1)">
-        <i class="fa-solid fa-chevron-left text-xs"></i>
+    <footer class="flex items-center justify-between border-t border-pic-border bg-pic-muted-surface px-3 py-2.5">
+      <button
+        type="button"
+        class="flex h-8 w-8 items-center justify-center rounded-md border border-pic-border bg-pic-surface text-pic-text-muted transition hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pic-brand-border disabled:cursor-not-allowed disabled:opacity-30"
+        :disabled="page <= 1 || loading"
+        aria-label="Página anterior"
+        @click="emit('page', page - 1)"
+      >
+        <i class="fa-solid fa-chevron-left text-[10px]" aria-hidden="true"></i>
       </button>
-      <span class="text-[10px] font-black uppercase tracking-wide text-slate-500">Pagina {{ page }} de {{ totalPages }}</span>
-      <button type="button" class="h-8 w-8 rounded-lg border border-slate-200 text-slate-500 transition hover:border-pic-brand-border hover:text-pic-brand disabled:opacity-30" :disabled="page >= totalPages || loading" @click="emit('page', page + 1)">
-        <i class="fa-solid fa-chevron-right text-xs"></i>
+
+      <span class="text-[10px] font-medium text-pic-text-muted">
+        Página <strong class="font-semibold text-pic-text-main">{{ page }}</strong> de {{ totalPages }}
+      </span>
+
+      <button
+        type="button"
+        class="flex h-8 w-8 items-center justify-center rounded-md border border-pic-border bg-pic-surface text-pic-text-muted transition hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pic-brand-border disabled:cursor-not-allowed disabled:opacity-30"
+        :disabled="page >= totalPages || loading"
+        aria-label="Página siguiente"
+        @click="emit('page', page + 1)"
+      >
+        <i class="fa-solid fa-chevron-right text-[10px]" aria-hidden="true"></i>
       </button>
-    </div>
+    </footer>
   </aside>
 </template>
 
 <style scoped>
-.custom-scrollbar::-webkit-scrollbar { width: 6px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: #f8fafc; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+.custom-scrollbar {
+  scrollbar-color: hsl(var(--pic-border)) hsl(var(--pic-surface));
+  scrollbar-width: thin;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: hsl(var(--pic-surface));
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--pic-border));
+  border-radius: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--pic-brand-border));
+}
 </style>
