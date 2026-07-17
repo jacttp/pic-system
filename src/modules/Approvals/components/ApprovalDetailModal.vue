@@ -2,17 +2,20 @@
 <script setup lang="ts">
 import { ref, computed, reactive, watch } from 'vue';
 import type { Approval } from '../types/approval.types';
-import { APPROVAL_TYPE_CONFIG } from '../types/approval.types';
+import { APPROVAL_STATUS_CONFIG, APPROVAL_TYPE_CONFIG } from '../types/approval.types';
 import { useApprovalsStore } from '../stores/approvalsStore';
 import { approvalsApi } from '../services/approvalsApi';
-import ApprovalStatusBadge from './ApprovalStatusBadge.vue';
+import ApprovalStatusSelector from './ApprovalStatusSelector.vue';
 import logoUrl from '@/assets/logo.png';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
    modelValue: boolean
    approval: Approval | null
    canResolve: boolean
-}>();
+   canCancel?: boolean
+}>(), {
+   canCancel: false,
+});
 
 interface CpfrPreviewRow {
    id_cliente: string
@@ -111,12 +114,13 @@ interface CpfrStoreGroup {
    totalKg: number
 }
 
-const emit = defineEmits(['update:modelValue', 'resolved']);
+const emit = defineEmits(['update:modelValue', 'resolved', 'cancelled']);
 
 const approvalsStore = useApprovalsStore();
 
 const resolutionComment = ref('');
 const isSubmitting = ref(false);
+const isCancelling = ref(false);
 const errorMessage = ref('');
 const isLoadingCpfrDetail = ref(false);
 const cpfrDetailError = ref('');
@@ -793,6 +797,30 @@ const handleConfirm = async () => {
       isSubmitting.value = false;
    }
 };
+
+const handleCancel = async () => {
+   if (!props.approval || !props.canCancel || isCancelling.value) return;
+
+   const currentStatus = APPROVAL_STATUS_CONFIG[props.approval.status]?.label || props.approval.status;
+   const scope = props.approval.type === 'CPFR_ORDER'
+      ? ' Las OC asociadas volverán a borrador en CPFR y a pendiente en la orden de compra.'
+      : '';
+   if (!confirm(
+      `Se cambiará la solicitud "${props.approval.title}" de "${currentStatus}" a "Cancelada".${scope}\n\n¿Deseas continuar?`
+   )) return;
+
+   isCancelling.value = true;
+   errorMessage.value = '';
+   try {
+      await approvalsStore.cancelApproval(props.approval.id);
+      emit('cancelled', props.approval.type === 'CPFR_ORDER');
+      closeModal();
+   } catch (e: any) {
+      errorMessage.value = e.response?.data?.message || 'No se pudo cancelar la solicitud.';
+   } finally {
+      isCancelling.value = false;
+   }
+};
 </script>
 
 <template>
@@ -819,7 +847,12 @@ const handleConfirm = async () => {
                   <i class="fa-solid fa-arrow-left text-[10px]"></i>
                   Volver
                </button>
-               <ApprovalStatusBadge :status="approval.status" />
+               <ApprovalStatusSelector
+                  :status="approval.status"
+                  :options="canCancel ? ['CANCELLED'] : []"
+                  :disabled="isCancelling"
+                  @select="handleCancel"
+               />
             </div>
          </div>
 
@@ -873,7 +906,7 @@ const handleConfirm = async () => {
             </div>
 
             <section class="space-y-3">
-               <section class="overflow-hidden rounded-xl border border-white/10 bg-pic-nav text-pic-nav-text shadow-sm">
+               <section class="rounded-xl border border-white/10 bg-pic-nav text-pic-nav-text shadow-sm">
                   <div class="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                      <div class="flex min-w-0 items-start gap-3.5">
                         <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-pic-brand-soft text-pic-brand ring-1 ring-pic-brand-border">
@@ -884,7 +917,13 @@ const handleConfirm = async () => {
                            <h3 class="mt-0.5 break-words text-sm font-bold leading-5 text-pic-nav-text sm:text-base md:text-lg">OV {{ cpfrNumPedido }}</h3>
                         </div>
                      </div>
-                     <ApprovalStatusBadge :status="approval.status" dark />
+                     <ApprovalStatusSelector
+                        :status="approval.status"
+                        :options="canCancel ? ['CANCELLED'] : []"
+                        :disabled="isCancelling"
+                        dark
+                        @select="handleCancel"
+                     />
                   </div>
 
                   <div class="border-t border-white/10 px-4 py-3 sm:px-5">
@@ -1474,7 +1513,7 @@ const handleConfirm = async () => {
          <div v-if="canResolve && approval.status === 'PENDING'" class="border-t border-slate-100 pt-4 space-y-3">
             <p class="text-sm font-semibold text-slate-700">Resolver solicitud</p>
 
-            <div>
+            <div v-if="canResolve">
                <label class="block text-xs font-medium text-slate-600 mb-1">Comentarios <span class="text-slate-400">(opcional)</span></label>
                <textarea 
                   v-model="resolutionComment"
@@ -1486,8 +1525,9 @@ const handleConfirm = async () => {
 
             <div class="flex justify-end">
                <button
+                  v-if="canResolve"
                   @click="handleConfirm"
-                  :disabled="isSubmitting"
+                  :disabled="isSubmitting || isCancelling"
                   class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-70 sm:w-auto"
                >
                   <i :class="isSubmitting ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-check'" class="text-xs"></i>

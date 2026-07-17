@@ -8,9 +8,14 @@ interface Props {
   currentValues: ClassificationValues;
   loading?: boolean;
   error?: string | null;
+  canDelete?: boolean;
 }
-const props = withDefaults(defineProps<Props>(), { loading: false, error: null });
-const emit = defineEmits<{ (event: 'generate'): void; (event: 'apply-all'): void }>();
+const props = withDefaults(defineProps<Props>(), { loading: false, error: null, canDelete: false });
+const emit = defineEmits<{
+  (event: 'generate'): void;
+  (event: 'apply-all'): void;
+  (event: 'delete'): void;
+}>();
 const FIELDS = ['SkuReal', 'Marca', 'Grupo', 'Status', 'Nombre', 'Canibalizacion', 'EmpaqueA', 'Categorias', 'TipoCom', 'Id_SkuRetail', 'EmpaqueB', 'Peso', 'Contol', 'TipoEsqDis', 'GrupoOP'] as ClassificationField[];
 const TYPE_LABELS = { PRODUCT: 'Producto', CHARGE: 'Cargo', RETURN: 'Devolución', SERVICE: 'Servicio', EQUIPMENT: 'Equipo', REBILLING: 'Refacturación', OTHER: 'Otro' };
 const appliedCount = computed(() => props.suggestion ? FIELDS.filter(field => props.currentValues[field] === props.suggestion?.values[field]).length : 0);
@@ -32,11 +37,21 @@ const appliedCount = computed(() => props.suggestion ? FIELDS.filter(field => pr
         </p>
       </div>
       <div class="flex shrink-0 gap-2">
+        <StdButton
+          v-if="suggestion && canDelete"
+          size="icon"
+          variant="ghost"
+          icon="fa-regular fa-trash-can"
+          :disabled="loading"
+          aria-label="Borrar propuesta"
+          title="Borrar propuesta"
+          @click="emit('delete')"
+        />
         <StdButton size="sm" :icon="loading ? 'fa-solid fa-circle-notch fa-spin' : suggestion ? 'fa-solid fa-arrows-rotate' : 'fa-solid fa-wand-magic-sparkles'" :disabled="loading" @click="emit('generate')">
-          {{ suggestion ? 'Regenerar' : 'Generar' }}
+          {{ suggestion ? 'Regenerar' : 'Crear propuesta' }}
         </StdButton>
         <StdButton v-if="suggestion" size="sm" variant="primary" icon="fa-solid fa-arrow-down" :disabled="loading || appliedCount === 15" @click="emit('apply-all')">
-          Aplicar propuesta
+          Aplicar
         </StdButton>
       </div>
     </div>

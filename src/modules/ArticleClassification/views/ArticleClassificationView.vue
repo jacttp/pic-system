@@ -28,8 +28,32 @@ const {
 const mobilePane = ref<'queue' | 'detail'>('queue');
 const showUserGuide = ref(false);
 const showBatchApproval = ref(false);
+const deleteSuggestionMode = ref<'one' | 'all' | null>(null);
 let claimRenewalTimer: ReturnType<typeof setInterval> | null = null;
 const currentUserId = computed(() => authStore.user?.id == null ? null : Number(authStore.user.id));
+const showDeleteSuggestionConfirmation = computed({
+  get: () => deleteSuggestionMode.value !== null,
+  set: (visible: boolean) => { if (!visible) deleteSuggestionMode.value = null; },
+});
+const deleteSuggestionRunning = computed(() => (
+  deleteSuggestionMode.value === 'all' ? batchRunning.value : suggestionLoading.value
+));
+const batchHeadline = computed(() => {
+  if (batchPreviewLoading.value) return 'Actualizando estado';
+  if (batchPreview.value.readyToApprove > 0) return `${batchPreview.value.readyToApprove} listos para aprobar`;
+  if (batchPreview.value.proposalsAvailable > 0) return `${batchPreview.value.proposalsAvailable} propuestas por revisar`;
+  if (batchPreview.value.missingSuggestion > 0) return `${batchPreview.value.missingSuggestion} conceptos sin propuesta`;
+  if (batchPreview.value.invalidDrafts > 0) return `${batchPreview.value.invalidDrafts} borradores requieren atención`;
+  return 'Sin acciones pendientes';
+});
+const batchDetail = computed(() => {
+  const parts: string[] = [];
+  if (batchPreview.value.proposalsAvailable > 0) parts.push(`${batchPreview.value.proposalsAvailable} con propuesta`);
+  if (batchPreview.value.missingSuggestion > 0) parts.push(`${batchPreview.value.missingSuggestion} sin propuesta`);
+  if (batchPreview.value.invalidDrafts > 0) parts.push(`${batchPreview.value.invalidDrafts} por corregir`);
+  if (batchPreview.value.reservedByOther > 0) parts.push(`${batchPreview.value.reservedByOther} reservados`);
+  return parts.join(' · ') || 'La bandeja no requiere acciones masivas.';
+});
 
 const batchSkippedCount = computed(() => (
   batchPreview.value.reservedByOther
@@ -125,6 +149,33 @@ const handleGenerateSuggestion = async () => {
   }
 };
 
+const handleDeleteSuggestion = () => { deleteSuggestionMode.value = 'one'; };
+
+const confirmDeleteSuggestions = async () => {
+  const mode = deleteSuggestionMode.value;
+  if (!mode) return;
+  try {
+    if (mode === 'one') {
+      await store.deleteSuggestion();
+      toast({ title: 'Propuesta borrada', description: 'El concepto queda disponible para captura manual o para generar otra propuesta.' });
+    } else {
+      const result = await store.deleteAllUnusedSuggestions();
+      if (result) {
+        toast({
+          title: 'Propuestas borradas',
+          description: `${result.deleted} propuestas eliminadas en ${result.affectedConcepts} conceptos.`,
+        });
+      }
+    }
+    deleteSuggestionMode.value = null;
+  } catch {
+    toast({
+      title: mode === 'one' ? 'No se pudo borrar la propuesta' : 'No se pudieron borrar las propuestas',
+      description: (mode === 'one' ? suggestionError.value : error.value) || 'Recarga e intenta nuevamente.',
+    });
+  }
+};
+
 const handleGenerateAllSuggestions = async () => {
   const confirmed = window.confirm(
     'Se generaran propuestas para toda la bandeja que aun no tenga una. Esto consume creditos de OpenAI, pero no aprueba ni inserta registros en ArticulosIC. ¿Continuar?',
@@ -153,6 +204,8 @@ const handleApplyBatch = async () => {
   }
 };
 
+const handleDeleteAllSuggestions = () => { deleteSuggestionMode.value = 'all'; };
+
 const handleReviewBatch = async () => {
   try {
     const result = await store.reviewBatch();
@@ -179,65 +232,78 @@ const handleReviewBatch = async () => {
         :meta="`${summary.total} por resolver`"
       >
         <template #actions>
-          <button
-            type="button"
-            class="flex h-8 w-8 items-center justify-center rounded-full border border-pic-border bg-pic-surface text-xs text-pic-text-muted shadow-sm transition hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand focus:outline-none focus:ring-2 focus:ring-pic-brand-border"
+          <StdButton
+            size="icon"
+            variant="ghost"
+            icon="fa-solid fa-question"
             aria-label="Abrir guía de uso"
             title="Guía de uso"
             @click="showUserGuide = true"
-          >
-            <i class="fa-solid fa-question" aria-hidden="true"></i>
-          </button>
+          />
           <StdButton
-            size="sm"
-            :icon="bulkProgress.running ? 'fa-solid fa-gears fa-beat-fade' : 'fa-solid fa-wand-magic-sparkles'"
-            :disabled="bulkProgress.running || queueLoading || summary.total === 0"
-            @click="handleGenerateAllSuggestions"
-          >
-            {{ bulkProgress.running ? `${bulkProgress.processed}/${bulkProgress.total}` : 'Generar pendientes' }}
-          </StdButton>
-          <StdButton
-            size="sm"
+            size="icon"
+            variant="ghost"
             :icon="queueLoading ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-rotate'"
             :disabled="queueLoading"
+            aria-label="Actualizar datos"
+            title="Vuelve a consultar la lista, el total por resolver y el estado del lote; no genera ni aplica propuestas."
             @click="handleRefresh"
-          >
-            Actualizar bandeja
-          </StdButton>
+          />
         </template>
       </StdPageHeader>
 
       <ClassificationUserGuideModal v-model="showUserGuide" />
 
-      <section class="overflow-hidden rounded-xl border border-pic-brand-border bg-pic-surface shadow-sm" aria-label="Acciones para toda la bandeja">
+      <section class="relative overflow-hidden rounded-xl border border-pic-border bg-pic-surface shadow-sm" aria-label="Acciones para toda la bandeja">
+        <span class="absolute inset-y-0 left-0 w-1 bg-pic-brand" aria-hidden="true"></span>
         <div class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div>
             <p class="text-[10px] font-black uppercase tracking-[0.16em] text-pic-brand">Revisión por lote</p>
-            <p class="mt-1 text-sm font-black text-pic-text-main">
-              {{ batchPreview.readyToApprove }} borradores listos para crear artículos
-            </p>
-            <p class="mt-1 text-xs font-semibold leading-5 text-pic-text-muted">
-              {{ batchPreview.proposalsAvailable }} propuestas disponibles · {{ batchPreview.missingSuggestion }} sin propuesta · {{ batchPreview.reservedByOther }} reservados por otra persona.
-            </p>
+            <p class="mt-1 text-sm font-black text-pic-text-main">{{ batchHeadline }}</p>
+            <p class="mt-1 text-xs font-semibold leading-5 text-pic-text-muted">{{ batchDetail }}</p>
           </div>
-          <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
             <StdButton
+              v-if="bulkProgress.running || (!batchPreviewLoading && batchPreview.missingSuggestion > 0)"
               size="sm"
-              icon="fa-solid fa-layer-group"
-              :disabled="batchRunning || batchPreviewLoading || batchPreview.proposalsAvailable === 0"
-              @click="handleApplyBatch"
+              :variant="batchPreview.proposalsAvailable === 0 && batchPreview.readyToApprove === 0 ? 'primary' : 'secondary'"
+              :icon="bulkProgress.running ? 'fa-solid fa-gears fa-beat-fade' : 'fa-solid fa-wand-magic-sparkles'"
+              :disabled="bulkProgress.running || batchRunning || queueLoading"
+              @click="handleGenerateAllSuggestions"
             >
-              Aplicar propuestas a todos
+              {{ bulkProgress.running ? `${bulkProgress.processed}/${bulkProgress.total}` : 'Generar propuestas' }}
             </StdButton>
             <StdButton
+              v-if="!batchPreviewLoading && batchPreview.proposalsAvailable > 0"
+              size="sm"
+              :variant="batchPreview.readyToApprove === 0 ? 'primary' : 'secondary'"
+              icon="fa-solid fa-arrow-down"
+              :disabled="batchRunning"
+              @click="handleApplyBatch"
+            >
+              Aplicar
+            </StdButton>
+            <StdButton
+              v-if="!batchPreviewLoading && batchPreview.readyToApprove > 0"
               size="sm"
               variant="primary"
               :icon="batchRunning ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-check-double'"
-              :disabled="batchRunning || batchPreviewLoading || batchPreview.readyToApprove === 0"
+              :disabled="batchRunning"
               @click="showBatchApproval = true"
             >
-              Aprobar y guardar todos
+              Aprobar lote
             </StdButton>
+            <StdButton
+              v-if="!batchPreviewLoading && batchPreview.proposalsAvailable > 0"
+              size="icon"
+              variant="ghost"
+              class="self-end sm:ml-1 sm:self-auto"
+              icon="fa-regular fa-trash-can"
+              :disabled="batchRunning"
+              aria-label="Borrar todas las propuestas sin aplicar"
+              title="Borrar todas las propuestas sin aplicar"
+              @click="handleDeleteAllSuggestions"
+            />
           </div>
         </div>
         <div v-if="batchResult" class="border-t border-pic-brand-border bg-pic-brand-soft/40 px-4 py-2.5 text-xs font-semibold text-pic-text-main">
@@ -298,6 +364,7 @@ const handleReviewBatch = async () => {
             @skip="handleSkip"
             @back="handleBack"
             @generate-suggestion="handleGenerateSuggestion"
+            @delete-suggestion="handleDeleteSuggestion"
           />
 
           <div v-else class="workbench-empty flex min-h-[520px] items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white px-6 text-center shadow-sm lg:h-[calc(100vh-235px)] lg:min-h-[560px]">
@@ -344,7 +411,7 @@ const handleReviewBatch = async () => {
         </aside>
       </section>
 
-      <ModalDialog v-model="showBatchApproval" title="Aprobar y guardar todos" size="lg">
+      <ModalDialog v-model="showBatchApproval" title="Aprobar lote" size="lg">
         <div class="space-y-4">
           <div class="rounded-lg border border-pic-brand-border bg-pic-brand-soft p-4">
             <p class="text-[10px] font-black uppercase tracking-[0.14em] text-pic-brand">Confirmación de lote</p>
@@ -365,7 +432,43 @@ const handleReviewBatch = async () => {
         <template #footer>
           <div class="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <StdButton :disabled="batchRunning" @click="showBatchApproval = false">Cancelar</StdButton>
-            <StdButton variant="primary" icon="fa-solid fa-check-double" :disabled="batchRunning" @click="handleReviewBatch">Confirmar y crear artículos</StdButton>
+            <StdButton variant="primary" icon="fa-solid fa-check-double" :disabled="batchRunning" @click="handleReviewBatch">Crear artículos</StdButton>
+          </div>
+        </template>
+      </ModalDialog>
+
+      <ModalDialog
+        v-model="showDeleteSuggestionConfirmation"
+        :title="deleteSuggestionMode === 'all' ? 'Borrar todas las propuestas' : 'Borrar propuesta'"
+        size="lg"
+      >
+        <div class="space-y-4">
+          <div class="rounded-lg border border-[hsl(var(--pic-danger)/0.24)] bg-[hsl(var(--pic-danger)/0.06)] p-4">
+            <p class="text-[10px] font-black uppercase tracking-[0.14em] text-pic-danger">Propuestas sin aplicar</p>
+            <p class="mt-2 text-sm font-bold leading-5 text-pic-text-main">
+              <template v-if="deleteSuggestionMode === 'all'">
+                Se borrarán las propuestas de {{ batchPreview.proposalsAvailable }} conceptos elegibles sin borrador.
+              </template>
+              <template v-else>
+                Se borrará únicamente la propuesta visible de este concepto.
+              </template>
+            </p>
+          </div>
+          <p class="text-xs font-semibold leading-5 text-pic-text-muted">
+            No se modificará ArticulosIC. Las propuestas ya aplicadas, los borradores y las reservas de otra persona se conservarán.
+          </p>
+        </div>
+        <template #footer>
+          <div class="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <StdButton :disabled="deleteSuggestionRunning" @click="showDeleteSuggestionConfirmation = false">Cancelar</StdButton>
+            <StdButton
+              variant="danger"
+              :icon="deleteSuggestionRunning ? 'fa-solid fa-circle-notch fa-spin' : 'fa-regular fa-trash-can'"
+              :disabled="deleteSuggestionRunning"
+              @click="confirmDeleteSuggestions"
+            >
+              {{ deleteSuggestionMode === 'all' ? 'Borrar todas' : 'Borrar propuesta' }}
+            </StdButton>
           </div>
         </template>
       </ModalDialog>

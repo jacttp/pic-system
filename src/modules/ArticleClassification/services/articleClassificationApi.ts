@@ -85,6 +85,13 @@ export const articleClassificationApi = {
     return data.data;
   },
 
+  async deleteAllUnusedSuggestions(): Promise<{ deleted: number; affectedConcepts: number; conceptIds: number[] }> {
+    const { data } = await api.delete<ApiEnvelope<{ deleted: number; affectedConcepts: number; conceptIds: number[] }>>(
+      `${BASE}/batch/suggestions`,
+    );
+    return data.data;
+  },
+
   async reviewBatch(): Promise<BatchReviewResult> {
     const { data } = await api.post<ApiEnvelope<BatchReviewResult>>(`${BASE}/batch/review`);
     return data.data;
@@ -113,6 +120,10 @@ export const articleClassificationApi = {
       requestKey,
     });
     return data.data;
+  },
+
+  async deleteSuggestion(conceptId: number, suggestionId: number): Promise<void> {
+    await api.delete(`${BASE}/${conceptId}/suggestions/${suggestionId}`);
   },
 
   async claim(conceptId: number): Promise<void> {

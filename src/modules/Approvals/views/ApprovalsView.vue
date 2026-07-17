@@ -8,8 +8,10 @@ import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import type { Approval, ApprovalStatus, ApprovalType } from '../types/approval.types';
 import { APPROVAL_STATUS_CONFIG, APPROVAL_TYPE_CONFIG } from '../types/approval.types';
 import ApprovalDetailModal from '../components/ApprovalDetailModal.vue';
+import ApprovalStatusSelector from '../components/ApprovalStatusSelector.vue';
 import ManagementTray from '@/modules/Shared/components/ManagementTray.vue';
 import StdButton from '@/modules/Shared/components/std/StdButton.vue';
+import { toast } from '@/components/ui/toast/use-toast';
 
 type SortKey = 'recent' | 'oldest' | 'status';
 
@@ -22,7 +24,6 @@ interface ApprovalRow {
    approval: Approval
    typeIcon: string
    statusLabel: string
-   statusIcon: string
    requestedDate: string
    requestedTime: string
    storeName: string
@@ -60,6 +61,7 @@ const filters = reactive<FilterState>({
 
 const showDetailModal = ref(false);
 const selectedApproval = ref<Approval | null>(null);
+const cancellingApprovalId = ref<number | null>(null);
 const isDetailOpen = computed(() => showDetailModal.value && selectedApproval.value !== null);
 const isCompactFiltersOpen = ref(false);
 
@@ -202,6 +204,11 @@ const compactFiltersLabel = computed(() => {
    if (activeFiltersCount.value === 0) return 'Mostrar filtros';
    return `${activeFiltersCount.value} filtro${activeFiltersCount.value === 1 ? '' : 's'} activo${activeFiltersCount.value === 1 ? '' : 's'}`;
 });
+const canCancelSelected = computed(() => Boolean(
+   selectedApproval.value
+   && ['PENDING', 'APPROVED'].includes(selectedApproval.value.status)
+   && isSuperAdmin.value
+));
 
 const sortedRows = computed<ApprovalRow[]>(() => {
    const rows = filteredApprovals.value.map(toApprovalRow);
@@ -261,6 +268,59 @@ const handleResolved = () => {
    approvalsStore.fetchAssignedApprovals();
    approvalsStore.fetchApprovals();
    profileStore.fetchNotifications();
+};
+
+const canCancelApproval = (approval: Approval) =>
+   isSuperAdmin.value && ['PENDING', 'APPROVED'].includes(approval.status);
+
+const statusChangeOptions = (approval: Approval): ApprovalStatus[] =>
+   canCancelApproval(approval) ? ['CANCELLED'] : [];
+
+const handleStatusSelection = (approval: Approval, status: ApprovalStatus) => {
+   if (status === 'CANCELLED') handleCancelApproval(approval);
+};
+
+const handleCancelApproval = async (approval: Approval, event?: Event) => {
+   event?.stopPropagation();
+   if (!canCancelApproval(approval) || cancellingApprovalId.value !== null) return;
+
+   const currentStatus = APPROVAL_STATUS_CONFIG[approval.status]?.label || approval.status;
+   const scope = approval.type === 'CPFR_ORDER'
+      ? ' Las OC asociadas volverán a borrador en CPFR y a pendiente en la orden de compra.'
+      : '';
+   if (!confirm(
+      `Se cambiará la solicitud "${approval.title}" de "${currentStatus}" a "Cancelada".${scope}\n\n¿Deseas continuar?`
+   )) return;
+
+   cancellingApprovalId.value = approval.id;
+   try {
+      await approvalsStore.cancelApproval(approval.id);
+      await profileStore.fetchNotifications();
+      toast({
+         title: 'Solicitud cancelada',
+         description: approval.type === 'CPFR_ORDER'
+            ? 'Las OC asociadas regresaron al flujo inicial.'
+            : 'La solicitud quedó cancelada.',
+      });
+   } catch (error: any) {
+      toast({
+         title: 'No se pudo cancelar',
+         description: error.response?.data?.message || 'Intenta nuevamente.',
+         variant: 'destructive',
+      });
+   } finally {
+      cancellingApprovalId.value = null;
+   }
+};
+
+const handleCancelled = (isCpfr: boolean) => {
+   handleResolved();
+   toast({
+      title: 'Solicitud cancelada',
+      description: isCpfr
+         ? 'Las OC asociadas regresaron al flujo inicial.'
+         : 'La solicitud quedó cancelada.',
+   });
 };
 
 const canDeleteCancelled = (approval: Approval) =>
@@ -337,7 +397,6 @@ function toApprovalRow(approval: Approval): ApprovalRow {
       approval,
       typeIcon: typeConfig.icon,
       statusLabel: statusConfig.label,
-      statusIcon: statusConfig.icon,
       requestedDate: formatDate(requestedAt),
       requestedTime: formatTime(requestedAt),
       storeName: buildStoreName(approval),
@@ -440,17 +499,6 @@ function embarqueStatusClass(tone: ApprovalRow['embarqueTone']) {
    };
 
    return classes[tone];
-}
-
-function approvalStatusClass(status: ApprovalStatus) {
-   const classes: Record<ApprovalStatus, string> = {
-      PENDING: 'border-pic-brand-border bg-pic-brand-soft text-pic-brand',
-      APPROVED: 'border-[hsl(var(--pic-success)/0.28)] bg-[hsl(var(--pic-success)/0.10)] text-pic-success',
-      REJECTED: 'border-[hsl(var(--pic-danger)/0.32)] bg-[hsl(var(--pic-danger)/0.10)] text-pic-danger',
-      CANCELLED: 'border-[hsl(var(--pic-danger)/0.42)] bg-[hsl(var(--pic-danger)/0.16)] text-pic-danger',
-   };
-
-   return classes[status];
 }
 
 function readPayloadValue(payload: Record<string, unknown>, keys: string[]) {
@@ -670,7 +718,7 @@ function formatTime(date: Date) {
                      <article
                         v-for="row in tableRows"
                         :key="row.approval.id"
-                        class="group overflow-hidden rounded-xl border border-pic-border bg-pic-surface shadow-sm transition hover:border-pic-brand-border hover:shadow-md"
+                        class="group rounded-xl border border-pic-border bg-pic-surface shadow-sm transition hover:border-pic-brand-border hover:shadow-md"
                      >
                         <div class="p-4 sm:p-5">
                            <div class="flex items-start justify-between gap-3">
@@ -688,10 +736,12 @@ function formatTime(date: Date) {
                                     <span class="mt-1 block break-words text-xs font-semibold leading-5 text-pic-text-muted">OC {{ row.orderLabel }}</span>
                                  </span>
                               </button>
-                              <span class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold" :class="approvalStatusClass(row.approval.status)">
-                                 <i :class="row.statusIcon" class="text-[10px]"></i>
-                                 {{ row.statusLabel }}
-                              </span>
+                              <ApprovalStatusSelector
+                                 :status="row.approval.status"
+                                 :options="statusChangeOptions(row.approval)"
+                                 :disabled="cancellingApprovalId !== null"
+                                 @select="handleStatusSelection(row.approval, $event)"
+                              />
                            </div>
 
                            <div class="mt-4 grid gap-2 border-t border-pic-border pt-3 sm:grid-cols-3 sm:gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_148px]">
@@ -816,7 +866,9 @@ function formatTime(date: Date) {
                v-model="showDetailModal"
                :approval="selectedApproval"
                :can-resolve="canResolveSelected"
+               :can-cancel="canCancelSelected"
                @resolved="handleResolved"
+               @cancelled="handleCancelled"
             />
          </section>
       </div>

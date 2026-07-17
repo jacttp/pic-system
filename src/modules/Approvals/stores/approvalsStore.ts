@@ -156,9 +156,14 @@ export const useApprovalsStore = defineStore('approvals', () => {
       error.value = null;
       try {
          await approvalsApi.cancelApproval(id);
-         const idx = approvals.value.findIndex(a => a.id === id);
-         if (idx !== -1) {
-            approvals.value[idx] = { ...approvals.value[idx]!, status: 'CANCELLED' };
+         const markCancelled = (items: Approval[]) => items.map(approval =>
+            approval.id === id ? { ...approval, status: 'CANCELLED' as const } : approval
+         );
+
+         approvals.value = markCancelled(approvals.value);
+         assignedApprovals.value = markCancelled(assignedApprovals.value);
+         if (selectedApproval.value?.id === id) {
+            selectedApproval.value = { ...selectedApproval.value, status: 'CANCELLED' };
          }
       } catch (err: any) {
          error.value = err.response?.data?.message || 'Error al cancelar solicitud.';

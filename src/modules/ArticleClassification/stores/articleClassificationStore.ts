@@ -307,6 +307,27 @@ export const useArticleClassificationStore = defineStore('article-classification
     }
   }
 
+  async function deleteAllUnusedSuggestions() {
+    if (batchRunning.value) return null;
+    batchRunning.value = true;
+    error.value = null;
+    try {
+      const result = await articleClassificationApi.deleteAllUnusedSuggestions();
+      if (selected.value && !selected.value.draft) {
+        const conceptId = selected.value.ConceptId;
+        selected.value = await articleClassificationApi.getDetail(conceptId);
+        suggestion.value = await articleClassificationApi.getSuggestion(conceptId);
+      }
+      await Promise.all([fetchQueue(), fetchSummary(), fetchBatchPreview()]);
+      return result;
+    } catch (requestError) {
+      error.value = errorMessage(requestError, 'No fue posible borrar las propuestas sin aplicar.');
+      throw requestError;
+    } finally {
+      batchRunning.value = false;
+    }
+  }
+
   async function reviewBatch() {
     if (batchRunning.value) return null;
     batchRunning.value = true;
@@ -392,6 +413,28 @@ export const useArticleClassificationStore = defineStore('article-classification
       if (selected.value?.ConceptId === conceptId) {
         suggestionError.value = errorMessage(requestError, 'OpenAI no pudo generar una sugerencia valida.');
       }
+      throw requestError;
+    } finally {
+      if (selected.value?.ConceptId === conceptId) suggestionLoading.value = false;
+    }
+  }
+
+  async function deleteSuggestion() {
+    if (!selected.value || !suggestion.value || suggestionLoading.value) return;
+    const conceptId = selected.value.ConceptId;
+    const suggestionId = suggestion.value.suggestionId;
+    suggestionLoading.value = true;
+    suggestionError.value = null;
+    error.value = null;
+    try {
+      await articleClassificationApi.deleteSuggestion(conceptId, suggestionId);
+      if (selected.value?.ConceptId === conceptId && suggestion.value?.suggestionId === suggestionId) {
+        selected.value = await articleClassificationApi.getDetail(conceptId);
+        suggestion.value = await articleClassificationApi.getSuggestion(conceptId);
+      }
+      await fetchBatchPreview();
+    } catch (requestError) {
+      suggestionError.value = errorMessage(requestError, 'No fue posible borrar la propuesta.');
       throw requestError;
     } finally {
       if (selected.value?.ConceptId === conceptId) suggestionLoading.value = false;
@@ -512,7 +555,7 @@ export const useArticleClassificationStore = defineStore('article-classification
     catalogsLoading, catalogsError,
     bulkProgress, batchPreview, batchPreviewLoading, batchRunning, batchResult, saving, error, totalPages,
     initialize, fetchQueue, fetchSummary, openConcept, releaseCurrent, renewCurrentClaim,
-    saveReview, saveDraft, skipCurrent, refresh, fetchBatchPreview, applyBatchSuggestions, reviewBatch, fetchNeighbors, setNeighborDimensions, fetchSuggestion,
-    generateSuggestion, generateAllSuggestions, setSearch, setStatus, setPage,
+    saveReview, saveDraft, skipCurrent, refresh, fetchBatchPreview, applyBatchSuggestions, deleteAllUnusedSuggestions, reviewBatch, fetchNeighbors, setNeighborDimensions, fetchSuggestion,
+    generateSuggestion, deleteSuggestion, generateAllSuggestions, setSearch, setStatus, setPage,
   };
 });

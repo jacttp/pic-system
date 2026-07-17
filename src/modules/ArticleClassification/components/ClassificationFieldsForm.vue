@@ -57,6 +57,7 @@ const emit = defineEmits<{
   (event: 'skip', reason: string): void;
   (event: 'back'): void;
   (event: 'generate-suggestion'): void;
+  (event: 'delete-suggestion'): void;
 }>();
 
 const FIELD_KEYS: ClassificationField[] = [
@@ -227,9 +228,10 @@ const copySource = async () => {
           :current-values="form"
           :loading="suggestionLoading"
           :error="suggestionError"
+          :can-delete="!detail.draft"
           @generate="emit('generate-suggestion')"
           @apply-all="applyAllSuggestions"
-          @apply-field="applySuggestionField"
+          @delete="emit('delete-suggestion')"
         />
 
         <section v-for="group in groups" :key="group.key" class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -269,7 +271,7 @@ const copySource = async () => {
         <textarea id="classification-skip-reason" v-model="skipReason" rows="3" maxlength="500" class="mt-2 w-full resize-none rounded-lg border border-pic-border bg-pic-surface px-3 py-2 text-sm font-semibold text-pic-text-main outline-none focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border" placeholder="Ej. Falta confirmar el SKU real con Operaciones."></textarea>
         <div class="mt-3 flex justify-end gap-2">
           <StdButton size="sm" @click="showSkip = false">Cancelar</StdButton>
-          <StdButton size="sm" variant="primary" icon="fa-solid fa-forward" :disabled="skipReason.trim().length < 3 || saving" @click="handleSkip">Confirmar</StdButton>
+          <StdButton size="sm" variant="primary" icon="fa-solid fa-forward" :disabled="skipReason.trim().length < 3 || saving" @click="handleSkip">Posponer</StdButton>
         </div>
       </section>
 
@@ -279,16 +281,16 @@ const copySource = async () => {
           NULL y “NULL” se guardan como ausencia. “NO” se conserva como valor.
         </p>
         <div class="flex shrink-0 gap-2">
-          <StdButton size="sm" icon="fa-solid fa-forward" :disabled="saving" @click="showSkip = true">Posponer</StdButton>
-          <StdButton size="sm" icon="fa-regular fa-floppy-disk" :disabled="!canSave" @click="emit('save-draft', { ...form })">Guardar borrador</StdButton>
+          <StdButton size="sm" icon="fa-regular fa-clock" :disabled="saving" @click="showSkip = true">Más tarde</StdButton>
+          <StdButton size="sm" icon="fa-regular fa-floppy-disk" :disabled="!canSave" @click="emit('save-draft', { ...form })">Guardar avance</StdButton>
           <StdButton type="submit" size="sm" variant="primary" :icon="saving ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-check'" :disabled="!canSave">
-            Aprobar y guardar este
+            Aprobar
           </StdButton>
         </div>
       </div>
     </form>
 
-    <ModalDialog v-model="showApprovalConfirmation" title="Confirmar aprobación" size="lg">
+    <ModalDialog v-model="showApprovalConfirmation" title="Aprobar concepto" size="lg">
       <div class="space-y-4">
         <div class="rounded-lg border border-pic-border bg-pic-muted-surface p-3">
           <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-pic-text-muted">Concepto que se registrará</p>
@@ -309,7 +311,7 @@ const copySource = async () => {
       <template #footer>
         <div class="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <StdButton :disabled="saving" @click="showApprovalConfirmation = false">Seguir revisando</StdButton>
-          <StdButton variant="primary" icon="fa-solid fa-check" :disabled="saving" @click="handleSave">Confirmar e insertar</StdButton>
+          <StdButton variant="primary" icon="fa-solid fa-check" :disabled="saving" @click="handleSave">Crear artículo</StdButton>
         </div>
       </template>
     </ModalDialog>
