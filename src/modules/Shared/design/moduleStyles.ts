@@ -200,6 +200,13 @@ export const MODULE_VISUAL_STYLES: Record<string, ModuleVisualStyle> = {
     accent: 'bg-[hsl(var(--pic-accent-yellow))]',
     desc: 'Importa archivos Excel con metas de ventas y visualiza el historico.',
   },
+  UPLOAD_SELLOUT: {
+    color: 'text-[hsl(var(--pic-accent-teal))]',
+    bg: 'bg-[hsl(var(--pic-accent-teal-soft))]',
+    border: 'border-[hsl(var(--pic-accent-teal))]',
+    accent: 'bg-[hsl(var(--pic-accent-teal))]',
+    desc: 'Carga y reemplaza el sellout mensual reportado por cadenas comerciales.',
+  },
   STOCK_ANALYTICS: {
     color: 'text-[hsl(var(--pic-accent-teal))]',
     bg: 'bg-[hsl(var(--pic-accent-teal-soft))]',

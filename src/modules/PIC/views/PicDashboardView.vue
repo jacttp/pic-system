@@ -861,7 +861,7 @@ const handleExportConfirm = async (config: PicPdfExportConfig) => {
                             >
                                 <i v-if="isExporting" class="fa-solid fa-spinner fa-spin text-pic-text-muted"></i>
                                 <i v-else class="fa-solid text-pic-brand" :class="showExportModal ? 'fa-eye' : 'fa-file-pdf'"></i>
-                                {{ isExporting ? 'Generando PDF...' : (showExportModal ? 'Cerrar panel PDF' : 'Configurar PDF') }}
+                                {{ isExporting ? 'Generando PDF...' : (showExportModal ? 'Cerrar panel PDF' : 'Exportar a PDF') }}
                             </button>
                         </div>
 

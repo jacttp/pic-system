@@ -235,6 +235,17 @@ const router = createRouter({
                }
             },
             {
+               path: 'upload-sellout',
+               name: 'UploadSellout',
+               component: () => import('@/modules/SelloutUpload/views/SelloutUploadView.vue'),
+               meta: {
+                  requiresAuth: true,
+                  minRoleLevel: 3,
+                  moduleKey: 'UPLOAD_SELLOUT',
+                  title: 'Carga Sellout'
+               }
+            },
+            {
                path: 'documentation',
                name: 'documentation',
                component: () => import('@/modules/Documentation/DocumentationView.vue'),

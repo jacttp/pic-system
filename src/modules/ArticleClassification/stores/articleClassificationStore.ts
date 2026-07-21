@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
 import { articleClassificationApi } from '../services/articleClassificationApi';
+import { createRequestKey } from '../utils/requestKey';
 import type {
   ClassificationCatalogs,
   ClassificationCatalogMetadata,
@@ -406,12 +407,12 @@ export const useArticleClassificationStore = defineStore('article-classification
       const result = await articleClassificationApi.generateSuggestion(
         conceptId,
         selected.value.SourceVersion,
-        crypto.randomUUID(),
+        createRequestKey(),
       );
       if (selected.value?.ConceptId === conceptId) suggestion.value = result;
     } catch (requestError) {
       if (selected.value?.ConceptId === conceptId) {
-        suggestionError.value = errorMessage(requestError, 'OpenAI no pudo generar una sugerencia valida.');
+        suggestionError.value = errorMessage(requestError, 'No fue posible solicitar la propuesta.');
       }
       throw requestError;
     } finally {
@@ -475,6 +476,7 @@ export const useArticleClassificationStore = defineStore('article-classification
       const conceptId = item.ConceptId;
       const isCurrent = selected.value?.ConceptId === conceptId;
       let claimedForBatch = false;
+      let stage: 'lookup' | 'claim' | 'generate' = 'lookup';
       bulkProgress.value.activeConceptIds = [...bulkProgress.value.activeConceptIds, conceptId];
       try {
         const existing = await articleClassificationApi.getSuggestion(conceptId);
@@ -485,22 +487,29 @@ export const useArticleClassificationStore = defineStore('article-classification
         }
 
         if (!isCurrent) {
+          stage = 'claim';
           await articleClassificationApi.claim(conceptId);
           claimedForBatch = true;
         }
+        stage = 'generate';
         const generated = await articleClassificationApi.generateSuggestion(
           conceptId,
           item.SourceVersion,
-          crypto.randomUUID(),
+          createRequestKey(),
         );
         bulkProgress.value.generated += 1;
         if (selected.value?.ConceptId === conceptId) suggestion.value = generated;
       } catch (requestError) {
+        const fallbackByStage = {
+          lookup: 'No fue posible comprobar si ya existe una propuesta.',
+          claim: 'No fue posible reservar el concepto.',
+          generate: 'No fue posible generar la propuesta.',
+        } as const;
         bulkProgress.value.failed += 1;
         bulkProgress.value.failures.push({
           conceptId,
           SKUMuliix: item.SKUMuliix,
-          message: errorMessage(requestError, 'No fue posible generar la propuesta.'),
+          message: errorMessage(requestError, fallbackByStage[stage]),
         });
       } finally {
         if (claimedForBatch) {
