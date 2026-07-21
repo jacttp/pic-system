@@ -26,7 +26,9 @@ const createForm = (year: number, month: number, sorianaFile: File | null, walma
 export const selloutApi = {
   async preview(year: number, month: number, sorianaFile: File | null, walmartFile: File | null) {
     const form = createForm(year, month, sorianaFile, walmartFile)
-    const { data } = await api.post<ApiResponse<SelloutPreviewData>>(`${BASE_PATH}/preview`, form)
+    const { data } = await api.post<ApiResponse<SelloutPreviewData>>(`${BASE_PATH}/preview`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
     return data.data
   },
 
@@ -39,7 +41,9 @@ export const selloutApi = {
   ) {
     const form = createForm(year, month, sorianaFile, walmartFile)
     form.append('previewToken', previewToken)
-    const { data } = await api.post<ApiResponse<SelloutCommitData>>(`${BASE_PATH}/commit`, form)
+    const { data } = await api.post<ApiResponse<SelloutCommitData>>(`${BASE_PATH}/commit`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
     return data.data
   },
 
