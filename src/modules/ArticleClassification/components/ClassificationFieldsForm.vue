@@ -192,6 +192,16 @@ const copySource = async () => {
             <span class="inline-flex items-center gap-1.5 rounded-md border border-pic-brand-border bg-pic-brand-soft px-2 py-1 text-[10px] font-black uppercase text-pic-brand">
               <i class="fa-solid fa-lock text-[9px]"></i> Reservado para ti
             </span>
+            <StdButton
+              class="!hidden !h-7 !w-7 !rounded-md lg:!inline-flex"
+              size="icon"
+              variant="ghost"
+              icon="fa-solid fa-unlock-keyhole"
+              :disabled="saving || suggestionLoading"
+              aria-label="Liberar concepto"
+              title="Liberar concepto y volver a la bandeja"
+              @click="emit('back')"
+            />
             <span v-if="modifiedCount" class="rounded-md border border-[hsl(var(--pic-warning)/0.28)] bg-[hsl(var(--pic-warning)/0.08)] px-2 py-1 text-[10px] font-bold uppercase text-pic-warning">
               {{ modifiedCount }} cambios
             </span>
