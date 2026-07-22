@@ -194,7 +194,10 @@ export function buildVisibleCpfrDias(options: CpfrVisibilityOptions): CpfrDiaDas
 
                 if (activeTab === 'centralizados') {
                     if (!(state === 'pendiente' || state === 'borrador' || !state)) return false
-                    if (!isVisibleOrderWindow(sku, tienda.resumen?.lead_time)) return false
+                    // Las OC dentro de la ventana operativa siguen visibles aunque ya no
+                    // alcancen el fin de embarque por lead time. La tabla las identifica
+                    // con el badge de alerta para que el usuario pueda cerrar su caso.
+                    if (!isVisibleOrderWindow(sku, tienda.resumen?.lead_time, false)) return false
                 } else if (activeTab === 'revision') {
                     if ((!isCurrentWeek(sku) && !isPreviousWeek(sku)) || state !== 'revision') return false
                 } else if (activeTab === 'aprobada') {
