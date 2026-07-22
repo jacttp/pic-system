@@ -144,7 +144,6 @@ const filteredItems = computed<ExportTiendaItem[]>(() => {
 // We use exclusions because "Everything is included by default" is the requested UX
 const excludedStores = ref<Set<string>>(new Set())
 const excludedOCs     = ref<Set<string>>(new Set())
-const excludedSKUs    = ref<Set<string>>(new Set())
 const expandedOCs     = ref<Set<string>>(new Set())
 const expandedStores  = ref<Set<string>>(new Set())
 
@@ -176,27 +175,11 @@ function toggleOC(i: ExportTiendaItem) {
         excludedOCs.value.delete(k)
         // If the store was excluded, the individual toggle restores the store too
         excludedStores.value.delete(i.id_cliente)
-        
-        // Restore all SKUs of this OC if re-included
-        const prefix = k + '|'
-        const toDelete = [...excludedSKUs.value].filter(sk => sk.startsWith(prefix))
-        toDelete.forEach(sk => excludedSKUs.value.delete(sk))
     } else {
         excludedOCs.value.add(k)
     }
     excludedOCs.value     = new Set(excludedOCs.value)
     excludedStores.value  = new Set(excludedStores.value)
-    excludedSKUs.value    = new Set(excludedSKUs.value)
-}
-
-function toggleSku(i: ExportTiendaItem, row: { sku_key?: string; upc: string }) {
-    const k = skuKey(i, row)
-    if (excludedSKUs.value.has(k)) {
-        excludedSKUs.value.delete(k)
-    } else {
-        excludedSKUs.value.add(k)
-    }
-    excludedSKUs.value = new Set(excludedSKUs.value)
 }
 
 function toggleExpandOC(i: ExportTiendaItem) {
@@ -216,7 +199,6 @@ function toggleExpandStore(id_cliente: string) {
 watch([selectedDays, search, selectedWeeks, () => panelTab.value, () => JSON.stringify(store.statusFilters)], () => {
     excludedStores.value = new Set()
     excludedOCs.value     = new Set()
-    excludedSKUs.value    = new Set()
 })
 
 // The actual final list for Preview & Export
@@ -226,10 +208,8 @@ const includedItems = computed(() => {
         if (excludedStores.value.has(i.id_cliente)) return null
         if (excludedOCs.value.has(itemKey(i))) return null
 
-        // Filter SKU rows
         const filteredRows = i.rows.filter(r =>
-            !excludedSKUs.value.has(skuKey(i, r))
-            && (panelTab.value !== 'aprobada' || normalizeCpfrOrderState(r.estado_oc) === 'aprobado')
+            panelTab.value !== 'aprobada' || normalizeCpfrOrderState(r.estado_oc) === 'aprobado'
         )
         if (filteredRows.length === 0) return null
 
@@ -274,6 +254,12 @@ const excelExportItems = computed<ExportTiendaItem[]>(() => includedItems.value
     .filter(item => item.rows.length > 0)
 )
 
+const excelOrderNumbers = computed(() => [...new Set(
+    excelExportItems.value
+        .map(item => String(item.num_pedido || '').trim())
+        .filter(numPedido => numPedido && numPedido !== 'SIN_PEDIDO')
+)])
+
 // El estado se persiste por OC. Las exclusiones de tienda u OC determinan el
 // alcance; excluir un SKU no puede enviar solo una parte de su pedido.
 const reviewOrderNumbers = computed(() => {
@@ -314,10 +300,15 @@ const pdfProcessing = ref(false)
 const excelProcessing = ref(false)
 const reviewProcessing = ref(false)
 const canDownloadExcel = computed(() => panelTab.value === 'aprobada')
-const excelRestrictionMessage = 'No se incluyen OC o SKUs que actualmente estén en Revisión o Borrador. El Excel final solo puede descargarse desde la pestaña Aprobados.'
+const excelRestrictionMessage = 'El Excel final solo se genera desde Aprobados y cambia las OC incluidas completamente a Enviado.'
 
-function buildExcelAuditDetail(filename: string, downloadedAt: Date): CpfrExcelExportAuditDetail {
-    const exportedItems = excelExportItems.value
+function buildExcelAuditDetail(
+    filename: string,
+    downloadedAt: Date,
+    exportedItems: ExportTiendaItem[],
+    orderCount: number,
+    statusResult: { ok: boolean; error?: string }
+): CpfrExcelExportAuditDetail {
     const orderDetails = exportedItems.map(item => ({
         numero: item.num_pedido || 'SIN FOLIO',
         tienda: { id: item.id_cliente, nombre: item.nombre_tienda },
@@ -336,6 +327,12 @@ function buildExcelAuditDetail(filename: string, downloadedAt: Date): CpfrExcelE
         cadena: store.nom_cadena,
         pestaña: 'aprobada',
         estado_incluido: 'aprobado',
+        transicion_estado: {
+            destino: 'enviado',
+            exitosa: statusResult.ok,
+            ocs_solicitadas: orderCount,
+            error: statusResult.error || null,
+        },
         dias: Array.from(selectedDays.value).sort((a, b) => a - b).map(numero => ({
             numero,
             nombre: DAY_NAMES[numero] || `Día ${numero}`
@@ -367,20 +364,59 @@ async function handleExcelExport() {
 
     excelProcessing.value = true
     try {
+        if (!store.currentWeek) {
+            toast({ title: 'Contexto no disponible', description: 'No se pudo identificar la semana activa.', variant: 'destructive' })
+            return
+        }
+
+        const orderNumbers = [...excelOrderNumbers.value]
+        if (!orderNumbers.length) {
+            toast({ title: 'OC no disponibles', description: 'No se identificaron folios válidos para registrar el envío.', variant: 'destructive' })
+            return
+        }
+
         const downloadedAt = new Date()
-        const filename = generateExcel(excelExportItems.value, Array.from(selectedDays.value))
-        toast({ title: 'Documento generado', description: filename })
+        const exportedItems = excelExportItems.value.map(item => ({
+            ...item,
+            rows: item.rows.map(row => ({ ...row })),
+        }))
+        const filename = generateExcel(exportedItems, Array.from(selectedDays.value))
+        const statusResult = await store.updateStatusBulk({
+            num_pedidos: orderNumbers,
+            year: store.currentWeek.anio,
+            week: store.currentWeek.semana,
+            estado: 'enviado',
+        })
 
         try {
-            await auditApi.createCpfrExcelExportLog(buildExcelAuditDetail(filename, downloadedAt))
+            await auditApi.createCpfrExcelExportLog(
+                buildExcelAuditDetail(filename, downloadedAt, exportedItems, orderNumbers.length, statusResult)
+            )
         } catch (error) {
             console.error('[CpfrExportPanel.audit]', error)
             toast({
                 title: 'Archivo descargado sin bitácora',
-                description: 'No se pudo registrar esta descarga en Auditoría. Intenta descargarlo de nuevo para dejar evidencia.',
+                description: 'No se pudo registrar esta descarga en Auditoría.',
                 variant: 'destructive'
             })
         }
+
+        if (!statusResult.ok) {
+            toast({
+                title: 'Excel descargado; envío pendiente',
+                description: statusResult.error || 'Las OC permanecen aprobadas porque no se pudo registrar su envío.',
+                variant: 'destructive',
+                duration: 7000,
+            })
+            return
+        }
+
+        await store.loadDashboard()
+        toast({
+            title: 'OC enviadas',
+            description: `${orderNumbers.length} OC cambiaron a Enviado después de generar ${filename}.`,
+            duration: 6000,
+        })
     } catch (error) {
         console.error('[CpfrExportPanel.excel]', error)
         toast({ title: 'Error', description: 'No se pudo generar el Excel.', variant: 'destructive' })
@@ -478,7 +514,7 @@ async function handlePdfExport() {
                 <p class="text-[11px] text-slate-500 font-medium">
                     {{ isCentralizedReview
                         ? 'Selecciona las órdenes de compra que se enviarán a revisión'
-                        : 'Exportación final de órdenes de compra aprobadas' }}
+                        : 'Genera el Excel y registra las OC completas como enviadas' }}
                 </p>
             </div>
         </div>
@@ -672,7 +708,7 @@ async function handlePdfExport() {
                        <!-- OCs list inside store -->
                        <div v-if="expandedStores.has(id_cliente)" class="ml-6 space-y-2 border-l border-slate-100 pl-3 animate-in fade-in slide-in-from-top-1 duration-200">
                            <!-- Si está agrupado en OC, muestra la lista de OCs -->
-                           <template v-if="store.groupByOC">
+                           <template v-if="true">
                                <div v-for="oc in group.items" :key="itemKey(oc)" class="space-y-1.5">
                                     <div class="flex items-center gap-2 group/oc cursor-pointer" @click.stop="toggleOC(oc)">
                                         <button
@@ -702,18 +738,12 @@ async function handlePdfExport() {
                                     <!-- SKUs List (Nested) -->
                                     <div v-if="expandedOCs.has(itemKey(oc))" class="ml-5 space-y-1 border-l border-slate-100 pl-3 py-1 animate-in fade-in slide-in-from-top-1 duration-200">
                                         <div v-for="sku in oc.rows" :key="skuKey(oc, sku)" 
-                                            class="flex items-center gap-2 group/sku cursor-pointer hover:bg-slate-50 rounded p-0.5 pr-2 transition-colors"
-                                            @click.stop="toggleSku(oc, sku)"
+                                            class="flex items-center gap-2 hover:bg-slate-50 rounded p-0.5 pr-2 transition-colors"
                                         >
-                                            <button
-                                                class="w-3.5 h-3.5 rounded border flex items-center justify-center transition-all"
-                                                :class="!excludedSKUs.has(skuKey(oc, sku)) && !excludedOCs.has(itemKey(oc)) && !excludedStores.has(id_cliente)
-                                                    ? 'bg-emerald-500 border-emerald-600 text-white'
-                                                    : 'bg-white border-slate-200 text-slate-300'"
-                                            >
-                                                <i v-if="!excludedSKUs.has(skuKey(oc, sku)) && !excludedOCs.has(itemKey(oc)) && !excludedStores.has(id_cliente)" class="fa-solid fa-check text-[6px]"></i>
-                                            </button>
-                                            <span class="text-[8px] font-medium truncate" :class="!excludedSKUs.has(skuKey(oc, sku)) ? 'text-slate-500' : 'text-slate-300'">
+                                            <span class="inline-flex w-3.5 h-3.5 items-center justify-center rounded bg-slate-100 text-slate-400">
+                                                <i class="fa-solid fa-box text-[6px]"></i>
+                                            </span>
+                                            <span class="text-[8px] font-medium truncate text-slate-500">
                                                 {{ sku.desc }}
                                             </span>
                                             <span class="ml-auto text-[7px] font-bold text-brand-600/60">{{ sku.cant_pedida }} pz</span>
@@ -724,19 +754,13 @@ async function handlePdfExport() {
                            <!-- Si está desagrupado, muestra los SKUs directamente bajo la tienda -->
                            <template v-else>
                                <div v-for="sku in group.items.flatMap(i => i.rows.map(r => ({ ...r, itemRef: i })))" :key="skuKey(sku.itemRef, sku)" 
-                                    class="flex items-center gap-2 group/sku cursor-pointer hover:bg-slate-50 rounded p-1 pr-2 transition-colors animate-in fade-in duration-200"
-                                    @click.stop="toggleSku(sku.itemRef, sku)"
+                                    class="flex items-center gap-2 hover:bg-slate-50 rounded p-1 pr-2 transition-colors animate-in fade-in duration-200"
                                >
-                                    <button
-                                        class="w-3.5 h-3.5 rounded border flex items-center justify-center transition-all"
-                                        :class="!excludedSKUs.has(skuKey(sku.itemRef, sku)) && !excludedStores.has(id_cliente)
-                                            ? 'bg-emerald-500 border-emerald-600 text-white'
-                                            : 'bg-white border-slate-200 text-slate-300'"
-                                    >
-                                        <i v-if="!excludedSKUs.has(skuKey(sku.itemRef, sku)) && !excludedStores.has(id_cliente)" class="fa-solid fa-check text-[6px]"></i>
-                                    </button>
+                                    <span class="inline-flex w-3.5 h-3.5 items-center justify-center rounded bg-slate-100 text-slate-400">
+                                        <i class="fa-solid fa-box text-[6px]"></i>
+                                    </span>
                                     <div class="flex-1 flex items-center justify-between gap-2 min-w-0">
-                                        <span class="text-[9px] font-medium truncate" :class="!excludedSKUs.has(skuKey(sku.itemRef, sku)) ? 'text-slate-500' : 'text-slate-300'">
+                                        <span class="text-[9px] font-medium truncate text-slate-500">
                                             {{ sku.desc }}
                                         </span>
                                         <span class="px-1 py-0.5 rounded text-[7px] font-mono font-bold bg-slate-100 text-slate-500 border border-slate-200 shrink-0">
@@ -764,7 +788,7 @@ async function handlePdfExport() {
                 <div class="space-y-1">
                     <div class="flex items-center justify-between text-[11px]">
                          <span class="font-black text-slate-700 uppercase tracking-tighter">
-                            {{ isCentralizedReview ? reviewOrderNumbers.length : includedItems.length }} PEDIDOS
+                            {{ isCentralizedReview ? reviewOrderNumbers.length : excelOrderNumbers.length }} PEDIDOS
                          </span>
                          <span class="font-black text-brand-700">
                             {{ totalCantidad.toLocaleString('es-MX') }} <small class="text-brand-500 font-bold">PZ</small>
@@ -802,12 +826,12 @@ async function handlePdfExport() {
                         v-else
                         @click="handleExcelExport"
                         :disabled="!canDownloadExcel || excelProcessing || pdfProcessing || excelExportItems.length === 0"
-                        :title="canDownloadExcel ? 'Descargar Excel de OC aprobadas' : excelRestrictionMessage"
+                        :title="canDownloadExcel ? 'Generar Excel y marcar las OC completas como enviadas' : excelRestrictionMessage"
                         class="w-full h-9 border-2 border-brand-600 text-brand-700 hover:bg-brand-50 disabled:bg-slate-50 disabled:text-slate-300 disabled:border-slate-200 rounded-xl font-black text-[11px] transition-all flex items-center justify-center gap-2 group"
                     >
                         <i v-if="excelProcessing" class="fa-solid fa-circle-notch fa-spin"></i>
                         <i v-else class="fa-solid fa-file-excel transition-transform group-hover:scale-110"></i>
-                        {{ excelProcessing ? 'REGISTRANDO...' : 'DESCARGAR EXCEL' }}
+                        {{ excelProcessing ? 'REGISTRANDO...' : 'GENERAR Y ENVIAR' }}
                     </button>
 
                     <button

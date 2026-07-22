@@ -161,8 +161,12 @@ export function buildVisibleCpfrDias(options: CpfrVisibilityOptions): CpfrDiaDas
         return y === last.year && w === last.week
     }
 
-    const isVisibleOrderWindow = (sku: CpfrSkuDash, leadTime: number | null | undefined) => {
-        if (!canStillShipByLeadTime(sku, leadTime, today)) return false
+    const isVisibleOrderWindow = (
+        sku: CpfrSkuDash,
+        leadTime: number | null | undefined,
+        requireShippable = true,
+    ) => {
+        if (requireShippable && !canStillShipByLeadTime(sku, leadTime, today)) return false
 
         const pedidoDate = parseLocalDate(sku.fec_pedido_cadena)
         const finEmbarqueDate = parseLocalDate(sku.fec_fin_embarque)
@@ -194,7 +198,11 @@ export function buildVisibleCpfrDias(options: CpfrVisibilityOptions): CpfrDiaDas
                 } else if (activeTab === 'revision') {
                     if ((!isCurrentWeek(sku) && !isPreviousWeek(sku)) || state !== 'revision') return false
                 } else if (activeTab === 'aprobada') {
-                    if (state !== 'aprobado' || !isVisibleOrderWindow(sku, tienda.resumen?.lead_time)) return false
+                    if (state !== 'aprobado') return false
+                    // Conserva el alcance operativo de Centralizados (semana actual y arrastre
+                    // inmediato permitido), pero no oculta una OC ya aprobada porque su fecha
+                    // de embarque haya vencido o ya no alcance por lead time.
+                    if (!isVisibleOrderWindow(sku, tienda.resumen?.lead_time, false)) return false
                 } else if (activeTab === 'sin_embarcar') {
                     if (state !== 'cerrado') return false
                     if (selectedFilterWeek !== 'TODAS' && skuWeekKey(sku) !== selectedFilterWeek) return false

@@ -132,7 +132,7 @@ function openChainConfig() {
               @click="store.setViewMode('cards')"
               class="w-6 h-6 flex items-center justify-center rounded-md transition-all"
               :class="store.viewMode === 'cards' ? 'bg-white text-brand-600 shadow-sm border border-slate-200' : 'text-slate-400 hover:text-slate-600 hover:bg-white/50'"
-              title="Vista de Tarjetas"
+              title="Modo Admin"
             >
               <i class="fa-solid fa-table-cells-large text-[11px]"></i>
             </button>

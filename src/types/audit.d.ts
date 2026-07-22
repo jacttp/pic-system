@@ -20,6 +20,12 @@ export interface CpfrExcelExportAuditDetail {
     cadena: string;
     pestaña: 'aprobada';
     estado_incluido: 'aprobado';
+    transicion_estado: {
+        destino: 'enviado';
+        exitosa: boolean;
+        ocs_solicitadas: number;
+        error: string | null;
+    };
     dias: Array<{ numero: number; nombre: string }>;
     semanas: string[];
     resumen: { tiendas: number; ocs: number; skus: number; piezas: number; kilogramos: number };

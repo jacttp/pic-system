@@ -697,7 +697,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         statusFilters.searchSku = ''
     }
 
-    async function updateStatusBulk(body: CpfrBulkUpdateStatusBody): Promise<{ ok: boolean; approvalId?: number; approvalCount?: number; updatedOrders?: number }> {
+    async function updateStatusBulk(body: CpfrBulkUpdateStatusBody): Promise<{ ok: boolean; error?: string; approvalId?: number; approvalCount?: number; updatedOrders?: number }> {
         try {
             const res = await cpfrApi.updateStatusBulk(body)
             const nums = new Set(body.num_pedidos)
@@ -729,7 +729,10 @@ export const useCpfrStore = defineStore('cpfr', () => {
             }
         } catch (e: any) {
             console.error('[cpfrStore.updateStatusBulk]', e)
-            return { ok: false }
+            return {
+                ok: false,
+                error: e?.response?.data?.message || e?.message || 'No se pudo cambiar el estado de las OC.',
+            }
         }
     }
 

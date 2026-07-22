@@ -863,6 +863,36 @@ function canStillShipByLeadTime(sku: any, leadTime: number | null | undefined, t
     return finEmbarqueDate.getTime() >= earliestShipDate.getTime()
 }
 
+function isShipmentDeadlineAtRisk(
+    fecFinEmbarque: string | null | undefined,
+    leadTime: number | null | undefined,
+    today = new Date(),
+): boolean {
+    return !canStillShipByLeadTime({ fec_fin_embarque: fecFinEmbarque }, leadTime, today)
+}
+
+function shipmentDeadlineBadgeClass(
+    fecFinEmbarque: string | null | undefined,
+    leadTime: number | null | undefined,
+): string {
+    return isShipmentDeadlineAtRisk(fecFinEmbarque, leadTime)
+        ? 'border-orange-700 bg-orange-600 text-white shadow-sm ring-1 ring-orange-200'
+        : 'border-amber-200 bg-amber-50 text-amber-700'
+}
+
+function shipmentDeadlineTitle(
+    fecFinEmbarque: string | null | undefined,
+    leadTime: number | null | undefined,
+): string {
+    if (!fecFinEmbarque) return 'Sin fecha de fin de embarque'
+    if (!isShipmentDeadlineAtRisk(fecFinEmbarque, leadTime)) {
+        return `Fin embarque: ${fecFinEmbarque.slice(0, 10)}`
+    }
+
+    const days = Math.max(0, Number(leadTime) || 0)
+    return `Alerta: la OC ya no alcanza a embarcar considerando ${days} día${days === 1 ? '' : 's'} de lead time.`
+}
+
 const filteredDias = computed(() => buildVisibleCpfrDias({
     activeTab: currentTab.value,
     dias: store.dias,
@@ -1754,6 +1784,15 @@ const totalUniqueOCs = computed(() => {
                               {{ estadoBadge(oc.estado_oc).label }}
                             </span>
                             <span v-if="oc.fec_pedido_cadena" class="text-[10px] font-bold text-slate-400">{{ formatShortDate(oc.fec_pedido_cadena) }}</span>
+                            <span
+                              v-if="oc.fec_fin_embarque"
+                              class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[9px] font-black"
+                              :class="shipmentDeadlineBadgeClass(oc.fec_fin_embarque, tienda.source.resumen?.lead_time)"
+                              :title="shipmentDeadlineTitle(oc.fec_fin_embarque, tienda.source.resumen?.lead_time)"
+                            >
+                              <i v-if="isShipmentDeadlineAtRisk(oc.fec_fin_embarque, tienda.source.resumen?.lead_time)" class="fa-solid fa-triangle-exclamation text-[8px]" aria-hidden="true"></i>
+                              Fin emb. {{ formatShortDate(oc.fec_fin_embarque) }}
+                            </span>
                           </div>
                           <div class="grid grid-cols-2 gap-2 text-[10px]" :class="isApprovedTab ? 'sm:grid-cols-2' : 'sm:grid-cols-4'">
                             <div class="rounded-md bg-white/70 px-2 py-1 text-right">
@@ -1854,6 +1893,15 @@ const totalUniqueOCs = computed(() => {
                         <span class="rounded-md bg-slate-100 px-2 py-0.5 font-black text-slate-700">OC {{ sku.num_pedido || 'Sin número' }}</span>
                         <span class="rounded-md border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider" :class="estadoBadge(sku.estado_oc).cls">
                           {{ estadoBadge(sku.estado_oc).label }}
+                        </span>
+                        <span
+                          v-if="sku.fec_fin_embarque"
+                          class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[9px] font-black"
+                          :class="shipmentDeadlineBadgeClass(sku.fec_fin_embarque, tienda.source.resumen?.lead_time)"
+                          :title="shipmentDeadlineTitle(sku.fec_fin_embarque, tienda.source.resumen?.lead_time)"
+                        >
+                          <i v-if="isShipmentDeadlineAtRisk(sku.fec_fin_embarque, tienda.source.resumen?.lead_time)" class="fa-solid fa-triangle-exclamation text-[8px]" aria-hidden="true"></i>
+                          Fin emb. {{ formatShortDate(sku.fec_fin_embarque) }}
                         </span>
                       </div>
                       <button class="col-span-2 min-w-0 text-left font-semibold text-slate-700 hover:text-brand-700 md:col-span-1" @click.stop="openHistorialProductPanel(tienda, sku)">
@@ -2152,10 +2200,12 @@ const totalUniqueOCs = computed(() => {
 
                             <div v-if="ocGroup.fec_fin_embarque" class="ml-1 relative">
                               <span
-                                class="flex items-center gap-1.5 font-bold px-1.5 py-0.5 rounded-md text-[9px] bg-amber-50 text-amber-700 border border-amber-200 cursor-help opacity-80"
-                                :title="`Fin embarque: ${ocGroup.fec_fin_embarque.slice(0, 10)}`"
+                                class="flex items-center gap-1.5 rounded-md border px-1.5 py-0.5 text-[9px] font-bold cursor-help"
+                                :class="shipmentDeadlineBadgeClass(ocGroup.fec_fin_embarque, tienda.resumen?.lead_time)"
+                                :title="shipmentDeadlineTitle(ocGroup.fec_fin_embarque, tienda.resumen?.lead_time)"
                               >
-                                <i class="fa-solid fa-calendar-xmark"></i>
+                                <i v-if="isShipmentDeadlineAtRisk(ocGroup.fec_fin_embarque, tienda.resumen?.lead_time)" class="fa-solid fa-triangle-exclamation text-[8px]" aria-hidden="true"></i>
+                                <i v-else class="fa-solid fa-calendar-xmark"></i>
                                 {{ ocGroup.fec_fin_embarque.slice(0, 10) }}
                               </span>
                             </div>
@@ -2461,6 +2511,15 @@ const totalUniqueOCs = computed(() => {
                                 <i class="fa-regular fa-calendar-check text-brand-300"></i>
                                 {{ sku.fec_pedido_cadena.slice(0, 10) }}
                               </span>
+                              <span
+                                v-if="sku.fec_fin_embarque"
+                                class="flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-bold"
+                                :class="shipmentDeadlineBadgeClass(sku.fec_fin_embarque, tienda.resumen?.lead_time)"
+                                :title="shipmentDeadlineTitle(sku.fec_fin_embarque, tienda.resumen?.lead_time)"
+                              >
+                                <i v-if="isShipmentDeadlineAtRisk(sku.fec_fin_embarque, tienda.resumen?.lead_time)" class="fa-solid fa-triangle-exclamation text-[8px]" aria-hidden="true"></i>
+                                Fin emb. {{ sku.fec_fin_embarque.slice(0, 10) }}
+                              </span>
                             </div>
                           </div>
                         </td>
@@ -2649,7 +2708,7 @@ const totalUniqueOCs = computed(() => {
           </tbody>
         </table>
 
-        <!-- ── Vista de Tarjetas ── -->
+        <!-- ── Vista de Tarjetas - MODO DIOS ── -->
         <div v-else class="p-5 space-y-10 bg-slate-50/50 min-h-full">
             <div v-for="dia in filteredDias" :key="dia.dia_num" class="space-y-5">
                 <!-- Título del día -->
@@ -2802,8 +2861,14 @@ const totalUniqueOCs = computed(() => {
                                                 <i class="fa-regular fa-calendar-check text-brand-400"></i>
                                                 {{ oc.fec_pedido_cadena.slice(0, 10) }}
                                             </div>
-                                            <div v-if="oc.fec_fin_embarque" class="flex items-center gap-1.5 px-1.5 py-0.5 rounded-md text-[8px] font-bold bg-amber-50 text-amber-700 border border-amber-100" title="Fin Embarque">
-                                                <i class="fa-solid fa-triangle-exclamation text-amber-500"></i>
+                                            <div
+                                              v-if="oc.fec_fin_embarque"
+                                              class="flex items-center gap-1.5 rounded-md border px-1.5 py-0.5 text-[8px] font-bold"
+                                              :class="shipmentDeadlineBadgeClass(oc.fec_fin_embarque, tienda.resumen?.lead_time)"
+                                              :title="shipmentDeadlineTitle(oc.fec_fin_embarque, tienda.resumen?.lead_time)"
+                                            >
+                                                <i v-if="isShipmentDeadlineAtRisk(oc.fec_fin_embarque, tienda.resumen?.lead_time)" class="fa-solid fa-triangle-exclamation text-[8px]" aria-hidden="true"></i>
+                                                <i v-else class="fa-solid fa-triangle-exclamation text-amber-500"></i>
                                                 {{ oc.fec_fin_embarque.slice(0, 10) }}
                                             </div>
                                         </div>

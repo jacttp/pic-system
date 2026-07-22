@@ -102,7 +102,8 @@ export const cpfrApi = {
     /**
      * PATCH /api/cpfr/orders/status
      * Cambia el estado del pedido de una tienda.
-     * Estados: pendiente → aprobado → cerrado
+     * Estados operativos: pendiente → revision → aprobado → enviado.
+     * Cerrado se conserva para las OC sin embarcar.
      */
     async updateStatus(body: CpfrUpdateStatusBody): Promise<{ success: boolean; approval_id?: number | null }> {
         const { data } = await api.patch('/cpfr/orders/status', body)
