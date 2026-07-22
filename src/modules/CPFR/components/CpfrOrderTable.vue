@@ -1018,7 +1018,7 @@ async function loadHistoryApprovedZeroCandidates() {
         historyApprovedZeroPurgeRows.value = []
         toast({
             title: 'No se pudo validar historial',
-            description: 'No se pudieron consultar los renglones aprobados en cero para las semanas seleccionadas.',
+            description: 'No se pudieron consultar los renglones aprobados o enviados en cero para las semanas seleccionadas.',
             variant: 'destructive',
             duration: 5000,
         })
@@ -1116,7 +1116,7 @@ async function purgeApprovedZeroSkus() {
     } catch (err) {
         toast({
             title: 'Error al purgar ceros',
-            description: 'No se pudieron eliminar los renglones aprobados en cero.',
+            description: 'No se pudieron eliminar los renglones aprobados o enviados en cero.',
             variant: 'destructive',
             duration: 5000,
         })
@@ -1389,7 +1389,7 @@ const totalUniqueOCs = computed(() => {
             v-if="(isApprovedTab || currentTab === 'historial') && approvedZeroPurgeRows.length > 0"
             class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="submittingOC === 'approved-zero-purge' || historyZeroValidationLoading"
-            title="Eliminar de CPFR_PedidoGenerado los SKUs aprobados cuyo total final es cero"
+            title="Eliminar de CPFR_PedidoGenerado los SKUs aprobados o enviados cuyo total final es cero"
             @click.stop="openApprovedZeroPurgeModal"
           >
             <i v-if="submittingOC === 'approved-zero-purge' || historyZeroValidationLoading" class="fa-solid fa-circle-notch fa-spin"></i>
@@ -3182,10 +3182,10 @@ const totalUniqueOCs = computed(() => {
                 <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500 text-white shadow-sm">
                   <i class="fa-solid fa-broom text-[11px]"></i>
                 </span>
-                <h3 class="text-sm font-black uppercase tracking-wider text-slate-800">Purgar SKUs aprobados en cero</h3>
+                <h3 class="text-sm font-black uppercase tracking-wider text-slate-800">Purgar SKUs aprobados o enviados en cero</h3>
               </div>
               <p class="text-xs font-medium leading-relaxed text-slate-600">
-                Se eliminarán únicamente renglones de CPFR_PedidoGenerado que sigan aprobados y con total final cero.
+                Se eliminarán únicamente renglones de CPFR_PedidoGenerado que sigan aprobados o enviados y tengan total final cero.
               </p>
             </div>
             <button
@@ -3266,7 +3266,7 @@ const totalUniqueOCs = computed(() => {
         <footer class="shrink-0 border-t border-slate-200 bg-slate-50 px-5 py-3">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p class="text-[11px] font-semibold text-slate-500">
-              La base de datos volverá a validar estado aprobado y total cero antes de borrar.
+              La base de datos volverá a validar estado aprobado o enviado y total cero antes de borrar.
             </p>
             <div class="flex justify-end gap-2">
               <button

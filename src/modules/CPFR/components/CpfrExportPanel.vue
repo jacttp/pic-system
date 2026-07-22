@@ -254,10 +254,16 @@ const excelExportItems = computed<ExportTiendaItem[]>(() => includedItems.value
     .filter(item => item.rows.length > 0)
 )
 
+// El archivo omite cantidades cero, pero la transición se calcula desde las
+// OC completas incluidas. Una OC totalmente ajustada a cero también se envía.
+const sentOrderItems = computed<ExportTiendaItem[]>(() => includedItems.value.filter(item => {
+    const numPedido = String(item.num_pedido || '').trim()
+    return numPedido && numPedido !== 'SIN_PEDIDO'
+}))
+
 const excelOrderNumbers = computed(() => [...new Set(
-    excelExportItems.value
+    sentOrderItems.value
         .map(item => String(item.num_pedido || '').trim())
-        .filter(numPedido => numPedido && numPedido !== 'SIN_PEDIDO')
 )])
 
 // El estado se persiste por OC. Las exclusiones de tienda u OC determinan el
@@ -305,20 +311,23 @@ const excelRestrictionMessage = 'El Excel final solo se genera desde Aprobados y
 function buildExcelAuditDetail(
     filename: string,
     downloadedAt: Date,
-    exportedItems: ExportTiendaItem[],
+    sentItems: ExportTiendaItem[],
     orderCount: number,
     statusResult: { ok: boolean; error?: string }
 ): CpfrExcelExportAuditDetail {
-    const orderDetails = exportedItems.map(item => ({
-        numero: item.num_pedido || 'SIN FOLIO',
-        tienda: { id: item.id_cliente, nombre: item.nombre_tienda },
-        dia: item.dayNum,
-        semana: item.semana_ic,
-        anio: item.anio,
-        skus: item.rows.length,
-        piezas: sumPz(item.rows),
-        kilogramos: sumKg(item.rows)
-    }))
+    const orderDetails = sentItems.map(item => {
+        const exportedRows = item.rows.filter(row => Number(row.cant_pedida) > 0)
+        return {
+            numero: item.num_pedido || 'SIN FOLIO',
+            tienda: { id: item.id_cliente, nombre: item.nombre_tienda },
+            dia: item.dayNum,
+            semana: item.semana_ic,
+            anio: item.anio,
+            skus: exportedRows.length,
+            piezas: sumPz(exportedRows),
+            kilogramos: sumKg(exportedRows)
+        }
+    })
 
     return {
         tipo: 'CPFR_EXCEL_FINAL',
@@ -337,15 +346,15 @@ function buildExcelAuditDetail(
             numero,
             nombre: DAY_NAMES[numero] || `Día ${numero}`
         })),
-        semanas: [...new Set(exportedItems
+        semanas: [...new Set(sentItems
             .filter(item => item.anio && item.semana_ic)
             .map(item => `${item.anio}-${item.semana_ic}`))],
         resumen: {
-            tiendas: new Set(exportedItems.map(item => item.id_cliente)).size,
-            ocs: exportedItems.length,
-            skus: exportedItems.reduce((total, item) => total + item.rows.length, 0),
-            piezas: exportedItems.reduce((total, item) => total + sumPz(item.rows), 0),
-            kilogramos: exportedItems.reduce((total, item) => total + sumKg(item.rows), 0)
+            tiendas: new Set(sentItems.map(item => item.id_cliente)).size,
+            ocs: sentItems.length,
+            skus: orderDetails.reduce((total, item) => total + item.skus, 0),
+            piezas: orderDetails.reduce((total, item) => total + item.piezas, 0),
+            kilogramos: orderDetails.reduce((total, item) => total + item.kilogramos, 0)
         },
         ocs: orderDetails
     }
@@ -357,7 +366,7 @@ async function handleExcelExport() {
         return
     }
 
-    if (excelExportItems.value.length === 0) {
+    if (excelOrderNumbers.value.length === 0) {
         toast({ title: 'Atención', description: 'No hay pedidos aprobados incluidos para exportar.', variant: 'destructive' })
         return
     }
@@ -380,6 +389,10 @@ async function handleExcelExport() {
             ...item,
             rows: item.rows.map(row => ({ ...row })),
         }))
+        const sentItems = sentOrderItems.value.map(item => ({
+            ...item,
+            rows: item.rows.map(row => ({ ...row })),
+        }))
         const filename = generateExcel(exportedItems, Array.from(selectedDays.value))
         const statusResult = await store.updateStatusBulk({
             num_pedidos: orderNumbers,
@@ -390,7 +403,7 @@ async function handleExcelExport() {
 
         try {
             await auditApi.createCpfrExcelExportLog(
-                buildExcelAuditDetail(filename, downloadedAt, exportedItems, orderNumbers.length, statusResult)
+                buildExcelAuditDetail(filename, downloadedAt, sentItems, orderNumbers.length, statusResult)
             )
         } catch (error) {
             console.error('[CpfrExportPanel.audit]', error)
@@ -825,7 +838,7 @@ async function handlePdfExport() {
                     <button
                         v-else
                         @click="handleExcelExport"
-                        :disabled="!canDownloadExcel || excelProcessing || pdfProcessing || excelExportItems.length === 0"
+                        :disabled="!canDownloadExcel || excelProcessing || pdfProcessing || excelOrderNumbers.length === 0"
                         :title="canDownloadExcel ? 'Generar Excel y marcar las OC completas como enviadas' : excelRestrictionMessage"
                         class="w-full h-9 border-2 border-brand-600 text-brand-700 hover:bg-brand-50 disabled:bg-slate-50 disabled:text-slate-300 disabled:border-slate-200 rounded-xl font-black text-[11px] transition-all flex items-center justify-center gap-2 group"
                     >
