@@ -20,7 +20,11 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 export const useSelloutStore = defineStore('selloutUpload', () => {
   const year = ref(now.getFullYear())
   const month = ref(now.getMonth() + 1)
-  const files = reactive<Record<SelloutChain, File | null>>({ SORIANA: null, WALMART: null })
+  const files = reactive<Record<SelloutChain, File | null>>({
+    SORIANA: null,
+    WALMART: null,
+    CHEDRAUI: null,
+  })
   const previewData = ref<SelloutPreviewData | null>(null)
   const lastCommit = ref<SelloutCommitData | null>(null)
   const isPreviewing = ref(false)
@@ -37,7 +41,7 @@ export const useSelloutStore = defineStore('selloutUpload', () => {
     status: '',
   })
 
-  const hasFiles = computed(() => Boolean(files.SORIANA || files.WALMART))
+  const hasFiles = computed(() => Boolean(files.SORIANA || files.WALMART || files.CHEDRAUI))
   const canCommit = computed(() => Boolean(previewData.value?.previewToken) && !isCommitting.value)
 
   const invalidatePreview = () => {
@@ -62,7 +66,7 @@ export const useSelloutStore = defineStore('selloutUpload', () => {
     isPreviewing.value = true
     error.value = ''
     try {
-      previewData.value = await selloutApi.preview(year.value, month.value, files.SORIANA, files.WALMART)
+      previewData.value = await selloutApi.preview(year.value, month.value, files)
     } catch (cause) {
       previewData.value = null
       error.value = getErrorMessage(cause, 'No fue posible analizar los archivos.')
@@ -80,12 +84,12 @@ export const useSelloutStore = defineStore('selloutUpload', () => {
       lastCommit.value = await selloutApi.commit(
         year.value,
         month.value,
-        files.SORIANA,
-        files.WALMART,
+        files,
         previewData.value.previewToken,
       )
       files.SORIANA = null
       files.WALMART = null
+      files.CHEDRAUI = null
       previewData.value = null
       await fetchHistory()
     } catch (cause) {

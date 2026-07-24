@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useToast } from '@/components/ui/toast/use-toast'
 import { StdAlert, StdButton, StdPageHeader, StdSection } from '@/modules/Shared/components/std'
@@ -8,6 +8,7 @@ import SelloutDropZone from '../components/SelloutDropZone.vue'
 import SelloutPreview from '../components/SelloutPreview.vue'
 import SelloutHistory from '../components/SelloutHistory.vue'
 import type { SelloutChain } from '../types/sellout'
+import { SELLOUT_CHAINS } from '../utils/selloutChains'
 
 const store = useSelloutStore()
 const { files, previewData, lastCommit, isPreviewing, isCommitting, error, hasFiles } = storeToRefs(store)
@@ -19,6 +20,16 @@ const months = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ]
+const lastCommitDescription = computed(() => {
+  if (!lastCommit.value) return ''
+  const inserted = lastCommit.value.chains.reduce((sum, item) => sum + item.insertedRows, 0)
+  const provisional = lastCommit.value.chains.reduce((sum, item) => sum + item.provisionalRows, 0)
+  const reclassified = lastCommit.value.chains.reduce((sum, item) => sum + item.reclassifiedRows, 0)
+  const details = [`${inserted.toLocaleString('es-MX')} registros insertados`]
+  if (provisional) details.push(`${provisional.toLocaleString('es-MX')} provisionales`)
+  if (reclassified) details.push(`${reclassified.toLocaleString('es-MX')} históricos homologados`)
+  return `Lote ${lastCommit.value.batchId.slice(0, 8)} · ${details.join(' · ')}.`
+})
 
 onMounted(() => store.fetchHistory())
 
@@ -50,7 +61,7 @@ const commit = async () => {
       <StdPageHeader
         eyebrow="Gestión / Sellout"
         title="Carga Sellout"
-        description="Transforma y reemplaza el movimiento mensual reportado por Soriana y Walmart con las reglas operativas vigentes."
+        description="Transforma y reemplaza el movimiento mensual reportado por Soriana, Walmart y Chedraui con las reglas operativas vigentes."
         icon="fa-solid fa-file-import"
         meta="Reemplazo transaccional"
       />
@@ -66,13 +77,13 @@ const commit = async () => {
         v-if="lastCommit"
         tone="success"
         title="Periodo actualizado correctamente"
-        :description="`Lote ${lastCommit.batchId.slice(0, 8)} · ${lastCommit.chains.reduce((sum, item) => sum + item.insertedRows, 0).toLocaleString('es-MX')} registros insertados.`"
+        :description="lastCommitDescription"
       />
 
       <StdSection
         eyebrow="Paso 1"
         title="Preparar carga"
-        description="Selecciona el periodo que se limpiará y agrega uno o ambos archivos de cadena."
+        description="Selecciona el periodo que se limpiará y agrega uno o más archivos de cadena."
         icon="fa-solid fa-box-open"
       >
         <div class="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[180px_minmax(220px,1fr)_auto] sm:items-end">
@@ -92,9 +103,15 @@ const commit = async () => {
           </div>
         </div>
 
-        <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <SelloutDropZone chain="SORIANA" :file="files.SORIANA" :disabled="isPreviewing || isCommitting" @change="updateFile('SORIANA', $event)" />
-          <SelloutDropZone chain="WALMART" :file="files.WALMART" :disabled="isPreviewing || isCommitting" @change="updateFile('WALMART', $event)" />
+        <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+          <SelloutDropZone
+            v-for="chain in SELLOUT_CHAINS"
+            :key="chain"
+            :chain="chain"
+            :file="files[chain]"
+            :disabled="isPreviewing || isCommitting"
+            @change="updateFile(chain, $event)"
+          />
         </div>
 
         <div class="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">

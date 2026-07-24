@@ -22,6 +22,7 @@ const columns = [
     { key: 'Nombre',    label: 'Cliente',  class: 'min-w-[280px] w-full' },
     { key: 'Canal',     label: 'Canal'    },
     { key: 'Gerencia',  label: 'Gerencia' },
+    { key: 'Ruta',      label: 'Ruta'     },
     { key: 'Ciudad',    label: 'Ciudad'   },
     { key: 'Estado',    label: 'Estado'   },
 ];
@@ -225,6 +226,12 @@ const clearFilters  = () => { filterCanal.value = ''; filterGerencia.value = '';
                 <!-- Gerencia cell -->
                 <template #cell-Gerencia="{ value }">
                     <span v-if="value" class="text-xs text-slate-600 font-medium">{{ value }}</span>
+                    <span v-else class="text-slate-300 text-xs">—</span>
+                </template>
+
+                <!-- Ruta cell: commercial route code -->
+                <template #cell-Ruta="{ value }">
+                    <span v-if="value" class="font-mono text-xs font-semibold text-slate-600">{{ value }}</span>
                     <span v-else class="text-slate-300 text-xs">—</span>
                 </template>
             </BaseTable>

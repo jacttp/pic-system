@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { StdButton } from '@/modules/Shared/components/std'
-import sorianaLogo from '@/assets/chains/soriana.png'
-import walmartLogo from '@/assets/chains/walmart.png'
 import type { SelloutChain } from '../types/sellout'
+import { SELLOUT_CHAIN_CONFIG } from '../utils/selloutChains'
 
 interface Props {
   chain: SelloutChain
@@ -19,23 +18,7 @@ const emit = defineEmits<{
 const input = ref<HTMLInputElement | null>(null)
 const isDragging = ref(false)
 
-const config = computed(() => props.chain === 'SORIANA'
-  ? {
-      name: 'Soriana',
-      logo: sorianaLogo,
-      accept: '.xls,.xlsx',
-      format: 'Excel · primera hoja · columnas A:E',
-      columns: 'Código Tienda · Código de Barras · Fecha · Venta · Inventario',
-      accent: 'border-pic-accent-teal bg-pic-accent-teal-soft text-pic-accent-teal',
-    }
-  : {
-      name: 'Walmart',
-      logo: walmartLogo,
-      accept: '.txt',
-      format: 'TXT · tabulador · sin encabezados',
-      columns: 'Fecha · Tienda · Artículo · vacío · Venta · Inventario',
-      accent: 'border-pic-accent-blue bg-pic-accent-blue-soft text-pic-accent-blue',
-    })
+const config = computed(() => SELLOUT_CHAIN_CONFIG[props.chain])
 
 const fileSize = computed(() => {
   if (!props.file) return ''
@@ -58,7 +41,7 @@ const handleDrop = (event: DragEvent) => {
 
 <template>
   <article class="relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md">
-    <div class="absolute inset-y-0 left-0 w-1" :class="chain === 'SORIANA' ? 'bg-pic-accent-teal' : 'bg-pic-accent-blue'"></div>
+    <div class="absolute inset-y-0 left-0 w-1" :class="config.rail"></div>
     <div class="p-4 sm:p-5">
       <div class="flex items-start justify-between gap-3">
         <div class="flex min-w-0 items-center gap-3">
@@ -71,7 +54,7 @@ const handleDrop = (event: DragEvent) => {
           </div>
         </div>
         <span class="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-black uppercase text-slate-500">
-          {{ chain === 'SORIANA' ? 'XLS/XLSX' : 'TXT' }}
+          {{ config.fileTag }}
         </span>
       </div>
 

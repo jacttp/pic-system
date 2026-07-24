@@ -3,7 +3,8 @@ import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { StdButton, StdDataTable, StdSection } from '@/modules/Shared/components/std'
 import { useSelloutStore } from '../stores/selloutStore'
-import type { SelloutHistoryStatus } from '../types/sellout'
+import type { SelloutChain, SelloutHistoryStatus } from '../types/sellout'
+import { SELLOUT_CHAIN_CONFIG } from '../utils/selloutChains'
 
 const store = useSelloutStore()
 const { historyEntries, historyFilters, historyTotal, isLoadingHistory } = storeToRefs(store)
@@ -30,6 +31,9 @@ const rows = computed<Array<Record<string, unknown>>>(() => historyEntries.value
   status: entry.Status,
   startedAt: entry.StartedAt,
   omitted: entry.OmittedRowCount,
+  provisional: entry.ProvisionalRowCount,
+  provisionalStores: entry.ProvisionalStores,
+  reclassified: entry.ReclassifiedRowCount,
   error: entry.ErrorMessage,
 })))
 
@@ -47,6 +51,13 @@ const formatDateTime = (value: unknown) => {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(date)
+}
+
+const provisionalTitle = (value: unknown) => {
+  if (!Array.isArray(value)) return ''
+  return value
+    .map((store) => `${store.storeCode}: ${Number(store.rowCount).toLocaleString('es-MX')} filas`)
+    .join('\n')
 }
 
 const reloadFromFirstPage = () => {
@@ -81,6 +92,7 @@ const changePage = (delta: number) => {
           <option value="">Todas</option>
           <option value="SORIANA">Soriana</option>
           <option value="WALMART">Walmart</option>
+          <option value="CHEDRAUI">Chedraui</option>
         </select>
       </label>
       <label class="block">
@@ -121,8 +133,8 @@ const changePage = (delta: number) => {
     >
       <template #cell-chain="{ value }">
         <span class="inline-flex items-center gap-2 font-black text-slate-900">
-          <span class="h-2.5 w-2.5 rounded-sm" :class="value === 'SORIANA' ? 'bg-pic-accent-teal' : 'bg-pic-accent-blue'"></span>
-          {{ value === 'SORIANA' ? 'Soriana' : 'Walmart' }}
+          <span class="h-2.5 w-2.5 rounded-sm" :class="SELLOUT_CHAIN_CONFIG[value as SelloutChain]?.marker"></span>
+          {{ SELLOUT_CHAIN_CONFIG[value as SelloutChain]?.name || value }}
         </span>
       </template>
       <template #cell-file="{ row, value }">
@@ -135,6 +147,16 @@ const changePage = (delta: number) => {
         <div class="text-right">
           <p class="font-black tabular-nums text-slate-900">{{ Number(value).toLocaleString('es-MX') }}</p>
           <p v-if="Number(row.omitted)" class="text-[10px] font-bold text-amber-600">{{ Number(row.omitted).toLocaleString('es-MX') }} omitidas</p>
+          <p
+            v-if="Number(row.provisional)"
+            class="text-[10px] font-bold text-sky-600"
+            :title="provisionalTitle(row.provisionalStores)"
+          >
+            {{ Number(row.provisional).toLocaleString('es-MX') }} provisionales
+          </p>
+          <p v-if="Number(row.reclassified)" class="text-[10px] font-bold text-emerald-600">
+            {{ Number(row.reclassified).toLocaleString('es-MX') }} homologadas
+          </p>
         </div>
       </template>
       <template #cell-status="{ row, value }">

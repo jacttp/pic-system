@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { StdAlert, StdButton, StdSection } from '@/modules/Shared/components/std'
 import type { SelloutPreviewChain, SelloutPreviewData } from '../types/sellout'
+import { SELLOUT_CHAIN_CONFIG } from '../utils/selloutChains'
 
 interface Props {
   preview: SelloutPreviewData
@@ -15,12 +16,28 @@ const showConfirmation = ref(false)
 const totals = computed(() => props.preview.chains.reduce((summary, chain) => ({
   prepared: summary.prepared + chain.stats.preparedRows,
   existing: summary.existing + chain.stats.existingRows,
-  omitted: summary.omitted + chain.stats.discardedInvalidDate,
-}), { prepared: 0, existing: 0, omitted: 0 }))
+  invalidDates: summary.invalidDates + chain.stats.discardedInvalidDate,
+  unmappedStores: summary.unmappedStores + chain.stats.unmappedStoreRows,
+  provisional: summary.provisional + chain.stats.provisionalStoreRows,
+  reclassifying: summary.reclassifying + chain.stats.historicalRowsToReclassify,
+  omitted: summary.omitted + chain.stats.discardedInvalidDate + chain.stats.unmappedStoreRows,
+}), {
+  prepared: 0,
+  existing: 0,
+  invalidDates: 0,
+  unmappedStores: 0,
+  provisional: 0,
+  reclassifying: 0,
+  omitted: 0,
+}))
 
-const chainName = (chain: SelloutPreviewChain) => chain.chain === 'SORIANA' ? 'Soriana' : 'Walmart'
+const chainConfig = (chain: SelloutPreviewChain) => SELLOUT_CHAIN_CONFIG[chain.chain]
 const sampleColumns = (chain: SelloutPreviewChain) => Object.keys(chain.sample[0] || {})
 const formatNumber = (value: number) => value.toLocaleString('es-MX')
+const formatMetric = (value: number) => value.toLocaleString('es-MX', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
 
 const confirm = () => {
   showConfirmation.value = false
@@ -58,9 +75,9 @@ const confirm = () => {
       <article v-for="chain in preview.chains" :key="chain.chain" class="overflow-hidden rounded-xl border border-slate-200">
         <header class="flex flex-col gap-3 bg-slate-800 px-4 py-3 text-white sm:flex-row sm:items-center sm:justify-between">
           <div class="flex min-w-0 items-center gap-3">
-            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-xs font-black">{{ chain.chain === 'SORIANA' ? 'SO' : 'WM' }}</span>
+            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-xs font-black">{{ chainConfig(chain).shortCode }}</span>
             <div class="min-w-0">
-              <h3 class="text-sm font-black">{{ chainName(chain) }} · {{ chain.targetTable }}</h3>
+              <h3 class="text-sm font-black">{{ chainConfig(chain).name }} · {{ chain.targetTable }}</h3>
               <p class="truncate text-[11px] font-semibold text-slate-400">{{ chain.file.name }}</p>
             </div>
           </div>
@@ -90,6 +107,81 @@ const confirm = () => {
           </div>
         </div>
 
+        <div v-if="chain.provisionalStores.length" class="border-t border-sky-200 bg-sky-50 px-4 py-4">
+          <div class="flex items-start gap-3">
+            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-sky-200 bg-white text-sky-600">
+              <i class="fa-solid fa-code-branch text-xs"></i>
+            </span>
+            <div class="min-w-0 flex-1">
+              <p class="text-xs font-black text-sky-950">
+                {{ formatNumber(chain.stats.provisionalStoreRows) }} filas incluidas con identificación temporal
+              </p>
+              <p class="mt-1 text-[11px] font-semibold leading-4 text-sky-700">
+                La sucursal está registrada, pero espera matriz ERP. Sus datos se preservarán y se homologarán automáticamente cuando exista una matriz válida.
+              </p>
+              <div class="mt-3 grid grid-cols-1 gap-2 xl:grid-cols-2">
+                <article
+                  v-for="store in chain.provisionalStores"
+                  :key="store.storeCode"
+                  class="rounded-lg border border-sky-200 bg-white px-3 py-3"
+                >
+                  <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <p class="text-[10px] font-black uppercase text-sky-600">{{ store.storeCode }} · Pendiente de ERP</p>
+                      <p class="truncate text-xs font-bold text-slate-700" :title="store.storeName">{{ store.storeName }}</p>
+                      <p class="mt-1 font-mono text-[10px] font-bold text-slate-400">{{ store.temporaryCode }}</p>
+                    </div>
+                    <span class="w-fit shrink-0 rounded-md bg-sky-100 px-2 py-1 text-[10px] font-black text-sky-800">
+                      {{ formatNumber(store.rowCount) }} filas
+                    </span>
+                  </div>
+                  <div class="mt-3 grid grid-cols-2 gap-2 border-t border-sky-100 pt-2">
+                    <div>
+                      <p class="text-[9px] font-black uppercase text-slate-400">VentaU</p>
+                      <p class="mt-0.5 text-xs font-black tabular-nums text-slate-800">{{ formatMetric(store.ventaUSum) }}</p>
+                    </div>
+                    <div>
+                      <p class="text-[9px] font-black uppercase text-slate-400">InventarioU</p>
+                      <p class="mt-0.5 text-xs font-black tabular-nums text-slate-800">{{ formatMetric(store.inventarioUSum) }}</p>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="chain.unmappedStores.length" class="border-t border-amber-200 bg-amber-50 px-4 py-4">
+          <div class="flex items-start gap-3">
+            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-amber-200 bg-white text-amber-600">
+              <i class="fa-solid fa-store-slash text-xs"></i>
+            </span>
+            <div class="min-w-0 flex-1">
+              <p class="text-xs font-black text-amber-900">
+                {{ formatNumber(chain.stats.unmappedStoreRows) }} filas excluidas por sucursal sin catálogo
+              </p>
+              <p class="mt-1 text-[11px] font-semibold leading-4 text-amber-700">
+                Estas filas no se insertarán; el resto del archivo puede confirmarse.
+              </p>
+              <div class="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-2">
+                <div
+                  v-for="store in chain.unmappedStores"
+                  :key="store.storeCode"
+                  class="flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-white px-3 py-2"
+                >
+                  <div class="min-w-0">
+                    <p class="text-[10px] font-black uppercase text-amber-600">{{ store.storeCode }}</p>
+                    <p class="truncate text-xs font-bold text-slate-700" :title="store.storeName">{{ store.storeName }}</p>
+                  </div>
+                  <span class="shrink-0 rounded-md bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-800">
+                    {{ formatNumber(store.rowCount) }} filas
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="hidden overflow-x-auto md:block">
           <table class="w-full min-w-[680px] text-left text-xs">
             <thead class="bg-slate-50 text-[10px] font-black uppercase text-slate-500">
@@ -115,11 +207,19 @@ const confirm = () => {
     </div>
 
     <StdAlert
-      v-if="totals.omitted"
+      v-if="totals.invalidDates"
       class="mt-4"
       tone="warning"
-      title="Se encontraron fechas inválidas en Soriana"
-      :description="`${formatNumber(totals.omitted)} filas serán omitidas, conforme a la transformación vigente.`"
+      title="Se encontraron fechas inválidas"
+      :description="`${formatNumber(totals.invalidDates)} filas serán omitidas, conforme a la transformación vigente.`"
+    />
+
+    <StdAlert
+      v-if="totals.reclassifying"
+      class="mt-4"
+      tone="info"
+      title="Homologación histórica detectada"
+      :description="`${formatNumber(totals.reclassifying)} registros temporales históricos se reclasificarán con las matrices ERP vigentes dentro de la misma transacción.`"
     />
 
     <div class="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
@@ -143,6 +243,20 @@ const confirm = () => {
             <p class="mt-2 text-sm font-semibold leading-6 text-slate-600">
               Se eliminarán {{ formatNumber(totals.existing) }} registros existentes y se cargarán {{ formatNumber(totals.prepared) }} registros preparados.
             </p>
+            <div v-if="totals.omitted || totals.provisional || totals.reclassifying" class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <div v-if="totals.omitted" class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                <p class="text-[9px] font-black uppercase text-amber-600">No se cargan</p>
+                <p class="mt-0.5 text-sm font-black tabular-nums text-amber-900">{{ formatNumber(totals.omitted) }} omitidas</p>
+              </div>
+              <div v-if="totals.provisional" class="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2">
+                <p class="text-[9px] font-black uppercase text-sky-600">Sí se cargan</p>
+                <p class="mt-0.5 text-sm font-black tabular-nums text-sky-900">{{ formatNumber(totals.provisional) }} provisionales</p>
+              </div>
+              <div v-if="totals.reclassifying" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                <p class="text-[9px] font-black uppercase text-emerald-600">Histórico</p>
+                <p class="mt-0.5 text-sm font-black tabular-nums text-emerald-900">{{ formatNumber(totals.reclassifying) }} homologados</p>
+              </div>
+            </div>
           </div>
         </div>
         <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
