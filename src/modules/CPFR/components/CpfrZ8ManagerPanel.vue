@@ -64,6 +64,19 @@ const previewDesc = computed(() => {
     return { desde, hasta }
 })
 
+const DAY_NAMES: Record<number, string> = {
+    1: 'Lunes',
+    2: 'Martes',
+    3: 'Miércoles',
+    4: 'Jueves',
+    5: 'Viernes',
+    6: 'Sábado',
+    7: 'Domingo',
+}
+
+const selectedDay = computed(() => Number(store.filters.dia))
+const selectedDayLabel = computed(() => DAY_NAMES[selectedDay.value] || 'Sin día seleccionado')
+
 const isRangeValid = computed(() => {
     if (!fecInicio.value || !fecFin.value) return false
     return new Date(fecInicio.value) <= new Date(fecFin.value)
@@ -72,6 +85,11 @@ const isRangeValid = computed(() => {
 // ── Acción principal ──────────────────────────────────────────────────────────
 
 async function handleDelete() {
+    if (!Number.isInteger(selectedDay.value) || selectedDay.value < 1 || selectedDay.value > 7) {
+        toast({ title: 'Selecciona un día antes de eliminar Z8', variant: 'destructive', duration: 3000 })
+        return
+    }
+
     if (!isRangeValid.value) {
         toast({ title: '⚠️ Rango de fechas inválido', variant: 'destructive', duration: 3000 })
         return
@@ -79,13 +97,14 @@ async function handleDelete() {
 
     const tiendaInfo = idCliente.value.trim()
         ? `Tienda: ${idCliente.value.trim()}`
-        : 'Todas las tiendas'
+        : `Tiendas: todas las asignadas a ${selectedDayLabel.value}`
 
     const confirmMsg = [
         `¿Eliminar TODOS los cascarones Z8 en estado BORRADOR?`,
         ``,
         `  Rango:   ${previewDesc.value.desde} → ${previewDesc.value.hasta}`,
         `  Cadena:  ${nomCadena.value}`,
+        `  Día:     ${selectedDayLabel.value}`,
         `  ${tiendaInfo}`,
         ``,
         `Esta acción NO se puede deshacer.`,
@@ -101,6 +120,7 @@ async function handleDelete() {
             fec_inicio: fecInicio.value,
             fec_fin:    fecFin.value,
             nom_cadena: nomCadena.value,
+            dia_ventas: selectedDay.value,
             id_cliente: idCliente.value.trim() || undefined,
         })
 
@@ -175,7 +195,7 @@ function resetForm() {
         <p class="text-[11px] text-amber-700 leading-relaxed">
         Esta acción borra los registros de <strong>CPFR_ocz8</strong> (<code>estado=pendiente</code>)
           y <strong>CPFR_PedidoGenerado</strong> (<code>estado=pendiente/borrador</code>)
-          para el rango seleccionado. Solo afecta OC con prefijo <strong>Z8</strong>.
+          para el rango y día seleccionados. Solo afecta OC con prefijo <strong>Z8</strong>.
           Úsalo para limpiar antes de regenerar.
         </p>
       </div>
@@ -230,7 +250,7 @@ function resetForm() {
         <div>
           <label class="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2 pl-1">
             <i class="fa-solid fa-store mr-1"></i>Tienda
-            <span class="ml-1 normal-case font-medium text-slate-300">(opcional — deja vacío para todas)</span>
+            <span class="ml-1 normal-case font-medium text-slate-300">(opcional — vacío incluye todas las del día)</span>
           </label>
           <input
             type="text"
@@ -258,9 +278,13 @@ function resetForm() {
             <span class="font-bold text-slate-700 uppercase">{{ nomCadena || '—' }}</span>
           </div>
           <div class="flex items-center gap-2">
+            <span class="text-slate-400 w-16 shrink-0">Día</span>
+            <span class="font-bold text-slate-700">{{ selectedDayLabel }}</span>
+          </div>
+          <div class="flex items-center gap-2">
             <span class="text-slate-400 w-16 shrink-0">Tienda</span>
             <span class="font-bold" :class="idCliente.trim() ? 'text-slate-700' : 'text-slate-400 italic'">
-              {{ idCliente.trim() || 'Todas las tiendas' }}
+              {{ idCliente.trim() || `Todas las de ${selectedDayLabel}` }}
             </span>
           </div>
           <div class="pt-1 flex items-center gap-2 border-t border-slate-200">
@@ -323,7 +347,7 @@ function resetForm() {
 
         <button
           @click="handleDelete"
-          :disabled="deleting || !isRangeValid"
+          :disabled="deleting || !isRangeValid || !selectedDay"
           class="inline-flex items-center gap-2 px-4 py-2 text-[11px] font-bold rounded-lg transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           :class="deleting
             ? 'bg-rose-400 text-white cursor-wait'

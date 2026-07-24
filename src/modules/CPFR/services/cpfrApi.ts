@@ -284,6 +284,7 @@ export const cpfrApi = {
         fec_inicio: string
         fec_fin: string
         nom_cadena: string
+        dia_ventas: number
         id_cliente?: string
     }): Promise<{
         success: boolean

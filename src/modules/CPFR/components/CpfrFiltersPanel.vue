@@ -182,7 +182,13 @@ async function triggerGenerateZ8() {
           <button @click.stop="emit('open-chain-config')" class="h-[34px] w-[36px] flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-400 hover:text-brand-600 hover:bg-brand-50 hover:border-brand-200 transition-all" title="Abrir Catalogo de Configuracion de Cadena">
             <i class="fa-solid fa-gear text-[14px]"></i>
           </button>
-          <button @click.stop="emit('open-z8-manager')" class="h-[34px] w-[36px] flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-400 hover:text-rose-600 hover:bg-rose-100 hover:border-rose-300 transition-all" title="Gestion de Borradores Z8 - Limpiar registros en borrador">
+          <button
+            @click.stop="emit('open-z8-manager')"
+            :disabled="!store.filters.dia"
+            class="h-[34px] w-[36px] flex items-center justify-center rounded-lg border transition-all disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-300"
+            :class="store.filters.dia ? 'border-rose-200 bg-rose-50 text-rose-400 hover:text-rose-600 hover:bg-rose-100 hover:border-rose-300' : ''"
+            :title="store.filters.dia ? `Eliminar borradores Z8 del día ${store.filters.dia}` : 'Selecciona un día antes de eliminar borradores Z8'"
+          >
             <i class="fa-solid fa-trash-can-arrow-up text-[14px]"></i>
           </button>
         </div>
