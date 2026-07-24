@@ -5,6 +5,10 @@ import type { Approval } from '../types/approval.types';
 import { APPROVAL_STATUS_CONFIG, APPROVAL_TYPE_CONFIG } from '../types/approval.types';
 import { useApprovalsStore } from '../stores/approvalsStore';
 import { approvalsApi } from '../services/approvalsApi';
+import { useCpfrExport } from '@/modules/CPFR/composables/useCpfrExport';
+import type { ExportRow, ExportTiendaItem } from '@/modules/CPFR/composables/useCpfrExport';
+import { cpfrApi } from '@/modules/CPFR/services/cpfrApi';
+import { toast } from '@/components/ui/toast/use-toast';
 import ApprovalStatusSelector from './ApprovalStatusSelector.vue';
 import logoUrl from '@/assets/logo.png';
 
@@ -117,10 +121,15 @@ interface CpfrStoreGroup {
 const emit = defineEmits(['update:modelValue', 'resolved', 'cancelled']);
 
 const approvalsStore = useApprovalsStore();
+const { generateStorePdfs } = useCpfrExport();
 
 const resolutionComment = ref('');
 const isSubmitting = ref(false);
 const isCancelling = ref(false);
+const isExportingPdf = ref(false);
+const isLoadingCpfrConfig = ref(false);
+const cpfrAssignedDay = ref<number | null>(null);
+const cpfrConfigError = ref('');
 const errorMessage = ref('');
 const isLoadingCpfrDetail = ref(false);
 const cpfrDetailError = ref('');
@@ -161,6 +170,8 @@ watch(
    async ([open, id, type]) => {
       cpfrDetail.value = null;
       cpfrDetailError.value = '';
+      cpfrAssignedDay.value = null;
+      cpfrConfigError.value = '';
       cpfrMixPreview.value = null;
       cpfrMixError.value = '';
       selectedMixRowKey.value = '';
@@ -175,6 +186,8 @@ watch(
       isLoadingCpfrDetail.value = true;
       try {
          cpfrDetail.value = await approvalsApi.getCpfrOrderDetail(id);
+         const idCliente = String(cpfrDetail.value?.id_cliente ?? props.approval?.payload?.id_cliente ?? '');
+         if (idCliente) await loadCpfrAssignedDay(idCliente);
          await loadCpfrMixPreview(id);
       } catch (e: any) {
          cpfrDetailError.value = e.response?.data?.message || 'No se pudo cargar el detalle de SKUs.';
@@ -184,6 +197,25 @@ watch(
    },
    { immediate: true }
 );
+
+async function loadCpfrAssignedDay(idCliente: string) {
+   isLoadingCpfrConfig.value = true;
+   cpfrConfigError.value = '';
+   try {
+      const config = await cpfrApi.getConfig(idCliente);
+      const assignedDay = Number(config.dia_ventas);
+      if (!Number.isInteger(assignedDay) || assignedDay < 1 || assignedDay > 7) {
+         throw new Error('La configuración no contiene un día de ventas válido.');
+      }
+      cpfrAssignedDay.value = assignedDay;
+   } catch (error) {
+      console.error('[ApprovalDetailModal.config]', error);
+      cpfrAssignedDay.value = null;
+      cpfrConfigError.value = 'No se pudo obtener el día asignado de la tienda.';
+   } finally {
+      isLoadingCpfrConfig.value = false;
+   }
+}
 
 const typeConfig = computed(() => {
    if (!props.approval) return { label: '', color: '', icon: '' };
@@ -624,6 +656,63 @@ const cpfrStoreGroups = computed<CpfrStoreGroup[]>(() => {
    }));
 });
 
+const cpfrPdfDayNumbers = computed(() =>
+   cpfrAssignedDay.value === null ? [] : [cpfrAssignedDay.value]
+);
+
+const cpfrPdfItems = computed<ExportTiendaItem[]>(() => {
+   const items = new Map<string, ExportTiendaItem>();
+
+   for (const row of cpfrPreviewRows.value) {
+      const key = `${row.id_cliente}|${row.num_pedido}`;
+      const dayNum = cpfrAssignedDay.value ?? 0;
+      if (!items.has(key)) {
+         items.set(key, {
+            id_cliente: row.id_cliente,
+            nombre_tienda: row.nombre,
+            jefatura: row.jefatura || null,
+            num_pedido: row.num_pedido,
+            estado_oc: row.estado || null,
+            dayNum,
+            semana_ic: row.semana_ic || null,
+            anio: Number(row.anio) || null,
+            rows: [],
+         });
+      }
+
+      const exportRow: ExportRow = {
+         sku_key: row.sku_muliix || row.sku_cadena || row.upc || row.desc,
+         cliente: row.cliente,
+         nombre: row.nombre,
+         sucursal: row.sucursal,
+         jefatura: row.jefatura || null,
+         semana_ic: row.semana_ic || null,
+         fec_pedido_cadena: row.fec_pedido_cadena,
+         fec_fin_embarque: row.fec_fin_embarque,
+         num_pedido: row.num_pedido,
+         cant_pedida: row.cant_pedida,
+         pedido_kg: row.pedido_kg,
+         inv_actual_pz: row.inv_actual_pz,
+         promedio_sellout_pz: row.promedio_sellout_pz,
+         cobertura_calculada: calcularCoberturaDinamica(row),
+         upc: row.upc,
+         desc: row.desc,
+         estado_oc: row.estado || null,
+      };
+      items.get(key)!.rows.push(exportRow);
+   }
+
+   return [...items.values()].filter(item => item.rows.some(row => Number(row.cant_pedida) > 0));
+});
+
+const canExportCpfrPdf = computed(() =>
+   props.approval?.type === 'CPFR_ORDER'
+   && !isLoadingCpfrDetail.value
+   && !isLoadingCpfrConfig.value
+   && cpfrAssignedDay.value !== null
+   && cpfrPdfItems.value.length > 0
+);
+
 const formatDate = (dateStr?: string) => {
    if (!dateStr) return '—';
    return new Date(dateStr).toLocaleString('es-MX', { 
@@ -775,6 +864,40 @@ const closeModal = () => {
    emit('update:modelValue', false);
 };
 
+const handlePdfExport = async () => {
+   if (isExportingPdf.value) return;
+   if (cpfrAssignedDay.value === null) {
+      toast({
+         title: 'Día no disponible',
+         description: cpfrConfigError.value || 'No se encontró el día asignado de la tienda.',
+         variant: 'destructive',
+      });
+      return;
+   }
+   if (!canExportCpfrPdf.value) return;
+
+   isExportingPdf.value = true;
+   try {
+      const tab = props.approval?.status === 'PENDING' ? 'revision' : undefined;
+      const result = await generateStorePdfs(cpfrPdfItems.value, cpfrPdfDayNumbers.value, tab);
+      toast({
+         title: result.zipped ? 'ZIP generado' : 'PDF generado',
+         description: result.zipped
+            ? `${result.filename} contiene ${result.fileCount} PDF(s), uno por tienda.`
+            : `${result.filename} descargado.`,
+      });
+   } catch (error) {
+      console.error('[ApprovalDetailModal.PDF]', error);
+      toast({
+         title: 'Error',
+         description: 'No se pudo generar el PDF del pedido.',
+         variant: 'destructive',
+      });
+   } finally {
+      isExportingPdf.value = false;
+   }
+};
+
 const handleConfirm = async () => {
    if (!props.approval) return;
 
@@ -894,7 +1017,7 @@ const handleCancel = async () => {
 
          <!-- Payload CPFR_ORDER: pedido + template OV -->
          <div v-if="approval.type === 'CPFR_ORDER' && approval.payload" class="space-y-4">
-            <div>
+            <div class="flex items-center justify-between gap-3">
                <button
                   type="button"
                   class="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-pic-border bg-pic-surface px-3.5 text-sm font-bold text-pic-text-main shadow-sm transition hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand"
@@ -902,6 +1025,19 @@ const handleCancel = async () => {
                >
                   <i class="fa-solid fa-arrow-left text-xs"></i>
                   Volver a solicitudes
+               </button>
+               <button
+                  type="button"
+                  class="group inline-flex h-10 items-center justify-center gap-2 rounded-xl border-2 border-rose-600 bg-white px-3.5 text-xs font-black text-rose-700 transition-all hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-300"
+                  :disabled="!canExportCpfrPdf || isExportingPdf"
+                  :title="cpfrConfigError || 'Descargar el pedido con el formato PDF de CPFR'"
+                  @click="handlePdfExport"
+               >
+                  <i
+                     class="fa-solid"
+                     :class="isExportingPdf ? 'fa-circle-notch fa-spin' : 'fa-file-pdf transition-transform group-hover:scale-110'"
+                  ></i>
+                  <span class="hidden sm:inline">{{ isExportingPdf ? 'GENERANDO...' : 'DESCARGAR PDF' }}</span>
                </button>
             </div>
 

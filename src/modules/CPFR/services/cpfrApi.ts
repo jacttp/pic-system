@@ -170,7 +170,7 @@ export const cpfrApi = {
      */
     async getConfig(id_cliente: string): Promise<CpfrStoreConfig> {
         const { data } = await api.get(`/v2/cpfr/config/${id_cliente}`)
-        return data
+        return data.data
     },
 
     /**
