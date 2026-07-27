@@ -5,7 +5,8 @@ import type { ChainZ8CatalogItem, ChainZ8CatalogPayload } from '../types/chainCo
 import { normalizeZ8Permission, Z8_PERMISSION_OPTIONS } from '../utils/chainConfigOptions';
 
 const store = useChainConfigStore();
-const search = ref('');
+const storeSearch = ref('');
+const skuPairSearch = ref('');
 const selectedPermission = ref<string>('');
 const editingId = ref<number | null>(null);
 const expandedStores = ref<Set<string>>(new Set());
@@ -30,18 +31,21 @@ const editForm = reactive<ChainZ8CatalogPayload>({
 });
 
 const filteredItems = computed(() => {
-   const query = search.value.trim().toLowerCase();
+   const storeQuery = storeSearch.value.trim().toLowerCase();
+   const skuPairQuery = skuPairSearch.value.trim().toLowerCase();
+
    return store.z8Catalog.filter(item => {
       const matchesPermission = !selectedPermission.value || item.permiso_oc === selectedPermission.value;
-      const matchesSearch = !query ||
-         item.id_cliente.toLowerCase().includes(query) ||
-         (item.nombre_tienda || '').toLowerCase().includes(query) ||
-         (item.Jefatura || '').toLowerCase().includes(query) ||
-         item.sku_muliix.toLowerCase().includes(query) ||
-         item.sku_nombre.toLowerCase().includes(query) ||
-         (item.par_muliix || '').toLowerCase().includes(query) ||
-         (item.par_nombre || '').toLowerCase().includes(query);
-      return matchesPermission && matchesSearch;
+      const matchesStore = !storeQuery ||
+         item.id_cliente.toLowerCase().includes(storeQuery) ||
+         (item.nombre_tienda || '').toLowerCase().includes(storeQuery);
+      const matchesSkuPair = !skuPairQuery ||
+         item.sku_muliix.toLowerCase().includes(skuPairQuery) ||
+         item.sku_nombre.toLowerCase().includes(skuPairQuery) ||
+         (item.par_muliix || '').toLowerCase().includes(skuPairQuery) ||
+         (item.par_nombre || '').toLowerCase().includes(skuPairQuery);
+
+      return matchesPermission && matchesStore && matchesSkuPair;
    });
 });
 
@@ -84,7 +88,7 @@ const noResurtibleCount = computed(() =>
    store.z8Catalog.filter(item => item.permiso_oc === 'NoResurtible').length
 );
 
-watch([search, selectedPermission], () => {
+watch([storeSearch, skuPairSearch, selectedPermission], () => {
    expandedStores.value = new Set();
 });
 
@@ -173,12 +177,32 @@ function toggleStore(idCliente: string) {
             <h2 class="text-sm font-black text-slate-800 uppercase tracking-tight">Catalogo Z8</h2>
             <p class="text-xs text-slate-500">Asocia tiendas existentes con SKUs internos y permisos Z8.</p>
          </div>
-         <div class="flex flex-col sm:flex-row gap-3">
-            <select v-model="selectedPermission" class="control w-full sm:w-44">
-               <option value="">Todos los permisos</option>
-               <option v-for="permission in Z8_PERMISSION_OPTIONS" :key="permission" :value="permission">{{ permission }}</option>
-            </select>
-            <input v-model="search" type="text" placeholder="Buscar tienda, SKU o par..." class="control w-full sm:w-80">
+         <div class="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-[11rem_15rem_15rem]">
+            <label class="block">
+               <span class="field-label">Permiso OC</span>
+               <select v-model="selectedPermission" class="control w-full">
+                  <option value="">Todos los permisos</option>
+                  <option v-for="permission in Z8_PERMISSION_OPTIONS" :key="permission" :value="permission">{{ permission }}</option>
+               </select>
+            </label>
+            <label class="block">
+               <span class="field-label">Buscar tienda</span>
+               <input
+                  v-model="storeSearch"
+                  type="search"
+                  placeholder="Nombre o ID de tienda..."
+                  class="control w-full"
+               >
+            </label>
+            <label class="block sm:col-span-2 xl:col-span-1">
+               <span class="field-label">Buscar SKU o par</span>
+               <input
+                  v-model="skuPairSearch"
+                  type="search"
+                  placeholder="Codigo o nombre..."
+                  class="control w-full"
+               >
+            </label>
          </div>
       </header>
 
