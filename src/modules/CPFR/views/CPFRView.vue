@@ -25,7 +25,6 @@ const chainLabel = computed(() => store.nom_cadena === 'SAMS' ? "Sam's" : 'Soria
 const visibleDias = computed(() => buildVisibleCpfrDias({
     activeTab: store.activeTab,
     dias: store.dias,
-    historialDias: store.historialDias,
     statusFilters: store.statusFilters,
     criterioGlobal: store.criterio_global,
 }))
@@ -34,40 +33,6 @@ const orderTotals = computed(() => {
     let piezas = 0
     let kg = 0
     const tiendas = new Set<string>()
-
-    if (store.activeTab === 'historial') {
-        const term = store.historialSearch.trim().toLowerCase()
-
-        for (const dia of store.historialDias) {
-            for (const tienda of dia.tiendas) {
-                let hasVisibleSku = false
-
-                for (const sku of tienda.skus) {
-                    const state = String(sku.estado_oc ?? '').trim().toLowerCase()
-                    if (state !== 'aprobado' && state !== 'cerrado') continue
-
-                    const searchable = [
-                        tienda.nombre_tienda,
-                        tienda.id_cliente,
-                        state,
-                        sku.num_pedido,
-                    ].filter(Boolean).join(' ').toLowerCase()
-
-                    if (term && !searchable.includes(term)) continue
-
-                    const piezasSku = cpfrSkuFinalPieces(sku)
-                    const kgPorPieza = Number(sku.unidad_inventario ?? 0)
-                    piezas += piezasSku
-                    kg += kgPorPieza > 0 ? piezasSku * kgPorPieza : Number(sku.pedido_sugerido_kg ?? 0)
-                    hasVisibleSku = true
-                }
-
-                if (hasVisibleSku) tiendas.add(tienda.id_cliente)
-            }
-        }
-
-        return { tiendas: tiendas.size, piezas, kg }
-    }
 
     for (const dia of visibleDias.value) {
         for (const tienda of dia.tiendas) {

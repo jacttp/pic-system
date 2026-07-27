@@ -1,7 +1,7 @@
 <!-- src/modules/Approvals/components/ApprovalDetailModal.vue -->
 <script setup lang="ts">
 import { ref, computed, reactive, watch } from 'vue';
-import type { Approval } from '../types/approval.types';
+import type { Approval, CpfrApprovalDetail, CpfrZ8ConversionLine } from '../types/approval.types';
 import { APPROVAL_STATUS_CONFIG, APPROVAL_TYPE_CONFIG } from '../types/approval.types';
 import { useApprovalsStore } from '../stores/approvalsStore';
 import { approvalsApi } from '../services/approvalsApi';
@@ -9,6 +9,7 @@ import { useCpfrExport } from '@/modules/CPFR/composables/useCpfrExport';
 import type { ExportRow, ExportTiendaItem } from '@/modules/CPFR/composables/useCpfrExport';
 import { cpfrApi } from '@/modules/CPFR/services/cpfrApi';
 import { toast } from '@/components/ui/toast/use-toast';
+import { StdAlert, StdButton } from '@/modules/Shared/components/std';
 import ApprovalStatusSelector from './ApprovalStatusSelector.vue';
 import logoUrl from '@/assets/logo.png';
 
@@ -58,6 +59,10 @@ interface CpfrPreviewRow {
    par_muliix: string
    mixbase: number | null
    mixpar: number | null
+   lead_time: number
+   z8_eligible: boolean
+   z8_permiso_oc: string
+   is_expired: boolean
 }
 
 interface CpfrMixGroup {
@@ -98,6 +103,10 @@ interface CpfrOrderGroup {
    anio: string
    fec_pedido_cadena: string
    fec_fin_embarque: string
+   source_type: string
+   isExpired: boolean
+   leadTime: number
+   eligibleSkus: number
    rows: CpfrPreviewRow[]
    totalPz: number
    totalKg: number
@@ -133,8 +142,12 @@ const cpfrConfigError = ref('');
 const errorMessage = ref('');
 const isLoadingCpfrDetail = ref(false);
 const cpfrDetailError = ref('');
-const cpfrDetail = ref<any | null>(null);
+const cpfrDetail = ref<CpfrApprovalDetail | null>(null);
 const adjustingRows = ref<Set<string>>(new Set());
+const conversionQuantities = reactive<Record<string, number>>({});
+const convertingOrders = ref<Set<string>>(new Set());
+const conversionErrors = reactive<Record<string, string>>({});
+const showExpiredApprovalConfirmation = ref(false);
 const isLoadingMixPreview = ref(false);
 const isApplyingMix = ref(false);
 const cpfrMixError = ref('');
@@ -155,8 +168,12 @@ watch(() => props.modelValue, (open) => {
       cpfrDetailError.value = '';
       cpfrMixError.value = '';
       adjustingRows.value = new Set();
+      convertingOrders.value = new Set();
+      showExpiredApprovalConfirmation.value = false;
       cpfrMixPreview.value = null;
       selectedMixRowKey.value = '';
+      Object.keys(conversionQuantities).forEach(key => delete conversionQuantities[key]);
+      Object.keys(conversionErrors).forEach(key => delete conversionErrors[key]);
       Object.keys(mixOverrides).forEach(key => delete mixOverrides[key]);
       Object.keys(mixPieceOverrides).forEach(key => delete mixPieceOverrides[key]);
       Object.keys(mixDefaultRatios).forEach(key => delete mixDefaultRatios[key]);
@@ -175,6 +192,10 @@ watch(
       cpfrMixPreview.value = null;
       cpfrMixError.value = '';
       selectedMixRowKey.value = '';
+      convertingOrders.value = new Set();
+      showExpiredApprovalConfirmation.value = false;
+      Object.keys(conversionQuantities).forEach(key => delete conversionQuantities[key]);
+      Object.keys(conversionErrors).forEach(key => delete conversionErrors[key]);
       Object.keys(mixOverrides).forEach(key => delete mixOverrides[key]);
       Object.keys(mixPieceOverrides).forEach(key => delete mixPieceOverrides[key]);
       Object.keys(mixDefaultRatios).forEach(key => delete mixDefaultRatios[key]);
@@ -186,6 +207,7 @@ watch(
       isLoadingCpfrDetail.value = true;
       try {
          cpfrDetail.value = await approvalsApi.getCpfrOrderDetail(id);
+         syncConversionQuantities();
          const idCliente = String(cpfrDetail.value?.id_cliente ?? props.approval?.payload?.id_cliente ?? '');
          if (idCliente) await loadCpfrAssignedDay(idCliente);
          await loadCpfrMixPreview(id);
@@ -248,6 +270,14 @@ const cpfrTotalCadena = computed(() => Number(cpfrSource.value.total_pzas_cadena
 const cpfrTotalSugeridas = computed(() => Number(cpfrSource.value.total_pzas_sugeridas ?? 0));
 const canEditCpfrOrder = computed(() =>
    props.approval?.type === 'CPFR_ORDER' && props.approval?.status === 'PENDING' && props.canResolve
+);
+const isApprovalSubmissionDisabled = computed(() =>
+   isSubmitting.value
+   || isCancelling.value
+   || (
+      props.approval?.type === 'CPFR_ORDER'
+      && (isLoadingCpfrDetail.value || cpfrDetail.value === null)
+   )
 );
 
 const splitClientId = (idCliente: string) => {
@@ -347,10 +377,11 @@ const selectedMixGroup = computed(() => {
 });
 
 const isMixPairRow = (row: CpfrPreviewRow) => String(row.permiso_oc || '').toLowerCase() === 'mix';
-const canShowCpfrStepper = computed(() => canEditCpfrOrder.value);
+const canShowCpfrStepper = (row: CpfrPreviewRow) => canEditCpfrOrder.value && !row.is_expired;
 const getMixRowKey = (row: CpfrPreviewRow) => `${row.source_type}|${row.num_pedido}|${row.sku_muliix}`;
 const getRowMixGroup = (row: CpfrPreviewRow) => cpfrMixGroupsByRowKey.value.get(getMixRowKey(row)) || null;
-const rowHasMixMetadata = (row: CpfrPreviewRow) => Boolean(row.par_muliix) || Boolean(getRowMixGroup(row));
+const rowHasMixMetadata = (row: CpfrPreviewRow) =>
+   !row.is_expired && (Boolean(row.par_muliix) || Boolean(getRowMixGroup(row)));
 const isMixAdjustmentLocked = (row: CpfrPreviewRow) =>
    isMixPairRow(row) || Boolean(getRowMixGroup(row)?.pair_exists);
 const groupPreKg = (group: CpfrMixGroup) => Number(group.pre_mix_quantity || 0) * Number(group.base_unit_kg || 0);
@@ -389,6 +420,7 @@ const getRowMixButtonTitle = (row: CpfrPreviewRow) => {
    return 'Revisar mix de producto';
 };
 const openRowMix = (row: CpfrPreviewRow) => {
+   if (row.is_expired) return;
    const group = getRowMixGroup(row);
    const key = group ? getMixKey(group) : getMixRowKey(row);
    confirmedMixKey.value = '';
@@ -538,7 +570,7 @@ const cpfrPreviewRows = computed(() => {
          pzas_bolsa: pzasBolsa,
          ajusteValido: isAdjustmentMultiple(ajuste, pzasBolsa),
          cantidad_oc: Number(row.cantidad_oc ?? row.cant_pedida_oc ?? 0),
-         pedido_kg: Number(row.pedido_kg ?? (cantPedida * unidad) ?? 0),
+         pedido_kg: Number(row.pedido_kg ?? (cantPedida * unidad)),
          inv_actual_pz: Number(row.inv_actual_pz ?? row.inv_actual_uni ?? 0),
          inv_actual_kg: Number(row.inv_actual_kg ?? 0),
          promedio_sellout_pz: Number(row.promedio_sellout_pz ?? row.venta_prom_uni ?? 0),
@@ -557,6 +589,10 @@ const cpfrPreviewRows = computed(() => {
          par_muliix: String(row.par_muliix ?? ''),
          mixbase: row.mixbase == null ? null : Number(row.mixbase),
          mixpar: row.mixpar == null ? null : Number(row.mixpar),
+         lead_time: toNumericValue(row.lead_time),
+         z8_eligible: Boolean(row.z8_eligible),
+         z8_permiso_oc: String(row.z8_permiso_oc ?? ''),
+         is_expired: Boolean(row.is_expired),
          };
       });
    }
@@ -598,6 +634,10 @@ const cpfrPreviewRows = computed(() => {
       par_muliix: '',
       mixbase: null,
       mixpar: null,
+      lead_time: 0,
+      z8_eligible: false,
+      z8_permiso_oc: '',
+      is_expired: false,
    } satisfies CpfrPreviewRow];
 });
 
@@ -635,6 +675,10 @@ const cpfrStoreGroups = computed<CpfrStoreGroup[]>(() => {
             anio: row.anio || cpfrYear.value,
             fec_pedido_cadena: row.fec_pedido_cadena,
             fec_fin_embarque: row.fec_fin_embarque,
+            source_type: row.source_type,
+            isExpired: row.is_expired && row.source_type !== 'ocz8',
+            leadTime: row.lead_time,
+            eligibleSkus: 0,
             rows: [],
             totalPz: 0,
             totalKg: 0,
@@ -643,6 +687,9 @@ const cpfrStoreGroups = computed<CpfrStoreGroup[]>(() => {
       }
 
       orderGroup.rows.push(row);
+      orderGroup.isExpired = orderGroup.isExpired || (row.is_expired && row.source_type !== 'ocz8');
+      orderGroup.leadTime = Math.max(orderGroup.leadTime, row.lead_time);
+      orderGroup.eligibleSkus += row.z8_eligible ? 1 : 0;
       orderGroup.totalPz += row.cant_pedida;
       orderGroup.totalKg += row.pedido_kg;
       storeGroup.totalSkus += 1;
@@ -655,6 +702,116 @@ const cpfrStoreGroups = computed<CpfrStoreGroup[]>(() => {
       totalOrders: group.orders.length,
    }));
 });
+
+const expiredCpfrOrders = computed(() =>
+   cpfrStoreGroups.value.flatMap(store =>
+      store.orders.filter(order => order.isExpired)
+   )
+);
+const expiredCpfrOrderNumbers = computed(() =>
+   expiredCpfrOrders.value.map(order => order.num_pedido)
+);
+const expiredApprovalConfirmationDescription = computed(() => {
+   const closure = expiredCpfrOrders.value.length === 1
+      ? 'la OC caducada se cerrará'
+      : 'las OCs caducadas se cerrarán';
+   return `Si apruebas el pedido, ${closure} y sus productos quedarán fuera del envío. Para conservarlos, vuelve al detalle y usa “Cambiar a Z8” antes de aprobar.`;
+});
+const expiredWarningDescription = computed(() => {
+   const count = expiredCpfrOrders.value.length;
+   return `${count === 1 ? 'Esta OC ya no alcanza' : 'Estas OC ya no alcanzan'} la fecha fin de embarque considerando el lead time. No admiten ajustes ni mix; al aprobar se cerrarán y se excluirán, salvo las que cambies a Z8.`;
+});
+
+const getConversionRowKey = (row: CpfrPreviewRow) =>
+   `${row.id_cliente}|${row.num_pedido}|${row.sku_muliix}`;
+
+function syncConversionQuantities() {
+   const activeKeys = new Set<string>();
+   for (const row of cpfrPreviewRows.value) {
+      if (!row.is_expired || !row.z8_eligible || !row.sku_muliix) continue;
+      const key = getConversionRowKey(row);
+      activeKeys.add(key);
+      if (!(key in conversionQuantities)) {
+         conversionQuantities[key] = Math.max(0, Number(row.cant_pedida || 0));
+      }
+   }
+   for (const key of Object.keys(conversionQuantities)) {
+      if (!activeKeys.has(key)) delete conversionQuantities[key];
+   }
+}
+
+const getConversionQuantity = (row: CpfrPreviewRow) =>
+   Number(conversionQuantities[getConversionRowKey(row)] ?? row.cant_pedida ?? 0);
+
+const getConversionStep = (row: CpfrPreviewRow) =>
+   Math.max(1, Number(row.pzas_bolsa || 0));
+
+const canDecreaseConversion = (row: CpfrPreviewRow) =>
+   getConversionQuantity(row) > 0;
+
+const canIncreaseConversion = (row: CpfrPreviewRow) =>
+   getConversionQuantity(row) < Math.max(0, Number(row.cant_pedida || 0));
+
+function adjustConversionQuantity(row: CpfrPreviewRow, direction: 1 | -1) {
+   if (!canEditCpfrOrder.value || !row.is_expired || !row.z8_eligible) return;
+   const maximum = Math.max(0, Number(row.cant_pedida || 0));
+   const current = getConversionQuantity(row);
+   const step = getConversionStep(row);
+   const next = direction < 0
+      ? (current <= step ? 0 : current - step)
+      : Math.min(maximum, current + step);
+   conversionQuantities[getConversionRowKey(row)] = next;
+   delete conversionErrors[`${row.id_cliente}|${row.num_pedido}`];
+}
+
+const isOrderConverting = (order: CpfrOrderGroup) =>
+   convertingOrders.value.has(order.key);
+
+const getConversionLines = (order: CpfrOrderGroup): CpfrZ8ConversionLine[] =>
+   order.rows
+      .filter(row => row.z8_eligible && Boolean(row.sku_muliix))
+      .map(row => ({
+         sku_muliix: row.sku_muliix,
+         cantidad: getConversionQuantity(row),
+      }));
+
+const canConvertOrder = (order: CpfrOrderGroup) =>
+   canEditCpfrOrder.value
+   && order.isExpired
+   && !isOrderConverting(order)
+   && getConversionLines(order).some(line => line.cantidad > 0);
+
+async function convertOrderToZ8(order: CpfrOrderGroup) {
+   if (!props.approval?.id || !canConvertOrder(order)) return;
+   const nextConverting = new Set(convertingOrders.value);
+   nextConverting.add(order.key);
+   convertingOrders.value = nextConverting;
+   delete conversionErrors[order.key];
+
+   try {
+      const response = await approvalsApi.convertExpiredCpfrOrderToZ8(
+         props.approval.id,
+         order.num_pedido,
+         getConversionLines(order)
+      );
+      cpfrDetail.value = response.detail;
+      syncConversionQuantities();
+      await loadCpfrMixPreview(props.approval.id);
+
+      const targets = response.conversion.targets.map(target => target.num_pedido).join(', ');
+      toast({
+         title: 'OC cambiada a Z8',
+         description: `${response.conversion.transferred_skus} SKU y ${formatNumber(response.conversion.transferred_pieces, 0)} pz transferidos a ${targets}.`,
+         duration: 5000,
+      });
+   } catch (e: any) {
+      conversionErrors[order.key] = e.response?.data?.message || 'No se pudo cambiar la OC a Z8.';
+   } finally {
+      const remaining = new Set(convertingOrders.value);
+      remaining.delete(order.key);
+      convertingOrders.value = remaining;
+   }
+}
 
 const cpfrPdfDayNumbers = computed(() =>
    cpfrAssignedDay.value === null ? [] : [cpfrAssignedDay.value]
@@ -809,10 +966,11 @@ const setRowAdjusting = (row: CpfrPreviewRow, isAdjusting: boolean) => {
 const refreshCpfrDetail = async () => {
    if (!props.approval?.id) return;
    cpfrDetail.value = await approvalsApi.getCpfrOrderDetail(props.approval.id);
+   syncConversionQuantities();
 };
 
 const handleAdjustPedido = async (row: CpfrPreviewRow, direction: 1 | -1) => {
-   if (!props.approval || !canEditCpfrOrder.value || isRowAdjusting(row)) return;
+   if (!props.approval || !canEditCpfrOrder.value || row.is_expired || isRowAdjusting(row)) return;
 
    const step = Number(row.pzas_bolsa || 0);
    if (step <= 0) {
@@ -861,6 +1019,7 @@ const getGeneratedLabel = (storeGroup: CpfrStoreGroup) => {
 };
 
 const closeModal = () => {
+   showExpiredApprovalConfirmation.value = false;
    emit('update:modelValue', false);
 };
 
@@ -898,7 +1057,7 @@ const handlePdfExport = async () => {
    }
 };
 
-const handleConfirm = async () => {
+const submitApproval = async () => {
    if (!props.approval) return;
 
    isSubmitting.value = true;
@@ -919,6 +1078,22 @@ const handleConfirm = async () => {
    } finally {
       isSubmitting.value = false;
    }
+};
+
+const handleConfirm = async () => {
+   if (!props.approval || isApprovalSubmissionDisabled.value) return;
+
+   if (props.approval.type === 'CPFR_ORDER' && expiredCpfrOrders.value.length > 0) {
+      showExpiredApprovalConfirmation.value = true;
+      return;
+   }
+
+   await submitApproval();
+};
+
+const confirmApprovalWithoutZ8Conversion = async () => {
+   showExpiredApprovalConfirmation.value = false;
+   await submitApproval();
 };
 
 const handleCancel = async () => {
@@ -958,7 +1133,7 @@ const handleCancel = async () => {
                </div>
                <div class="min-w-0">
                   <p class="text-xs font-medium" :class="typeConfig.color">{{ typeConfig.label }}</p>
-                  <h3 class="truncate text-base font-bold text-slate-800">{{ approval.type === 'CPFR_ORDER' ? `OV ${cpfrNumPedido}` : approval.title }}</h3>
+                  <h3 class="truncate text-base font-bold text-slate-800">{{ approval.title }}</h3>
                </div>
             </div>
             <div class="flex items-center justify-between gap-3 sm:justify-end">
@@ -1098,6 +1273,14 @@ const handleCancel = async () => {
                   <i class="fa-solid fa-triangle-exclamation mr-1"></i>
                   {{ cpfrDetailError }} Se muestra la informacion disponible en la solicitud.
                </div>
+               <StdAlert
+                  v-if="!isLoadingCpfrDetail && expiredCpfrOrders.length"
+                  class="mx-3 sm:mx-4"
+                  :title="`${expiredCpfrOrders.length} OC ${expiredCpfrOrders.length === 1 ? 'caducada' : 'caducadas'}`"
+                  :description="expiredWarningDescription"
+                  tone="warning"
+                  icon="fa-solid fa-clock-rotate-left"
+               />
 
                <section
                   v-if="false"
@@ -1247,11 +1430,22 @@ const handleCancel = async () => {
 
                      <div class="space-y-3 px-3 pb-4 sm:px-4 sm:pb-5">
                         <section v-for="order in storeGroup.orders" :key="order.key" class="overflow-hidden rounded-lg border border-slate-100 bg-white">
-                           <div class="relative overflow-hidden rounded-t-lg bg-brand-600 px-3 py-3 text-white sm:px-4">
-                              <div class="absolute inset-y-0 right-0 hidden w-[128px] origin-bottom skew-x-[-18deg] bg-amber-500 sm:block"></div>
+                           <div
+                              class="relative overflow-hidden rounded-t-lg px-3 py-3 text-white sm:px-4"
+                              :class="order.isExpired ? 'bg-amber-700' : 'bg-brand-600'"
+                           >
+                              <div
+                                 class="absolute inset-y-0 right-0 hidden w-[128px] origin-bottom skew-x-[-18deg] sm:block"
+                                 :class="order.isExpired ? 'bg-rose-600' : 'bg-amber-500'"
+                              ></div>
                               <div class="relative flex items-center justify-between gap-4">
                                  <div class="min-w-0">
-                                    <p class="truncate text-[11px] font-black uppercase tracking-wide">OC {{ order.num_pedido }}</p>
+                                    <p class="flex min-w-0 items-center gap-2 text-[11px] font-black uppercase tracking-wide">
+                                       <span class="truncate">OC {{ order.num_pedido }}</span>
+                                       <span v-if="order.isExpired" class="shrink-0 rounded-md bg-white px-2 py-0.5 text-[8px] text-amber-800">
+                                          Caducada
+                                       </span>
+                                    </p>
                                     <p class="mt-1 text-[9px] font-black leading-relaxed text-brand-100 sm:truncate sm:text-white">
                                        SEM {{ order.semana_ic || '-' }} <span class="hidden sm:inline">| Pedido {{ order.fec_pedido_cadena || '-' }} | Fin emb. {{ order.fec_fin_embarque || '-' }} |</span> {{ order.rows.length }} SKU
                                     </p>
@@ -1260,6 +1454,39 @@ const handleCancel = async () => {
                                     {{ formatNumber(order.totalPz, 0) }} pz <span class="hidden sm:inline">| {{ formatNumber(order.totalKg, 1) }} kg</span>
                                  </p>
                               </div>
+                           </div>
+
+                           <div
+                              v-if="order.isExpired"
+                              class="flex flex-col gap-3 border-b border-amber-200 bg-amber-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4"
+                           >
+                              <div class="min-w-0">
+                                 <p class="text-[10px] font-black uppercase tracking-wide text-amber-900">
+                                    <i class="fa-solid fa-ban mr-1"></i>
+                                    Edición y mix deshabilitados
+                                 </p>
+                                 <p class="mt-1 text-[10px] font-semibold leading-4 text-amber-800">
+                                    Lead time: {{ order.leadTime }} d · {{ order.eligibleSkus }} de {{ order.rows.length }} SKU habilitados para Z8.
+                                    Al confirmar la aprobación, esta OC se cerrará si no la conviertes.
+                                 </p>
+                                 <p v-if="conversionErrors[order.key]" class="mt-1 text-[10px] font-bold text-rose-700">
+                                    {{ conversionErrors[order.key] }}
+                                 </p>
+                              </div>
+                              <StdButton
+                                 v-if="canEditCpfrOrder && order.eligibleSkus > 0"
+                                 class="w-full sm:w-auto"
+                                 variant="primary"
+                                 size="sm"
+                                 :icon="isOrderConverting(order) ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-arrow-right-arrow-left'"
+                                 :disabled="!canConvertOrder(order)"
+                                 @click="convertOrderToZ8(order)"
+                              >
+                                 {{ isOrderConverting(order) ? 'Cambiando...' : 'Cambiar a Z8' }}
+                              </StdButton>
+                              <span v-else-if="order.eligibleSkus === 0" class="text-[10px] font-black text-rose-700">
+                                 Sin SKU transferibles
+                              </span>
                            </div>
 
                            <div class="space-y-2 bg-slate-50 p-2.5 xl:hidden">
@@ -1308,13 +1535,37 @@ const handleCancel = async () => {
 
                                  <div class="flex items-center justify-between gap-3 bg-brand-50/40 px-3 py-3 md:py-2.5">
                                     <div class="min-w-0">
-                                       <p class="text-[8px] font-black uppercase tracking-wide text-slate-500">Pedido final</p>
-                                       <p class="mt-0.5 text-xl font-black leading-none text-brand-700">
+                                       <p class="text-[8px] font-black uppercase tracking-wide text-slate-500">
+                                          {{ row.is_expired && row.z8_eligible ? 'Cantidad a Z8' : 'Pedido final' }}
+                                       </p>
+                                       <p
+                                          class="mt-0.5 text-xl font-black leading-none"
+                                          :class="row.is_expired ? 'text-amber-700' : 'text-brand-700'"
+                                       >
                                           <i v-if="isRowAdjusting(row)" class="fa-solid fa-circle-notch fa-spin text-sm"></i>
-                                          <span v-else>{{ formatNumber(row.cant_pedida, 0) }}</span><span class="ml-1 text-[10px]">pz</span>
+                                          <span v-else>{{ formatNumber(row.is_expired && row.z8_eligible ? getConversionQuantity(row) : row.cant_pedida, 0) }}</span><span class="ml-1 text-[10px]">pz</span>
                                        </p>
                                     </div>
-                                    <div v-if="canShowCpfrStepper" class="flex h-11 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                                    <div
+                                       v-if="canEditCpfrOrder && row.is_expired && row.z8_eligible"
+                                       class="flex h-11 shrink-0 overflow-hidden rounded-lg border border-amber-200 bg-white shadow-sm"
+                                    >
+                                       <button
+                                          type="button"
+                                          class="flex h-11 w-11 items-center justify-center text-amber-700 transition active:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-35"
+                                          title="Disminuir cantidad a Z8"
+                                          :disabled="isOrderConverting(order) || !canDecreaseConversion(row)"
+                                          @click="adjustConversionQuantity(row, -1)"
+                                       ><i class="fa-solid fa-minus text-xs"></i></button>
+                                       <button
+                                          type="button"
+                                          class="flex h-11 w-11 items-center justify-center border-l border-amber-200 text-amber-700 transition active:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-35"
+                                          title="Regresar hacia la cantidad original"
+                                          :disabled="isOrderConverting(order) || !canIncreaseConversion(row)"
+                                          @click="adjustConversionQuantity(row, 1)"
+                                       ><i class="fa-solid fa-plus text-xs"></i></button>
+                                    </div>
+                                    <div v-else-if="canShowCpfrStepper(row)" class="flex h-11 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
                                        <button
                                           type="button"
                                           class="flex h-11 w-11 items-center justify-center text-slate-600 transition active:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-35"
@@ -1330,7 +1581,13 @@ const handleCancel = async () => {
                                           @click="handleAdjustPedido(row, 1)"
                                        ><i class="fa-solid fa-plus text-xs"></i></button>
                                     </div>
-                                    <span v-else class="text-[10px] font-black uppercase text-emerald-700">{{ isMixPairRow(row) ? 'Generado por mix' : 'Sin edición' }}</span>
+                                    <span
+                                       v-else
+                                       class="text-right text-[9px] font-black uppercase"
+                                       :class="row.is_expired ? 'text-rose-700' : 'text-emerald-700'"
+                                    >
+                                       {{ row.is_expired ? (row.z8_eligible ? 'Solo lectura' : 'No transferible a Z8') : (isMixPairRow(row) ? 'Generado por mix' : 'Sin edición') }}
+                                    </span>
                                  </div>
                               </article>
                            </div>
@@ -1343,7 +1600,7 @@ const handleCancel = async () => {
                                        <th class="w-[14%] px-3 py-2 text-right">Inv. Act.</th>
                                        <th class="w-[14%] px-3 py-2 text-right">Sell Prom.</th>
                                        <th class="w-[14%] px-3 py-2 text-right">Cob. S.</th>
-                                       <th class="w-[18%] px-3 py-2 text-right">Pedido final</th>
+                                       <th class="w-[18%] px-3 py-2 text-right">{{ order.isExpired ? 'Cantidad a Z8' : 'Pedido final' }}</th>
                                     </tr>
                                  </thead>
                                  <tbody class="divide-y divide-dashed divide-slate-200">
@@ -1372,7 +1629,35 @@ const handleCancel = async () => {
                                        </td>
                                        <td class="px-3 py-2">
                                           <div
-                                             v-if="canShowCpfrStepper"
+                                             v-if="canEditCpfrOrder && row.is_expired && row.z8_eligible"
+                                             class="ml-auto flex items-center justify-end"
+                                          >
+                                             <div class="flex h-9 w-[128px] items-center justify-end overflow-hidden rounded-lg border border-amber-200 bg-white shadow-sm">
+                                                <button
+                                                   type="button"
+                                                   class="flex h-9 w-9 shrink-0 items-center justify-center text-amber-700 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                                   title="Disminuir cantidad a Z8"
+                                                   :disabled="isOrderConverting(order) || !canDecreaseConversion(row)"
+                                                   @click="adjustConversionQuantity(row, -1)"
+                                                >
+                                                   <i class="fa-solid fa-minus text-[10px]"></i>
+                                                </button>
+                                                <span class="flex h-9 min-w-0 flex-1 items-center justify-center border-x border-amber-200 bg-amber-50 px-2 text-center font-black text-amber-800">
+                                                   {{ formatNumber(getConversionQuantity(row), 0) }}
+                                                </span>
+                                                <button
+                                                   type="button"
+                                                   class="flex h-9 w-9 shrink-0 items-center justify-center text-amber-700 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                                   title="Regresar hacia la cantidad original"
+                                                   :disabled="isOrderConverting(order) || !canIncreaseConversion(row)"
+                                                   @click="adjustConversionQuantity(row, 1)"
+                                                >
+                                                   <i class="fa-solid fa-plus text-[10px]"></i>
+                                                </button>
+                                             </div>
+                                          </div>
+                                          <div
+                                             v-else-if="canShowCpfrStepper(row)"
                                              class="ml-auto flex items-center justify-end gap-2"
                                           >
                                              <div class="flex h-9 w-[128px] items-center justify-end overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -1415,9 +1700,14 @@ const handleCancel = async () => {
                                              </button>
                                              <span v-else class="h-8 min-w-[50px] shrink-0" aria-hidden="true"></span>
                                           </div>
-                                          <p v-else class="text-right font-black" :class="isMixPairRow(row) ? 'text-emerald-700' : 'text-brand-700'">
+                                          <p
+                                             v-else
+                                             class="text-right font-black"
+                                             :class="row.is_expired ? 'text-rose-700' : (isMixPairRow(row) ? 'text-emerald-700' : 'text-brand-700')"
+                                          >
                                              {{ formatNumber(row.cant_pedida, 0) }} pz
                                              <span v-if="isMixPairRow(row)" class="ml-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[8px] font-black uppercase text-emerald-700">mix</span>
+                                             <span v-else-if="row.is_expired && !row.z8_eligible" class="ml-1 rounded-md bg-rose-50 px-1.5 py-0.5 text-[8px] font-black uppercase text-rose-700">No Z8</span>
                                           </p>
                                        </td>
                                     </tr>
@@ -1453,7 +1743,7 @@ const handleCancel = async () => {
                </div>
 
                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-dashed border-brand-100 bg-brand-50/50 px-4 py-1.5 text-[9px] text-slate-500">
-                  <span><b class="font-black text-slate-600">Solicitante</b> {{ approval.requestedBy }}</span>
+                  <span><b class="font-black text-slate-600">Solicitante</b> {{ approval?.requestedBy }}</span>
                   <span><b class="font-black text-slate-600">Fecha</b> {{ formatShortDate(cpfrSource.fec_pedido_cadena) }}</span>
                   <span><b class="font-black text-slate-600">Fin embarque</b> {{ formatShortDate(cpfrSource.fec_fin_embarque) }}</span>
                   <span><b class="font-black text-slate-600">Sem</b> {{ cpfrWeek }} / {{ cpfrYear || '—' }}</span>
@@ -1521,8 +1811,8 @@ const handleCancel = async () => {
                <div class="grid gap-0 border-b border-slate-200 bg-slate-50 md:grid-cols-4">
                   <div class="border-b border-slate-200 p-4 md:border-b-0 md:border-r">
                      <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Solicitante</p>
-                     <p class="mt-1 truncate text-sm font-bold text-slate-800">{{ approval.requestedBy }}</p>
-                     <p class="text-[11px] text-slate-500">{{ formatDate(approval.requestedAt) }}</p>
+                     <p class="mt-1 truncate text-sm font-bold text-slate-800">{{ approval?.requestedBy }}</p>
+                     <p class="text-[11px] text-slate-500">{{ formatDate(approval?.requestedAt) }}</p>
                   </div>
                   <div class="border-b border-slate-200 p-4 md:border-b-0 md:border-r">
                      <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Tienda</p>
@@ -1663,7 +1953,8 @@ const handleCancel = async () => {
                <button
                   v-if="canResolve"
                   @click="handleConfirm"
-                  :disabled="isSubmitting || isCancelling"
+                  :disabled="isApprovalSubmissionDisabled"
+                  :title="approval.type === 'CPFR_ORDER' && cpfrDetail === null ? 'Espera a que cargue la validación de OCs caducadas' : 'Aprobar solicitud'"
                   class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-70 sm:w-auto"
                >
                   <i :class="isSubmitting ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-check'" class="text-xs"></i>
@@ -1672,6 +1963,86 @@ const handleCancel = async () => {
             </div>
          </div>
 
+      </div>
+
+      <div
+         v-if="showExpiredApprovalConfirmation"
+         class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/55 px-3 py-6 backdrop-blur-[1px]"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="expired-approval-confirmation-title"
+         @click.self="showExpiredApprovalConfirmation = false"
+      >
+         <section class="w-full max-w-xl overflow-hidden rounded-xl border border-amber-200 bg-white shadow-2xl shadow-slate-950/25">
+            <header class="flex items-start justify-between gap-4 border-b border-amber-100 bg-amber-50/70 px-4 py-3.5 sm:px-5">
+               <div class="flex min-w-0 items-start gap-3">
+                  <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-amber-200 bg-white text-amber-700 shadow-sm">
+                     <i class="fa-solid fa-triangle-exclamation"></i>
+                  </span>
+                  <div class="min-w-0">
+                     <p class="text-[10px] font-black uppercase tracking-widest text-amber-700">Confirmación requerida</p>
+                     <h3 id="expired-approval-confirmation-title" class="mt-0.5 text-base font-black leading-5 text-slate-900">
+                        Hay OCs caducadas sin convertir a Z8
+                     </h3>
+                  </div>
+               </div>
+               <button
+                  type="button"
+                  class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-slate-700"
+                  aria-label="Cerrar confirmación"
+                  :disabled="isSubmitting"
+                  @click="showExpiredApprovalConfirmation = false"
+               >
+                  <i class="fa-solid fa-xmark"></i>
+               </button>
+            </header>
+
+            <div class="space-y-4 px-4 py-4 sm:px-5">
+               <StdAlert
+                  title="Estos productos no se enviarán"
+                  :description="expiredApprovalConfirmationDescription"
+                  tone="warning"
+                  icon="fa-solid fa-truck-ramp-box"
+               />
+
+               <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                  <p class="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                     {{ expiredCpfrOrders.length === 1 ? 'OC que se cerrará' : 'OCs que se cerrarán' }}
+                  </p>
+                  <div class="mt-2 flex flex-wrap gap-2">
+                     <span
+                        v-for="numPedido in expiredCpfrOrderNumbers"
+                        :key="numPedido"
+                        class="rounded-md border border-amber-200 bg-white px-2.5 py-1 font-mono text-[11px] font-black text-amber-800 shadow-sm"
+                     >
+                        {{ numPedido }}
+                     </span>
+                  </div>
+                  <p class="mt-2 text-xs font-semibold leading-5 text-slate-600">
+                     Las OCs vigentes del pedido se aprobarán normalmente.
+                  </p>
+               </div>
+            </div>
+
+            <footer class="flex flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-5">
+               <StdButton
+                  class="w-full sm:w-auto"
+                  :disabled="isSubmitting"
+                  @click="showExpiredApprovalConfirmation = false"
+               >
+                  Volver y convertir a Z8
+               </StdButton>
+               <StdButton
+                  class="w-full sm:w-auto"
+                  variant="danger"
+                  icon="fa-solid fa-check"
+                  :disabled="isSubmitting"
+                  @click="confirmApprovalWithoutZ8Conversion"
+               >
+                  {{ isSubmitting ? 'Aprobando...' : 'Aprobar sin Z8' }}
+               </StdButton>
+            </footer>
+         </section>
       </div>
 
       <div

@@ -42,6 +42,7 @@ export interface ExportTiendaItem {
     dayNum: number
     semana_ic: string | null
     anio: number | null
+    lead_time?: number
     rows: ExportRow[]
 }
 
@@ -302,6 +303,7 @@ export function buildExportItems(dias: any[]): ExportTiendaItem[] {
                     estado_oc: normalizeOrderState(skus[0]?.estado_oc ?? skus[0]?.estado ?? skus[0]?.estado_pedido ?? tienda.estado_pedido),
                     semana_ic: skus[0]?.semana_ic || null,
                     anio: skus[0]?.fec_pedido_cadena ? parseInt(skus[0].fec_pedido_cadena.slice(0, 4)) : null,
+                    lead_time: Number(tienda.resumen?.lead_time ?? 0),
                     dayNum: dia.dia_num,
                     rows
                 })

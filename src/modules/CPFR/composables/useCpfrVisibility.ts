@@ -17,7 +17,6 @@ type CpfrStatusFilters = {
 type CpfrVisibilityOptions = {
     activeTab: string
     dias: CpfrDiaDash[]
-    historialDias?: CpfrDiaDash[]
     statusFilters?: CpfrStatusFilters
     criterioGlobal?: number
     selectedFilterWeek?: string
@@ -141,7 +140,7 @@ export function buildVisibleCpfrDias(options: CpfrVisibilityOptions): CpfrDiaDas
     const immediatePreviousSaturday = addDays(currentWeekStart, -2)
     const immediatePreviousSunday = addDays(currentWeekStart, -1)
     const rollingSevenDaysStart = addDays(startOfLocalDay(today), -7)
-    const source = activeTab === 'historial' ? (options.historialDias || []) : options.dias
+    const source = options.dias
 
     const hasStatusFilter = !!(
         sf.escenarioA || sf.escenarioB || sf.sinSellout || sf.desabasto
@@ -202,15 +201,11 @@ export function buildVisibleCpfrDias(options: CpfrVisibilityOptions): CpfrDiaDas
                     if ((!isCurrentWeek(sku) && !isPreviousWeek(sku)) || state !== 'revision') return false
                 } else if (activeTab === 'aprobada') {
                     if (state !== 'aprobado') return false
-                    // Conserva el alcance operativo de Centralizados (semana actual y arrastre
-                    // inmediato permitido), pero no oculta una OC ya aprobada porque su fecha
-                    // de embarque haya vencido o ya no alcance por lead time.
-                    if (!isVisibleOrderWindow(sku, tienda.resumen?.lead_time, false)) return false
                 } else if (activeTab === 'sin_embarcar') {
                     if (state !== 'cerrado') return false
                     if (selectedFilterWeek !== 'TODAS' && skuWeekKey(sku) !== selectedFilterWeek) return false
                 } else if (activeTab === 'historial') {
-                    if (isCurrentWeek(sku) || isPreviousWeek(sku)) return false
+                    if (state !== 'enviado') return false
                     if (selectedFilterWeek !== 'TODAS' && skuWeekKey(sku) !== selectedFilterWeek) return false
                 }
 

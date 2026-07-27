@@ -12,6 +12,13 @@ import CpfrZ8Panel from '../components/CpfrZ8Panel.vue'
 import CpfrProductBehaviorPanel from '../components/CpfrProductBehaviorPanel.vue'
 import { buildVisibleCpfrDias } from '../composables/useCpfrVisibility'
 import { cpfrApi } from '../services/cpfrApi'
+import {
+    addCpfrDays,
+    canStillShipByLeadTime,
+    isShipmentDeadlineExpired,
+    parseCpfrLocalDate,
+    startOfCpfrLocalDay,
+} from '../utils/shipmentDeadline'
 
 const showZ8Panel = ref(false)
 const selectedProductContext = ref<{ tienda: CpfrStoreDash; sku: CpfrSkuDash } | null>(null)
@@ -20,6 +27,7 @@ const store = useCpfrStore()
 const showZeroZ8 = ref(false)
 const showExpiredCloseModal = ref(false)
 const showApprovedZeroPurgeModal = ref(false)
+const useLegacyArchiveView = false
 
 const emit = defineEmits<{
     (e: 'open-config', id_cliente: string, nombre_tienda: string): void
@@ -43,7 +51,7 @@ const tabs = [
     { id: 'revision',       label: 'Revisión' },
     { id: 'aprobada',       label: 'Aprobados' },
     { id: 'sin_embarcar',   label: 'Sin Embarcar' },
-    { id: 'historial',      label: 'Historial' },
+    { id: 'historial',      label: 'Archivo' },
 ]
 
 const selectedFilterWeek = ref<string>('TODAS')
@@ -809,23 +817,6 @@ function fillRateStatusDot(sku: any): { cls: string; label: string } {
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-function parseLocalDate(value: string | null | undefined): Date | null {
-    if (!value) return null
-    const [year, month, day] = value.slice(0, 10).split('-').map(Number)
-    if (!year || !month || !day) return null
-    return new Date(year, month - 1, day)
-}
-
-function startOfLocalDay(date: Date): Date {
-    return new Date(date.getFullYear(), date.getMonth(), date.getDate())
-}
-
-function addDays(date: Date, days: number): Date {
-    const next = new Date(date)
-    next.setDate(next.getDate() + days)
-    return next
-}
-
 function sameLocalDay(a: Date | null, b: Date | null): boolean {
     if (!a || !b) return false
     return a.getFullYear() === b.getFullYear()
@@ -843,9 +834,9 @@ function getISOContext(date: Date) {
 }
 
 function startOfISOWeek(date: Date): Date {
-    const d = startOfLocalDay(date)
+    const d = startOfCpfrLocalDay(date)
     const dayNum = d.getDay() || 7
-    return addDays(d, 1 - dayNum)
+    return addCpfrDays(d, 1 - dayNum)
 }
 
 function isSameISOWeek(date: Date | null, context: { year: number; week: number }): boolean {
@@ -854,21 +845,12 @@ function isSameISOWeek(date: Date | null, context: { year: number; week: number 
     return dateContext.year === context.year && dateContext.week === context.week
 }
 
-function canStillShipByLeadTime(sku: any, leadTime: number | null | undefined, today = new Date()): boolean {
-    const finEmbarqueDate = parseLocalDate(sku.fec_fin_embarque)
-    if (!finEmbarqueDate) return true
-
-    const normalizedLeadTime = Math.max(0, Number(leadTime) || 0)
-    const earliestShipDate = addDays(startOfLocalDay(today), normalizedLeadTime)
-    return finEmbarqueDate.getTime() >= earliestShipDate.getTime()
-}
-
 function isShipmentDeadlineAtRisk(
     fecFinEmbarque: string | null | undefined,
     leadTime: number | null | undefined,
     today = new Date(),
 ): boolean {
-    return !canStillShipByLeadTime({ fec_fin_embarque: fecFinEmbarque }, leadTime, today)
+    return isShipmentDeadlineExpired(fecFinEmbarque, leadTime, today)
 }
 
 function shipmentDeadlineBadgeClass(
@@ -896,7 +878,6 @@ function shipmentDeadlineTitle(
 const filteredDias = computed(() => buildVisibleCpfrDias({
     activeTab: currentTab.value,
     dias: store.dias,
-    historialDias: store.historialDias,
     statusFilters: store.statusFilters,
     criterioGlobal: store.criterio_global,
     selectedFilterWeek: selectedFilterWeek.value,
@@ -905,11 +886,11 @@ const filteredDias = computed(() => buildVisibleCpfrDias({
 const expiredCentralizedOCs = computed(() => {
     const today = new Date()
     const curr = getISOContext(today)
-    const last = getISOContext(addDays(today, -7))
+    const last = getISOContext(addCpfrDays(today, -7))
     const currentWeekStart = startOfISOWeek(today)
-    const immediatePreviousSaturday = addDays(currentWeekStart, -2)
-    const immediatePreviousSunday = addDays(currentWeekStart, -1)
-    const rollingSevenDaysStart = addDays(startOfLocalDay(today), -7)
+    const immediatePreviousSaturday = addCpfrDays(currentWeekStart, -2)
+    const immediatePreviousSunday = addCpfrDays(currentWeekStart, -1)
+    const rollingSevenDaysStart = addCpfrDays(startOfCpfrLocalDay(today), -7)
     const map = new Map<string, {
         id_cliente: string
         nombre_tienda: string
@@ -921,8 +902,8 @@ const expiredCentralizedOCs = computed(() => {
     }>()
 
     const isCentralizadosDateEligible = (sku: any) => {
-        const pedidoDate = parseLocalDate(sku.fec_pedido_cadena)
-        const finEmbarqueDate = parseLocalDate(sku.fec_fin_embarque)
+        const pedidoDate = parseCpfrLocalDate(sku.fec_pedido_cadena)
+        const finEmbarqueDate = parseCpfrLocalDate(sku.fec_fin_embarque)
 
         if (isSameISOWeek(pedidoDate, curr)) return true
         if (sameLocalDay(pedidoDate, immediatePreviousSaturday) || sameLocalDay(pedidoDate, immediatePreviousSunday)) return true
@@ -942,7 +923,7 @@ const expiredCentralizedOCs = computed(() => {
                 if (state === 'revision' || state === 'aprobado' || state === 'cerrado') continue
                 if (!(state === 'pendiente' || state === 'borrador' || !state)) continue
                 if (!isCentralizadosDateEligible(sku)) continue
-                if (canStillShipByLeadTime(sku, leadTime, today)) continue
+                if (canStillShipByLeadTime(sku.fec_fin_embarque, leadTime, today)) continue
 
                 const key = `${tienda.id_cliente}|${sku.num_pedido}`
                 if (!map.has(key)) {
@@ -1017,8 +998,8 @@ async function loadHistoryApprovedZeroCandidates() {
     } catch (err) {
         historyApprovedZeroPurgeRows.value = []
         toast({
-            title: 'No se pudo validar historial',
-            description: 'No se pudieron consultar los renglones aprobados o enviados en cero para las semanas seleccionadas.',
+            title: 'No se pudo validar el archivo',
+            description: 'No se pudieron consultar los renglones enviados en cero para las semanas seleccionadas.',
             variant: 'destructive',
             duration: 5000,
         })
@@ -1209,7 +1190,7 @@ const historialStoreGroups = computed<HistorialStoreGroup[]>(() => {
         for (const tienda of dia.tiendas) {
             for (const sku of tienda.skus) {
                 const state = sku.estado_oc
-                if (state !== 'aprobado' && state !== 'cerrado') continue
+                if (state !== 'enviado') continue
 
                 const searchable = [
                     tienda.nombre_tienda,
@@ -1300,7 +1281,7 @@ const historialSummary = computed(() => {
 const showHistoryWeekGroups = computed(() => store.historialSelectedWeeks.length > 1)
 
 const totalUniqueOCs = computed(() => {
-    if (currentTab.value === 'historial') return historialSummary.value.ocs
+    if (useLegacyArchiveView && currentTab.value === 'historial') return historialSummary.value.ocs
 
     const ocSet = new Set<string>();
     filteredDias.value.forEach(dia => {
@@ -1327,9 +1308,9 @@ const totalUniqueOCs = computed(() => {
     class="flex-1 flex flex-col min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden"
   >
 
-    <!-- Sin datos (solo para pestañas normales, no historial) -->
+    <!-- Sin datos -->
     <div
-      v-if="!store.dias.length && currentTab !== 'historial'"
+      v-if="!store.dias.length"
       class="flex-1 flex flex-col items-center justify-center gap-3 text-slate-400 p-12 bg-slate-50/50"
     >
       <i class="fa-solid fa-box-open text-3xl text-slate-300"></i>
@@ -1338,7 +1319,7 @@ const totalUniqueOCs = computed(() => {
     </div>
 
     <!-- ── Tabla y Toolbar ──────────────────────────────────────────────── -->
-    <template v-else-if="store.dias.length || currentTab === 'historial'">
+    <template v-else>
       
       <!-- ── Toolbar de Control de Vistas ── -->
       <div class="shrink-0 px-4 py-2 border-b border-slate-200 bg-white/95 flex flex-col gap-2">
@@ -1408,8 +1389,8 @@ const totalUniqueOCs = computed(() => {
             >{{ t.label }}</button>
           </div>
 
-          <!-- Selector de semanas anteriores para Sin Embarcar -->
-          <div v-if="currentTab === 'sin_embarcar'" class="flex items-center animate-in fade-in slide-in-from-left-2 duration-200">
+          <!-- Selector semanal para estados cerrados y enviados -->
+          <div v-if="currentTab === 'sin_embarcar' || currentTab === 'historial'" class="flex items-center animate-in fade-in slide-in-from-left-2 duration-200">
             <select
               v-model="selectedFilterWeek"
               class="h-8 bg-white border border-slate-200 text-slate-700 text-[10px] font-bold uppercase tracking-wider rounded-lg px-2.5 shadow-sm focus:outline-none focus:ring-1 focus:ring-brand-500 cursor-pointer hover:border-slate-300 transition-colors"
@@ -1453,9 +1434,9 @@ const totalUniqueOCs = computed(() => {
         </div>
       </div>
 
-        <!-- Controles exclusivos de Historial -->
+        <!-- Controles exclusivos de Archivo -->
         <div
-          v-if="currentTab === 'historial'"
+          v-if="useLegacyArchiveView && currentTab === 'historial'"
           class="flex flex-col gap-2 border-t border-slate-100 pt-2 animate-in fade-in slide-in-from-top-1 duration-200 md:flex-row md:items-center md:justify-between"
         >
           <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -1463,13 +1444,13 @@ const totalUniqueOCs = computed(() => {
               <button
                 class="group inline-flex h-9 w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white pl-3 pr-2 text-left shadow-sm shadow-slate-100 transition hover:border-red-100 hover:bg-red-50/20 focus:outline-none focus:ring-2 focus:ring-red-100 sm:w-auto sm:min-w-[220px]"
                 :class="historyWeekPickerOpen ? 'border-red-200 ring-2 ring-red-100' : ''"
-                title="Seleccionar semanas de historial"
+                title="Seleccionar semanas del archivo"
                 @click.stop="historyWeekPickerOpen = !historyWeekPickerOpen"
               >
                 <span class="flex min-w-0 items-center gap-2">
                   <span class="inline-flex h-5 w-1 rounded-full bg-red-600"></span>
                   <span class="min-w-0">
-                    <span class="block text-[9px] font-black uppercase leading-none text-red-600">Historial</span>
+                    <span class="block text-[9px] font-black uppercase leading-none text-red-600">Archivo</span>
                     <span class="mt-0.5 block truncate text-[11px] font-black text-slate-900">{{ selectedHistoryWeeksLabel }}</span>
                   </span>
                 </span>
@@ -1583,7 +1564,7 @@ const totalUniqueOCs = computed(() => {
             >
               <i v-if="store.historialLoading" class="fa-solid fa-circle-notch fa-spin"></i>
               <i v-else class="fa-solid fa-clock-rotate-left"></i>
-              Cargar historial
+              Cargar archivo
             </button>
           </div>
 
@@ -1609,42 +1590,42 @@ const totalUniqueOCs = computed(() => {
       <!-- ── Contenedor desplazable ── -->
       <div class="flex-1 min-h-0 overflow-auto scrollbar-thin">
 
-        <!-- ── Loading Historial ── -->
+        <!-- ── Loading Archivo ── -->
         <div
-          v-if="currentTab === 'historial' && store.historialLoading"
+          v-if="useLegacyArchiveView && currentTab === 'historial' && store.historialLoading"
           class="flex flex-col items-center justify-center gap-3 text-slate-400 py-16"
         >
           <i class="fa-solid fa-circle-notch fa-spin text-2xl text-brand-400"></i>
-          <p class="text-sm font-medium">Cargando historial de órdenes…</p>
+          <p class="text-sm font-medium">Cargando archivo de órdenes…</p>
         </div>
 
-        <!-- ── Historial sin carga inicial ── -->
+        <!-- ── Archivo sin carga inicial ── -->
         <div
-          v-else-if="currentTab === 'historial' && !store.historialLoaded"
+          v-else-if="useLegacyArchiveView && currentTab === 'historial' && !store.historialLoaded"
           class="flex flex-col items-center justify-center gap-3 px-6 py-20 text-center text-slate-400"
         >
           <div class="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-300">
-            <i class="fa-solid fa-clock-rotate-left text-xl"></i>
+            <i class="fa-solid fa-box-archive text-xl"></i>
           </div>
-          <p class="text-sm font-bold text-slate-600">Selecciona una o más semanas para cargar historial.</p>
+          <p class="text-sm font-bold text-slate-600">Selecciona una o más semanas para cargar el archivo.</p>
           <p class="max-w-md text-xs font-medium text-slate-400">
-            La pestaña no carga datos por defecto para evitar consultas pesadas. El historial sólo mostrará OC aprobadas o cerradas.
+            La pestaña no carga datos por defecto para evitar consultas pesadas. El archivo sólo muestra OC enviadas.
           </p>
           <p v-if="store.historialError" class="text-xs font-bold text-rose-500">{{ store.historialError }}</p>
         </div>
 
-        <!-- ── Historial sin resultados ── -->
+        <!-- ── Archivo sin resultados ── -->
         <div
-          v-else-if="currentTab === 'historial' && historialStoreGroups.length === 0"
+          v-else-if="useLegacyArchiveView && currentTab === 'historial' && historialStoreGroups.length === 0"
           class="flex flex-col items-center justify-center gap-3 px-6 py-20 text-center text-slate-400"
         >
           <i class="fa-solid fa-folder-open text-4xl text-slate-300"></i>
-          <p class="text-sm font-bold text-slate-600">No hay órdenes históricas para la selección actual.</p>
-          <p class="text-xs text-slate-400">Ajusta semanas o búsqueda. Sólo se consideran estados aprobado y cerrado.</p>
+          <p class="text-sm font-bold text-slate-600">No hay órdenes enviadas para la selección actual.</p>
+          <p class="text-xs text-slate-400">Ajusta las semanas o la búsqueda. Sólo se considera el estado enviado.</p>
         </div>
 
-        <!-- ── Vista dedicada Historial ── -->
-        <div v-else-if="currentTab === 'historial'" class="min-h-full bg-slate-50/60 p-4">
+        <!-- ── Vista dedicada Archivo ── -->
+        <div v-else-if="useLegacyArchiveView && currentTab === 'historial'" class="min-h-full bg-slate-50/60 p-4">
           <div class="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-4">
             <div class="rounded-lg border border-brand-100 bg-white px-4 py-3 shadow-sm">
               <p class="text-[9px] font-black uppercase tracking-wider text-brand-500">Tiendas página</p>
@@ -1671,7 +1652,7 @@ const totalUniqueOCs = computed(() => {
                 · {{ store.historialPagination.page_size }} OC por página
               </p>
               <p class="mt-0.5 text-[10px] text-slate-400">
-                Total historial seleccionado: {{ n(store.historialPagination.total_ocs, 0) }} OC · {{ n(store.historialPagination.total_skus, 0) }} SKU
+                Total archivo seleccionado: {{ n(store.historialPagination.total_ocs, 0) }} OC · {{ n(store.historialPagination.total_skus, 0) }} SKU
               </p>
             </div>
 

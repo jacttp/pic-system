@@ -47,6 +47,63 @@ export interface ApprovalFilters {
    role?: 'assignee'
 }
 
+export interface CpfrApprovalRow extends Record<string, unknown> {
+   id_cliente: string
+   num_pedido: string
+   sku_muliix: string
+   source_type: string
+   cant_pedida: number
+   fec_fin_embarque?: string | null
+   lead_time: number
+   z8_eligible: boolean
+   z8_permiso_oc?: 'z8' | 'z8carnes' | null
+   is_expired: boolean
+}
+
+export interface CpfrExpiredOrderSummary {
+   id_cliente: string
+   num_pedido: string
+   fec_fin_embarque: string | null
+   lead_time: number
+   total_skus: number
+   eligible_skus: number
+   total_pieces: number
+}
+
+export interface CpfrApprovalDetail extends Record<string, unknown> {
+   rows: CpfrApprovalRow[]
+   expired_orders: CpfrExpiredOrderSummary[]
+}
+
+export interface CpfrZ8ConversionLine {
+   sku_muliix: string
+   cantidad: number
+}
+
+export interface CpfrZ8Target {
+   num_pedido: string
+   permiso_oc: 'z8' | 'z8carnes'
+   created: boolean
+   fec_pedido_cadena: string
+   fec_fin_embarque: string
+   semana_ic: string
+   anio: string
+}
+
+export interface CpfrZ8ConversionResult {
+   source_order: string
+   id_cliente: string
+   nombre_tienda: string
+   targets: CpfrZ8Target[]
+   transferred_skus: number
+   transferred_pieces: number
+}
+
+export interface CpfrZ8ConversionResponse {
+   conversion: CpfrZ8ConversionResult
+   detail: CpfrApprovalDetail
+}
+
 // Labels y colores para UI
 export const APPROVAL_STATUS_CONFIG: Record<ApprovalStatus, { label: string; color: string; bg: string; icon: string }> = {
    PENDING: { label: 'Pendiente', color: 'text-pic-brand', bg: 'bg-pic-brand-soft border-pic-brand-border', icon: 'fa-solid fa-clock' },

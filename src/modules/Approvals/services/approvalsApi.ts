@@ -5,6 +5,9 @@ import type {
    ApprovalCreatePayload,
    ApprovalResolution,
    ApprovalFilters,
+   CpfrApprovalDetail,
+   CpfrZ8ConversionLine,
+   CpfrZ8ConversionResponse,
 } from '../types/approval.types';
 
 const mapApproval = (row: any): Approval => ({
@@ -41,8 +44,20 @@ export const approvalsApi = {
       return mapApproval(data.data);
    },
 
-   async getCpfrOrderDetail(id: number): Promise<any> {
+   async getCpfrOrderDetail(id: number): Promise<CpfrApprovalDetail> {
       const { data } = await api.get(`/v2/approvals/${id}/cpfr-order-detail`);
+      return data.data;
+   },
+
+   async convertExpiredCpfrOrderToZ8(
+      id: number,
+      numPedido: string,
+      lines: CpfrZ8ConversionLine[]
+   ): Promise<CpfrZ8ConversionResponse> {
+      const { data } = await api.post(
+         `/v2/approvals/${id}/cpfr-orders/${encodeURIComponent(numPedido)}/convert-to-z8`,
+         { lines }
+      );
       return data.data;
    },
 

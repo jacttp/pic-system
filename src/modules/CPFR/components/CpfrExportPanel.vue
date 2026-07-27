@@ -9,6 +9,7 @@ import { buildVisibleCpfrDias, normalizeCpfrOrderState } from '../composables/us
 import { toast } from '@/components/ui/toast/use-toast'
 import { auditApi } from '@/modules/Audit/services/auditApi'
 import type { CpfrExcelExportAuditDetail } from '@/types/audit'
+import { isShipmentDeadlineExpired } from '../utils/shipmentDeadline'
 
 const emit = defineEmits<{
     (e: 'close'): void
@@ -32,7 +33,6 @@ const DAY_CODES: Record<number, string>  = { 1: 'LU', 2: 'MA', 3: 'MI', 4: 'JU',
 const visibleDias = computed<CpfrDiaDash[]>(() => buildVisibleCpfrDias({
     activeTab: panelTab.value,
     dias: store.dias,
-    historialDias: store.historialDias,
     statusFilters: store.statusFilters,
     criterioGlobal: store.criterio_global,
 }))
@@ -105,7 +105,7 @@ function toggleWeek(weekKey: string) {
     selectedWeeks.value = new Set(selectedWeeks.value)
 }
 
-const filteredItems = computed<ExportTiendaItem[]>(() => {
+const candidateItems = computed<ExportTiendaItem[]>(() => {
     const term = search.value.trim().toLowerCase()
 
     return allItems.value.map(i => {
@@ -139,6 +139,27 @@ const filteredItems = computed<ExportTiendaItem[]>(() => {
         }
     }).filter((i): i is ExportTiendaItem => i !== null)
 })
+
+const isExpiredReviewItem = (item: ExportTiendaItem, today = new Date()) => {
+    if (!isCentralizedReview.value) return false
+    const orderState = normalizeCpfrOrderState(item.estado_oc)
+    if (orderState !== 'pendiente' && orderState !== 'borrador') return false
+
+    return item.rows.some(row =>
+        isShipmentDeadlineExpired(row.fec_fin_embarque, item.lead_time, today)
+    )
+}
+
+const expiredReviewOrderNumbers = computed(() => [...new Set(
+    candidateItems.value
+        .filter(item => isExpiredReviewItem(item))
+        .map(item => item.num_pedido)
+        .filter(Boolean)
+)])
+
+const filteredItems = computed<ExportTiendaItem[]>(() =>
+    candidateItems.value.filter(item => !isExpiredReviewItem(item))
+)
 
 // ── Exclusion logic ───────────────────────────────────────────────────────────
 // We use exclusions because "Everything is included by default" is the requested UX
@@ -236,6 +257,7 @@ const previewItems = computed(() => {
                     dayNum: item.dayNum,
                     semana_ic: item.semana_ic,
                     anio: item.anio,
+                    lead_time: item.lead_time,
                     rows: []
                 })
             }
@@ -797,6 +819,14 @@ async function handlePdfExport() {
                 >
                     <i class="fa-solid fa-triangle-exclamation mr-1.5 text-amber-600"></i>
                     {{ excelRestrictionMessage }}
+                </div>
+                <div
+                    v-if="isCentralizedReview && expiredReviewOrderNumbers.length > 0"
+                    class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] leading-relaxed text-amber-800"
+                    role="alert"
+                >
+                    <i class="fa-solid fa-clock-rotate-left mr-1.5 text-amber-600"></i>
+                    {{ expiredReviewOrderNumbers.length }} OC(s) cuyo día límite ya pasó fueron excluidas del envío a revisión. Las OCs que vencen hoy todavía están incluidas.
                 </div>
                 <div class="space-y-1">
                     <div class="flex items-center justify-between text-[11px]">

@@ -39,7 +39,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
     const allCpfrWeeks = ref<Array<{ anio: number; semana: number; semana_ic: string; key: string }>>([])
     const weeksLoading = ref(false)
 
-    // Historial — datos cargados con estado='all' para mostrar OC de semanas pasadas sin importar estado
+    // Archivo — datos enviados cargados bajo demanda por semanas
     const historialDias = ref<CpfrDiaDash[]>([])
     const historialLoading = ref(false)
     const historialLoaded = ref(false)
@@ -94,8 +94,8 @@ export const useCpfrStore = defineStore('cpfr', () => {
 
     function setActiveTab(tab: string) {
         activeTab.value = tab
-        if (!currentWeek.value || tab === 'historial') return
-        if (['centralizados', 'revision', 'aprobada', 'sin_embarcar'].includes(tab)) {
+        if (!currentWeek.value) return
+        if (['centralizados', 'revision', 'aprobada', 'sin_embarcar', 'historial'].includes(tab)) {
             loadDashboard()
         }
     }
@@ -132,6 +132,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
             activeTab.value === 'revision' ? 'revision'
             : activeTab.value === 'aprobada' ? 'aprobado'
             : activeTab.value === 'sin_embarcar' ? 'cerrado'
+            : activeTab.value === 'historial' ? 'enviado'
             : 'pendiente'
 
         return {
@@ -360,7 +361,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         if (!normalizedWeeks.length) {
             historialDias.value = []
             historialLoaded.value = false
-            historialError.value = 'Selecciona una o más semanas para cargar historial.'
+            historialError.value = 'Selecciona una o más semanas para cargar el archivo.'
             historialPage.value = 1
             historialPagination.value = null
             return
@@ -396,7 +397,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
                 }
             }
         } catch (e: any) {
-            historialError.value = 'Error al cargar el historial CPFR.'
+            historialError.value = 'Error al cargar el archivo CPFR.'
             console.error('[cpfrStore.loadHistorial]', e)
         } finally {
             historialLoading.value = false
@@ -617,8 +618,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
     }
 
     function expandAll() {
-        const source = activeTab.value === 'historial' ? historialDias.value : dias.value
-        for (const dia of source) {
+        for (const dia of dias.value) {
             for (const t of dia.tiendas) {
                 expandedStores[t.id_cliente] = true
             }
@@ -635,8 +635,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
     }
 
     function expandAllOCs(ocGroupKeys: Record<string, boolean>) {
-        const source = activeTab.value === 'historial' ? historialDias.value : dias.value
-        for (const dia of source) {
+        for (const dia of dias.value) {
             for (const t of dia.tiendas) {
                 const seen = new Set<string>()
                 for (const sku of t.skus) {
