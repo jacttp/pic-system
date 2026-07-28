@@ -151,10 +151,83 @@ export function getChartConfig(labels: string[], datasets: any[], type: 'bar' | 
    };
 }
 /**
- * Genera configuración para ECharts con escala Y siempre desde 0,
- * tooltips enriquecidos, dataZoom interactivo y soporte de series mixtas bar+line.
+ * Genera configuración para ECharts con escala Y inteligente,
+ * tooltips enriquecidos, zoom por eje y soporte de series mixtas bar+line.
  */
+const getNumericChartValue = (value: any): number | null => {
+    const rawValue = typeof value === 'object' && value !== null ? value.value : value;
+    if (rawValue === null || rawValue === undefined || rawValue === '') return null;
+    const numericValue = Number(rawValue);
+    return Number.isFinite(numericValue) ? numericValue : null;
+};
+
+/**
+ * Calcula una escala vertical que amplifica diferencias cuando los valores son
+ * comparables, pero conserva el cero si existe un valor incipiente respecto al
+ * máximo (por ejemplo, al inicio de mes o de año).
+ */
+export function calculateSmartYAxisBounds(labels: string[], datasets: any[]) {
+    const values = datasets
+        .flatMap(dataset => Array.isArray(dataset.data) ? dataset.data : [])
+        .map(getNumericChartValue)
+        .filter((value): value is number => value !== null);
+
+    if (values.length === 0) {
+        return { min: 0, max: 1 };
+    }
+
+    const dataMin = Math.min(...values);
+    const dataMax = Math.max(...values);
+
+    if (dataMin < 0) {
+        const signedRange = Math.max(dataMax - dataMin, Math.abs(dataMax) * 0.1, 1);
+        return {
+            min: dataMin - signedRange * 0.12,
+            max: dataMax + signedRange * 0.12
+        };
+    }
+
+    const positiveValues = values.filter(value => value > 0);
+    if (positiveValues.length === 0) {
+        return { min: 0, max: Math.max(dataMax, 1) };
+    }
+
+    const minPositive = Math.min(...positiveValues);
+    const positiveRange = Math.max(dataMax - minPositive, 0);
+    const currentYear = String(new Date().getFullYear());
+    const currentMonth = MONTH_NAMES[new Date().getMonth()];
+    const currentYearIndex = labels.findIndex(label => String(label) === currentYear);
+    const currentMonthIndex = labels.findIndex(label => label === currentMonth);
+
+    const hasCurrentPeriodAtZero = datasets.some(dataset => {
+        let valueIndex = currentYearIndex;
+
+        if (valueIndex < 0 && currentMonthIndex >= 0 && String(dataset.label || '').includes(currentYear)) {
+            valueIndex = currentMonthIndex;
+        }
+
+        if (valueIndex < 0 || !Array.isArray(dataset.data)) return false;
+        return getNumericChartValue(dataset.data[valueIndex]) === 0;
+    });
+
+    // Si el menor valor representa 30% o menos del mayor, el cero aporta
+    // contexto y evita exagerar periodos que apenas comienzan.
+    const shouldStartAtZero =
+        positiveValues.length === 1 ||
+        hasCurrentPeriodAtZero ||
+        minPositive / Math.max(dataMax, 1) <= 0.30;
+
+    const lowerPadding = Math.max(positiveRange * 0.25, dataMax * 0.05);
+    const upperPadding = Math.max(positiveRange * 0.15, dataMax * 0.05, 1);
+
+    return {
+        min: shouldStartAtZero ? 0 : Math.max(0, minPositive - lowerPadding),
+        max: dataMax + upperPadding
+    };
+}
+
 export function getEChartConfig(labels: string[], datasets: any[], type: 'bar' | 'line' = 'bar') {
+    const yAxisBounds = calculateSmartYAxisBounds(labels, datasets);
 
     // Convertir datasets (formato Chart.js-like) a series de ECharts
     const series: any[] = datasets.map(ds => {
@@ -254,7 +327,9 @@ export function getEChartConfig(labels: string[], datasets: any[], type: 'bar' |
         },
         yAxis: {
             type: 'value',
-            min: 0, // Siempre desde 0 para proporcionalidad real
+            scale: yAxisBounds.min > 0,
+            min: yAxisBounds.min,
+            max: yAxisBounds.max,
             axisLabel: {
                 color: '#94a3b8',
                 fontSize: 10,
@@ -262,9 +337,30 @@ export function getEChartConfig(labels: string[], datasets: any[], type: 'bar' |
             },
             splitLine: { lineStyle: { color: '#f1f5f9' } }
         },
-        // Zoom interactivo: scroll con rueda del mouse, drag para paneo
+        // La rueda conserva el recorte de periodos en X. El componente captura
+        // Alt + rueda y lo dirige exclusivamente al zoom vertical.
         dataZoom: [
-            { type: 'inside', start: 0, end: 100, zoomOnMouseWheel: true, moveOnMouseMove: true }
+            {
+                id: 'pic-x-axis-zoom',
+                type: 'inside',
+                xAxisIndex: 0,
+                start: 0,
+                end: 100,
+                zoomOnMouseWheel: true,
+                moveOnMouseMove: true,
+                moveOnMouseWheel: false
+            },
+            {
+                id: 'pic-y-axis-zoom',
+                type: 'inside',
+                yAxisIndex: 0,
+                start: 0,
+                end: 100,
+                filterMode: 'none',
+                zoomOnMouseWheel: false,
+                moveOnMouseMove: false,
+                moveOnMouseWheel: false
+            }
         ],
         series,
         animationDuration: 600,

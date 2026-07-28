@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, onUnmounted, shallowRef } from 'vue';
+import { computed, ref, onMounted, watch, onUnmounted, shallowRef } from 'vue';
 import * as echarts from 'echarts';
 import { usePicChatStore } from '../../stores/picChatStore';
 
@@ -13,6 +13,53 @@ const chartRef = ref<HTMLDivElement | null>(null);
 const chartInstance = shallowRef<echarts.ECharts | null>(null);
 const currentType = ref<'bar' | 'line'>('bar');
 const chatStore = usePicChatStore();
+const hasCartesianZoom = computed(() =>
+    Array.isArray(props.option?.dataZoom) &&
+    props.option.dataZoom.some((zoom: any) => zoom?.yAxisIndex !== undefined)
+);
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const handleVerticalWheelZoom = (event: WheelEvent) => {
+    if (!event.altKey || !chartInstance.value || !chartRef.value || !hasCartesianZoom.value) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+
+    const option = chartInstance.value.getOption();
+    const dataZoom = Array.isArray(option.dataZoom) ? option.dataZoom : [];
+    const verticalZoom = dataZoom.find((zoom: any) => zoom?.id === 'pic-y-axis-zoom') as any;
+    if (!verticalZoom) return;
+
+    const start = Number(verticalZoom.start ?? 0);
+    const end = Number(verticalZoom.end ?? 100);
+    const currentSpan = Math.max(end - start, 1);
+    const zoomFactor = event.deltaY < 0 ? 0.82 : 1.22;
+    const nextSpan = clamp(currentSpan * zoomFactor, 5, 100);
+    const bounds = chartRef.value.getBoundingClientRect();
+    const pointerPercent = clamp((1 - (event.clientY - bounds.top) / Math.max(bounds.height, 1)) * 100, 0, 100);
+    const anchor = clamp((pointerPercent - start) / currentSpan, 0, 1);
+
+    let nextStart = pointerPercent - anchor * nextSpan;
+    let nextEnd = nextStart + nextSpan;
+
+    if (nextStart < 0) {
+        nextEnd -= nextStart;
+        nextStart = 0;
+    }
+    if (nextEnd > 100) {
+        nextStart -= nextEnd - 100;
+        nextEnd = 100;
+    }
+
+    chartInstance.value.dispatchAction({
+        type: 'dataZoom',
+        dataZoomId: 'pic-y-axis-zoom',
+        start: clamp(nextStart, 0, 100),
+        end: clamp(nextEnd, 0, 100)
+    });
+};
 
 // Aplica la opción al chart, respetando el tipo de vista actual (bar/line)
 const applyOption = () => {
@@ -58,11 +105,13 @@ onMounted(() => {
             chartInstance.value?.resize();
         });
         resizeObserver.observe(chartRef.value);
+        chartRef.value.addEventListener('wheel', handleVerticalWheelZoom, { capture: true, passive: false });
     }
 });
 
 onUnmounted(() => {
     resizeObserver?.disconnect();
+    chartRef.value?.removeEventListener('wheel', handleVerticalWheelZoom, true);
     chartInstance.value?.dispose();
     chartInstance.value = null;
 });
@@ -102,6 +151,16 @@ const handleAnalyze = () => {
             </h3>
 
             <div class="ml-auto flex items-center gap-2">
+                <span
+                    v-if="hasCartesianZoom"
+                    data-pic-print-control="true"
+                    class="flex h-7 w-7 items-center justify-center rounded-lg text-pic-text-muted"
+                    title="Escala Y automática. Rueda: recortar periodos. Alt + rueda: zoom vertical."
+                    aria-label="Ayuda de escala y zoom del gráfico"
+                >
+                    <i class="fa-solid fa-magnifying-glass-chart text-xs"></i>
+                </span>
+
                 <button
                     data-pic-print-control="true"
                     @click="handleAnalyze"
