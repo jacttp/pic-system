@@ -46,7 +46,11 @@ onMounted(async () => {
     approvalsStore.fetchApprovals();
 });
 
-const dashboardModules = computed(() => setupStore.userMenu.filter(m => m.ModuleKey !== 'HUB'));
+const dashboardModules = computed(() =>
+    Object.values(setupStore.groupedMenu)
+        .flat()
+        .filter(module => module.ModuleKey !== 'HUB')
+);
 const displayName = computed(() => profileStore.profile?.nombre || auth.user?.nombre || auth.user?.username || 'Usuario');
 const showManagementTray = computed(() => setupStore.hubFeatureVisibility['hub.management_tray']);
 const showQuickActions = computed(() => setupStore.hubFeatureVisibility['hub.quick_actions']);

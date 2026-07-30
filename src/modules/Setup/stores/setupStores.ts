@@ -108,6 +108,7 @@ export const useSetupStore = defineStore('setup', () => {
 
    // Datos Mock para desarrollo (Fallback)
    const MOCK_MODULES: SystemModule[] = [
+      { ModuleId: 12, ModuleKey: 'PIC_52S', Label: 'Reporte PIC 52S', Route: '/admin/pic-52s', Icon: 'fa-solid fa-chart-line', Category: 'Analítica', DisplayOrder: 25, IsActive: true, MinRoleLevel: 1, DevStatus: 'Development', Description: 'Comparativo semanal de ventas en kilogramos y pesos para tres años.', IconColor: 'text-pic-accent-blue', BgColor: 'bg-pic-accent-blue-soft' },
       // Analítica
       { ModuleId: 1, ModuleKey: 'HUB', Label: 'Hub Central', Route: '/', Icon: 'fa-solid fa-chart-simple', Category: 'Analítica', DisplayOrder: 10, IsActive: true, MinRoleLevel: 1, DevStatus: 'Finished' },
       { ModuleId: 2, ModuleKey: 'PIC_RPT', Label: 'Reporte PIC', Route: '/admin/pic', Icon: 'fa-solid fa-chart-pie', Category: 'Analítica', DisplayOrder: 20, IsActive: true, MinRoleLevel: 1, DevStatus: 'Maintaining' },

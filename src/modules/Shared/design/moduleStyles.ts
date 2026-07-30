@@ -88,6 +88,13 @@ export const MODULE_VISUAL_STYLES: Record<string, ModuleVisualStyle> = {
     accent: 'bg-pic-brand',
     desc: 'Dashboard analitico de ventas y metas.',
   },
+  PIC_52S: {
+    color: 'text-[hsl(var(--pic-accent-blue))]',
+    bg: 'bg-[hsl(var(--pic-accent-blue-soft))]',
+    border: 'border-[hsl(var(--pic-accent-blue))]',
+    accent: 'bg-[hsl(var(--pic-accent-blue))]',
+    desc: 'Comparativo semanal de ventas en kilogramos y pesos para tres años.',
+  },
   SEGMENT: {
     color: 'text-[hsl(var(--pic-accent-orange))]',
     bg: 'bg-[hsl(var(--pic-accent-orange-soft))]',

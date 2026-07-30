@@ -171,6 +171,17 @@ const router = createRouter({
                component: () => import('@/modules/PIC/views/PicDashboardView.vue')
             },
             {
+               path: 'pic-52s',
+               name: 'pic-52s',
+               component: () => import('@/modules/PIC52/views/Pic52ReportView.vue'),
+               meta: {
+                  requiresAuth: true,
+                  minRoleLevel: 1,
+                  moduleKey: 'PIC_52S',
+                  title: 'Reporte PIC 52S'
+               }
+            },
+            {
                path: 'pic-logistics',
                name: 'pic-logistics',
                component: () => import('@/modules/PIC/views/PicDashboardView.vue')

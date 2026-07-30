@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, onUnmounted, reactive } from 'vue';
 import { usePicFilterStore } from '../stores/picFilterStore';
-import FilterDropdown from './FilterDropdown.vue';
+import FilterDropdown from '@/modules/Shared/components/FilterDropdown.vue';
 import PicClientModal from './modals/PicClientModal.vue';
 
 const store = usePicFilterStore();
