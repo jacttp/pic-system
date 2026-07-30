@@ -2,7 +2,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { useStockAnalyticsStore } from '../stores/stockAnalyticsStore';
-import FilterDropdown from '../../PIC/components/FilterDropdown.vue';
+import FilterDropdown from '@/modules/Shared/components/FilterDropdown.vue';
 
 const store = useStockAnalyticsStore();
 
