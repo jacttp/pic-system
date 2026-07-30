@@ -10,6 +10,7 @@ import {
 interface Props {
   report: Pic52Report;
   metric: Pic52Metric;
+  filterSummary?: string;
 }
 
 const props = defineProps<Props>();
@@ -74,6 +75,14 @@ const rowHasMissing = (row: Pic52MetricRow) => (
             Comparativo semanal · {{ metricLabel }}
           </p>
           <h3 class="mt-0.5 truncate text-sm font-black text-pic-text-main">{{ title }}</h3>
+          <p
+            v-if="filterSummary"
+            class="mt-1 text-[10px] font-semibold leading-4 text-pic-text-muted"
+            :title="filterSummary"
+          >
+            <i class="fa-solid fa-filter mr-1 text-pic-brand"></i>
+            {{ filterSummary }}
+          </p>
         </div>
       </div>
       <span class="inline-flex h-7 shrink-0 items-center rounded-lg border border-pic-border bg-pic-muted-surface px-2.5 font-mono text-[10px] font-bold text-pic-text-muted">

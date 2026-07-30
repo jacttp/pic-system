@@ -32,6 +32,8 @@ patrón existente; cualquier excepción deberá quedar justificada en este docum
   extremos, hasta SEM-52 o SEM-53.
 - `Visualizar` consulta una sola vez `/api/pic-52s/report` y presenta las dos tablas
   comparativas y las dos gráficas ECharts.
+- Cada tabla se presenta como un bloque independiente de ancho completo. El resumen
+  de filtros solo aparece en su encabezado cuando la selección difiere del default.
 - Cada año seleccionado se muestra como columna. La variación porcentual y la
   diferencia absoluta comparan los dos años más recientes de la selección.
 - Los totales suman exclusivamente semanas `observed`; las semanas `missing`
@@ -43,11 +45,11 @@ patrón existente; cualquier excepción deberá quedar justificada en este docum
   sin ejecutar una consulta distinta.
 - La misma respuesta presenta dos superficies ECharts apiladas de ancho completo:
   kilogramos y pesos.
-- Ambas gráficas comparten zoom, puntero, leyenda, resaltado y selección de rango.
+- Ambas gráficas comparten zoom, puntero, leyenda y resaltado.
 - Tooltip semanal con valores por año, diferencia y variación.
 - Clic para fijar una semana y mostrar un resumen común de KG y MXN.
-- Zoom interior, slider táctil, brush, marca de semana actual y toolbox con vista
-  de datos, restauración, línea/barras y descarga PNG.
+- Zoom interior, slider táctil, marca de semana actual y toolbox con vista de datos,
+  restauración, línea/barras y descarga PNG.
 - Navegación por semanas mediante teclado (`←`, `→`) y restauración con `Esc`.
 - Las semanas `missing` permanecen como huecos y nunca conectan artificialmente
   el trazo.
@@ -66,14 +68,12 @@ patrón existente; cualquier excepción deberá quedar justificada en este docum
 4. Mover el cursor y confirmar tooltip sincronizado con valores, diferencia y %.
 5. Ocultar un año desde la leyenda y confirmar el mismo estado en ambas gráficas.
 6. Usar rueda, gesto táctil o slider y confirmar el mismo zoom en ambas.
-7. Pulsar `Seleccionar rango`, arrastrar horizontalmente sobre cualquiera de las
-   gráficas y confirmar selección y etiqueta comunes.
-8. Hacer clic en una semana y confirmar el resumen fijado de KG y MXN.
-9. Enfocar una gráfica y usar `←`, `→` y `Esc`.
-10. Probar vista de datos, restauración, línea/barras y descarga PNG del toolbox.
-11. Confirmar la marca de semana actual cuando el año vigente esté seleccionado.
-12. Cambiar cualquier filtro y confirmar que tablas y gráficas se ocultan hasta
+7. Hacer clic en una semana y confirmar el resumen fijado de KG y MXN.
+8. Enfocar una gráfica y usar `←`, `→` y `Esc`.
+9. Probar vista de datos, restauración, línea/barras y descarga PNG del toolbox.
+10. Confirmar la marca de semana actual cuando el año vigente esté seleccionado.
+11. Cambiar cualquier filtro y confirmar que tablas y gráficas se ocultan hasta
     aplicar nuevamente con `Visualizar`.
-13. Revisar legibilidad y controles en laptop 1366×768, tablet y móvil.
+12. Revisar legibilidad y controles en laptop 1366×768, tablet y móvil.
 
 La impresión pertenece a la Fase 5.

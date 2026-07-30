@@ -19,9 +19,9 @@ const {
   report,
   reportError,
   isReportLoading,
-  reportFromCache,
   hasObservedReportData,
   selectedYears,
+  catalogs,
   context,
 } = storeToRefs(store);
 
@@ -33,29 +33,90 @@ const scopeLabel = computed(() => {
 const headerMeta = computed(() => (
   `52 semanas · ${selectedYears.value.length || 0} años`
 ));
-const generatedAt = computed(() => {
-  if (!report.value?.generatedAt) return '';
-  const date = new Date(report.value.generatedAt);
-  return Number.isNaN(date.getTime())
-    ? ''
-    : new Intl.DateTimeFormat('es-MX', {
-      dateStyle: 'short',
-      timeStyle: 'short',
-    }).format(date);
-});
-const coverageSummary = computed(() => {
-  if (!report.value) return '';
-  const observed = report.value.series.reduce(
-    (total, series) => total + series.totals.observedWeeks,
-    0,
-  );
-  const possible = report.value.series.length * report.value.weeks.length;
-  return `${observed} de ${possible} puntos observados`;
+const sameSelection = (left: Array<string | number>, right: Array<string | number>) => (
+  [...left].map(String).sort().join('|') === [...right].map(String).sort().join('|')
+);
+const appliedFilterSummary = computed(() => {
+  const payload = appliedPayload.value;
+  const catalog = catalogs.value;
+  if (!payload || !catalog) return '';
+
+  const parts: string[] = [];
+  const defaultYears = catalog.defaultYears?.length
+    ? catalog.defaultYears
+    : catalog.years.slice(0, 3);
+  if (!sameSelection(payload.years, defaultYears)) {
+    parts.push(`Años: ${payload.years.join(', ')}`);
+  }
+
+  const defaultTransaction = catalog.transactions.find(option => option.value === 'Ventas')
+    ?? catalog.transactions[0];
+  if (defaultTransaction && payload.transaction !== defaultTransaction.value) {
+    parts.push(`Transacción: ${payload.transaction}`);
+  }
+
+  const defaultWeekEnd = payload.years.some(
+    year => catalog.weeksByYear[String(year)]?.includes(53),
+  ) ? 53 : 52;
+  const defaultWeeks = Array.from({ length: defaultWeekEnd }, (_, index) => index + 1);
+  if (!sameSelection(payload.weeks, defaultWeeks)) {
+    parts.push(`Semanas: ${payload.weeks[0]}–${payload.weeks.at(-1)}`);
+  }
+
+  const filterLabels: Record<string, { singular: string; plural: string }> = {
+    canales: { singular: 'Canal', plural: 'canales' },
+    gerencias: { singular: 'Gerencia', plural: 'gerencias' },
+    jefaturas: { singular: 'Jefatura', plural: 'jefaturas' },
+    rutas: { singular: 'Ruta', plural: 'rutas' },
+    matrices: { singular: 'Matriz', plural: 'matrices' },
+    formatos: { singular: 'Formato', plural: 'formatos' },
+    marcas: { singular: 'Marca', plural: 'marcas' },
+    gruposSku: { singular: 'Grupo SKU', plural: 'grupos SKU' },
+    categorias: { singular: 'Categoría', plural: 'categorías' },
+    gruposComercialesA: { singular: 'Grupo comercial A', plural: 'grupos comerciales A' },
+    gruposComercialesB: { singular: 'Grupo comercial B', plural: 'grupos comerciales B' },
+    skus: { singular: 'SKU', plural: 'SKU' },
+  };
+  const contextDefaults: Record<string, string[]> = {
+    gerencias: context.value?.gerencia ? [context.value.gerencia] : [],
+    jefaturas: context.value?.jefatura ? [context.value.jefatura] : [],
+  };
+
+  Object.entries(payload.filters).forEach(([key, values]) => {
+    const defaults = contextDefaults[key] ?? [];
+    if (sameSelection(values, defaults) || values.length === 0) return;
+    const label = filterLabels[key];
+    if (!label) return;
+    parts.push(
+      values.length === 1
+        ? `${label.singular}: ${values[0]}`
+        : `${values.length} ${label.plural}`,
+    );
+  });
+
+  if (parts.length <= 3) return parts.join(' · ');
+  return `${parts.slice(0, 3).join(' · ')} · +${parts.length - 3} filtros`;
 });
 
 const scrollToResult = async (targetId = 'pic52-results') => {
   await nextTick();
-  document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const target = document.getElementById(targetId);
+  if (!target) return;
+
+  const scrollContainer = target.closest<HTMLElement>('[data-admin-scroll-container]');
+  if (!scrollContainer) return;
+
+  const containerTop = scrollContainer.getBoundingClientRect().top;
+  const targetTop = target.getBoundingClientRect().top;
+  const nextScrollTop = Math.max(
+    0,
+    scrollContainer.scrollTop + targetTop - containerTop - 16,
+  );
+
+  scrollContainer.scrollTo({
+    top: nextScrollTop,
+    behavior: 'smooth',
+  });
 };
 
 const handleApply = async (_mode: Pic52ReportMode) => {
@@ -73,7 +134,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <main class="min-h-screen bg-pic-background px-3 py-4 text-pic-text-main sm:px-4 lg:px-6 lg:py-5">
+  <main class="min-h-full bg-pic-background px-5 pt-4 text-pic-text-main sm:px-10 sm:pt-5 lg:px-16">
     <div class="mx-auto max-w-[1800px] space-y-4">
       <StdPageHeader
         eyebrow="Analítica semanal"
@@ -202,35 +263,18 @@ onMounted(() => {
       <section
         v-else-if="report && hasObservedReportData && !filtersDirty"
         id="pic52-results"
-        class="space-y-3"
+        class="space-y-4"
       >
-        <div class="flex flex-col gap-3 rounded-xl border border-pic-brand-border bg-pic-brand-soft px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div class="flex min-w-0 items-center gap-3">
-            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-pic-brand text-white">
-              <i class="fa-solid fa-table-columns"></i>
-            </span>
-            <div class="min-w-0">
-              <p class="text-[9px] font-black uppercase tracking-[0.16em] text-pic-brand">Comparación aplicada</p>
-              <p class="mt-0.5 text-xs font-black text-pic-text-main">
-                {{ report.years.join(' · ') }} · {{ report.transaction.label }}
-              </p>
-            </div>
-          </div>
-          <div class="flex flex-wrap items-center gap-2 text-[10px] font-bold text-pic-text-muted">
-            <span class="rounded-lg border border-pic-brand-border bg-pic-surface px-2.5 py-1.5">
-              {{ coverageSummary }}
-            </span>
-            <span class="rounded-lg border border-pic-brand-border bg-pic-surface px-2.5 py-1.5">
-              {{ reportFromCache ? 'Caché' : 'Consulta nueva' }}
-            </span>
-            <span v-if="generatedAt" class="font-mono">{{ generatedAt }}</span>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 gap-4 min-[1500px]:grid-cols-2">
-          <Pic52ComparisonTable :report="report" metric="kg" />
-          <Pic52ComparisonTable :report="report" metric="pesos" />
-        </div>
+        <Pic52ComparisonTable
+          :report="report"
+          metric="kg"
+          :filter-summary="appliedFilterSummary"
+        />
+        <Pic52ComparisonTable
+          :report="report"
+          metric="pesos"
+          :filter-summary="appliedFilterSummary"
+        />
       </section>
 
       <Pic52ChartsPanel

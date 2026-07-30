@@ -126,15 +126,6 @@ const panelStatus = computed(() => {
   if (appliedPayload.value) return { text: 'Reporte actualizado', tone: 'ready' };
   return { text: 'Listo para consultar', tone: 'idle' };
 });
-const liveStatusText = computed(() => {
-  if (isInitializing.value) return 'Cargando catálogos';
-  if (isReportLoading.value) return 'Consultando reporte semanal';
-  if (dependentLoading.value.jefaturas || dependentLoading.value.rutas) {
-    return 'Actualizando estructura comercial';
-  }
-  if (dependentLoading.value.products) return 'Actualizando producto';
-  return isReady.value ? 'Catálogos listos' : 'Sin conexión';
-});
 const actionsDisabled = computed(() => (
   !isReady.value
   || !hasRequiredSelection.value
@@ -324,7 +315,6 @@ onUnmounted(() => {
         </span>
 
         <StdButton
-          class="hidden lg:inline-flex"
           size="sm"
           variant="ghost"
           icon="fa-solid fa-trash-can"
@@ -502,37 +492,6 @@ onUnmounted(() => {
           </section>
         </div>
 
-        <div class="sticky bottom-0 mt-3 flex flex-col gap-2 border-t border-pic-border bg-pic-surface/95 py-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-          <p class="text-xs font-medium text-pic-text-muted">
-            <span
-              class="mr-2 inline-flex h-2 w-2 rounded-sm"
-              :class="isReady ? 'bg-pic-success' : 'bg-pic-danger'"
-            ></span>
-            <span class="mr-2 font-bold text-pic-text-main">{{ liveStatusText }}</span>
-            <span v-if="filtersDirty">Los cambios se aplican al consultar el reporte.</span>
-            <span v-else>Selección aplicada para {{ appliedPayload?.weeks.length }} semanas.</span>
-          </p>
-          <div class="flex flex-wrap items-center justify-end gap-2">
-            <StdButton
-              size="sm"
-              variant="ghost"
-              icon="fa-solid fa-trash-can"
-              :disabled="!isReady || isReportLoading || isResetting"
-              @click="handleReset"
-            >
-              Limpiar filtros
-            </StdButton>
-            <StdButton
-              size="sm"
-              variant="primary"
-              icon="fa-solid fa-eye"
-              :disabled="actionsDisabled"
-              @click="handleApply('table')"
-            >
-              {{ isReportLoading && appliedMode === 'table' ? 'Consultando' : 'Visualizar' }}
-            </StdButton>
-          </div>
-        </div>
       </div>
     </div>
   </section>

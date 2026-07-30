@@ -29,11 +29,8 @@ const pesosChartRef = ref<HTMLDivElement | null>(null);
 const kgChart = shallowRef<echarts.ECharts | null>(null);
 const pesosChart = shallowRef<echarts.ECharts | null>(null);
 const pinnedWeek = ref<number | null>(null);
-const brushedRange = ref<[number, number] | null>(null);
-const brushActive = ref(false);
 const chartGroupId = `pic52-linked-${Math.random().toString(36).slice(2)}`;
 let resizeObserver: ResizeObserver | null = null;
-let syncingBrush = false;
 
 const years = computed(() => [...props.report.years].sort((left, right) => right - left));
 const weeks = computed(() => [...props.report.weeks].sort((left, right) => left - right));
@@ -134,12 +131,6 @@ const pinnedSummary = computed<{
     pesosComparison: comparisonLabel('pesos'),
   };
 });
-
-const brushedRangeLabel = computed(() => (
-  brushedRange.value
-    ? `SEM-${brushedRange.value[0]} → SEM-${brushedRange.value[1]}`
-    : 'Sin rango seleccionado'
-));
 
 const seriesColors = () => [
   token('--pic-chart-1', '#d3121e'),
@@ -256,10 +247,6 @@ const buildOption = (metric: Pic52Metric): echarts.EChartsOption => {
         dataZoom: {
           yAxisIndex: 'none',
           title: { zoom: 'Acercar', back: 'Deshacer zoom' },
-        },
-        brush: {
-          type: ['lineX', 'clear'],
-          title: { lineX: 'Seleccionar semanas', clear: 'Limpiar selección' },
         },
         dataView: {
           readOnly: true,
@@ -382,21 +369,12 @@ const buildOption = (metric: Pic52Metric): echarts.EChartsOption => {
         },
         moveHandleStyle: { color: token('--pic-brand', '#d3121e') },
         textStyle: { color: textColor, fontSize: 9 },
-        brushSelect: true,
+        brushSelect: false,
         showDetail: false,
         start: 0,
         end: 100,
       },
     ],
-    brush: {
-      xAxisIndex: 'all',
-      brushMode: 'single',
-      transformable: true,
-      throttleType: 'debounce',
-      throttleDelay: 120,
-      inBrush: { opacity: 1 },
-      outOfBrush: { opacity: 0.28 },
-    },
     series: years.value.map((year, index) => ({
       id: `pic52-${metric}-${year}`,
       name: String(year),
@@ -483,68 +461,8 @@ const handleChartClick = (params: Record<string, unknown>) => {
   if (week !== null) setPinnedWeek(week);
 };
 
-const normalizeBrushBoundary = (value: unknown) => {
-  if (typeof value === 'string') {
-    const parsed = parseWeek(value);
-    if (parsed !== null && weeks.value.includes(parsed)) return parsed;
-  }
-  const index = Number(value);
-  return Number.isInteger(index) ? weeks.value[index] ?? null : null;
-};
-
-const syncBrush = (
-  source: echarts.ECharts,
-  target: echarts.ECharts | null,
-  event: Record<string, unknown>,
-) => {
-  if (syncingBrush) return;
-  const batch = Array.isArray(event.batch) ? event.batch as Array<Record<string, unknown>> : [];
-  const areas = Array.isArray(batch[0]?.areas) ? batch[0].areas as Array<Record<string, unknown>> : [];
-  const selected = Array.isArray(batch[0]?.selected)
-    ? batch[0].selected as Array<Record<string, unknown>>
-    : [];
-  const selectedIndexes = selected
-    .flatMap(item => Array.isArray(item.dataIndex) ? item.dataIndex : [])
-    .map(Number)
-    .filter(Number.isInteger);
-  const coordRange = Array.isArray(areas[0]?.coordRange) ? areas[0].coordRange : [];
-  const start = selectedIndexes.length
-    ? weeks.value[Math.min(...selectedIndexes)] ?? null
-    : normalizeBrushBoundary(coordRange[0]);
-  const end = selectedIndexes.length
-    ? weeks.value[Math.max(...selectedIndexes)] ?? null
-    : normalizeBrushBoundary(coordRange[1]);
-  brushedRange.value = start !== null && end !== null
-    ? [Math.min(start, end), Math.max(start, end)]
-    : null;
-
-  if (areas.length > 0 && brushActive.value) {
-    brushActive.value = false;
-    [kgChart.value, pesosChart.value].forEach(chart => {
-      chart?.dispatchAction({
-        type: 'takeGlobalCursor',
-        key: 'brush',
-        brushOption: { brushType: false },
-      });
-    });
-  }
-
-  if (!target || source === target) return;
-  syncingBrush = true;
-  target.dispatchAction({ type: 'brush', areas });
-  queueMicrotask(() => {
-    syncingBrush = false;
-  });
-};
-
-const registerChartEvents = (
-  chart: echarts.ECharts,
-  otherChart: () => echarts.ECharts | null,
-) => {
+const registerChartEvents = (chart: echarts.ECharts) => {
   chart.on('click', (params) => handleChartClick(params as unknown as Record<string, unknown>));
-  chart.on('brushSelected', (event) => {
-    syncBrush(chart, otherChart(), event as unknown as Record<string, unknown>);
-  });
 };
 
 const initCharts = () => {
@@ -561,33 +479,16 @@ const initCharts = () => {
 
   kgChart.value.setOption(buildOption('kg'), { notMerge: true });
   pesosChart.value.setOption(buildOption('pesos'), { notMerge: true });
-  registerChartEvents(kgChart.value, () => pesosChart.value);
-  registerChartEvents(pesosChart.value, () => kgChart.value);
+  registerChartEvents(kgChart.value);
+  registerChartEvents(pesosChart.value);
   echarts.connect(chartGroupId);
 };
 
 const resetView = () => {
-  brushedRange.value = null;
   pinnedWeek.value = null;
-  brushActive.value = false;
   [kgChart.value, pesosChart.value].forEach(chart => {
     chart?.dispatchAction({ type: 'restore' });
-    chart?.dispatchAction({ type: 'brush', areas: [] });
     chart?.dispatchAction({ type: 'hideTip' });
-  });
-};
-
-const toggleBrush = () => {
-  brushActive.value = !brushActive.value;
-  [kgChart.value, pesosChart.value].forEach(chart => {
-    chart?.dispatchAction({
-      type: 'takeGlobalCursor',
-      key: 'brush',
-      brushOption: {
-        brushType: brushActive.value ? 'lineX' : false,
-        brushMode: 'single',
-      },
-    });
   });
 };
 
@@ -630,8 +531,6 @@ onMounted(() => {
 
 watch(() => props.report, async () => {
   pinnedWeek.value = null;
-  brushedRange.value = null;
-  brushActive.value = false;
   await nextTick();
   initCharts();
 }, { deep: false });
@@ -654,66 +553,8 @@ onBeforeUnmount(() => {
   <section
     id="pic52-charts"
     class="space-y-4"
-    aria-labelledby="pic52-charts-title"
+    aria-label="Gráficas comparativas semanales"
   >
-    <div class="overflow-hidden rounded-xl border border-pic-brand-border bg-pic-surface shadow-sm">
-      <div class="flex flex-col gap-3 bg-pic-brand-soft px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-        <div class="flex min-w-0 items-center gap-3">
-          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-pic-brand text-white shadow-sm">
-            <i class="fa-solid fa-wave-square"></i>
-          </span>
-          <div class="min-w-0">
-            <p class="text-[9px] font-black uppercase tracking-[0.18em] text-pic-brand">
-              Exploración sincronizada
-            </p>
-            <h2 id="pic52-charts-title" class="mt-0.5 text-sm font-black text-pic-text-main">
-              {{ report.transaction.label }} · {{ report.years.join(' · ') }}
-            </h2>
-          </div>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            class="inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-[10px] font-black transition focus:outline-none focus:ring-2 focus:ring-pic-brand-border"
-            :class="brushActive
-              ? 'border-pic-brand bg-pic-brand text-white'
-              : 'border-pic-brand-border bg-pic-surface text-pic-brand hover:bg-pic-brand hover:text-white'"
-            :aria-pressed="brushActive"
-            @click="toggleBrush"
-          >
-            <i class="fa-solid fa-paintbrush"></i>
-            {{ brushActive ? 'Arrastra en la gráfica' : 'Seleccionar rango' }}
-          </button>
-          <span class="inline-flex h-8 items-center rounded-lg border border-pic-brand-border bg-pic-surface px-3 text-[10px] font-bold text-pic-text-muted">
-            <i class="fa-solid fa-arrows-left-right mr-1.5 text-pic-brand"></i>
-            {{ brushedRangeLabel }}
-          </span>
-          <button
-            type="button"
-            class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-pic-brand-border bg-pic-surface px-3 text-[10px] font-black text-pic-brand transition hover:bg-pic-brand hover:text-white focus:outline-none focus:ring-2 focus:ring-pic-brand-border"
-            @click="resetView"
-          >
-            <i class="fa-solid fa-rotate-left"></i>
-            Restaurar ambas
-          </button>
-        </div>
-      </div>
-
-      <div
-        id="pic52-chart-keyboard-help"
-        class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-pic-brand-border px-4 py-2 text-[9px] font-semibold text-pic-text-muted"
-      >
-        <span><i class="fa-solid fa-computer-mouse mr-1 text-pic-brand"></i>Clic: fijar semana</span>
-        <span><i class="fa-solid fa-left-right mr-1 text-pic-brand"></i>Rueda o slider: zoom</span>
-        <span>
-          <i class="fa-solid fa-paintbrush mr-1 text-pic-brand"></i>
-          Pulsa “Seleccionar rango” y arrastra horizontalmente
-        </span>
-        <span><i class="fa-solid fa-keyboard mr-1 text-pic-brand"></i>← →: recorrer semanas · Esc: restaurar</span>
-      </div>
-    </div>
-
     <div
       v-if="pinnedSummary"
       class="grid grid-cols-1 overflow-hidden rounded-xl border border-pic-border bg-pic-surface shadow-sm lg:grid-cols-[126px_minmax(0,1fr)_260px]"
@@ -771,7 +612,6 @@ onBeforeUnmount(() => {
         tabindex="0"
         role="img"
         aria-label="Gráfica comparativa de kilogramos por semana. Usa flechas izquierda y derecha para recorrer semanas."
-        aria-describedby="pic52-chart-keyboard-help"
         @keydown="handleKeyboard"
       ></div>
     </article>
@@ -797,7 +637,6 @@ onBeforeUnmount(() => {
         tabindex="0"
         role="img"
         aria-label="Gráfica comparativa de pesos por semana. Usa flechas izquierda y derecha para recorrer semanas."
-        aria-describedby="pic52-chart-keyboard-help"
         @keydown="handleKeyboard"
       ></div>
     </article>

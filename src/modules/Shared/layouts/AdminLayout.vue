@@ -26,8 +26,17 @@ const showMobileSidebar = ref(false);
 const collapsedSidebarCategories = ref<Record<string, boolean>>({});
 
 let notifPoll: ReturnType<typeof setInterval> | null = null;
+let previousDocumentOverflow = '';
+let previousBodyOverflow = '';
 
 onMounted(async () => {
+   previousDocumentOverflow = document.documentElement.style.overflow;
+   previousBodyOverflow = document.body.style.overflow;
+   document.documentElement.scrollTop = 0;
+   document.body.scrollTop = 0;
+   document.documentElement.style.overflow = 'hidden';
+   document.body.style.overflow = 'hidden';
+
    isCollapsed.value = localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === 'true';
    loadSidebarCategoryState();
    void uiThemeStore.loadThemeCatalog();
@@ -42,6 +51,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
    if (notifPoll) clearInterval(notifPoll);
+   document.documentElement.style.overflow = previousDocumentOverflow;
+   document.body.style.overflow = previousBodyOverflow;
 });
 
 const handleLogout = () => {
@@ -138,7 +149,7 @@ const sidebarLogo = computed(() => isCollapsed.value ? coronaLogoMobile : corona
 </script>
 
 <template>
-   <div class="flex h-screen overflow-hidden bg-pic-background text-pic-text-main">
+  <div class="fixed inset-0 flex min-h-0 w-full overflow-hidden bg-pic-background text-pic-text-main">
       <aside
          class="relative z-40 hidden shrink-0 flex-col border-r border-white/10 bg-pic-nav text-pic-nav-text shadow-2xl transition-all duration-300 ease-in-out md:flex"
          :class="isCollapsed ? 'w-20' : 'w-64'"
@@ -323,7 +334,10 @@ const sidebarLogo = computed(() => isCollapsed.value ? coronaLogoMobile : corona
          </header>
 
          <main class="flex min-h-0 min-w-0 flex-1 flex-col">
-            <section class="min-h-0 flex-1 overflow-y-auto">
+            <section
+               data-admin-scroll-container
+               class="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-pic-background"
+            >
                <router-view></router-view>
             </section>
          </main>
