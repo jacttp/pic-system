@@ -277,7 +277,7 @@ const excelExportItems = computed<ExportTiendaItem[]>(() => includedItems.value
 )
 
 // El archivo omite cantidades cero, pero la transición se calcula desde las
-// OC completas incluidas. Una OC totalmente ajustada a cero también se envía.
+// OC completas incluidas. Una OC oficial totalmente en cero se cierra.
 const sentOrderItems = computed<ExportTiendaItem[]>(() => includedItems.value.filter(item => {
     const numPedido = String(item.num_pedido || '').trim()
     return numPedido && numPedido !== 'SIN_PEDIDO'
@@ -328,15 +328,18 @@ const pdfProcessing = ref(false)
 const excelProcessing = ref(false)
 const reviewProcessing = ref(false)
 const canDownloadExcel = computed(() => panelTab.value === 'aprobada')
-const excelRestrictionMessage = 'El Excel final solo se genera desde Aprobados y cambia las OC incluidas completamente a Enviado.'
+const excelRestrictionMessage = 'El Excel final solo se genera desde Aprobados: envía las OC con cantidad y cierra las OC oficiales totalmente en cero.'
 
 function buildExcelAuditDetail(
     filename: string,
     downloadedAt: Date,
     sentItems: ExportTiendaItem[],
     orderCount: number,
-    statusResult: { ok: boolean; error?: string }
+    statusResult: { ok: boolean; error?: string; sentOrders?: number; closedZeroOrders?: number; deletedZeroZ8Orders?: number }
 ): CpfrExcelExportAuditDetail {
+    const sentOrders = statusResult.sentOrders ?? (statusResult.ok ? orderCount : 0)
+    const closedZeroOrders = statusResult.closedZeroOrders ?? 0
+    const deletedZeroZ8Orders = statusResult.deletedZeroZ8Orders ?? 0
     const orderDetails = sentItems.map(item => {
         const exportedRows = item.rows.filter(row => Number(row.cant_pedida) > 0)
         return {
@@ -359,9 +362,18 @@ function buildExcelAuditDetail(
         pestaña: 'aprobada',
         estado_incluido: 'aprobado',
         transicion_estado: {
-            destino: 'enviado',
+            destino: [sentOrders > 0, closedZeroOrders > 0, deletedZeroZ8Orders > 0].filter(Boolean).length > 1
+                ? 'mixto'
+                : closedZeroOrders > 0
+                    ? 'cerrado'
+                    : deletedZeroZ8Orders > 0
+                        ? 'eliminado'
+                        : 'enviado',
             exitosa: statusResult.ok,
             ocs_solicitadas: orderCount,
+            ocs_enviadas: sentOrders,
+            ocs_cerradas_cero: closedZeroOrders,
+            z8_eliminadas_cero: deletedZeroZ8Orders,
             error: statusResult.error || null,
         },
         dias: Array.from(selectedDays.value).sort((a, b) => a - b).map(numero => ({
@@ -447,9 +459,16 @@ async function handleExcelExport() {
         }
 
         await store.loadDashboard()
+        const sentOrders = statusResult.sentOrders ?? orderNumbers.length
+        const closedZeroOrders = statusResult.closedZeroOrders ?? 0
+        const deletedZeroZ8Orders = statusResult.deletedZeroZ8Orders ?? 0
         toast({
-            title: 'OC enviadas',
-            description: `${orderNumbers.length} OC cambiaron a Enviado después de generar ${filename}.`,
+            title: closedZeroOrders > 0 || deletedZeroZ8Orders > 0 ? 'Generación completada' : 'OC enviadas',
+            description: [
+                `${sentOrders} OC cambiaron a Enviado`,
+                closedZeroOrders > 0 ? `${closedZeroOrders} OC oficiales en cero se cerraron` : null,
+                deletedZeroZ8Orders > 0 ? `${deletedZeroZ8Orders} Z8 en cero se eliminaron` : null,
+            ].filter(Boolean).join('; ') + ` después de generar ${filename}.`,
             duration: 6000,
         })
     } catch (error) {
@@ -869,7 +888,7 @@ async function handlePdfExport() {
                         v-else
                         @click="handleExcelExport"
                         :disabled="!canDownloadExcel || excelProcessing || pdfProcessing || excelOrderNumbers.length === 0"
-                        :title="canDownloadExcel ? 'Generar Excel y marcar las OC completas como enviadas' : excelRestrictionMessage"
+                        :title="canDownloadExcel ? 'Generar Excel, enviar las OC con cantidad y cerrar las oficiales totalmente en cero' : excelRestrictionMessage"
                         class="w-full h-9 border-2 border-brand-600 text-brand-700 hover:bg-brand-50 disabled:bg-slate-50 disabled:text-slate-300 disabled:border-slate-200 rounded-xl font-black text-[11px] transition-all flex items-center justify-center gap-2 group"
                     >
                         <i v-if="excelProcessing" class="fa-solid fa-circle-notch fa-spin"></i>

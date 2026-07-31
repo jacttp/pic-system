@@ -14,6 +14,7 @@ import type {
     CpfrAdjustSkuBody,
     CpfrUpdateStatusBody,
     CpfrBulkUpdateStatusBody,
+    CpfrUpdateStatusResponse,
     CpfrUploadOCResponse,
     CpfrStoreConfig,
     CpfrSkuOverride,
@@ -105,12 +106,12 @@ export const cpfrApi = {
      * Estados operativos: pendiente → revision → aprobado → enviado.
      * Cerrado se conserva para las OC sin embarcar.
      */
-    async updateStatus(body: CpfrUpdateStatusBody): Promise<{ success: boolean; approval_id?: number | null }> {
+    async updateStatus(body: CpfrUpdateStatusBody): Promise<CpfrUpdateStatusResponse> {
         const { data } = await api.patch('/cpfr/orders/status', body)
         return data
     },
 
-    async updateStatusBulk(body: CpfrBulkUpdateStatusBody): Promise<{ success: boolean; approval_id?: number | null; approval_ids?: number[]; updated_orders?: number }> {
+    async updateStatusBulk(body: CpfrBulkUpdateStatusBody): Promise<CpfrUpdateStatusResponse> {
         const { data } = await api.patch('/cpfr/orders/status/bulk', body)
         return data
     },

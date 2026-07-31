@@ -332,7 +332,7 @@ export interface GroupedOC {
 
 function isZ8(num: string | null): boolean {
     if (!num) return false
-    const n = num.toLowerCase()
+    const n = num.trim().toLowerCase()
     return n.startsWith('z8')
 }
 
@@ -1012,6 +1012,19 @@ const approvedZeroPurgeRows = computed<ApprovedZeroPurgeRow[]>(() => {
     if (currentTab.value === 'historial') return historyApprovedZeroPurgeRows.value
     if (!isApprovedTab.value) return []
 
+    const ordersWithNonZeroSku = new Set<string>()
+    for (const dia of filteredDias.value) {
+        for (const tienda of dia.tiendas) {
+            for (const sku of tienda.skus) {
+                if (!sku.num_pedido) continue
+                if (String(sku.estado_oc || '').toLowerCase() !== 'aprobado') continue
+                if (Math.abs(skuFinalOrderQuantity(sku)) > 0.0001) {
+                    ordersWithNonZeroSku.add(sku.num_pedido)
+                }
+            }
+        }
+    }
+
     const map = new Map<number, ApprovedZeroPurgeRow>()
     for (const dia of filteredDias.value) {
         for (const tienda of dia.tiendas) {
@@ -1020,6 +1033,7 @@ const approvedZeroPurgeRows = computed<ApprovedZeroPurgeRow[]>(() => {
                 if (!Number.isInteger(id) || id <= 0) continue
                 if (String(sku.estado_oc || '').toLowerCase() !== 'aprobado') continue
                 if (Math.abs(skuFinalOrderQuantity(sku)) > 0.0001) continue
+                if (!isZ8(sku.num_pedido) && !ordersWithNonZeroSku.has(String(sku.num_pedido || ''))) continue
 
                 map.set(id, {
                     id,
@@ -3166,7 +3180,7 @@ const totalUniqueOCs = computed(() => {
                 <h3 class="text-sm font-black uppercase tracking-wider text-slate-800">Purgar SKUs aprobados o enviados en cero</h3>
               </div>
               <p class="text-xs font-medium leading-relaxed text-slate-600">
-                Se eliminarán únicamente renglones de CPFR_PedidoGenerado que sigan aprobados o enviados y tengan total final cero.
+                Las OC oficiales totalmente en cero conservan su referencia para cerrarse al generar; los renglones Z8 en cero sí pueden eliminarse.
               </p>
             </div>
             <button
@@ -3247,7 +3261,7 @@ const totalUniqueOCs = computed(() => {
         <footer class="shrink-0 border-t border-slate-200 bg-slate-50 px-5 py-3">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p class="text-[11px] font-semibold text-slate-500">
-              La base de datos volverá a validar estado aprobado o enviado y total cero antes de borrar.
+              La base de datos vuelve a validar el estado, el total cero y que no se pierda la referencia de una OC oficial.
             </p>
             <div class="flex justify-end gap-2">
               <button

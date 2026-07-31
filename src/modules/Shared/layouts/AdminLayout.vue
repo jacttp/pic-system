@@ -61,8 +61,11 @@ const handleLogout = () => {
 };
 
 const isActive = (path: string) => {
-   if (path === '/') return route.path === '/';
-   return route.path.startsWith(path);
+   const normalizedPath = path.length > 1 ? path.replace(/\/+$/, '') : path;
+
+   if (normalizedPath === '/') return route.path === '/';
+
+   return route.path === normalizedPath || route.path.startsWith(`${normalizedPath}/`);
 };
 
 const closeFloatingMenus = () => {

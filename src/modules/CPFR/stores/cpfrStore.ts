@@ -542,7 +542,8 @@ export const useCpfrStore = defineStore('cpfr', () => {
     async function updateStatus(body: CpfrUpdateStatusBody): Promise<{ ok: boolean; approvalId?: number }> {
         try {
             const res = await cpfrApi.updateStatus(body)
-            const localEstado = body.estado === 'pendiente' ? 'borrador' : body.estado
+            const transition = res.order_transitions?.find(item => item.num_pedido === body.num_pedido && item.estado !== 'eliminado')
+            const localEstado = transition?.estado || (body.estado === 'pendiente' ? 'borrador' : body.estado)
             // Actualizar localmente sin re-fetch
             for (const dia of dias.value) {
                 for (const store of dia.tiendas) {
@@ -696,16 +697,21 @@ export const useCpfrStore = defineStore('cpfr', () => {
         statusFilters.searchSku = ''
     }
 
-    async function updateStatusBulk(body: CpfrBulkUpdateStatusBody): Promise<{ ok: boolean; error?: string; approvalId?: number; approvalCount?: number; updatedOrders?: number }> {
+    async function updateStatusBulk(body: CpfrBulkUpdateStatusBody): Promise<{ ok: boolean; error?: string; approvalId?: number; approvalCount?: number; updatedOrders?: number; sentOrders?: number; closedZeroOrders?: number; deletedZeroZ8Orders?: number }> {
         try {
             const res = await cpfrApi.updateStatusBulk(body)
             const nums = new Set(body.num_pedidos)
-            const localEstado = body.estado === 'pendiente' ? 'borrador' : body.estado
+            const transitions = new Map(
+                (res.order_transitions || [])
+                    .filter(item => item.estado !== 'eliminado')
+                    .map(item => [item.num_pedido, item.estado])
+            )
+            const fallbackEstado = body.estado === 'pendiente' ? 'borrador' : body.estado
             for (const dia of dias.value) {
                 for (const store of dia.tiendas) {
                     for (const sku of store.skus) {
                         if (sku.num_pedido && nums.has(sku.num_pedido)) {
-                            sku.estado_oc = localEstado
+                            sku.estado_oc = transitions.get(sku.num_pedido) || fallbackEstado
                         }
                     }
                 }
@@ -725,6 +731,9 @@ export const useCpfrStore = defineStore('cpfr', () => {
                 approvalId: res.approval_id ?? undefined,
                 approvalCount: res.approval_ids?.length ?? (res.approval_id ? 1 : 0),
                 updatedOrders: res.updated_orders ?? body.num_pedidos.length,
+                sentOrders: res.sent_orders,
+                closedZeroOrders: res.closed_zero_orders,
+                deletedZeroZ8Orders: res.deleted_zero_z8_orders,
             }
         } catch (e: any) {
             console.error('[cpfrStore.updateStatusBulk]', e)

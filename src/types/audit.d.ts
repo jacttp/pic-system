@@ -21,9 +21,12 @@ export interface CpfrExcelExportAuditDetail {
     pestaña: 'aprobada';
     estado_incluido: 'aprobado';
     transicion_estado: {
-        destino: 'enviado';
+        destino: 'enviado' | 'cerrado' | 'eliminado' | 'mixto';
         exitosa: boolean;
         ocs_solicitadas: number;
+        ocs_enviadas: number;
+        ocs_cerradas_cero: number;
+        z8_eliminadas_cero: number;
         error: string | null;
     };
     dias: Array<{ numero: number; nombre: string }>;

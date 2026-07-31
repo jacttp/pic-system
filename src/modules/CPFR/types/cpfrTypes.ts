@@ -177,6 +177,22 @@ export interface CpfrBulkUpdateStatusBody {
     estado: CpfrUpdateStatusBody['estado']
 }
 
+export interface CpfrOrderStatusTransition {
+    num_pedido: string
+    estado: 'enviado' | 'cerrado' | 'eliminado'
+}
+
+export interface CpfrUpdateStatusResponse {
+    success: boolean
+    approval_id?: number | null
+    approval_ids?: number[]
+    updated_orders?: number
+    sent_orders?: number
+    closed_zero_orders?: number
+    deleted_zero_z8_orders?: number
+    order_transitions?: CpfrOrderStatusTransition[]
+}
+
 // ─── Config de tienda — GET|PUT /api/v2/cpfr/config/:id_cliente ─────────────
 // (usado por CpfrStoreConfigModal)
 
