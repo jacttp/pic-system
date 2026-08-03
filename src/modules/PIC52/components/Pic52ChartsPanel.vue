@@ -9,11 +9,16 @@ import {
   watch,
 } from 'vue';
 import * as echarts from 'echarts';
-import type { Pic52Report } from '../types/pic52';
+import type { Pic52Report, Pic52TrendData, Pic52TrendJob } from '../types/pic52';
 import { calculateComparison, type Pic52Metric } from '../utils/pic52Report';
+import Pic52ContinuousTrendChart from './Pic52ContinuousTrendChart.vue';
 
 interface Props {
   report: Pic52Report;
+  trendData?: Pic52TrendData | null;
+  trendJob?: Pic52TrendJob | null;
+  trendError?: string;
+  isTrendLoading?: boolean;
 }
 
 interface PinnedYearDetail {
@@ -22,7 +27,17 @@ interface PinnedYearDetail {
   pesos: string;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  trendData: null,
+  trendJob: null,
+  trendError: '',
+  isTrendLoading: false,
+});
+const emit = defineEmits<{
+  (event: 'generate-trend'): void;
+  (event: 'retry-trend'): void;
+  (event: 'cancel-trend'): void;
+}>();
 
 const kgChartRef = ref<HTMLDivElement | null>(null);
 const pesosChartRef = ref<HTMLDivElement | null>(null);
@@ -558,6 +573,17 @@ onBeforeUnmount(() => {
     class="space-y-4 font-sans"
     aria-label="Gráficas comparativas semanales"
   >
+    <Pic52ContinuousTrendChart
+      :report="report"
+      :trend-data="trendData"
+      :job="trendJob"
+      :error="trendError"
+      :loading="isTrendLoading"
+      @generate="emit('generate-trend')"
+      @retry="emit('retry-trend')"
+      @cancel="emit('cancel-trend')"
+    />
+
     <div
       v-if="pinnedSummary"
       class="grid grid-cols-1 overflow-hidden rounded-xl border border-pic-border bg-pic-surface shadow-sm lg:grid-cols-[126px_minmax(0,1fr)_260px]"
@@ -643,6 +669,7 @@ onBeforeUnmount(() => {
         @keydown="handleKeyboard"
       ></div>
     </article>
+
   </section>
 </template>
 

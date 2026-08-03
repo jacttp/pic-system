@@ -19,6 +19,10 @@ const {
   report,
   reportError,
   isReportLoading,
+  trendData,
+  trendJob,
+  trendError,
+  isTrendLoading,
   hasObservedReportData,
   selectedYears,
   catalogs,
@@ -51,7 +55,11 @@ const appliedFilterSummary = computed(() => {
 
   const defaultTransaction = catalog.transactions.find(option => option.value === 'Ventas')
     ?? catalog.transactions[0];
-  if (defaultTransaction && payload.transaction !== defaultTransaction.value) {
+  if ((payload.transactions?.length ?? 0) > 1) {
+    parts.push(
+      payload.transactions!.length + ' transacciones · principal ' + payload.transaction,
+    );
+  } else if (defaultTransaction && payload.transaction !== defaultTransaction.value) {
     parts.push(`Transacción: ${payload.transaction}`);
   }
 
@@ -270,6 +278,13 @@ onMounted(() => {
       >
         <Pic52ChartsPanel
           :report="report"
+          :trend-data="trendData"
+          :trend-job="trendJob"
+          :trend-error="trendError"
+          :is-trend-loading="isTrendLoading"
+          @generate-trend="store.loadTrend"
+          @retry-trend="store.retryTrend"
+          @cancel-trend="store.cancelTrend"
         />
 
         <Pic52ComparisonTable

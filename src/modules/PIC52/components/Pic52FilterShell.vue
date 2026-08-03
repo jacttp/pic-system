@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia';
 import FilterDropdown from '@/modules/Shared/components/FilterDropdown.vue';
 import { StdButton } from '@/modules/Shared/components/std';
 import Pic52WeekRangeSelector from './Pic52WeekRangeSelector.vue';
+import Pic52TransactionSelector from './Pic52TransactionSelector.vue';
 import { usePic52Store, type Pic52ReportMode } from '../stores/pic52Store';
 import type { Pic52Filters, Pic52ProductOptions } from '../types/pic52';
 
@@ -42,6 +43,7 @@ const {
   selected,
   selectedYears,
   transactionSelections,
+  compareTransactions,
   weeks,
   options,
   productOptions,
@@ -56,7 +58,7 @@ const {
   isGerenciaLocked,
   isJefaturaLocked,
   availableYears,
-  transactionValues,
+  transactionOptions,
   comparisonYears,
   weekValues,
   hasRequiredSelection,
@@ -91,6 +93,12 @@ const transactionModel = computed<string[]>({
   get: () => transactionSelections.value,
   set: value => {
     store.setTransactionSelections(value);
+  },
+});
+const compareTransactionsModel = computed<boolean>({
+  get: () => compareTransactions.value,
+  set: value => {
+    store.setCompareTransactions(value);
   },
 });
 
@@ -440,15 +448,12 @@ onUnmounted(() => {
               ></i>
             </button>
             <div :class="mobileSections.configuration ? 'block' : 'hidden md:block'">
-              <FilterDropdown
+              <Pic52TransactionSelector
                 v-model="transactionModel"
-                density="compact"
-                label="Transacción"
-                :options="transactionValues"
-                placeholder="Seleccione transacciones"
-                :show-select-all="false"
+                v-model:compare-enabled="compareTransactionsModel"
+                :options="transactionOptions"
                 :disabled="!isReady"
-                @change="store.handleConfigurationChange"
+                @change="store.handleTransactionChange"
                 @open-change="handleDropdownOpen"
               />
             </div>

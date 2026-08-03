@@ -54,6 +54,29 @@ patrón existente; cualquier excepción deberá quedar justificada en este docum
 - Las semanas `missing` permanecen como huecos y nunca conectan artificialmente
   el trazo.
 - Cambiar filtros invalida y oculta las gráficas hasta aplicar nuevamente.
+- La configuración permite comparar hasta ocho transacciones lógicas. Ventas es
+  una opción indivisible que agrega Venta + NC y permanece como transacción
+  principal cuando forma parte de la selección.
+- Las tablas y las dos gráficas comparativas existentes continúan usando solamente
+  la transacción principal.
+- Una tercera gráfica presenta el periodo como una línea cronológica continua,
+  desde la primera semana del año menor hasta la última semana del año mayor.
+- La tarjeta continua inicia sin consultar datos. Solo llama
+  POST /api/pic-52s/trend al presionar Generar tendencia continua.
+- El POST registra o reutiliza una tarea y regresa de inmediato. La vista consulta
+  GET /api/pic-52s/trend/:jobId cada dos segundos hasta recibir el resultado.
+- La tarjeta distingue En cola, Generando, completado, fallo, cancelación y tarea
+  expirada; muestra tiempo transcurrido real y permite cancelar con
+  DELETE /api/pic-52s/trend/:jobId.
+- Cambiar filtros detiene el polling local sin cancelar la tarea remota. Si el
+  mismo alcance vuelve a solicitarse dentro de 30 minutos, reutiliza el resultado.
+- Visualizar conserva una única llamada ligera a POST /api/pic-52s/report.
+- La tendencia puede reagruparse en cliente por total, producto, transacción o
+  producto por transacción, sin ejecutar una consulta adicional.
+- El producto se desglosa por el nivel multiseleccionado más específico. Comercial
+  y Clientes permanecen como restricciones del conjunto y nunca generan series.
+- La tendencia limita la visualización a ocho líneas y conserva ausencia como
+  hueco, además de distinguir transacciones mediante trazo y marcador.
 
 ## Pendiente para Fase 5
 
@@ -75,5 +98,9 @@ patrón existente; cualquier excepción deberá quedar justificada en este docum
 11. Cambiar cualquier filtro y confirmar que tablas y gráficas se ocultan hasta
     aplicar nuevamente con `Visualizar`.
 12. Revisar legibilidad y controles en laptop 1366×768, tablet y móvil.
+13. Generar la tendencia y confirmar el flujo POST + polling GET sin solicitudes
+    de tendencia al usar `Visualizar`.
+14. Cancelar una generación y confirmar que la tarjeta permite solicitarla de
+    nuevo sin afectar tablas ni gráficas existentes.
 
 La impresión pertenece a la Fase 5.

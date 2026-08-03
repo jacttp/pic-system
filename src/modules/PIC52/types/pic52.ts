@@ -15,10 +15,22 @@ export interface Pic52Filters {
   skus: string[];
 }
 
+export type Pic52ProductDimension =
+  | 'marcas'
+  | 'gruposSku'
+  | 'categorias'
+  | 'gruposComercialesA'
+  | 'gruposComercialesB'
+  | 'skus';
+
 export interface Pic52ReportRequest {
   years: number[];
   weeks: number[];
   transaction: string;
+  transactions?: string[];
+  trend?: {
+    productDimension?: Pic52ProductDimension;
+  };
   filters: Pic52Filters;
 }
 
@@ -86,12 +98,61 @@ export interface Pic52YearSeries {
   };
 }
 
+export interface Pic52TrendPeriod {
+  key: string;
+  year: number;
+  week: number;
+  label: string;
+}
+
+export interface Pic52TrendPoint extends Pic52Point {
+  year: number;
+}
+
+export interface Pic52TrendSeries {
+  key: string;
+  label: string;
+  productValue: string | null;
+  transaction: Pic52TransactionOption;
+  points: Pic52TrendPoint[];
+}
+
+export interface Pic52TrendData {
+  start: { year: number; week: number };
+  end: { year: number; week: number };
+  timeline: Pic52TrendPeriod[];
+  transactions: Pic52TransactionOption[];
+  productDimension: Pic52ProductDimension | null;
+  productValues: string[];
+  series: Pic52TrendSeries[];
+}
+
+export type Pic52TrendJobStatus =
+  | 'queued'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
+export interface Pic52TrendJob {
+  jobId: string;
+  status: Pic52TrendJobStatus;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  expiresAt: string | null;
+  elapsedMs: number;
+  cached: boolean;
+  message: string | null;
+  result?: Pic52TrendData;
+}
+
 export interface Pic52Report {
   referenceYear: number;
   years: number[];
   weeks: number[];
   transaction: Pic52TransactionOption;
-  filters: Pic52Filters;
+  filters: Partial<Pic52Filters>;
   series: Pic52YearSeries[];
   generatedAt: string;
 }
@@ -102,5 +163,6 @@ export interface Pic52ApiResponse<T> {
   message?: string;
   meta?: {
     cached?: boolean;
+    reused?: boolean;
   };
 }

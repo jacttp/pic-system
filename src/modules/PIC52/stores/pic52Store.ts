@@ -6,8 +6,11 @@ import type {
   Pic52Catalogs,
   Pic52Filters,
   Pic52ProductOptions,
+  Pic52ProductDimension,
   Pic52Report,
   Pic52ReportRequest,
+  Pic52TrendData,
+  Pic52TrendJob,
   Pic52UserContext,
 } from '../types/pic52';
 
@@ -58,7 +61,8 @@ export const usePic52Store = defineStore('pic52', () => {
   const catalogs = ref<Pic52Catalogs | null>(null);
   const context = ref<Pic52UserContext | null>(null);
   const selectedYears = ref<number[]>([]);
-  const transactionSelections = ref<string[]>(['Venta', 'NC']);
+  const transactionSelections = ref<string[]>(['Ventas']);
+  const compareTransactions = ref(false);
   const weeks = ref<number[]>(Array.from({ length: 52 }, (_, index) => index + 1));
   const options = reactive({
     canales: [] as string[],
@@ -80,26 +84,41 @@ export const usePic52Store = defineStore('pic52', () => {
   const reportError = ref('');
   const isReportLoading = ref(false);
   const reportFromCache = ref(false);
+  const trendData = ref<Pic52TrendData | null>(null);
+  const trendJob = ref<Pic52TrendJob | null>(null);
+  const trendError = ref('');
+  const isTrendLoading = ref(false);
+  const trendFromCache = ref(false);
   let productRequestId = 0;
   let reportRequestId = 0;
+  let trendRequestId = 0;
+  let productOptionsTransaction = '';
 
   const isGerenciaLocked = computed(() => Boolean(context.value?.gerencia));
   const isJefaturaLocked = computed(() => Boolean(context.value?.jefatura));
   const availableYears = computed(() => catalogs.value?.years ?? []);
-  const transactionValues = computed(() => {
-    const values = (catalogs.value?.transactions ?? [])
-      .flatMap(option => option.sourceTransactions)
-      .filter(value => value.toLocaleLowerCase('es-MX') !== 'ventas');
-    return [...new Set(values)];
-  });
+  const transactionOptions = computed(() => (catalogs.value?.transactions ?? [])
+    .filter(option => !['venta', 'nc'].includes(option.value.toLocaleLowerCase('es-MX'))));
   const transaction = computed(() => {
-    const normalized = transactionSelections.value
-      .map(value => value.toLocaleLowerCase('es-MX'))
-      .sort();
-    if (normalized.length === 2 && normalized[0] === 'nc' && normalized[1] === 'venta') {
-      return 'Ventas';
-    }
-    return transactionSelections.value.length === 1 ? transactionSelections.value[0] : '';
+    const sales = transactionSelections.value.find(
+      value => value.toLocaleLowerCase('es-MX') === 'ventas',
+    );
+    return sales ?? transactionSelections.value[0] ?? '';
+  });
+  const trendProductCandidate = computed<Pic52ProductDimension | null>(() => {
+    const dimensions: Pic52ProductDimension[] = [
+      'skus',
+      'gruposComercialesB',
+      'gruposComercialesA',
+      'categorias',
+      'gruposSku',
+      'marcas',
+    ];
+    return dimensions.find(key => selected[key].length >= 2) ?? null;
+  });
+  const trendProductDimension = computed<Pic52ProductDimension | null>(() => {
+    const dimension = trendProductCandidate.value;
+    return dimension && selected[dimension].length <= 8 ? dimension : null;
   });
   const comparisonYears = computed(() => [...selectedYears.value].sort((left, right) => right - left));
   const weekValues = computed(() => {
@@ -119,13 +138,32 @@ export const usePic52Store = defineStore('pic52', () => {
     years: [...selectedYears.value].sort((left, right) => right - left),
     weeks: [...weeks.value].sort((left, right) => left - right),
     transaction: transaction.value,
+    transactions: compareTransactions.value
+      ? [...transactionSelections.value]
+      : [transaction.value],
+    trend: trendProductDimension.value
+      ? { productDimension: trendProductDimension.value }
+      : undefined,
     filters: Object.fromEntries(
       Object.entries(selected).map(([key, values]) => [key, [...values]]),
     ) as unknown as Pic52Filters,
   });
 
+  const stopTrendTracking = (clearState = true) => {
+    trendRequestId += 1;
+    isTrendLoading.value = false;
+    if (!clearState) return;
+    trendJob.value = null;
+    trendData.value = null;
+    trendError.value = '';
+    trendFromCache.value = false;
+  };
+
   watch([selected, selectedYears, transactionSelections, weeks], () => {
-    if (isReady.value) filtersDirty.value = true;
+    if (isReady.value) {
+      filtersDirty.value = true;
+      stopTrendTracking();
+    }
   }, { deep: true });
 
   const loadJefaturas = async () => {
@@ -184,6 +222,7 @@ export const usePic52Store = defineStore('pic52', () => {
         productOrder.slice(updateFromIndex).forEach(key => {
           productOptions[key] = data[key];
         });
+        productOptionsTransaction = transaction.value;
       }
     } catch (error) {
       if (requestId === productRequestId) {
@@ -237,8 +276,9 @@ export const usePic52Store = defineStore('pic52', () => {
       const defaultTransaction = catalogData.transactions.find(option => option.value === 'Ventas')
         ?? catalogData.transactions[0];
       transactionSelections.value = defaultTransaction
-        ? [...defaultTransaction.sourceTransactions]
+        ? [defaultTransaction.value]
         : [];
+      compareTransactions.value = false;
       weeks.value = [...weekValues.value];
       await applyContext();
       isReady.value = true;
@@ -294,24 +334,35 @@ export const usePic52Store = defineStore('pic52', () => {
     await refreshProductOptions();
   };
 
-  const setTransactionSelections = (values: string[]) => {
-    const uniqueValues = [...new Set(values)];
-    const normalized = uniqueValues.map(value => value.toLocaleLowerCase('es-MX')).sort();
-    const isSalesPair = normalized.length === 2
-      && normalized[0] === 'nc'
-      && normalized[1] === 'venta';
+  const handleTransactionChange = async () => {
+    if (transaction.value === productOptionsTransaction) return;
+    clearProductSelection();
+    await refreshProductOptions();
+  };
 
-    if (uniqueValues.length <= 1 || isSalesPair) {
+  const setTransactionSelections = (values: string[]) => {
+    const uniqueValues = [...new Set(values)].slice(0, 8);
+    if (compareTransactions.value) {
       transactionSelections.value = uniqueValues;
       return;
     }
 
     const newlyAdded = uniqueValues.find(value => !transactionSelections.value.includes(value));
-    transactionSelections.value = newlyAdded ? [newlyAdded] : uniqueValues.slice(-1);
+    transactionSelections.value = newlyAdded
+      ? [newlyAdded]
+      : uniqueValues.slice(-1);
+  };
+
+  const setCompareTransactions = (value: boolean) => {
+    compareTransactions.value = value;
+    if (!value && transaction.value) {
+      transactionSelections.value = [transaction.value];
+    }
   };
 
   const loadReport = async (payload: Pic52ReportRequest) => {
     const requestId = ++reportRequestId;
+    stopTrendTracking();
     isReportLoading.value = true;
     reportError.value = '';
     reportFromCache.value = false;
@@ -348,6 +399,76 @@ export const usePic52Store = defineStore('pic52', () => {
     return loadReport(appliedPayload.value);
   };
 
+  const loadTrend = async () => {
+    if (!appliedPayload.value || isTrendLoading.value) return null;
+    const requestId = ++trendRequestId;
+    isTrendLoading.value = true;
+    trendError.value = '';
+    trendFromCache.value = false;
+    trendData.value = null;
+    trendJob.value = null;
+
+    try {
+      let response = await pic52Api.createTrendJob(appliedPayload.value);
+      while (requestId === trendRequestId) {
+        const job = response.data;
+        trendJob.value = job;
+        trendFromCache.value = Boolean(response.meta?.cached || job.cached);
+
+        if (job.status === 'completed') {
+          trendData.value = job.result ?? null;
+          isTrendLoading.value = false;
+          if (!job.result) {
+            trendError.value = 'La tendencia termino sin un resultado disponible.';
+          }
+          return job.result ?? null;
+        }
+        if (job.status === 'failed') {
+          trendError.value = job.message || 'No fue posible generar la tendencia continua.';
+          isTrendLoading.value = false;
+          return null;
+        }
+        if (job.status === 'cancelled') {
+          isTrendLoading.value = false;
+          return null;
+        }
+
+        await new Promise(resolve => window.setTimeout(resolve, 2000));
+        if (requestId !== trendRequestId) return null;
+        response = await pic52Api.getTrendJob(job.jobId);
+      }
+      return null;
+    } catch (error) {
+      if (requestId === trendRequestId) {
+        trendError.value = errorMessage(
+          error,
+          'La generacion ya no esta disponible. Vuelve a generarla.',
+        );
+      }
+      return null;
+    } finally {
+      if (requestId === trendRequestId) isTrendLoading.value = false;
+    }
+  };
+
+  const retryTrend = async () => loadTrend();
+
+  const cancelTrend = async () => {
+    const jobId = trendJob.value?.jobId;
+    if (!jobId || !isTrendLoading.value) return null;
+    trendRequestId += 1;
+    isTrendLoading.value = false;
+    trendError.value = '';
+    try {
+      const response = await pic52Api.cancelTrendJob(jobId);
+      trendJob.value = response.data;
+      return response.data;
+    } catch (error) {
+      trendError.value = errorMessage(error, 'No fue posible cancelar la generacion.');
+      return null;
+    }
+  };
+
   const clearMatrices = () => {
     selected.matrices = [];
   };
@@ -371,8 +492,9 @@ export const usePic52Store = defineStore('pic52', () => {
     const defaultTransaction = catalogs.value.transactions.find(option => option.value === 'Ventas')
       ?? catalogs.value.transactions[0];
     transactionSelections.value = defaultTransaction
-      ? [...defaultTransaction.sourceTransactions]
+      ? [defaultTransaction.value]
       : [];
+    compareTransactions.value = false;
     weeks.value = [...weekValues.value];
 
     dependentError.value = '';
@@ -394,6 +516,7 @@ export const usePic52Store = defineStore('pic52', () => {
     selectedYears,
     transaction,
     transactionSelections,
+    compareTransactions,
     weeks,
     options,
     productOptions,
@@ -409,10 +532,16 @@ export const usePic52Store = defineStore('pic52', () => {
     reportError,
     isReportLoading,
     reportFromCache,
+    trendData,
+    trendJob,
+    trendError,
+    isTrendLoading,
+    trendFromCache,
     isGerenciaLocked,
     isJefaturaLocked,
     availableYears,
-    transactionValues,
+    transactionOptions,
+    trendProductDimension,
     comparisonYears,
     weekValues,
     hasRequiredSelection,
@@ -423,12 +552,18 @@ export const usePic52Store = defineStore('pic52', () => {
     handleJefaturasChange,
     handleProductChange,
     handleConfigurationChange,
+    handleTransactionChange,
     setTransactionSelections,
+    setCompareTransactions,
     refreshProductOptions,
     clearProductSelection,
     retryDependentOptions,
     applyFilters,
     retryReport,
+    loadTrend,
+    retryTrend,
+    cancelTrend,
+    stopTrendTracking,
     clearMatrices,
     resetFilters,
   };

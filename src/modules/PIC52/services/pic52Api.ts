@@ -7,6 +7,7 @@ import type {
   Pic52ProductOptions,
   Pic52Report,
   Pic52ReportRequest,
+  Pic52TrendJob,
   Pic52UserContext,
 } from '../types/pic52';
 
@@ -85,7 +86,32 @@ export const pic52Api = {
   },
 
   async getReport(payload: Pic52ReportRequest): Promise<Pic52ApiResponse<Pic52Report>> {
-    const { data } = await api.post<Pic52ApiResponse<Pic52Report>>('/pic-52s/report', payload);
+    const { years, weeks, transaction, filters } = payload;
+    const { data } = await api.post<Pic52ApiResponse<Pic52Report>>('/pic-52s/report', {
+      years,
+      weeks,
+      transaction,
+      filters,
+    });
+    return data;
+  },
+
+  async createTrendJob(payload: Pic52ReportRequest): Promise<Pic52ApiResponse<Pic52TrendJob>> {
+    const { data } = await api.post<Pic52ApiResponse<Pic52TrendJob>>('/pic-52s/trend', payload);
+    return data;
+  },
+
+  async getTrendJob(jobId: string): Promise<Pic52ApiResponse<Pic52TrendJob>> {
+    const { data } = await api.get<Pic52ApiResponse<Pic52TrendJob>>(
+      `/pic-52s/trend/${encodeURIComponent(jobId)}`,
+    );
+    return data;
+  },
+
+  async cancelTrendJob(jobId: string): Promise<Pic52ApiResponse<Pic52TrendJob>> {
+    const { data } = await api.delete<Pic52ApiResponse<Pic52TrendJob>>(
+      `/pic-52s/trend/${encodeURIComponent(jobId)}`,
+    );
     return data;
   },
 };
