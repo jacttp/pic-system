@@ -13,11 +13,13 @@ import ManagementTray from '@/modules/Shared/components/ManagementTray.vue';
 import StdButton from '@/modules/Shared/components/std/StdButton.vue';
 import { toast } from '@/components/ui/toast/use-toast';
 
-type SortKey = 'recent' | 'oldest' | 'status';
+type SortField = 'embarque' | 'creation' | 'requester';
+type SortDirection = 'asc' | 'desc';
 
 interface FilterState {
    status?: ApprovalStatus
    type?: ApprovalType
+   storeName: string
 }
 
 interface ApprovalRow {
@@ -50,13 +52,15 @@ const profileStore = useProfileStore();
 const authStore = useAuthStore();
 const route = useRoute();
 
-const sortKey = ref<SortKey>('recent');
+const sortField = ref<SortField>('creation');
+const sortDirection = ref<SortDirection>('desc');
 const currentPage = ref(1);
 const pageSize = 8;
 
 const filters = reactive<FilterState>({
    status: undefined,
    type: undefined,
+   storeName: '',
 });
 
 const showDetailModal = ref(false);
@@ -64,14 +68,6 @@ const selectedApproval = ref<Approval | null>(null);
 const cancellingApprovalId = ref<number | null>(null);
 const isDetailOpen = computed(() => showDetailModal.value && selectedApproval.value !== null);
 const isCompactFiltersOpen = ref(false);
-
-const statusOptions: { value: ApprovalStatus | ''; label: string }[] = [
-   { value: '', label: 'Todos los estados' },
-   { value: 'PENDING', label: 'Pendientes' },
-   { value: 'APPROVED', label: 'Aprobadas' },
-   { value: 'REJECTED', label: 'Rechazadas' },
-   { value: 'CANCELLED', label: 'Canceladas' },
-];
 
 const typeOptions: { value: ApprovalType | ''; label: string }[] = [
    { value: '', label: 'Todos los tipos' },
@@ -81,10 +77,10 @@ const typeOptions: { value: ApprovalType | ''; label: string }[] = [
    { value: 'REPORT_ACCESS', label: 'Acceso reporte' },
 ];
 
-const sortOptions: { value: SortKey; label: string }[] = [
-   { value: 'recent', label: 'Mas recientes' },
-   { value: 'oldest', label: 'Mas antiguos' },
-   { value: 'status', label: 'Por estado' },
+const sortOptions: { value: SortField; label: string; icon: string }[] = [
+   { value: 'embarque', label: 'Fin de embarque', icon: 'fa-solid fa-truck-ramp-box' },
+   { value: 'creation', label: 'Fecha de creación', icon: 'fa-solid fa-calendar-plus' },
+   { value: 'requester', label: 'Solicitante', icon: 'fa-solid fa-user' },
 ];
 
 const assignedIds = computed(() => new Set(approvalsStore.assignedApprovals.map(approval => approval.id)));
@@ -121,6 +117,16 @@ const allCancelledCount = computed(() =>
    unifiedApprovals.value.filter(approval => approval.status === 'CANCELLED').length
 );
 const canBulkDeleteCancelled = computed(() => isSuperAdmin.value && allCancelledCount.value > 0);
+const sortDirectionLabel = computed(() => {
+   if (sortField.value === 'requester') return sortDirection.value === 'asc' ? 'Alfabético A–Z' : 'Alfabético Z–A';
+   return sortDirection.value === 'desc' ? 'Más reciente' : 'Más antiguo';
+});
+const sortDirectionIcon = computed(() => {
+   if (sortField.value === 'requester') {
+      return sortDirection.value === 'asc' ? 'fa-solid fa-arrow-down-a-z' : 'fa-solid fa-arrow-up-a-z';
+   }
+   return sortDirection.value === 'desc' ? 'fa-solid fa-arrow-down-wide-short' : 'fa-solid fa-arrow-up-wide-short';
+});
 
 const managementTrayMetrics = computed<TrayMetric[]>(() => [
    {
@@ -189,16 +195,24 @@ const tableRows = computed(() => {
    return sortedRows.value.slice(start, start + pageSize);
 });
 
+const normalizedStoreSearch = computed(() => normalizeSearchText(filters.storeName));
+
 const filteredApprovals = computed(() =>
    unifiedApprovals.value.filter(approval => {
       const matchesStatus = !filters.status || approval.status === filters.status;
       const matchesType = !filters.type || approval.type === filters.type;
+      const matchesStoreName = !normalizedStoreSearch.value
+         || normalizeSearchText(buildStoreName(approval)).includes(normalizedStoreSearch.value);
 
-      return matchesStatus && matchesType;
+      return matchesStatus && matchesType && matchesStoreName;
    })
 );
 
-const activeFiltersCount = computed(() => Number(Boolean(filters.status)) + Number(Boolean(filters.type)));
+const activeFiltersCount = computed(() =>
+   Number(Boolean(filters.status))
+   + Number(Boolean(filters.type))
+   + Number(Boolean(filters.storeName.trim()))
+);
 const compactFiltersLabel = computed(() => {
    if (isCompactFiltersOpen.value) return 'Ocultar filtros';
    if (activeFiltersCount.value === 0) return 'Mostrar filtros';
@@ -214,15 +228,24 @@ const sortedRows = computed<ApprovalRow[]>(() => {
    const rows = filteredApprovals.value.map(toApprovalRow);
 
    return rows.sort((a, b) => {
-      if (sortKey.value === 'oldest') {
-         return new Date(a.approval.requestedAt).getTime() - new Date(b.approval.requestedAt).getTime();
+      if (sortField.value === 'requester') {
+         const requesterComparison = a.approval.requestedBy.localeCompare(b.approval.requestedBy, 'es-MX', { sensitivity: 'base' });
+         return sortDirection.value === 'asc' ? requesterComparison : -requesterComparison;
       }
 
-      if (sortKey.value === 'status') {
-         return a.statusLabel.localeCompare(b.statusLabel);
-      }
+      const aDate = sortField.value === 'embarque'
+         ? getEmbarqueDate(a.approval)
+         : parseDateValue(a.approval.requestedAt);
+      const bDate = sortField.value === 'embarque'
+         ? getEmbarqueDate(b.approval)
+         : parseDateValue(b.approval.requestedAt);
 
-      return new Date(b.approval.requestedAt).getTime() - new Date(a.approval.requestedAt).getTime();
+      if (!aDate && !bDate) return 0;
+      if (!aDate) return 1;
+      if (!bDate) return -1;
+
+      const dateComparison = aDate.getTime() - bDate.getTime();
+      return sortDirection.value === 'asc' ? dateComparison : -dateComparison;
    });
 });
 
@@ -242,12 +265,25 @@ const applyFilters = () => {
 const clearFilters = () => {
    filters.status = undefined;
    filters.type = undefined;
+   filters.storeName = '';
    applyFilters();
 };
 
 const selectStatusFilter = (status?: ApprovalStatus) => {
    filters.status = filters.status === status ? undefined : status;
    applyFilters();
+};
+
+const selectSortField = (field: SortField) => {
+   if (sortField.value === field) return;
+   sortField.value = field;
+   sortDirection.value = field === 'requester' ? 'asc' : 'desc';
+   currentPage.value = 1;
+};
+
+const toggleSortDirection = () => {
+   sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
+   currentPage.value = 1;
 };
 
 const handleTrayMetricClick = (metric: TrayMetric) => {
@@ -371,7 +407,7 @@ watch(
 );
 
 watch(
-   () => [filters.status, filters.type],
+   () => [filters.status, filters.type, filters.storeName],
    () => {
       currentPage.value = 1;
    }
@@ -413,6 +449,14 @@ function buildStoreName(approval: Approval) {
    return readPayloadValue(payload, ['nombre_tienda', 'tienda', 'storeName', 'id_cliente']) || 'Sin tienda';
 }
 
+function normalizeSearchText(value: string): string {
+   return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLocaleLowerCase('es-MX')
+      .trim();
+}
+
 function buildOrderLabel(approval: Approval) {
    const payload = approval.payload || {};
    if (Array.isArray(payload.num_pedidos)) {
@@ -422,15 +466,7 @@ function buildOrderLabel(approval: Approval) {
 }
 
 function buildEmbarqueInfo(approval: Approval) {
-   const payload = approval.payload || {};
-   const rawDate = readPayloadValue(payload, [
-      'fec_fin_embarque',
-      'fecha_fin_embarque',
-      'fin_embarque',
-      'endDate',
-      'fecha_fin',
-   ]);
-   const date = parseDateValue(rawDate);
+   const date = getEmbarqueDate(approval);
 
    if (!date) {
       return {
@@ -479,6 +515,18 @@ function buildEmbarqueInfo(approval: Approval) {
       statusLabel: `Faltan ${diffDays} dia${diffDays === 1 ? '' : 's'}`,
       tone: diffDays <= 2 ? 'danger' as const : diffDays <= 7 ? 'warning' as const : 'neutral' as const,
    };
+}
+
+function getEmbarqueDate(approval: Approval) {
+   const payload = approval.payload || {};
+   const rawDate = readPayloadValue(payload, [
+      'fec_fin_embarque',
+      'fecha_fin_embarque',
+      'fin_embarque',
+      'endDate',
+      'fecha_fin',
+   ]);
+   return parseDateValue(rawDate);
 }
 
 function embarqueToneClass(tone: ApprovalRow['embarqueTone']) {
@@ -579,71 +627,111 @@ function formatTime(date: Date) {
                </div>
                <div
                   id="approval-filters-panel"
-                  class="gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(150px,190px)_minmax(150px,190px)_minmax(160px,210px)_1fr_auto] xl:gap-3"
-                  :class="isCompactFiltersOpen ? 'grid' : 'hidden xl:grid'"
+                  class="space-y-3"
+                  :class="isCompactFiltersOpen ? 'block' : 'hidden xl:block'"
                >
-                  <div class="min-w-0 space-y-1.5">
-                     <label for="approval-status-filter" class="block text-[10px] font-bold uppercase tracking-[0.14em] text-pic-nav-text-muted xl:hidden">Estado</label>
-                     <select
-                        id="approval-status-filter"
-                        v-model="filters.status"
-                        class="h-11 w-full min-w-0 rounded-lg border border-white/15 bg-white/10 px-3 text-sm font-bold text-pic-nav-text outline-none transition hover:bg-white/15 focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border [&>option]:bg-pic-surface [&>option]:text-pic-text-main"
-                        @change="applyFilters"
-                     >
-                        <option v-for="option in statusOptions" :key="option.value" :value="option.value || undefined">
-                           {{ option.label }}
-                        </option>
-                     </select>
+                  <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(270px,1fr)_minmax(180px,220px)_auto]">
+                     <div class="min-w-0 space-y-1.5 sm:col-span-2 xl:col-span-1">
+                        <label for="approval-store-filter" class="block text-[10px] font-bold uppercase tracking-[0.14em] text-pic-nav-text-muted xl:hidden">Buscar tienda</label>
+                        <div class="relative">
+                           <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-pic-nav-text-muted"></i>
+                           <input
+                              id="approval-store-filter"
+                              v-model.trim="filters.storeName"
+                              type="search"
+                              autocomplete="off"
+                              placeholder="Buscar por tienda..."
+                              aria-label="Buscar solicitudes por nombre de tienda"
+                              class="h-11 w-full min-w-0 rounded-lg border border-white/15 bg-white/10 py-0 pl-9 pr-9 text-sm font-bold text-pic-nav-text placeholder:text-pic-nav-text-muted outline-none transition hover:bg-white/15 focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border"
+                           >
+                           <button
+                              v-if="filters.storeName"
+                              type="button"
+                              class="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-pic-nav-text-muted transition hover:bg-white/15 hover:text-pic-nav-text focus:outline-none focus:ring-2 focus:ring-pic-brand-border"
+                              aria-label="Limpiar búsqueda de tienda"
+                              @click="filters.storeName = ''"
+                           >
+                              <i class="fa-solid fa-xmark text-xs"></i>
+                           </button>
+                        </div>
+                     </div>
+
+                     <div class="min-w-0 space-y-1.5">
+                        <label for="approval-type-filter" class="block text-[10px] font-bold uppercase tracking-[0.14em] text-pic-nav-text-muted xl:hidden">Tipo de solicitud</label>
+                        <select
+                           id="approval-type-filter"
+                           v-model="filters.type"
+                           class="h-11 w-full min-w-0 rounded-lg border border-white/15 bg-white/10 px-3 text-sm font-bold text-pic-nav-text outline-none transition hover:bg-white/15 focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border [&>option]:bg-pic-surface [&>option]:text-pic-text-main"
+                           @change="applyFilters"
+                        >
+                           <option v-for="option in typeOptions" :key="option.value" :value="option.value || undefined">
+                              {{ option.label }}
+                           </option>
+                        </select>
+                     </div>
+
+                     <div class="flex flex-col gap-2 sm:col-span-2 sm:flex-row sm:justify-end xl:col-span-1 xl:self-end">
+                        <StdButton
+                           variant="secondary"
+                           class="w-full border-white/15 bg-white/10 text-pic-nav-text hover:border-pic-brand-border hover:bg-white/15 hover:text-pic-nav-text sm:w-auto"
+                           icon="fa-solid fa-rotate-left"
+                           @click="clearFilters"
+                        >
+                           Restablecer
+                        </StdButton>
+
+                        <StdButton
+                           v-if="canBulkDeleteCancelled"
+                           variant="danger"
+                           class="w-full bg-pic-surface sm:w-auto"
+                           icon="fa-solid fa-xmark"
+                           @click="handleDeleteAllCancelled"
+                        >
+                           Canceladas ({{ allCancelledCount }})
+                        </StdButton>
+                     </div>
                   </div>
 
-                  <div class="min-w-0 space-y-1.5">
-                     <label for="approval-type-filter" class="block text-[10px] font-bold uppercase tracking-[0.14em] text-pic-nav-text-muted xl:hidden">Tipo de solicitud</label>
-                     <select
-                        id="approval-type-filter"
-                        v-model="filters.type"
-                        class="h-11 w-full min-w-0 rounded-lg border border-white/15 bg-white/10 px-3 text-sm font-bold text-pic-nav-text outline-none transition hover:bg-white/15 focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border [&>option]:bg-pic-surface [&>option]:text-pic-text-main"
-                        @change="applyFilters"
-                     >
-                        <option v-for="option in typeOptions" :key="option.value" :value="option.value || undefined">
-                           {{ option.label }}
-                        </option>
-                     </select>
-                  </div>
+                  <div class="border-t border-white/10"></div>
 
-                  <div class="min-w-0 space-y-1.5 sm:col-span-2 xl:col-span-1">
-                     <label for="approval-sort-filter" class="block text-[10px] font-bold uppercase tracking-[0.14em] text-pic-nav-text-muted xl:hidden">Ordenar por</label>
-                     <select
-                        id="approval-sort-filter"
-                        v-model="sortKey"
-                        class="h-11 w-full min-w-0 rounded-lg border border-white/15 bg-white/10 px-3 text-sm font-bold text-pic-nav-text outline-none transition hover:bg-white/15 focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border [&>option]:bg-pic-surface [&>option]:text-pic-text-main"
-                     >
-                        <option v-for="option in sortOptions" :key="option.value" :value="option.value">
-                           {{ option.label }}
-                        </option>
-                     </select>
-                  </div>
+                  <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                     <div>
+                        <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-pic-nav-text-muted">Ordenar solicitudes</p>
+                        <p class="mt-1 text-xs font-semibold text-pic-nav-text-muted">Elige el criterio y ajusta la dirección del listado.</p>
+                     </div>
 
-                  <div class="hidden xl:block"></div>
+                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                        <div class="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:items-center" role="group" aria-label="Ordenar por">
+                           <span class="col-span-2 text-[10px] font-bold uppercase tracking-[0.14em] text-pic-nav-text-muted sm:mr-1 sm:col-auto">Ordenar por</span>
+                           <button
+                              v-for="option in sortOptions"
+                              :key="option.value"
+                              type="button"
+                              class="inline-flex h-9 min-w-0 items-center justify-center gap-2 rounded-lg border px-2 text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-pic-brand-border last:col-span-2 sm:w-auto sm:px-3"
+                              :class="sortField === option.value
+                                 ? 'border-pic-brand bg-pic-brand text-white shadow-sm shadow-pic-brand/30'
+                                 : 'border-white/15 bg-white/10 text-pic-nav-text hover:border-pic-brand-border hover:bg-white/15'"
+                              :aria-pressed="sortField === option.value"
+                              :aria-label="`Ordenar por ${option.label}`"
+                              :title="option.label"
+                              @click="selectSortField(option.value)"
+                           >
+                              <i :class="option.icon" class="text-[10px]"></i>
+                              <span class="truncate sm:hidden">{{ option.value === 'embarque' ? 'Embarque' : option.value === 'creation' ? 'Creación' : 'Solicitante' }}</span>
+                              <span class="hidden sm:inline">{{ option.label }}</span>
+                           </button>
+                        </div>
 
-                  <div class="col-span-full grid gap-2 sm:grid-cols-2 xl:col-span-1 xl:flex xl:justify-end">
-                     <StdButton
-                        variant="primary"
-                        class="w-full shadow-lg shadow-pic-brand/20 hover:brightness-95 sm:w-auto"
-                        icon="fa-solid fa-sliders"
-                        @click="clearFilters"
-                     >
-                        Limpiar
-                     </StdButton>
-
-                     <StdButton
-                        v-if="canBulkDeleteCancelled"
-                        variant="danger"
-                        class="w-full bg-pic-surface sm:w-auto"
-                        icon="fa-solid fa-xmark"
-                        @click="handleDeleteAllCancelled"
-                     >
-                        Canceladas ({{ allCancelledCount }})
-                     </StdButton>
+                        <button
+                           type="button"
+                           class="inline-flex h-9 w-full shrink-0 items-center justify-center gap-2 rounded-lg border border-pic-brand-border bg-pic-brand-soft px-3 text-xs font-black text-pic-brand transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-pic-brand-border sm:w-auto"
+                           :title="`Cambiar orden: ${sortDirectionLabel}`"
+                           @click="toggleSortDirection"
+                        >
+                           <i :class="sortDirectionIcon" class="text-[10px]"></i>
+                           {{ sortDirectionLabel }}
+                        </button>
+                     </div>
                   </div>
                </div>
             </section>

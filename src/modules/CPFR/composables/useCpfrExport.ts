@@ -52,6 +52,8 @@ export interface ExportPdfResult {
     zipped: boolean
 }
 
+export type ExportImageResult = ExportPdfResult
+
 function splitIdCliente(id_cliente: string): { cliente: string; sucursal: string } {
     const idx = id_cliente.toLowerCase().indexOf('s')
     if (idx === -1) return { cliente: id_cliente, sucursal: '' }
@@ -139,6 +141,35 @@ function downloadBlob(blob: Blob, filename: string): void {
     link.click()
     link.remove()
     URL.revokeObjectURL(url)
+}
+
+function escapeHtml(value: unknown): string {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => {
+            if (blob) resolve(blob)
+            else reject(new Error('No se pudo convertir la exportación a imagen.'))
+        }, 'image/png')
+    })
+}
+
+async function waitForImages(container: HTMLElement): Promise<void> {
+    const images = Array.from(container.querySelectorAll('img'))
+    await Promise.all(images.map((image) => {
+        if (image.complete) return Promise.resolve()
+        return new Promise<void>((resolve) => {
+            image.addEventListener('load', () => resolve(), { once: true })
+            image.addEventListener('error', () => resolve(), { once: true })
+        })
+    }))
 }
 
 async function imageUrlToDataUrl(url: string): Promise<string> {
@@ -582,5 +613,144 @@ export function useCpfrExport() {
         }
     }
 
-    return { generateExcel, generateStorePdfs, buildExportItems }
+    async function generateStoreImages(
+        selectedItems: ExportTiendaItem[],
+        dayNums: number[],
+        tab?: string
+    ): Promise<ExportImageResult> {
+        const { default: html2canvas } = await import('html2canvas')
+        const now = new Date()
+        const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '')
+        const dayCode = dayNums.length === 1 ? (DAY_MAP[dayNums[0]] || 'XX') : 'MIX'
+        const orderStatusLegend = tab === 'centralizados'
+            ? 'Estado del pedido: NO APROBADO'
+            : tab === 'revision'
+                ? 'Estado del pedido: EN REVISIÓN'
+                : null
+        const imageFiles: { name: string; data: Uint8Array }[] = []
+
+        for (const storeItem of groupItemsByStore(selectedItems)) {
+            const rowsByOc = new Map<string, ExportRow[]>()
+            for (const row of storeItem.rows) {
+                const key = row.num_pedido || 'SIN FOLIO'
+                if (!rowsByOc.has(key)) rowsByOc.set(key, [])
+                rowsByOc.get(key)!.push(row)
+            }
+
+            const totalPz = storeItem.rows.reduce((total, row) => total + row.cant_pedida, 0)
+            const totalKg = storeItem.rows.reduce((total, row) => total + row.pedido_kg, 0)
+            const jefatura = storeItem.jefatura || storeItem.rows[0]?.jefatura || 'N/D'
+            const sucursal = storeItem.rows[0]?.sucursal || '-'
+            const orderSections = Array.from(rowsByOc.entries()).map(([oc, rows]) => {
+                const first = rows[0]
+                const ocPz = rows.reduce((total, row) => total + row.cant_pedida, 0)
+                const ocKg = rows.reduce((total, row) => total + row.pedido_kg, 0)
+                const rowMarkup = rows.map((row) => `
+                    <tr>
+                        <td>${escapeHtml(row.desc || '-')}</td>
+                        <td>${escapeHtml(formatNumber(row.inv_actual_pz, 2))}</td>
+                        <td>${escapeHtml(formatNumber(row.promedio_sellout_pz, 2))}</td>
+                        <td>${escapeHtml(formatNumber(row.cobertura_calculada, 2))}</td>
+                        <td>${escapeHtml(`${formatNumber(row.cant_pedida, 0)} pz`)}</td>
+                    </tr>
+                `).join('')
+
+                return `
+                    <section class="oc-section">
+                        <div class="oc-header">
+                            <div>
+                                <strong>OC ${escapeHtml(oc)}</strong>
+                                <span>SEM ${escapeHtml(first?.semana_ic || '-')} | Pedido ${escapeHtml(first?.fec_pedido_cadena || '-')} | Fin emb. ${escapeHtml(first?.fec_fin_embarque || '-')} | ${rows.length} SKU</span>
+                            </div>
+                            <b>${escapeHtml(`${formatNumber(ocPz, 0)} pz | ${formatNumber(ocKg, 1)} kg`)}</b>
+                        </div>
+                        <table>
+                            <thead><tr><th>SKU</th><th>INV. ACT.</th><th>SELL. PROM.</th><th>COB. S.</th><th>PEDIDO</th></tr></thead>
+                            <tbody>${rowMarkup}</tbody>
+                        </table>
+                    </section>
+                `
+            }).join('')
+
+            const container = document.createElement('article')
+            container.style.cssText = 'position:fixed;left:-100000px;top:0;width:816px;background:#fff;color:#2d3748;font-family:Arial,sans-serif;z-index:-1;'
+            container.innerHTML = `
+                <style>
+                    * { box-sizing: border-box; }
+                    .report { padding: 32px; }
+                    .report-header { display:flex; align-items:center; gap:22px; }
+                    .report-header img { width:112px; height:91px; object-fit:contain; }
+                    .store-card { min-height:84px; flex:1; border-radius:10px; background:#c7121f; color:#fff; padding:17px 19px; display:flex; justify-content:space-between; gap:14px; }
+                    .store-card h1 { margin:0 0 9px; font-size:22px; line-height:1.05; letter-spacing:.2px; }
+                    .store-card p, .store-card b { margin:0; font-size:12px; line-height:1.45; }
+                    .store-summary { min-width:155px; text-align:right; }
+                    .meta-band { margin-top:17px; border-radius:8px; background:#f6f4f4; padding:11px 14px; display:flex; justify-content:space-between; gap:12px; color:#2d3748; font-size:11px; font-weight:700; }
+                    .status { color:#99111b; text-align:right; }
+                    .oc-section { margin-top:19px; }
+                    .oc-header { min-height:54px; border-radius:10px; background:linear-gradient(90deg,#c7121f 0%,#c7121f 73%,#c99422 73%,#c99422 100%); color:#fff; padding:11px 15px; display:flex; align-items:center; justify-content:space-between; gap:14px; }
+                    .oc-header strong { display:block; font-size:15px; margin-bottom:5px; }
+                    .oc-header span { display:block; font-size:10px; }
+                    .oc-header b { font-size:11px; text-align:right; white-space:nowrap; }
+                    table { width:100%; border-collapse:collapse; margin-top:9px; table-layout:fixed; font-size:11px; }
+                    th { padding:7px 5px; color:#2d3748; font-size:10px; text-align:right; border-bottom:1px solid #e0e0e0; }
+                    th:first-child, td:first-child { width:58%; text-align:left; }
+                    td { padding:8px 5px; color:#99111b; text-align:right; border-bottom:1px dashed #e0e0e0; vertical-align:top; }
+                    td:first-child { color:#2d3748; font-weight:700; word-break:break-word; }
+                    .report-footer { margin-top:25px; display:flex; align-items:center; justify-content:center; gap:12px; color:#a17014; font-size:10px; }
+                    .report-footer::before, .report-footer::after { content:''; height:1px; flex:1; background:#c99422; }
+                    .report-footer img { width:31px; height:25px; object-fit:contain; }
+                </style>
+                <div class="report">
+                    <header class="report-header">
+                        <img src="${escapeHtml(logoUrl)}" alt="PIC">
+                        <div class="store-card">
+                            <div>
+                                <h1>${escapeHtml(storeItem.nombre_tienda.toUpperCase())}</h1>
+                                <p>Cliente ${escapeHtml(storeItem.id_cliente)} | Jefatura ${escapeHtml(jefatura)}</p>
+                            </div>
+                            <div class="store-summary">
+                                <b>${rowsByOc.size} OC</b><br>
+                                <b>${storeItem.rows.length} SKU | ${escapeHtml(formatNumber(totalPz, 0))} pz | ${escapeHtml(formatNumber(totalKg, 1))} kg</b>
+                            </div>
+                        </div>
+                    </header>
+                    <div class="meta-band">
+                        <span>Generado ${escapeHtml(now.toLocaleDateString('es-MX'))} | Día ${escapeHtml(dayCode)} | Sucursal ${escapeHtml(sucursal)}</span>
+                        ${orderStatusLegend ? `<span class="status">${escapeHtml(orderStatusLegend)}</span>` : ''}
+                    </div>
+                    ${orderSections}
+                    <footer class="report-footer"><span></span><img src="${escapeHtml(logoUrl)}" alt="PIC"><span></span></footer>
+                </div>
+            `
+
+            document.body.appendChild(container)
+            try {
+                await waitForImages(container)
+                const canvas = await html2canvas(container, {
+                    backgroundColor: '#ffffff',
+                    logging: false,
+                    scale: 2,
+                    useCORS: true,
+                    windowWidth: 816,
+                })
+                const blob = await canvasToBlob(canvas)
+                const filename = `CPFR_${safeFilenamePart(storeItem.id_cliente)}_${safeFilenamePart(storeItem.nombre_tienda)}_${dayCode}_${dateStr}_${safeFilenamePart(jefatura)}.png`
+                imageFiles.push({ name: filename, data: new Uint8Array(await blob.arrayBuffer()) })
+            } finally {
+                container.remove()
+            }
+        }
+
+        if (imageFiles.length === 1) {
+            const file = imageFiles[0]
+            downloadBlob(new Blob([file.data], { type: 'image/png' }), file.name)
+            return { filename: file.name, fileCount: 1, zipped: false }
+        }
+
+        const zipName = `CPFR_Pedidos_${dayCode}_${dateStr}_imagenes.zip`
+        downloadBlob(createZipBlob(imageFiles), zipName)
+        return { filename: zipName, fileCount: imageFiles.length, zipped: true }
+    }
+
+    return { generateExcel, generateStorePdfs, generateStoreImages, buildExportItems }
 }

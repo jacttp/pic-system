@@ -130,12 +130,13 @@ interface CpfrStoreGroup {
 const emit = defineEmits(['update:modelValue', 'resolved', 'cancelled']);
 
 const approvalsStore = useApprovalsStore();
-const { generateStorePdfs } = useCpfrExport();
+const { generateStorePdfs, generateStoreImages } = useCpfrExport();
 
 const resolutionComment = ref('');
 const isSubmitting = ref(false);
 const isCancelling = ref(false);
 const isExportingPdf = ref(false);
+const isExportingImage = ref(false);
 const isLoadingCpfrConfig = ref(false);
 const cpfrAssignedDay = ref<number | null>(null);
 const cpfrConfigError = ref('');
@@ -1024,7 +1025,7 @@ const closeModal = () => {
 };
 
 const handlePdfExport = async () => {
-   if (isExportingPdf.value) return;
+   if (isExportingPdf.value || isExportingImage.value) return;
    if (cpfrAssignedDay.value === null) {
       toast({
          title: 'Día no disponible',
@@ -1054,6 +1055,40 @@ const handlePdfExport = async () => {
       });
    } finally {
       isExportingPdf.value = false;
+   }
+};
+
+const handleImageExport = async () => {
+   if (isExportingPdf.value || isExportingImage.value) return;
+   if (cpfrAssignedDay.value === null) {
+      toast({
+         title: 'Día no disponible',
+         description: cpfrConfigError.value || 'No se encontró el día asignado de la tienda.',
+         variant: 'destructive',
+      });
+      return;
+   }
+   if (!canExportCpfrPdf.value) return;
+
+   isExportingImage.value = true;
+   try {
+      const tab = props.approval?.status === 'PENDING' ? 'revision' : undefined;
+      const result = await generateStoreImages(cpfrPdfItems.value, cpfrPdfDayNumbers.value, tab);
+      toast({
+         title: result.zipped ? 'ZIP generado' : 'Imagen generada',
+         description: result.zipped
+            ? `${result.filename} contiene ${result.fileCount} imagen(es), una por tienda.`
+            : `${result.filename} descargado.`,
+      });
+   } catch (error) {
+      console.error('[ApprovalDetailModal.Image]', error);
+      toast({
+         title: 'Error',
+         description: 'No se pudo generar la imagen del pedido.',
+         variant: 'destructive',
+      });
+   } finally {
+      isExportingImage.value = false;
    }
 };
 
@@ -1201,19 +1236,36 @@ const handleCancel = async () => {
                   <i class="fa-solid fa-arrow-left text-xs"></i>
                   Volver a solicitudes
                </button>
-               <button
-                  type="button"
-                  class="group inline-flex h-10 items-center justify-center gap-2 rounded-xl border-2 border-rose-600 bg-white px-3.5 text-xs font-black text-rose-700 transition-all hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-300"
-                  :disabled="!canExportCpfrPdf || isExportingPdf"
-                  :title="cpfrConfigError || 'Descargar el pedido con el formato PDF de CPFR'"
-                  @click="handlePdfExport"
-               >
-                  <i
-                     class="fa-solid"
-                     :class="isExportingPdf ? 'fa-circle-notch fa-spin' : 'fa-file-pdf transition-transform group-hover:scale-110'"
-                  ></i>
-                  <span class="hidden sm:inline">{{ isExportingPdf ? 'GENERANDO...' : 'DESCARGAR PDF' }}</span>
-               </button>
+               <div class="flex items-center gap-2">
+                  <button
+                     type="button"
+                     class="group inline-flex h-10 items-center justify-center gap-2 rounded-xl border-2 border-emerald-600 bg-white px-3.5 text-xs font-black text-emerald-700 transition-all hover:bg-emerald-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-300"
+                     :disabled="!canExportCpfrPdf || isExportingPdf || isExportingImage"
+                     :title="cpfrConfigError || 'Descargar el pedido como imagen PNG con el formato CPFR'"
+                     aria-label="Descargar imagen PNG"
+                     @click="handleImageExport"
+                  >
+                     <i
+                        class="fa-solid"
+                        :class="isExportingImage ? 'fa-circle-notch fa-spin' : 'fa-image transition-transform group-hover:scale-110'"
+                     ></i>
+                     <span class="hidden sm:inline">{{ isExportingImage ? 'GENERANDO...' : 'DESCARGAR IMAGEN' }}</span>
+                  </button>
+                  <button
+                     type="button"
+                     class="group inline-flex h-10 items-center justify-center gap-2 rounded-xl border-2 border-rose-600 bg-white px-3.5 text-xs font-black text-rose-700 transition-all hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-300"
+                     :disabled="!canExportCpfrPdf || isExportingPdf || isExportingImage"
+                     :title="cpfrConfigError || 'Descargar el pedido con el formato PDF de CPFR'"
+                     aria-label="Descargar PDF"
+                     @click="handlePdfExport"
+                  >
+                     <i
+                        class="fa-solid"
+                        :class="isExportingPdf ? 'fa-circle-notch fa-spin' : 'fa-file-pdf transition-transform group-hover:scale-110'"
+                     ></i>
+                     <span class="hidden sm:inline">{{ isExportingPdf ? 'GENERANDO...' : 'DESCARGAR PDF' }}</span>
+                  </button>
+               </div>
             </div>
 
             <section class="space-y-3">
