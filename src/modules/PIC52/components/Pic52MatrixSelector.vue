@@ -119,7 +119,7 @@ onUnmounted(() => {
     @update:model-value="emit('update:modelValue', $event)"
     @close="close"
   >
-    <div class="flex min-h-[420px] flex-col">
+    <div class="flex min-h-[420px] flex-col font-sans">
       <div class="relative">
         <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-xs text-pic-text-muted"></i>
         <input
@@ -129,7 +129,7 @@ onUnmounted(() => {
           class="h-10 w-full rounded-lg border border-pic-border bg-pic-muted-surface pl-9 pr-3 text-xs font-semibold text-pic-text-main outline-none transition focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border"
         >
       </div>
-      <p v-if="!canSearch" class="mt-1 text-[10px] font-semibold text-amber-700">
+      <p v-if="!canSearch" class="mt-1 text-[10px] font-semibold text-pic-warning">
         Escribe al menos dos caracteres para buscar.
       </p>
 

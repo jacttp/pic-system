@@ -296,11 +296,11 @@ const toggleProjectionRow = (rowId: string) => {
         <div class="mb-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
           <div class="rounded-lg border border-pic-border bg-pic-muted-surface p-2.5">
             <p class="text-[9px] font-bold uppercase text-pic-text-muted">Venta 2026</p>
-            <p class="mt-1 font-mono text-sm font-extrabold text-pic-text-main">$8.14M</p>
+            <p class="mt-1 font-mono text-sm font-bold tabular-nums text-pic-text-main">$8.14M</p>
           </div>
           <div class="rounded-lg border border-[hsl(var(--pic-success)/0.25)] bg-[hsl(var(--pic-success)/0.08)] p-2.5">
             <p class="text-[9px] font-bold uppercase text-pic-text-muted">Crecimiento</p>
-            <p class="mt-1 font-mono text-sm font-extrabold text-pic-success">+7.1%</p>
+            <p class="mt-1 font-mono text-sm font-bold tabular-nums text-pic-success">+7.1%</p>
           </div>
           <div class="rounded-lg border border-pic-border bg-pic-muted-surface p-2.5">
             <p class="text-[9px] font-bold uppercase text-pic-text-muted">Periodo</p>
@@ -364,8 +364,8 @@ const toggleProjectionRow = (rowId: string) => {
                 <td class="px-3 py-3 text-pic-text-muted">{{ row.unit }}</td>
                 <td class="px-3 py-3 text-right font-mono text-pic-text-muted">{{ row.y2024 }}</td>
                 <td class="px-3 py-3 text-right font-mono text-pic-text-muted">{{ row.y2025 }}</td>
-                <td class="bg-pic-brand-soft/40 px-3 py-3 text-right font-mono font-extrabold text-pic-text-main">{{ row.y2026 }}</td>
-                <td class="px-3 py-3 text-right font-mono font-extrabold" :class="row.tone">{{ row.change }}</td>
+                <td class="bg-pic-brand-soft/40 px-3 py-3 text-right font-mono font-bold tabular-nums text-pic-text-main">{{ row.y2026 }}</td>
+                <td class="px-3 py-3 text-right font-mono font-bold tabular-nums" :class="row.tone">{{ row.change }}</td>
               </tr>
             </tbody>
           </table>
@@ -384,7 +384,7 @@ const toggleProjectionRow = (rowId: string) => {
             ['Cobertura', '3 zonas'],
           ]" :key="item[0]" class="rounded-lg border border-pic-border bg-pic-muted-surface p-2.5">
             <p class="text-[9px] font-bold uppercase text-pic-text-muted">{{ item[0] }}</p>
-            <p class="mt-1 font-mono text-sm font-extrabold text-pic-text-main">{{ item[1] }}</p>
+            <p class="mt-1 font-mono text-sm font-bold tabular-nums text-pic-text-main">{{ item[1] }}</p>
           </div>
         </div>
         <div class="overflow-x-auto rounded-xl border border-pic-border">
@@ -417,7 +417,7 @@ const toggleProjectionRow = (rowId: string) => {
                   <td class="px-3 py-2.5 text-right font-mono font-bold text-pic-text-main">{{ row.current }}</td>
                   <td class="px-3 py-2.5 text-right font-mono text-pic-text-muted">{{ row.target }}</td>
                   <td
-                    class="px-3 py-2.5 text-right font-mono font-extrabold"
+                    class="px-3 py-2.5 text-right font-mono font-bold tabular-nums"
                     :class="row.variance.startsWith('-') ? 'text-pic-danger' : 'text-pic-success'"
                   >
                     {{ row.variance }}

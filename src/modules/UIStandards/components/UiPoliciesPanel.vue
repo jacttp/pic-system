@@ -16,8 +16,8 @@ const policies = [
     icon: 'fa-solid fa-book-open',
   },
   {
-    title: 'Endpoints y tokens congelados',
-    description: 'Un rediseño no altera contratos backend, Tailwind, variables CSS ni persistencia del tema.',
+    title: 'Contratos globales congelados',
+    description: 'Un rediseño no altera endpoints, tokens, Tailwind, persistencia ni la familia tipográfica del producto.',
     icon: 'fa-solid fa-lock',
   },
 ];
@@ -39,6 +39,7 @@ const briefFields = [
   'Grupos, cascadas, dependencias y estados.',
   'Breakpoints: 1366×768, desktop, tablet y mobile.',
   'Endpoints existentes y tokens utilizados.',
+  'Jerarquía tipográfica y usos técnicos de font-mono.',
   'Cambios explícitamente fuera de alcance.',
 ];
 </script>

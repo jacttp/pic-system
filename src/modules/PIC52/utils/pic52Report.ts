@@ -61,9 +61,9 @@ export const buildMetricTable = (
   report: Pic52Report,
   metric: Pic52Metric,
 ): Pic52MetricTable => {
-  const years = [...report.years].sort((left, right) => right - left);
-  const referenceYear = years[0] ?? null;
-  const previousYear = years[1] ?? null;
+  const years = [...report.years].sort((left, right) => left - right);
+  const referenceYear = years.length ? years[years.length - 1]! : null;
+  const previousYear = years.length > 1 ? years[years.length - 2]! : null;
   const seriesByYear = new Map(report.series.map(series => [series.year, series]));
 
   const rows = [...report.weeks]

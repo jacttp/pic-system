@@ -3,6 +3,7 @@ import { ref, reactive, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useClientStore } from '../stores/clientStore';
 import type { Client } from '@/types/clients';
+import { StdButton, StdPageHeader, StdSection } from '@/modules/Shared/components/std';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -84,6 +85,12 @@ const clientInitials = computed(() => {
     return form.Nombre.trim().split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase();
 });
 
+const pageTitle = computed(() => isNew.value ? 'Nuevo cliente' : (form.Nombre || 'Editar cliente'));
+const pageDescription = computed(() => isNew.value
+    ? 'Captura la identidad, ubicación y clasificación comercial del cliente.'
+    : 'Actualiza los datos maestros y la asignación comercial del cliente.');
+const pageMeta = computed(() => isNew.value ? 'Alta de cliente' : (form.clienteid || 'Sin ID'));
+
 const handleSave = async () => {
     isSaving.value = true;
     try {
@@ -101,160 +108,135 @@ const handleCancel = () => {
 </script>
 
 <template>
-    <div class="min-h-full bg-slate-50/70 pb-20">
+    <div class="min-h-full bg-pic-background pb-20 font-sans text-pic-text-main">
 
         <!-- ── Sticky Header ── -->
-        <header class="bg-white/90 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-            <div class="w-full px-4 sm:px-6 lg:px-10 h-16 flex items-center justify-between gap-4">
-
-                <!-- Left: back + breadcrumb + identity -->
-                <div class="flex items-center gap-3 min-w-0">
-                    <button
-                        @click="handleCancel"
-                        class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors flex-shrink-0"
-                    >
-                        <i class="fa-solid fa-arrow-left text-sm"></i>
-                    </button>
-
-                    <!-- Breadcrumb -->
-                    <div class="hidden sm:flex items-center gap-2 text-xs text-slate-400">
-                        <span class="font-medium hover:text-slate-600 cursor-pointer transition-colors" @click="router.push('/admin/clients')">
-                            Clientes
-                        </span>
-                        <i class="fa-solid fa-chevron-right text-[9px] text-slate-300"></i>
-                        <span class="font-semibold text-slate-600 truncate max-w-[180px]">
-                            {{ isNew ? 'Nuevo Cliente' : (form.Nombre || `#${form.clienteid}`) }}
-                        </span>
-                    </div>
-
-                    <!-- Mobile avatar (sm hidden above) -->
-                    <div class="flex sm:hidden items-center gap-2">
-                        <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-                            <span class="text-xs font-bold text-emerald-700">{{ clientInitials }}</span>
-                        </div>
-                        <span class="text-sm font-semibold text-slate-800 truncate max-w-[140px]">
-                            {{ isNew ? 'Nuevo' : form.Nombre }}
-                        </span>
+        <header class="sticky top-0 z-30 border-b border-pic-border bg-pic-surface/95 backdrop-blur-sm">
+            <div class="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-2 sm:px-6 lg:px-10">
+                <div class="flex min-w-0 items-center gap-2">
+                    <StdButton variant="ghost" size="icon" icon="fa-solid fa-arrow-left" aria-label="Volver al listado de clientes" @click="handleCancel" />
+                    <div class="min-w-0">
+                        <p class="truncate text-xs font-bold text-pic-text-main">Clientes</p>
+                        <p class="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-pic-text-muted">
+                            {{ isNew ? 'Nuevo registro' : 'Edición de datos maestros' }}
+                        </p>
                     </div>
                 </div>
 
-                <!-- Right: unsaved badge + actions -->
-                <div class="flex items-center gap-2 flex-shrink-0">
+                <div class="flex shrink-0 items-center gap-2">
                     <transition name="badge-fade">
-                        <span v-if="hasChanges" class="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
-                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse inline-block"></span>
-                            Sin guardar
+                        <span v-if="hasChanges" class="hidden items-center gap-1.5 rounded-md border border-[hsl(var(--pic-warning)/0.3)] bg-[hsl(var(--pic-warning)/0.08)] px-2.5 py-1 text-xs font-bold text-pic-warning sm:inline-flex">
+                            <span class="h-1.5 w-1.5 animate-pulse rounded-sm bg-pic-warning"></span>
+                            Cambios pendientes
                         </span>
                     </transition>
-                    <button
-                        @click="handleCancel"
-                        class="text-sm font-medium text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
-                    >
-                        Cancelar
-                    </button>
-                    <button
+                    <StdButton class="hidden sm:inline-flex" variant="secondary" size="sm" @click="handleCancel">Cancelar</StdButton>
+                    <StdButton
+                        variant="primary"
+                        size="sm"
+                        :icon="isSaving ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-check'"
+                        :disabled="isSaving || (!hasChanges && !isNew)"
                         @click="handleSave"
-                        :disabled="!hasChanges && !isNew"
-                        class="inline-flex items-center gap-2 px-4 py-1.5 text-sm font-semibold rounded-lg shadow-sm transition-all
-                               bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800
-                               disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none disabled:cursor-not-allowed"
                     >
-                        <i v-if="isSaving" class="fa-solid fa-circle-notch fa-spin text-xs"></i>
-                        <i v-else class="fa-solid fa-check text-xs"></i>
-                        {{ isNew ? 'Crear Cliente' : 'Guardar' }}
-                    </button>
+                        {{ isSaving ? 'Guardando…' : (isNew ? 'Crear cliente' : 'Guardar') }}
+                    </StdButton>
                 </div>
             </div>
         </header>
 
         <!-- ── Loader ── -->
         <div v-if="isLoading" class="flex flex-col items-center justify-center py-24 gap-4">
-            <div class="w-10 h-10 rounded-full border-[3px] border-emerald-200 border-t-emerald-600 animate-spin"></div>
-            <p class="text-sm text-slate-400 font-medium">Cargando datos del cliente…</p>
+            <i class="fa-solid fa-circle-notch fa-spin text-2xl text-pic-brand" aria-hidden="true"></i>
+            <p class="text-sm font-medium text-pic-text-muted">Cargando datos del cliente…</p>
         </div>
 
         <!-- ── Two-column layout ── -->
-        <main v-else class="w-full px-4 sm:px-6 lg:px-10 py-6 lg:py-8">
-            <div class="flex flex-col lg:flex-row gap-6 lg:items-start">
+        <main v-else class="w-full px-4 py-5 sm:px-6 lg:px-10 lg:py-6">
+            <StdPageHeader
+                eyebrow="Directorio comercial"
+                :title="pageTitle"
+                :description="pageDescription"
+                icon="fa-solid fa-address-card"
+                :meta="pageMeta"
+                class="!border-pic-border !bg-pic-surface"
+            />
+
+            <div class="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start">
 
                 <!-- ══ LEFT SIDEBAR (sticky) ══ -->
-                <aside class="w-full lg:w-72 xl:w-80 flex-shrink-0 lg:sticky lg:top-20 space-y-4">
+                <aside class="w-full flex-shrink-0 space-y-4 lg:sticky lg:top-20 lg:w-72 xl:w-80">
 
                     <!-- Identity card -->
-                    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                        <!-- Gradient banner -->
-                        <div class="h-20 bg-gradient-to-br from-emerald-500 to-teal-600 relative">
-                            <div class="absolute inset-0 opacity-20"
-                                 style="background-image: url('data:image/svg+xml,%3Csvg width=\'40\' height=\'40\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 40L40 0H20L0 20M40 40V20L20 40\' fill=\'white\' fill-opacity=\'0.5\'/%3E%3C/svg%3E')">
-                            </div>
-                        </div>
-
-                        <div class="px-5 pb-5 -mt-9 relative">
+                    <div class="overflow-hidden rounded-xl border border-pic-border bg-pic-surface shadow-sm shadow-slate-100">
+                        <div class="relative border-l-4 border-pic-brand px-4 py-4">
                             <!-- Avatar -->
-                            <div class="w-16 h-16 rounded-2xl bg-white border-2 border-white shadow-md flex items-center justify-center mb-3">
-                                <div v-if="!isNew" class="w-full h-full rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
-                                    <span class="text-xl font-extrabold text-white">{{ clientInitials }}</span>
+                            <div class="mb-3 flex h-12 w-12 items-center justify-center rounded-lg border border-pic-brand-border bg-pic-brand-soft">
+                                <div v-if="!isNew" class="flex h-full w-full items-center justify-center rounded-lg bg-pic-brand-soft">
+                                    <span class="text-lg font-extrabold text-pic-brand">{{ clientInitials }}</span>
                                 </div>
-                                <div v-else class="w-full h-full rounded-2xl bg-slate-100 flex items-center justify-center">
-                                    <i class="fa-solid fa-store text-slate-400 text-xl"></i>
+                                <div v-else class="flex h-full w-full items-center justify-center rounded-lg bg-pic-muted-surface">
+                                    <i class="fa-solid fa-store text-lg text-pic-text-muted"></i>
                                 </div>
                             </div>
 
-                            <h2 class="text-base font-bold text-slate-900 leading-tight">
+                            <h2 class="text-base font-bold leading-tight text-pic-text-main">
                                 {{ form.Nombre || (isNew ? 'Nuevo Cliente' : 'Sin nombre') }}
                             </h2>
 
                             <div v-if="!isNew && form.clienteid" class="mt-1.5 flex items-center gap-1.5">
-                                <span class="font-mono text-xs font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">{{ form.clienteid }}</span>
+                                <span class="rounded-md bg-pic-muted-surface px-2 py-0.5 font-mono text-xs font-semibold text-pic-text-muted">{{ form.clienteid }}</span>
                             </div>
 
                             <!-- Unsaved indicator mobile -->
-                            <div v-if="hasChanges" class="mt-3 flex items-center gap-1.5 text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg">
-                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse inline-block"></span>
+                            <div v-if="hasChanges" class="mt-3 flex items-center gap-1.5 rounded-lg border border-[hsl(var(--pic-warning)/0.3)] bg-[hsl(var(--pic-warning)/0.08)] px-2.5 py-1.5 text-xs font-semibold text-pic-warning sm:hidden">
+                                <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-sm bg-pic-warning"></span>
                                 Cambios sin guardar
                             </div>
                         </div>
 
                         <!-- Meta data rows -->
-                        <div v-if="!isNew" class="border-t border-slate-100 divide-y divide-slate-100">
+                        <div v-if="!isNew" class="divide-y divide-pic-border border-t border-pic-border">
                             <div class="flex items-start gap-3 px-5 py-3" v-if="form.Canal">
-                                <i class="fa-solid fa-tag text-emerald-500 text-xs mt-0.5 w-4"></i>
+                                <i class="fa-solid fa-tag mt-0.5 w-4 text-xs text-pic-brand"></i>
                                 <div>
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Canal</p>
-                                    <p class="text-sm font-semibold text-slate-700 mt-0.5">{{ form.Canal }}</p>
+                                    <p class="text-[10px] font-bold uppercase tracking-wider text-pic-text-muted">Canal</p>
+                                    <p class="mt-0.5 text-sm font-semibold text-pic-text-main">{{ form.Canal }}</p>
                                 </div>
                             </div>
                             <div class="flex items-start gap-3 px-5 py-3" v-if="form.Gerencia">
-                                <i class="fa-solid fa-building text-emerald-500 text-xs mt-0.5 w-4"></i>
+                                <i class="fa-solid fa-building mt-0.5 w-4 text-xs text-pic-brand"></i>
                                 <div>
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Gerencia</p>
-                                    <p class="text-sm font-semibold text-slate-700 mt-0.5">{{ form.Gerencia }}</p>
+                                    <p class="text-[10px] font-bold uppercase tracking-wider text-pic-text-muted">Gerencia</p>
+                                    <p class="mt-0.5 text-sm font-semibold text-pic-text-main">{{ form.Gerencia }}</p>
                                 </div>
                             </div>
                             <div class="flex items-start gap-3 px-5 py-3" v-if="form.Ciudad">
-                                <i class="fa-solid fa-location-dot text-emerald-500 text-xs mt-0.5 w-4"></i>
+                                <i class="fa-solid fa-location-dot mt-0.5 w-4 text-xs text-pic-brand"></i>
                                 <div>
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ciudad</p>
-                                    <p class="text-sm font-semibold text-slate-700 mt-0.5">{{ form.Ciudad }}<span v-if="form.Estado" class="text-slate-400 font-normal">, {{ form.Estado }}</span></p>
+                                    <p class="text-[10px] font-bold uppercase tracking-wider text-pic-text-muted">Ciudad</p>
+                                    <p class="mt-0.5 text-sm font-semibold text-pic-text-main">{{ form.Ciudad }}<span v-if="form.Estado" class="font-normal text-pic-text-muted">, {{ form.Estado }}</span></p>
                                 </div>
                             </div>
                             <div class="flex items-start gap-3 px-5 py-3" v-if="form.Tipocli">
-                                <i class="fa-solid fa-shapes text-emerald-500 text-xs mt-0.5 w-4"></i>
+                                <i class="fa-solid fa-shapes mt-0.5 w-4 text-xs text-pic-brand"></i>
                                 <div>
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tipo</p>
-                                    <p class="text-sm font-semibold text-slate-700 mt-0.5">{{ form.Tipocli }}</p>
+                                    <p class="text-[10px] font-bold uppercase tracking-wider text-pic-text-muted">Tipo</p>
+                                    <p class="mt-0.5 text-sm font-semibold text-pic-text-main">{{ form.Tipocli }}</p>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Clasificación card -->
-                    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                        <div class="flex items-center gap-2 px-5 py-3 border-b border-slate-100 bg-slate-50/60">
-                            <i class="fa-solid fa-tag text-emerald-500 text-xs"></i>
-                            <h3 class="text-xs font-bold text-slate-600 uppercase tracking-wider">Clasificación</h3>
-                        </div>
-                        <div class="p-4 space-y-3.5">
+                    <StdSection
+                        eyebrow="Perfil"
+                        title="Clasificación"
+                        description="Atributos de catálogo y estatus."
+                        icon="fa-solid fa-tag"
+                        density="compact"
+                        class="!border-pic-border !bg-pic-surface"
+                    >
+                        <div class="space-y-3.5">
                             <div>
                                 <label class="field-label">Tipo Cliente</label>
                                 <input v-model="form.Tipocli" type="text" class="field-input" :class="{ 'field-changed': isChanged('Tipocli') }" />
@@ -268,23 +250,23 @@ const handleCancel = () => {
                                 <input v-model="form.LP" type="text" class="field-input" :class="{ 'field-changed': isChanged('LP') }" />
                             </div>
                         </div>
-                    </div>
+                    </StdSection>
                 </aside>
 
                 <!-- ══ RIGHT PANEL ══ -->
                 <div class="flex-1 min-w-0 space-y-5">
 
                     <!-- ── Section: Identificación ── -->
-                    <section class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                        <div class="flex items-center gap-2.5 px-6 py-4 border-b border-slate-100 bg-slate-50/60">
-                            <div class="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                                <i class="fa-solid fa-id-card text-emerald-600 text-xs"></i>
-                            </div>
-                            <h2 class="text-sm font-bold text-slate-700">Identificación</h2>
-                        </div>
-                        <div class="p-6 space-y-4">
+                    <StdSection
+                        eyebrow="Datos maestros"
+                        title="Identificación"
+                        description="Nombre comercial e identificador único del cliente."
+                        icon="fa-solid fa-id-card"
+                        class="!border-pic-border !bg-pic-surface"
+                    >
+                        <div class="space-y-4">
                             <div>
-                                <label class="field-label">Razón Social / Nombre <span class="text-red-500">*</span></label>
+                                <label class="field-label">Razón Social / Nombre <span class="text-pic-danger">*</span></label>
                                 <input
                                     v-model="form.Nombre"
                                     type="text"
@@ -293,38 +275,38 @@ const handleCancel = () => {
                                     :class="{ 'field-changed': isChanged('Nombre') }"
                                 />
                             </div>
-                            <div v-if="!isNew" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-50 border border-slate-200">
-                                <div class="w-9 h-9 rounded-xl bg-slate-200 flex items-center justify-center flex-shrink-0">
-                                    <i class="fa-solid fa-fingerprint text-slate-500 text-sm"></i>
+                            <div v-if="!isNew" class="flex items-center gap-3 rounded-lg border border-pic-border bg-pic-muted-surface px-4 py-3">
+                                <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-pic-brand-soft">
+                                    <i class="fa-solid fa-fingerprint text-sm text-pic-brand"></i>
                                 </div>
                                 <div>
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">ID de Negocio</p>
-                                    <p class="font-mono text-base font-bold text-slate-700 mt-0.5">{{ form.clienteid }}</p>
+                                    <p class="text-[10px] font-bold uppercase tracking-wider text-pic-text-muted">ID de Negocio</p>
+                                    <p class="mt-0.5 font-mono text-base font-bold text-pic-text-main">{{ form.clienteid }}</p>
                                 </div>
                             </div>
                         </div>
-                    </section>
+                    </StdSection>
 
                     <!-- ── Section: Ubicación Geográfica ── -->
-                    <section class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/60">
+                    <section class="overflow-hidden rounded-xl border border-pic-border bg-pic-surface shadow-sm">
+                        <div class="flex flex-col gap-2 border-b border-pic-border bg-pic-muted-surface px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                             <div class="flex items-center gap-2.5">
-                                <div class="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                                    <i class="fa-solid fa-location-dot text-emerald-600 text-xs"></i>
+                                <div class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-pic-brand-soft">
+                                    <i class="fa-solid fa-location-dot text-xs text-pic-brand"></i>
                                 </div>
-                                <h2 class="text-sm font-bold text-slate-700">Ubicación Geográfica</h2>
+                                <h2 class="text-sm font-bold text-pic-text-main">Ubicación Geográfica</h2>
                             </div>
-                            <div v-if="form.Geopos" class="flex items-center gap-1.5 text-xs font-mono text-slate-500 bg-white border border-slate-200 px-2.5 py-1 rounded-full shadow-sm">
-                                <i class="fa-solid fa-satellite-dish text-emerald-500 text-[10px]"></i>
+                            <div v-if="form.Geopos" class="flex items-center gap-1.5 self-start rounded-md border border-pic-border bg-pic-surface px-2.5 py-1 font-mono text-xs text-pic-text-muted shadow-sm">
+                                <i class="fa-solid fa-satellite-dish text-[10px] text-pic-brand"></i>
                                 {{ form.Geopos }}
                             </div>
                         </div>
 
                         <div class="grid grid-cols-1 lg:grid-cols-5">
                             <!-- Map -->
-                            <div class="lg:col-span-2 relative min-h-[260px] bg-slate-100">
+                            <div class="relative min-h-[260px] bg-pic-muted-surface lg:col-span-2">
                                 <div ref="mapContainer" class="absolute inset-0 z-0"></div>
-                                <div v-if="!form.Geopos" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-400 pointer-events-none">
+                                <div v-if="!form.Geopos" class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-pic-text-muted">
                                     <i class="fa-solid fa-map text-3xl opacity-30"></i>
                                     <p class="text-xs font-medium opacity-50">Arrastra el marcador para geolocalizar</p>
                                 </div>
@@ -363,22 +345,21 @@ const handleCancel = () => {
                     </section>
 
                     <!-- ── Section: Segmentación Comercial ── -->
-                    <section class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                        <div class="flex items-center gap-2.5 px-6 py-4 border-b border-slate-100 bg-slate-50/60">
-                            <div class="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                                <i class="fa-solid fa-sitemap text-emerald-600 text-xs"></i>
-                            </div>
-                            <h2 class="text-sm font-bold text-slate-700">Segmentación Comercial</h2>
-                        </div>
-
-                        <div class="p-6 space-y-6">
+                    <StdSection
+                        eyebrow="Estructura comercial"
+                        title="Segmentación comercial"
+                        description="Asigna la jerarquía de distribución y los atributos del canal."
+                        icon="fa-solid fa-sitemap"
+                        class="!border-pic-border !bg-pic-surface"
+                    >
+                        <div class="space-y-6">
 
                             <!-- Sub-group: Estructura de Distribución -->
                             <div>
                                 <div class="flex items-center gap-2 mb-4">
-                                    <div class="h-px flex-1 bg-slate-100"></div>
-                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2">Estructura de Distribución</span>
-                                    <div class="h-px flex-1 bg-slate-100"></div>
+                                    <div class="h-px flex-1 bg-pic-border"></div>
+                                    <span class="px-2 text-[10px] font-bold uppercase tracking-widest text-pic-text-muted">Estructura de Distribución</span>
+                                    <div class="h-px flex-1 bg-pic-border"></div>
                                 </div>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-4">
                                     <!-- Gerencia -->
@@ -389,7 +370,7 @@ const handleCancel = () => {
                                                 <option value="">Seleccionar…</option>
                                                 <option v-for="g in store.gerencias" :key="g" :value="g">{{ g }}</option>
                                             </select>
-                                            <i class="fa-solid fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                            <i class="fa-solid fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-pic-text-muted"></i>
                                         </div>
                                     </div>
                                     <!-- Jefatura -->
@@ -400,7 +381,7 @@ const handleCancel = () => {
                                                 <option value="">Seleccionar…</option>
                                                 <option v-for="j in store.jefaturas" :key="j" :value="j">{{ j }}</option>
                                             </select>
-                                            <i class="fa-solid fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                            <i class="fa-solid fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-pic-text-muted"></i>
                                         </div>
                                     </div>
                                     <div>
@@ -417,9 +398,9 @@ const handleCancel = () => {
                             <!-- Sub-group: Clasificación Comercial -->
                             <div>
                                 <div class="flex items-center gap-2 mb-4">
-                                    <div class="h-px flex-1 bg-slate-100"></div>
-                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2">Clasificación Comercial</span>
-                                    <div class="h-px flex-1 bg-slate-100"></div>
+                                    <div class="h-px flex-1 bg-pic-border"></div>
+                                    <span class="px-2 text-[10px] font-bold uppercase tracking-widest text-pic-text-muted">Clasificación Comercial</span>
+                                    <div class="h-px flex-1 bg-pic-border"></div>
                                 </div>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-4">
                                     <!-- Canal -->
@@ -430,7 +411,7 @@ const handleCancel = () => {
                                                 <option value="">Seleccionar…</option>
                                                 <option v-for="c in store.canales" :key="c" :value="c">{{ c }}</option>
                                             </select>
-                                            <i class="fa-solid fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                            <i class="fa-solid fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-pic-text-muted"></i>
                                         </div>
                                     </div>
                                     <div>
@@ -460,7 +441,7 @@ const handleCancel = () => {
                                 </div>
                             </div>
                         </div>
-                    </section>
+                    </StdSection>
 
                 </div>
                 <!-- end right panel -->
@@ -471,20 +452,51 @@ const handleCancel = () => {
 
 <style scoped>
 .field-label {
-    @apply block text-xs font-semibold text-slate-500 mb-1.5;
+    display: block;
+    margin-bottom: 0.375rem;
+    color: hsl(var(--pic-text-muted));
+    font-size: 0.625rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    line-height: 1rem;
+    text-transform: uppercase;
 }
-.field-input {
-    @apply w-full rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 px-3.5 py-2.5
-           focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none
-           placeholder:text-slate-300 transition-all duration-150;
+.field-input,
+.field-select {
+    width: 100%;
+    min-height: 2.5rem;
+    border: 1px solid hsl(var(--pic-border));
+    border-radius: 0.5rem;
+    background: hsl(var(--pic-surface));
+    color: hsl(var(--pic-text-main));
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: border-color 150ms, background-color 150ms, box-shadow 150ms;
 }
 .field-select {
-    @apply w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800
-           px-3.5 py-2.5 pr-9 cursor-pointer
-           focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all duration-150;
+    appearance: none;
+    padding-right: 2.25rem;
+    cursor: pointer;
+}
+.field-input::placeholder { color: hsl(var(--pic-text-muted)); }
+.field-input:hover,
+.field-select:hover { background: hsl(var(--pic-muted-surface)); }
+.field-input:focus,
+.field-select:focus {
+    border-color: hsl(var(--pic-brand));
+    background: hsl(var(--pic-surface));
+    box-shadow: 0 0 0 2px hsl(var(--pic-brand-border));
+    outline: none;
 }
 .field-changed {
-    @apply bg-amber-50 border-amber-300 text-amber-900 focus:border-amber-400 focus:ring-amber-400/20;
+    border-color: hsl(var(--pic-warning) / 0.45);
+    background: hsl(var(--pic-warning) / 0.08);
+    color: hsl(var(--pic-text-main));
+}
+.field-changed:focus {
+    border-color: hsl(var(--pic-warning));
+    box-shadow: 0 0 0 2px hsl(var(--pic-warning) / 0.18);
 }
 
 .badge-fade-enter-active, .badge-fade-leave-active { transition: opacity 0.2s, transform 0.2s; }

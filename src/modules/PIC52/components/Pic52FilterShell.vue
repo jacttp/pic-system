@@ -266,7 +266,7 @@ onUnmounted(() => {
 <template>
   <section
     ref="filterPanel"
-    class="relative z-40 w-full border-b border-pic-border bg-pic-surface text-pic-text-main shadow-sm"
+    class="relative z-40 w-full border-b border-pic-border bg-pic-surface font-sans text-pic-text-main shadow-sm"
   >
     <div class="flex min-h-[56px] flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between md:px-4 lg:px-6">
       <button

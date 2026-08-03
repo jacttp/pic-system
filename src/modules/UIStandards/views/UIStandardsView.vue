@@ -9,8 +9,9 @@ import UiReportCatalog from '../components/UiReportCatalog.vue';
 import UiStandardsHome from '../components/UiStandardsHome.vue';
 import UiTablesCatalog from '../components/UiTablesCatalog.vue';
 import UiThemeManager from '../components/UiThemeManager.vue';
+import UiTypographyCatalog from '../components/UiTypographyCatalog.vue';
 
-type SectionId = 'home' | 'components' | 'reports' | 'patterns' | 'charts' | 'tables' | 'theme' | 'policies';
+type SectionId = 'home' | 'typography' | 'components' | 'reports' | 'patterns' | 'charts' | 'tables' | 'theme' | 'policies';
 
 interface CatalogSection {
   id: SectionId;
@@ -27,6 +28,13 @@ const sections: CatalogSection[] = [
     description: 'Principios y recorrido',
     icon: 'fa-solid fa-compass',
     component: UiStandardsHome,
+  },
+  {
+    id: 'typography',
+    label: 'Tipografía',
+    description: 'Familias, escala y jerarquía',
+    icon: 'fa-solid fa-font',
+    component: UiTypographyCatalog,
   },
   {
     id: 'components',

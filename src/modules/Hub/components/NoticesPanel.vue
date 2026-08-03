@@ -23,8 +23,8 @@ const props = withDefaults(defineProps<{
             detail: 'SuperAdmin rechazo tu solicitud. Motivo: Prueba de rechazo.',
             time: '17 D',
             icon: 'fa-solid fa-xmark',
-            iconClass: 'text-rose-600',
-            badgeClass: 'bg-rose-50 text-rose-700',
+            iconClass: 'text-pic-danger',
+            badgeClass: 'bg-[hsl(var(--pic-danger)/0.12)] text-pic-danger',
         },
         {
             id: 'notice-approved-cpfr',
@@ -32,15 +32,15 @@ const props = withDefaults(defineProps<{
             detail: 'SuperAdmin aprobo tu solicitud.',
             time: '17 D',
             icon: 'fa-solid fa-check',
-            iconClass: 'text-emerald-600',
-            badgeClass: 'bg-emerald-50 text-emerald-700',
+            iconClass: 'text-pic-success',
+            badgeClass: 'bg-[hsl(var(--pic-success)/0.12)] text-pic-success',
         },
     ],
 });
 </script>
 
 <template>
-    <section class="overflow-hidden rounded-xl border border-pic-border bg-white shadow-sm">
+    <section class="overflow-hidden rounded-xl border border-pic-border bg-pic-surface font-sans shadow-sm">
         <div class="flex items-center justify-between gap-3 border-b border-pic-border px-4 py-4 sm:px-5">
             <div class="flex min-w-0 items-center gap-3">
             <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-pic-brand-soft text-pic-brand shadow-sm">

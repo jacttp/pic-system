@@ -56,7 +56,7 @@ const updateEnd = (event: Event) => {
 </script>
 
 <template>
-  <div class="min-w-0">
+  <div class="min-w-0 font-sans">
     <div class="mb-1.5 flex items-center justify-between gap-2">
       <span class="text-[9px] font-bold uppercase tracking-wider text-pic-text-muted">
         Semanas

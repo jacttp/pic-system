@@ -5,7 +5,7 @@ import Pic52ChartsPanel from '../components/Pic52ChartsPanel.vue';
 import Pic52ComparisonTable from '../components/Pic52ComparisonTable.vue';
 import Pic52FilterShell from '../components/Pic52FilterShell.vue';
 import Pic52MatrixSelector from '../components/Pic52MatrixSelector.vue';
-import { StdAlert, StdButton, StdPageHeader, StdSection } from '@/modules/Shared/components/std';
+import { StdAlert, StdButton, StdSection } from '@/modules/Shared/components/std';
 import { usePic52Store, type Pic52ReportMode } from '../stores/pic52Store';
 
 const store = usePic52Store();
@@ -134,23 +134,26 @@ onMounted(() => {
 </script>
 
 <template>
-  <main class="min-h-full bg-pic-background px-5 pt-4 text-pic-text-main sm:px-10 sm:pt-5 lg:px-16">
+  <main class="min-h-full bg-pic-background px-5 pt-4 font-sans text-pic-text-main sm:px-10 sm:pt-5 lg:px-16">
     <div class="mx-auto max-w-[1800px] space-y-4">
-      <StdPageHeader
-        eyebrow="Analítica semanal"
-        title="Reporte PIC 52S"
-        description="Comparativo de kilogramos y pesos por semana para todos los años seleccionados."
-        icon="fa-solid fa-chart-line"
-        :meta="headerMeta"
-      >
-        <template #actions>
+      <header class="flex flex-col gap-3 py-1 md:flex-row md:items-center md:justify-between">
+        <div class="min-w-0">
+          <h1 class="flex items-center gap-2 text-xl font-black leading-none tracking-tight text-pic-text-main md:text-lg">
+            <i class="fa-solid fa-chart-line text-pic-brand" aria-hidden="true"></i>
+            Reporte PIC 52S
+          </h1>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 md:justify-end">
+          <span class="inline-flex h-8 items-center rounded-lg border border-pic-border bg-pic-surface px-3 text-[11px] font-bold text-pic-text-muted">
+            {{ headerMeta }}
+          </span>
           <span class="inline-flex h-8 items-center gap-2 rounded-lg border border-pic-border bg-pic-muted-surface px-3 text-[11px] font-bold text-pic-text-muted">
             <i v-if="isInitializing" class="fa-solid fa-circle-notch fa-spin text-pic-brand"></i>
             <span v-else class="h-2 w-2 rounded-sm" :class="isReady ? 'bg-pic-success' : 'bg-pic-danger'"></span>
             {{ isInitializing ? 'Conectando filtros' : scopeLabel }}
           </span>
-        </template>
-      </StdPageHeader>
+        </div>
+      </header>
 
       <StdAlert
         v-if="initializationError"
@@ -265,6 +268,10 @@ onMounted(() => {
         id="pic52-results"
         class="space-y-4"
       >
+        <Pic52ChartsPanel
+          :report="report"
+        />
+
         <Pic52ComparisonTable
           :report="report"
           metric="kg"
@@ -276,11 +283,6 @@ onMounted(() => {
           :filter-summary="appliedFilterSummary"
         />
       </section>
-
-      <Pic52ChartsPanel
-        v-if="report && hasObservedReportData && !filtersDirty"
-        :report="report"
-      />
 
     </div>
 

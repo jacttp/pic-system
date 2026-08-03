@@ -3,7 +3,7 @@ const levels = [
   {
     number: 1,
     title: 'Principios visuales',
-    description: 'Jerarquía, densidad, responsive, accesibilidad y uso de los tokens existentes.',
+    description: 'Tipografía, jerarquía, densidad, responsive, accesibilidad y uso de los tokens existentes.',
     icon: 'fa-solid fa-compass-drafting',
   },
   {

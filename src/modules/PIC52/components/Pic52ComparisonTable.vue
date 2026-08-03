@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { Pic52Report } from '../types/pic52';
 import {
   buildMetricTable,
@@ -15,8 +15,10 @@ interface Props {
 
 const props = defineProps<Props>();
 
+const isExpanded = ref(false);
 const table = computed(() => buildMetricTable(props.report, props.metric));
 const isKilograms = computed(() => props.metric === 'kg');
+const tableContentId = computed(() => ('pic52-comparison-' + props.metric));
 const title = computed(() => (
   `${props.report.transaction.value} ${props.report.weeks.length} semanas en ${isKilograms.value ? 'kilogramos' : 'pesos'}`
 ));
@@ -31,6 +33,7 @@ const comparisonLabel = computed(() => {
 const observedWeeksByYear = computed(() => new Map(
   props.report.series.map(series => [series.year, series.totals.observedWeeks]),
 ));
+const headerYears = computed(() => [...table.value.years].reverse());
 
 const valueFormatter = new Intl.NumberFormat('es-MX', {
   minimumFractionDigits: 0,
@@ -64,7 +67,7 @@ const rowHasMissing = (row: Pic52MetricRow) => (
 </script>
 
 <template>
-  <article class="min-w-0 overflow-hidden rounded-xl border border-pic-border bg-pic-surface shadow-sm">
+  <article class="min-w-0 overflow-hidden rounded-xl border border-pic-border bg-pic-surface font-sans shadow-sm">
     <header class="flex flex-col gap-3 border-b border-pic-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
       <div class="flex min-w-0 items-center gap-3">
         <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-pic-brand-border bg-pic-brand-soft text-pic-brand">
@@ -85,15 +88,32 @@ const rowHasMissing = (row: Pic52MetricRow) => (
           </p>
         </div>
       </div>
-      <span class="inline-flex h-7 shrink-0 items-center rounded-lg border border-pic-border bg-pic-muted-surface px-2.5 font-mono text-[10px] font-bold text-pic-text-muted">
-        {{ comparisonLabel }}
-      </span>
+      <div class="flex shrink-0 items-center gap-2 self-start sm:self-auto">
+        <span class="inline-flex h-7 items-center rounded-lg border border-pic-border bg-pic-muted-surface px-2.5 font-mono text-[10px] font-bold text-pic-text-muted">
+          {{ comparisonLabel }}
+        </span>
+        <button
+          type="button"
+          class="inline-flex h-8 items-center gap-2 rounded-lg border border-pic-brand-border bg-pic-brand-soft px-3 text-[10px] font-black text-pic-brand transition-colors hover:bg-pic-brand hover:text-white focus:outline-none focus:ring-2 focus:ring-pic-brand-border focus:ring-offset-2 focus:ring-offset-pic-surface"
+          :aria-expanded="isExpanded"
+          :aria-controls="tableContentId"
+          @click="isExpanded = !isExpanded"
+        >
+          <i
+            class="fa-solid text-[9px]"
+            :class="isExpanded ? 'fa-chevron-up' : 'fa-chevron-down'"
+            aria-hidden="true"
+          ></i>
+          {{ isExpanded ? 'Contraer tabla' : 'Ver tabla' }}
+        </button>
+      </div>
     </header>
 
+    <div v-show="isExpanded" :id="tableContentId">
     <div class="border-b border-pic-border bg-pic-muted-surface px-4 py-2">
       <div class="flex flex-wrap gap-x-4 gap-y-1">
         <span
-          v-for="year in table.years"
+          v-for="year in headerYears"
           :key="year"
           class="text-[10px] font-bold text-pic-text-muted"
         >
@@ -112,10 +132,10 @@ const rowHasMissing = (row: Pic52MetricRow) => (
           {{ title }}. Las celdas con guion no tienen registros en la semana correspondiente.
         </caption>
         <thead class="sticky top-0 z-20">
-          <tr class="bg-slate-800 text-[9px] font-black uppercase tracking-[0.08em] text-white">
+          <tr class="bg-pic-text-main text-[9px] font-black uppercase tracking-[0.08em] text-pic-surface">
             <th
               scope="col"
-              class="sticky left-0 z-30 w-24 border-b border-r border-slate-700 bg-slate-900 px-3 py-2.5 text-left"
+              class="sticky left-0 z-30 w-24 border-b border-r border-pic-border bg-pic-text-main px-3 py-2.5 text-left"
             >
               Semana
             </th>
@@ -123,14 +143,14 @@ const rowHasMissing = (row: Pic52MetricRow) => (
               v-for="year in table.years"
               :key="year"
               scope="col"
-              class="min-w-[132px] border-b border-r border-slate-700 px-3 py-2.5"
+              class="min-w-[132px] border-b border-r border-pic-border px-3 py-2.5"
             >
               {{ metricLabel }} {{ year }}
             </th>
-            <th scope="col" class="min-w-[122px] border-b border-r border-slate-700 px-3 py-2.5">
+            <th scope="col" class="min-w-[122px] border-b border-r border-pic-border px-3 py-2.5">
               % {{ comparisonLabel }}
             </th>
-            <th scope="col" class="min-w-[132px] border-b border-slate-700 px-3 py-2.5">
+            <th scope="col" class="min-w-[132px] border-b border-pic-border px-3 py-2.5">
               Diferencia
             </th>
           </tr>
@@ -178,21 +198,21 @@ const rowHasMissing = (row: Pic52MetricRow) => (
           </tr>
         </tbody>
         <tfoot class="sticky bottom-0 z-20">
-          <tr class="bg-slate-900 text-white shadow-[0_-1px_0_0_hsl(var(--pic-border))]">
+          <tr class="bg-pic-text-main text-pic-surface shadow-[0_-1px_0_0_hsl(var(--pic-border))]">
             <th
               scope="row"
-              class="sticky left-0 z-30 border-r border-slate-700 bg-slate-950 px-3 py-3 text-left text-[9px] font-black uppercase tracking-[0.12em]"
+              class="sticky left-0 z-30 border-r border-pic-border bg-pic-text-main px-3 py-3 text-left text-[9px] font-black uppercase tracking-[0.12em]"
             >
               Total observado
             </th>
             <td
               v-for="year in table.years"
               :key="year"
-              class="border-r border-slate-700 px-3 py-3 font-black tabular-nums"
+              class="border-r border-pic-border px-3 py-3 font-black tabular-nums"
             >
               {{ formatValue(table.totals.values[year]) }}
             </td>
-            <td class="border-r border-slate-700 px-3 py-3 font-black tabular-nums">
+            <td class="border-r border-pic-border px-3 py-3 font-black tabular-nums">
               {{ formatPercentage(table.totals.percentage) }}
             </td>
             <td class="px-3 py-3 font-black tabular-nums">
@@ -211,6 +231,7 @@ const rowHasMissing = (row: Pic52MetricRow) => (
         mostradas en la tabla.
       </span>
     </footer>
+    </div>
   </article>
 </template>
 

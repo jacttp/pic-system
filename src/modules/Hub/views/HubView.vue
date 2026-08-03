@@ -155,32 +155,32 @@ const quickActions = [
         caption: 'Crear aprobacion',
         icon: 'fa-solid fa-square-plus',
         route: '/admin/approvals',
-        color: 'text-white',
-        bg: 'bg-gradient-to-br from-pic-brand to-red-500',
+        color: 'text-pic-surface',
+        bg: 'bg-pic-brand',
     },
     {
         label: 'Mis pendientes',
         caption: 'Ver mis tareas',
         icon: 'fa-solid fa-file-circle-check',
         route: '/admin/approvals',
-        color: 'text-white',
-        bg: 'bg-gradient-to-br from-[hsl(var(--pic-accent-orange))] to-amber-400',
+        color: 'text-pic-surface',
+        bg: 'bg-[hsl(var(--pic-accent-orange))]',
     },
     {
         label: 'Consultas recientes',
         caption: 'Acceder al historial',
         icon: 'fa-solid fa-clock',
         route: '/admin/approvals',
-        color: 'text-white',
-        bg: 'bg-gradient-to-br from-[hsl(var(--pic-accent-blue))] to-sky-400',
+        color: 'text-pic-surface',
+        bg: 'bg-[hsl(var(--pic-accent-blue))]',
     },
     {
         label: 'Reportes favoritos',
         caption: 'Ver guardados',
         icon: 'fa-regular fa-star',
         route: '/admin/pic',
-        color: 'text-white',
-        bg: 'bg-gradient-to-br from-[hsl(var(--pic-accent-purple))] to-fuchsia-400',
+        color: 'text-pic-surface',
+        bg: 'bg-[hsl(var(--pic-accent-purple))]',
     },
 ];
 
@@ -199,7 +199,7 @@ const metricToneClass = (tone: string) => ({
     purple: 'bg-[hsl(var(--pic-accent-purple-soft))] text-[hsl(var(--pic-accent-purple))]',
     teal: 'bg-[hsl(var(--pic-accent-teal-soft))] text-[hsl(var(--pic-accent-teal))]',
     yellow: 'bg-[hsl(var(--pic-accent-yellow-soft))] text-[hsl(var(--pic-accent-yellow))]',
-}[tone] || 'bg-slate-100 text-slate-500');
+}[tone] || 'bg-pic-muted-surface text-pic-text-muted');
 
 const metricTextClass = (tone: string) => ({
     brand: 'text-pic-brand',
@@ -210,7 +210,7 @@ const metricTextClass = (tone: string) => ({
     purple: 'text-[hsl(var(--pic-accent-purple))]',
     teal: 'text-[hsl(var(--pic-accent-teal))]',
     yellow: 'text-[hsl(var(--pic-accent-yellow))]',
-}[tone] || 'text-slate-500');
+}[tone] || 'text-pic-text-muted');
 
 const metricAccentClass = (tone: string) => ({
     brand: 'bg-pic-brand',
@@ -221,11 +221,11 @@ const metricAccentClass = (tone: string) => ({
     purple: 'bg-[hsl(var(--pic-accent-purple))]',
     teal: 'bg-[hsl(var(--pic-accent-teal))]',
     yellow: 'bg-[hsl(var(--pic-accent-yellow))]',
-}[tone] || 'bg-slate-300');
+}[tone] || 'bg-pic-border');
 </script>
 
 <template>
-    <main class="min-h-full bg-pic-background px-4 pb-6 pt-4 sm:px-5 sm:py-4 lg:px-7">
+    <main class="min-h-full bg-pic-background px-4 pb-6 pt-4 font-sans sm:px-5 sm:py-4 lg:px-7">
         <div class="mx-auto max-w-[1540px] space-y-4 sm:space-y-6">
             <section class="relative overflow-hidden px-0 pb-1 pt-3 sm:px-0 sm:py-5 lg:py-7">
                 <div class="pointer-events-none absolute inset-x-0 bottom-0 hidden h-28 overflow-hidden sm:block">
@@ -236,9 +236,9 @@ const metricAccentClass = (tone: string) => ({
                     <i class="fa-solid fa-crown text-[10rem]"></i>
                 </div>
                 <div class="pointer-events-none absolute right-6 top-6 hidden items-end gap-3 lg:flex">
-                    <span class="h-24 w-11 rounded-t-lg bg-gradient-to-b from-red-300 to-pic-brand shadow-lg shadow-pic-brand/20"></span>
-                    <span class="h-14 w-11 rounded-t-lg bg-gradient-to-b from-red-200 to-red-400 shadow-lg shadow-pic-brand/10"></span>
-                    <span class="h-20 w-11 rounded-t-lg bg-gradient-to-b from-red-200 to-red-500 shadow-lg shadow-pic-brand/10"></span>
+                    <span class="h-24 w-11 rounded-t-lg bg-pic-brand shadow-lg shadow-pic-brand/20"></span>
+                    <span class="h-14 w-11 rounded-t-lg bg-pic-brand/65 shadow-lg shadow-pic-brand/10"></span>
+                    <span class="h-20 w-11 rounded-t-lg bg-pic-brand/80 shadow-lg shadow-pic-brand/10"></span>
                 </div>
 
                 <div class="relative grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
@@ -253,7 +253,7 @@ const metricAccentClass = (tone: string) => ({
                     </div>
 
                     <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3 lg:grid-cols-1">
-                        <article class="group grid min-h-[58px] grid-cols-[42px_minmax(0,1fr)_20px] items-center gap-3 rounded-lg border border-pic-border bg-white px-3 py-2.5 shadow-sm sm:flex sm:min-h-0 sm:px-4 sm:py-3">
+                        <article class="group grid min-h-[58px] grid-cols-[42px_minmax(0,1fr)_20px] items-center gap-3 rounded-lg border border-pic-border bg-pic-surface px-3 py-2.5 shadow-sm sm:flex sm:min-h-0 sm:px-4 sm:py-3">
                             <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--pic-success)/0.12)] text-pic-success sm:h-10 sm:w-10">
                                 <i class="fa-solid fa-chart-pie text-sm"></i>
                             </span>
@@ -261,12 +261,12 @@ const metricAccentClass = (tone: string) => ({
                                 <p class="truncate text-xs font-black text-pic-text-main">Actualizacion de datos</p>
                                 <p class="text-[11px] font-semibold text-pic-text-muted">Hace 15 minutos</p>
                             </div>
-                            <i class="fa-solid fa-chevron-right justify-self-end text-xs text-slate-400 sm:hidden"></i>
-                            <div class="col-span-full h-1.5 overflow-hidden rounded-full bg-slate-100 sm:hidden">
-                                <div class="h-full w-full rounded-full bg-gradient-to-r from-pic-brand via-red-400 to-pic-brand"></div>
+                            <i class="fa-solid fa-chevron-right justify-self-end text-xs text-pic-text-muted sm:hidden"></i>
+                            <div class="col-span-full h-1.5 overflow-hidden rounded-lg bg-pic-muted-surface sm:hidden">
+                                <div class="h-full w-full rounded-lg bg-pic-brand"></div>
                             </div>
                         </article>
-                        <article class="mobile-cache-card overflow-hidden rounded-lg border border-pic-border bg-white shadow-sm sm:px-4 sm:py-3">
+                        <article class="mobile-cache-card overflow-hidden rounded-lg border border-pic-border bg-pic-surface shadow-sm sm:px-4 sm:py-3">
                             <CacheProgress />
                         </article>
                     </div>
@@ -279,14 +279,14 @@ const metricAccentClass = (tone: string) => ({
                     v-for="kpi in hubKpiCards"
                     :key="kpi.label"
                     :to="kpi.route"
-                    class="group relative min-h-[118px] overflow-hidden rounded-xl border border-pic-border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-pic-brand-border hover:shadow-md sm:p-5"
+                    class="group relative min-h-[118px] overflow-hidden rounded-xl border border-pic-border bg-pic-surface p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-pic-brand-border hover:shadow-md sm:p-5"
                 >
                     <span class="absolute inset-x-0 top-0 h-1" :class="metricAccentClass(kpi.tone)"></span>
                     <div class="flex items-start justify-between gap-4">
                         <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xl shadow-sm" :class="metricToneClass(kpi.tone)">
                             <i :class="kpi.icon"></i>
                         </span>
-                        <span v-if="kpi.route" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-pic-border bg-pic-muted-surface text-slate-400 transition group-hover:border-pic-brand-border group-hover:text-pic-brand">
+                        <span v-if="kpi.route" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-pic-border bg-pic-muted-surface text-pic-text-muted transition group-hover:border-pic-brand-border group-hover:text-pic-brand">
                             <i class="fa-solid fa-arrow-right text-xs"></i>
                         </span>
                     </div>
@@ -306,7 +306,7 @@ const metricAccentClass = (tone: string) => ({
 
             <section
                 v-if="showManagementTray"
-                class="overflow-hidden rounded-xl border border-pic-border bg-white shadow-sm"
+                class="overflow-hidden rounded-xl border border-pic-border bg-pic-surface shadow-sm"
             >
                 <div class="grid grid-cols-4 divide-x divide-pic-border sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-4">
                 <router-link
@@ -315,7 +315,7 @@ const metricAccentClass = (tone: string) => ({
                     :to="metric.route || '/admin/approvals'"
                     class="group flex min-h-[108px] flex-col items-start justify-between gap-2 px-3 py-3 transition hover:bg-pic-muted-surface sm:grid sm:min-h-[104px] sm:grid-cols-[68px_minmax(0,1fr)] sm:items-center sm:gap-4 sm:px-5 sm:py-4 lg:min-h-[116px]"
                 >
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg text-sm shadow-sm shadow-slate-200/70 sm:h-14 sm:w-14 sm:rounded-xl sm:text-2xl sm:shadow-lg" :class="metricToneClass(metric.tone)">
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg text-sm shadow-sm sm:h-14 sm:w-14 sm:rounded-xl sm:text-2xl sm:shadow-lg" :class="metricToneClass(metric.tone)">
                         <i :class="metric.icon"></i>
                     </span>
                     <span class="min-w-0">
@@ -333,7 +333,7 @@ const metricAccentClass = (tone: string) => ({
                         </span>
                         <span
                             v-if="!metric.value"
-                            class="inline-flex h-7 items-center rounded-lg border border-pic-border bg-white px-2 text-[10px] font-black text-pic-text-main shadow-sm transition group-hover:border-pic-brand-border group-hover:text-pic-brand sm:mt-2 sm:h-8 sm:px-3 sm:text-xs"
+                            class="inline-flex h-7 items-center rounded-lg border border-pic-border bg-pic-surface px-2 text-[10px] font-black text-pic-text-main shadow-sm transition group-hover:border-pic-brand-border group-hover:text-pic-brand sm:mt-2 sm:h-8 sm:px-3 sm:text-xs"
                         >
                             {{ metric.actionLabel }}
                         </span>
@@ -344,33 +344,33 @@ const metricAccentClass = (tone: string) => ({
 
             <div class="grid grid-cols-1 gap-5 xl:items-start" :class="showHubAside ? 'xl:grid-cols-[minmax(0,1fr)_360px]' : ''">
                 <section class="min-w-0 space-y-5 sm:space-y-6">
-                    <section v-if="showQuickActions" class="overflow-hidden rounded-xl text-pic-text-main sm:bg-pic-nav sm:p-5 sm:text-white sm:shadow-xl sm:shadow-slate-300/30">
+                    <section v-if="showQuickActions" class="overflow-hidden rounded-xl text-pic-text-main sm:bg-pic-nav sm:p-5 sm:text-pic-surface sm:shadow-xl sm:shadow-pic-border/30">
                         <div class="mb-2 flex items-center justify-between gap-3 sm:mb-4">
                             <h2 class="text-xs font-black uppercase tracking-wide sm:text-sm">Acceso rapido</h2>
                             <router-link
                                 to="/admin/setup"
-                                class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-1 text-[11px] font-black text-pic-brand transition hover:bg-pic-brand-soft sm:h-9 sm:border sm:border-white/10 sm:bg-white/5 sm:px-3 sm:text-xs sm:text-white sm:hover:bg-white/10"
+                                class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-1 text-[11px] font-black text-pic-brand transition hover:bg-pic-brand-soft sm:h-9 sm:border sm:border-pic-surface/10 sm:bg-pic-surface/5 sm:px-3 sm:text-xs sm:text-pic-surface sm:hover:bg-pic-surface/10"
                             >
                                 <i class="fa-solid fa-grip text-[10px]"></i>
                                 Personalizar
                             </router-link>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-2 rounded-xl bg-pic-nav p-2 shadow-xl shadow-slate-300/30 sm:grid-cols-2 sm:gap-3 sm:rounded-none sm:bg-transparent sm:p-0 sm:shadow-none 2xl:grid-cols-4">
+                        <div class="grid grid-cols-2 gap-2 rounded-xl bg-pic-nav p-2 shadow-xl shadow-pic-border/30 sm:grid-cols-2 sm:gap-3 sm:rounded-none sm:bg-transparent sm:p-0 sm:shadow-none 2xl:grid-cols-4">
                             <router-link
                                 v-for="action in quickActions"
                                 :key="action.label"
                                 :to="action.route"
-                                class="group grid min-h-[58px] grid-cols-[32px_minmax(0,1fr)_24px] items-center gap-2 rounded-lg border border-white/10 bg-white/10 px-2 py-2 transition hover:-translate-y-0.5 hover:bg-white/15 hover:shadow-lg hover:shadow-black/10 sm:min-h-[74px] sm:grid-cols-[44px_minmax(0,1fr)_32px] sm:gap-3 sm:px-3 sm:py-3"
+                                class="group grid min-h-[58px] grid-cols-[32px_minmax(0,1fr)_24px] items-center gap-2 rounded-lg border border-pic-surface/10 bg-pic-surface/10 px-2 py-2 transition hover:-translate-y-0.5 hover:bg-pic-surface/15 hover:shadow-lg hover:shadow-pic-text-main/10 sm:min-h-[74px] sm:grid-cols-[44px_minmax(0,1fr)_32px] sm:gap-3 sm:px-3 sm:py-3"
                             >
-                                <span class="flex h-8 w-8 items-center justify-center rounded-lg text-sm shadow-lg shadow-black/10 sm:h-10 sm:w-10 sm:text-base" :class="[action.bg, action.color]">
+                                <span class="flex h-8 w-8 items-center justify-center rounded-lg text-sm shadow-lg shadow-pic-text-main/10 sm:h-10 sm:w-10 sm:text-base" :class="[action.bg, action.color]">
                                     <i :class="action.icon"></i>
                                 </span>
                                 <span class="min-w-0">
-                                    <span class="block truncate text-[11px] font-black leading-tight text-white sm:text-sm">{{ action.label }}</span>
+                                    <span class="block truncate text-[11px] font-black leading-tight text-pic-surface sm:text-sm">{{ action.label }}</span>
                                     <span class="mt-0.5 block truncate text-[10px] font-semibold leading-tight text-pic-nav-text-muted sm:text-xs">{{ action.caption }}</span>
                                 </span>
-                                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-pic-nav-text-muted transition group-hover:bg-white/20 group-hover:text-white sm:h-8 sm:w-8">
+                                <span class="flex h-6 w-6 items-center justify-center rounded-lg bg-pic-surface/10 text-pic-nav-text-muted transition group-hover:bg-pic-surface/20 group-hover:text-pic-surface sm:h-8 sm:w-8">
                                     <i class="fa-solid fa-arrow-right text-xs"></i>
                                 </span>
                             </router-link>
@@ -380,7 +380,7 @@ const metricAccentClass = (tone: string) => ({
                     <section>
                         <div class="mb-3 flex items-center justify-between gap-3 sm:mb-4">
                             <h2 class="text-xs font-black uppercase tracking-wide text-pic-text-main sm:text-base">Modulos principales</h2>
-                            <span class="rounded-lg px-0 py-1.5 text-[10px] font-black text-pic-brand sm:border sm:border-pic-border sm:bg-white sm:px-3 sm:text-xs sm:font-bold sm:text-pic-text-muted sm:shadow-sm">
+                            <span class="rounded-lg px-0 py-1.5 text-[10px] font-black text-pic-brand sm:border sm:border-pic-border sm:bg-pic-surface sm:px-3 sm:text-xs sm:font-bold sm:text-pic-text-muted sm:shadow-sm">
                                 {{ dashboardModules.length }} modulos disponibles
                             </span>
                         </div>
@@ -407,7 +407,7 @@ const metricAccentClass = (tone: string) => ({
                                 :accent-class="getModuleVisualStyle(mod, setupStore.hasModuleColorOverride(mod.ModuleId)).accent"
                             />
 
-                            <div v-if="setupStore.userMenu.length === 0" class="col-span-full rounded-lg border border-dashed border-pic-border bg-white py-12 text-center text-pic-text-muted">
+                            <div v-if="setupStore.userMenu.length === 0" class="col-span-full rounded-lg border border-dashed border-pic-border bg-pic-surface py-12 text-center text-pic-text-muted">
                                 <i class="fa-regular fa-folder-open mb-4 text-4xl"></i>
                                 <p class="text-sm font-semibold">No tienes modulos asignados. Contacta al administrador.</p>
                             </div>
@@ -418,7 +418,7 @@ const metricAccentClass = (tone: string) => ({
                 <aside v-if="showHubAside" class="min-w-0 space-y-4 xl:sticky xl:top-5">
                     <NoticesPanel v-if="showNoticesPanel" />
 
-                    <section v-if="showActivityPanel" class="overflow-hidden rounded-xl border border-pic-border bg-white shadow-sm">
+                    <section v-if="showActivityPanel" class="overflow-hidden rounded-xl border border-pic-border bg-pic-surface shadow-sm">
                         <div class="flex items-center justify-between gap-3 border-b border-pic-border px-4 py-4 sm:px-5">
                             <div class="flex min-w-0 items-center gap-3">
                                 <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--pic-accent-blue-soft))] text-[hsl(var(--pic-accent-blue))] shadow-sm">

@@ -25,7 +25,7 @@ const linkLabel = computed(() => `Abrir módulo: ${props.title}`);
         target="_blank"
         rel="noopener noreferrer"
         :aria-label="linkLabel"
-        class="group flex min-h-[242px] flex-col overflow-hidden rounded-xl border border-pic-border bg-pic-surface shadow-sm shadow-slate-200/40 transition duration-200 hover:-translate-y-0.5 hover:border-pic-brand-border hover:shadow-md hover:shadow-slate-300/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pic-brand-border sm:min-h-[252px]"
+        class="group flex min-h-[242px] flex-col overflow-hidden rounded-xl border border-pic-border bg-pic-surface font-sans shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-pic-brand-border hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pic-brand-border sm:min-h-[252px]"
     >
         <div class="flex flex-1 flex-col items-center justify-center px-5 py-6 text-center sm:px-6 sm:py-7">
             <span
@@ -53,7 +53,7 @@ const linkLabel = computed(() => `Abrir módulo: ${props.title}`);
         v-else
         :to="to || '#'"
         :aria-label="linkLabel"
-        class="group flex min-h-[242px] flex-col overflow-hidden rounded-xl border border-pic-border bg-pic-surface shadow-sm shadow-slate-200/40 transition duration-200 hover:-translate-y-0.5 hover:border-pic-brand-border hover:shadow-md hover:shadow-slate-300/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pic-brand-border sm:min-h-[252px]"
+        class="group flex min-h-[242px] flex-col overflow-hidden rounded-xl border border-pic-border bg-pic-surface font-sans shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-pic-brand-border hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pic-brand-border sm:min-h-[252px]"
     >
         <div class="flex flex-1 flex-col items-center justify-center px-5 py-6 text-center sm:px-6 sm:py-7">
             <span

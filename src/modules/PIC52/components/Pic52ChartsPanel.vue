@@ -180,15 +180,18 @@ const tooltipFormatter = (metric: Pic52Metric) => (rawParams: unknown) => {
   if (!Number.isInteger(week)) return '';
 
   const colors = seriesColors();
+  const textMain = token('--pic-text-main', '#172033');
+  const textMuted = token('--pic-text-muted', '#64748b');
+  const borderColor = token('--pic-border', '#e2e8f0');
   const yearRows = years.value.map((year, index) => {
     const value = metricValue(year, week, metric);
     return `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:24px;margin-top:6px">
-        <span style="display:flex;align-items:center;gap:7px;color:#64748b">
+        <span style="display:flex;align-items:center;gap:7px;color:${textMuted}">
           <span style="width:8px;height:8px;border-radius:3px;background:${colors[index % colors.length]}"></span>
           ${year}
         </span>
-        <strong style="color:#172033;font-variant-numeric:tabular-nums">${formatMetric(value, metric)}</strong>
+        <strong style="color:${textMain};font-variant-numeric:tabular-nums">${formatMetric(value, metric)}</strong>
       </div>`;
   }).join('');
 
@@ -202,19 +205,19 @@ const tooltipFormatter = (metric: Pic52Metric) => (rawParams: unknown) => {
     : { difference: null, percentage: null };
 
   return `
-    <div style="min-width:210px;font-family:inherit">
-      <div style="font-size:11px;font-weight:800;color:#172033">SEM-${week} · ${metric === 'kg' ? 'Kilogramos' : 'Pesos'}</div>
+    <div style="min-width:210px">
+      <div style="font-size:11px;font-weight:800;color:${textMain}">SEM-${week} · ${metric === 'kg' ? 'Kilogramos' : 'Pesos'}</div>
       ${yearRows}
-      <div style="height:1px;background:#e2e8f0;margin:9px 0 7px"></div>
-      <div style="display:flex;justify-content:space-between;gap:18px;font-size:10px;color:#64748b">
+      <div style="height:1px;background:${borderColor};margin:9px 0 7px"></div>
+      <div style="display:flex;justify-content:space-between;gap:18px;font-size:10px;color:${textMuted}">
         <span>Diferencia</span>
-        <strong style="color:#172033">${formatSignedMetric(comparison.difference, metric)}</strong>
+        <strong style="color:${textMain}">${formatSignedMetric(comparison.difference, metric)}</strong>
       </div>
-      <div style="display:flex;justify-content:space-between;gap:18px;margin-top:4px;font-size:10px;color:#64748b">
+      <div style="display:flex;justify-content:space-between;gap:18px;margin-top:4px;font-size:10px;color:${textMuted}">
         <span>Variación</span>
-        <strong style="color:#172033">${formatPercentage(comparison.percentage)}</strong>
+        <strong style="color:${textMain}">${formatPercentage(comparison.percentage)}</strong>
       </div>
-      <div style="margin-top:8px;font-size:9px;color:#94a3b8">Clic para fijar esta semana</div>
+      <div style="margin-top:8px;font-size:9px;color:${textMuted}">Clic para fijar esta semana</div>
     </div>`;
 };
 
@@ -552,7 +555,7 @@ onBeforeUnmount(() => {
 <template>
   <section
     id="pic52-charts"
-    class="space-y-4"
+    class="space-y-4 font-sans"
     aria-label="Gráficas comparativas semanales"
   >
     <div
@@ -560,8 +563,8 @@ onBeforeUnmount(() => {
       class="grid grid-cols-1 overflow-hidden rounded-xl border border-pic-border bg-pic-surface shadow-sm lg:grid-cols-[126px_minmax(0,1fr)_260px]"
       aria-live="polite"
     >
-      <div class="flex items-center gap-3 border-b border-pic-border bg-slate-900 px-4 py-3 text-white lg:flex-col lg:items-start lg:justify-center lg:border-b-0 lg:border-r">
-        <span class="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">Semana fijada</span>
+      <div class="flex items-center gap-3 border-b border-pic-border bg-pic-text-main px-4 py-3 text-pic-surface lg:flex-col lg:items-start lg:justify-center lg:border-b-0 lg:border-r">
+        <span class="text-[9px] font-black uppercase tracking-[0.16em] text-pic-text-muted">Semana fijada</span>
         <strong class="font-mono text-lg">SEM-{{ pinnedSummary.week }}</strong>
       </div>
       <div class="overflow-x-auto">
