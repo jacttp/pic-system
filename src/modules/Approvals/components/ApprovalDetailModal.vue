@@ -950,7 +950,7 @@ const canDecreaseCpfrRow = (row: CpfrPreviewRow) => {
 
 const canIncreaseCpfrRow = (row: CpfrPreviewRow) => {
    const step = Number(row.pzas_bolsa || 0);
-   return step > 0 && row.ajuste < 0 && row.cantidad_base_uni + row.ajuste + step <= row.cantidad_base_uni;
+   return step > 0;
 };
 
 const setRowAdjusting = (row: CpfrPreviewRow, isAdjusting: boolean) => {
@@ -982,7 +982,6 @@ const handleAdjustPedido = async (row: CpfrPreviewRow, direction: 1 | -1) => {
    const nextAdjustment = row.ajuste + (step * direction);
    const nextTotal = row.cantidad_base_uni + nextAdjustment;
    if (nextTotal < 0) return;
-   if (nextTotal > row.cantidad_base_uni) return;
 
    setRowAdjusting(row, true);
    errorMessage.value = '';
