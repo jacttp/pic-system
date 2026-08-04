@@ -1,6 +1,7 @@
 <!-- src/modules/Hub/views/HubView.vue -->
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import { useSetupStore } from '@/modules/Setup/stores/setupStores';
 import { useProfileStore } from '@/modules/UserProfile/stores/profileStore';
@@ -33,6 +34,7 @@ const auth = useAuthStore();
 const setupStore = useSetupStore();
 const profileStore = useProfileStore();
 const approvalsStore = useApprovalsStore();
+const route = useRoute();
 
 onMounted(async () => {
     if (setupStore.modules.length === 0) {
@@ -51,6 +53,30 @@ const dashboardModules = computed(() =>
         .flat()
         .filter(module => module.ModuleKey !== 'HUB')
 );
+const moduleSearch = computed(() => {
+    const value = route.query.moduleSearch;
+    return (Array.isArray(value) ? value[0] : value || '').trim();
+});
+const normalizedModuleSearch = computed(() => moduleSearch.value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('es-MX')
+);
+const filteredDashboardModules = computed(() => {
+    if (!normalizedModuleSearch.value) return dashboardModules.value;
+
+    return dashboardModules.value.filter(module => [
+        module.Label,
+        module.Category,
+        module.Description,
+        module.ModuleKey,
+    ].filter(Boolean).some(value => String(value)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLocaleLowerCase('es-MX')
+        .includes(normalizedModuleSearch.value)
+    ));
+});
 const displayName = computed(() => profileStore.profile?.nombre || auth.user?.nombre || auth.user?.username || 'Usuario');
 const showManagementTray = computed(() => setupStore.hubFeatureVisibility['hub.management_tray']);
 const showQuickActions = computed(() => setupStore.hubFeatureVisibility['hub.quick_actions']);
@@ -381,9 +407,13 @@ const metricAccentClass = (tone: string) => ({
                         <div class="mb-3 flex items-center justify-between gap-3 sm:mb-4">
                             <h2 class="text-xs font-black uppercase tracking-wide text-pic-text-main sm:text-base">Modulos principales</h2>
                             <span class="rounded-lg px-0 py-1.5 text-[10px] font-black text-pic-brand sm:border sm:border-pic-border sm:bg-pic-surface sm:px-3 sm:text-xs sm:font-bold sm:text-pic-text-muted sm:shadow-sm">
-                                {{ dashboardModules.length }} modulos disponibles
+                                {{ filteredDashboardModules.length }} de {{ dashboardModules.length }} modulos
                             </span>
                         </div>
+
+                        <p v-if="moduleSearch" class="mb-3 text-xs font-semibold text-pic-text-muted">
+                            Resultados para <span class="font-black text-pic-text-main">“{{ moduleSearch }}”</span>
+                        </p>
 
                         <div v-if="setupStore.isLoading" class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 2xl:grid-cols-4">
                             <div v-for="i in 8" :key="i" class="min-h-[242px] animate-pulse rounded-xl border border-pic-border bg-pic-surface p-6 shadow-sm sm:min-h-[252px]">
@@ -396,7 +426,7 @@ const metricAccentClass = (tone: string) => ({
 
                         <div v-else class="grid grid-cols-1 gap-4 fade-in sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 2xl:grid-cols-4">
                             <ModuleCard
-                                v-for="mod in dashboardModules"
+                                v-for="mod in filteredDashboardModules"
                                 :key="mod.ModuleId"
                                 :title="mod.Label"
                                 :description="getModuleVisualStyle(mod).desc"
@@ -407,9 +437,17 @@ const metricAccentClass = (tone: string) => ({
                                 :accent-class="getModuleVisualStyle(mod, setupStore.hasModuleColorOverride(mod.ModuleId)).accent"
                             />
 
-                            <div v-if="setupStore.userMenu.length === 0" class="col-span-full rounded-lg border border-dashed border-pic-border bg-pic-surface py-12 text-center text-pic-text-muted">
+                            <div v-if="dashboardModules.length === 0" class="col-span-full rounded-lg border border-dashed border-pic-border bg-pic-surface py-12 text-center text-pic-text-muted">
                                 <i class="fa-regular fa-folder-open mb-4 text-4xl"></i>
                                 <p class="text-sm font-semibold">No tienes modulos asignados. Contacta al administrador.</p>
+                            </div>
+
+                            <div v-else-if="filteredDashboardModules.length === 0" class="col-span-full rounded-lg border border-dashed border-pic-border bg-pic-surface px-4 py-12 text-center text-pic-text-muted">
+                                <i class="fa-solid fa-magnifying-glass mb-4 text-3xl text-pic-brand"></i>
+                                <p class="text-sm font-black text-pic-text-main">No encontramos modulos para “{{ moduleSearch }}”.</p>
+                                <router-link :to="{ name: 'hub' }" class="mt-3 inline-flex rounded-lg bg-pic-brand-soft px-3 py-2 text-xs font-black text-pic-brand transition hover:bg-pic-brand hover:text-white">
+                                    Limpiar busqueda
+                                </router-link>
                             </div>
                         </div>
                     </section>

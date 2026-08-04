@@ -28,7 +28,7 @@ const scopes = [
   { value: 'Todos', label: 'Todos los alcances' },
   { value: 'shared', label: 'Compartidos' },
   { value: 'pattern', label: 'Patrones' },
-  { value: 'module-example', label: 'Ejemplos aplicados' },
+  { value: 'module-example', label: 'Referencias PIC' },
 ];
 
 const filteredEntries = computed(() => {
@@ -46,6 +46,12 @@ const selectedEntry = computed(() => (
 ));
 
 const selectedCode = computed(() => selectedEntry.value?.examples.find(example => example.code)?.code || '');
+const selectedRelatedEntries = computed(() => {
+  if (!selectedEntry.value) return [];
+  return selectedEntry.value.relatedEntries
+    .map(id => uiCatalogEntries.find(entry => entry.id === id))
+    .filter(Boolean);
+});
 
 const maturityMeta = {
   stable: { label: 'Estable', className: 'border-[hsl(var(--pic-success)/0.28)] bg-[hsl(var(--pic-success)/0.08)] text-pic-success' },
@@ -57,7 +63,15 @@ const maturityMeta = {
 const scopeMeta = {
   shared: 'Compartido',
   pattern: 'Patrón',
-  'module-example': 'Ejemplo aplicado',
+  'module-example': 'Referencia PIC',
+};
+
+const selectRelatedEntry = (id: string) => {
+  const entry = uiCatalogEntries.find(candidate => candidate.id === id);
+  if (!entry) return;
+  category.value = 'Todos';
+  scope.value = entry.scope;
+  selectedId.value = entry.id;
 };
 
 watch(filteredEntries, entries => {
@@ -122,7 +136,9 @@ const copyCode = async () => {
           <div class="flex items-start justify-between gap-2">
             <span class="min-w-0">
               <span class="block truncate text-xs font-extrabold text-pic-text-main">{{ entry.name }}</span>
-              <span class="mt-0.5 block text-[10px] font-bold uppercase tracking-[0.1em] text-pic-text-muted">{{ entry.category }}</span>
+              <span class="mt-0.5 block text-[10px] font-bold uppercase tracking-[0.1em] text-pic-text-muted">
+                {{ entry.category }} · {{ scopeMeta[entry.scope] }}
+              </span>
             </span>
             <span class="shrink-0 rounded-lg border px-2 py-0.5 text-[9px] font-bold uppercase" :class="maturityMeta[entry.maturity].className">
               {{ maturityMeta[entry.maturity].label }}
@@ -173,6 +189,70 @@ const copyCode = async () => {
                 </li>
               </ul>
             </div>
+          </div>
+        </article>
+
+        <article v-if="selectedEntry.scope === 'module-example'" class="overflow-hidden rounded-xl border border-pic-brand-border bg-pic-surface shadow-sm">
+          <div class="border-b border-pic-brand-border bg-pic-brand-soft px-4 py-3 sm:px-5">
+            <div class="flex items-start gap-3">
+              <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-pic-brand text-white">
+                <i class="fa-solid fa-book-open"></i>
+              </span>
+              <div>
+                <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-pic-brand">Referencia de implementación</p>
+                <h3 class="mt-0.5 text-sm font-extrabold text-pic-text-main">Estudia el criterio; no importes este componente.</h3>
+                <p class="mt-1 text-xs font-medium leading-5 text-pic-text-muted">Esta pieza pertenece al módulo PIC. Sirve para reconocer decisiones de jerarquía, densidad y comportamiento que puedes adaptar con los componentes compartidos.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-5 p-4 sm:p-5">
+            <div v-if="selectedEntry.examples.length" class="grid gap-3 sm:grid-cols-2">
+              <article v-for="example in selectedEntry.examples" :key="example.title" class="rounded-xl border border-pic-border bg-pic-muted-surface p-3">
+                <p class="text-[10px] font-bold uppercase tracking-[0.12em] text-pic-brand">{{ example.title }}</p>
+                <p class="mt-1 text-xs font-medium leading-5 text-pic-text-muted">{{ example.description }}</p>
+              </article>
+            </div>
+
+            <div class="grid gap-3 lg:grid-cols-3">
+              <section>
+                <h4 class="text-[10px] font-bold uppercase tracking-[0.12em] text-pic-text-muted">Estados que debe resolver</h4>
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                  <span v-for="state in selectedEntry.states" :key="state" class="rounded-md border border-pic-border bg-pic-surface px-2 py-1 text-[10px] font-bold text-pic-text-main">{{ state }}</span>
+                </div>
+              </section>
+              <section>
+                <h4 class="text-[10px] font-bold uppercase tracking-[0.12em] text-pic-text-muted">Adaptación</h4>
+                <ul class="mt-2 space-y-1.5">
+                  <li v-for="item in selectedEntry.responsive" :key="item" class="flex gap-2 text-[11px] font-medium leading-4 text-pic-text-muted">
+                    <i class="fa-solid fa-mobile-screen-button mt-0.5 text-[9px] text-pic-brand"></i><span>{{ item }}</span>
+                  </li>
+                </ul>
+              </section>
+              <section>
+                <h4 class="text-[10px] font-bold uppercase tracking-[0.12em] text-pic-text-muted">Accesibilidad</h4>
+                <ul class="mt-2 space-y-1.5">
+                  <li v-for="item in selectedEntry.accessibility" :key="item" class="flex gap-2 text-[11px] font-medium leading-4 text-pic-text-muted">
+                    <i class="fa-solid fa-universal-access mt-0.5 text-[9px] text-pic-brand"></i><span>{{ item }}</span>
+                  </li>
+                </ul>
+              </section>
+            </div>
+
+            <section v-if="selectedRelatedEntries.length" class="border-t border-pic-border pt-4">
+              <h4 class="text-[10px] font-bold uppercase tracking-[0.12em] text-pic-text-muted">Siguiente consulta</h4>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <button
+                  v-for="entry in selectedRelatedEntries"
+                  :key="entry!.id"
+                  type="button"
+                  class="inline-flex items-center gap-2 rounded-lg border border-pic-border bg-pic-surface px-2.5 py-1.5 text-left text-[11px] font-bold text-pic-text-main transition hover:border-pic-brand-border hover:bg-pic-brand-soft hover:text-pic-brand"
+                  @click="selectRelatedEntry(entry!.id)"
+                >
+                  <i class="fa-solid fa-arrow-right text-[9px]"></i>{{ entry!.name }}
+                </button>
+              </div>
+            </section>
           </div>
         </article>
 

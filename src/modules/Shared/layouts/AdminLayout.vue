@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import { useSetupStore } from '@/modules/Setup/stores/setupStores';
 import { useProfileStore } from '@/modules/UserProfile/stores/profileStore';
@@ -8,6 +8,7 @@ import { useRouter, useRoute } from 'vue-router';
 import NotificationCenter from '@/modules/UserProfile/components/NotificationCenter.vue';
 import coronaLogo from '@/assets/logo.png';
 import coronaLogoMobile from '@/assets/logo_movil.png';
+import type { SystemModule } from '@/modules/Setup/types/setupTypes';
 
 const SIDEBAR_COLLAPSE_KEY = 'pic_admin_sidebar_collapsed';
 const SIDEBAR_CATEGORY_COLLAPSE_KEY = 'pic_admin_sidebar_category_collapsed';
@@ -24,6 +25,10 @@ const showNotifDropdown = ref(false);
 const showUserMenu = ref(false);
 const showMobileSidebar = ref(false);
 const collapsedSidebarCategories = ref<Record<string, boolean>>({});
+const moduleSearch = ref('');
+const moduleSearchInput = ref<HTMLInputElement | null>(null);
+const isModuleSearchFocused = ref(false);
+const activeSearchResultIndex = ref(0);
 
 let notifPoll: ReturnType<typeof setInterval> | null = null;
 let previousDocumentOverflow = '';
@@ -47,10 +52,12 @@ onMounted(async () => {
    notifPoll = setInterval(() => {
       profileStore.fetchNotifications();
    }, 120_000);
+   window.addEventListener('keydown', handleGlobalSearchShortcut);
 });
 
 onUnmounted(() => {
    if (notifPoll) clearInterval(notifPoll);
+   window.removeEventListener('keydown', handleGlobalSearchShortcut);
    document.documentElement.style.overflow = previousDocumentOverflow;
    document.body.style.overflow = previousBodyOverflow;
 });
@@ -115,6 +122,114 @@ const toggleSidebarCategory = (category: string) => {
 };
 
 const categoryHasActiveModule = (modules: Array<{ Route: string }>) => modules.some(mod => isActive(mod.Route));
+
+const normalizeSearchValue = (value: string) => value
+   .normalize('NFD')
+   .replace(/[\u0300-\u036f]/g, '')
+   .toLocaleLowerCase('es-MX');
+
+const matchesModuleSearch = (module: SystemModule, query: string) => [
+   module.Label,
+   module.Category,
+   module.Description,
+   module.ModuleKey,
+].filter(Boolean).some(value => normalizeSearchValue(String(value)).includes(query));
+
+const moduleSearchFromRoute = (value: unknown) => Array.isArray(value) ? value[0] || '' : String(value || '');
+
+const isHubRoute = computed(() => route.name === 'hub');
+const searchTerm = computed(() => moduleSearch.value.trim());
+const normalizedSearchTerm = computed(() => normalizeSearchValue(searchTerm.value));
+const searchResults = computed(() => {
+   if (!normalizedSearchTerm.value) return [];
+
+   return setupStore.userMenu
+      .filter(module => matchesModuleSearch(module, normalizedSearchTerm.value))
+      .slice(0, 6);
+});
+const showSearchResults = computed(() => isModuleSearchFocused.value && Boolean(searchTerm.value));
+const showSearchEmptyState = computed(() => showSearchResults.value && searchResults.value.length === 0);
+
+const focusModuleSearch = async () => {
+   await nextTick();
+   moduleSearchInput.value?.focus();
+   moduleSearchInput.value?.select();
+};
+
+const handleGlobalSearchShortcut = (event: KeyboardEvent) => {
+   if (!(event.ctrlKey || event.metaKey) || event.key.toLocaleLowerCase('es-MX') !== 'k') return;
+
+   event.preventDefault();
+   void focusModuleSearch();
+};
+
+const selectSearchResult = async (module: SystemModule) => {
+   activeSearchResultIndex.value = 0;
+   await router.push(module.Route);
+   moduleSearch.value = '';
+};
+
+const handleSearchKeydown = (event: KeyboardEvent) => {
+   if (event.key === 'Escape') {
+      moduleSearch.value = '';
+      isModuleSearchFocused.value = false;
+      moduleSearchInput.value?.blur();
+      return;
+   }
+
+   if (searchResults.value.length === 0) return;
+
+   if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      activeSearchResultIndex.value = (activeSearchResultIndex.value + 1) % searchResults.value.length;
+   }
+
+   if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      activeSearchResultIndex.value = (activeSearchResultIndex.value - 1 + searchResults.value.length) % searchResults.value.length;
+   }
+
+   if (event.key === 'Enter') {
+      event.preventDefault();
+      const selectedModule = searchResults.value[activeSearchResultIndex.value];
+      if (selectedModule) selectSearchResult(selectedModule);
+   }
+};
+
+watch(moduleSearch, value => {
+   activeSearchResultIndex.value = 0;
+
+   if (!isHubRoute.value) return;
+
+   const nextSearch = value.trim();
+   if (moduleSearchFromRoute(route.query.moduleSearch) === nextSearch) return;
+
+   void router.replace({
+      query: {
+         ...route.query,
+         moduleSearch: nextSearch || undefined,
+      },
+   });
+});
+
+watch(
+   () => route.query.moduleSearch,
+   value => {
+      if (!isHubRoute.value) return;
+      const nextSearch = moduleSearchFromRoute(value);
+      if (moduleSearch.value !== nextSearch) moduleSearch.value = nextSearch;
+   },
+   { immediate: true },
+);
+
+watch(
+   () => route.name,
+   name => {
+      if (name !== 'hub') {
+         moduleSearch.value = '';
+      }
+   },
+);
 
 const goToProfile = () => {
    showUserMenu.value = false;
@@ -281,12 +396,53 @@ const sidebarLogo = computed(() => isCollapsed.value ? coronaLogoMobile : corona
                <label class="relative w-full max-w-2xl">
                   <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-sm text-slate-400"></i>
                   <input
+                     ref="moduleSearchInput"
+                     v-model="moduleSearch"
                      type="search"
                      aria-label="Buscar en PIC System"
-                     placeholder="Buscar modulos, reportes o datos..."
+                     :aria-expanded="showSearchResults"
+                     aria-controls="module-search-results"
+                     :aria-activedescendant="showSearchResults && searchResults[activeSearchResultIndex] ? `module-search-result-${searchResults[activeSearchResultIndex].ModuleId}` : undefined"
+                     :placeholder="isHubRoute ? 'Filtrar modulos del hub...' : 'Ir a un modulo...'"
                      class="h-10 w-full rounded-lg border border-pic-border bg-white pl-11 pr-20 text-sm font-semibold text-pic-text-main shadow-sm outline-none transition placeholder:text-slate-400 focus:border-pic-brand-border focus:ring-4 focus:ring-pic-brand-border/60"
+                     @focus="isModuleSearchFocused = true"
+                     @blur="isModuleSearchFocused = false"
+                     @keydown="handleSearchKeydown"
                   />
                   <span class="absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-pic-border bg-pic-muted-surface px-2 py-1 text-[11px] font-bold text-pic-text-muted">Ctrl + K</span>
+
+                  <div
+                     v-if="showSearchResults"
+                     id="module-search-results"
+                     role="listbox"
+                     class="absolute left-0 right-0 top-[calc(100%+0.5rem)] overflow-hidden rounded-xl border border-pic-border bg-pic-surface p-1.5 shadow-xl shadow-slate-200/70"
+                  >
+                     <button
+                        v-for="(module, index) in searchResults"
+                        :id="`module-search-result-${module.ModuleId}`"
+                        :key="module.ModuleId"
+                        type="button"
+                        role="option"
+                        :aria-selected="activeSearchResultIndex === index"
+                        class="grid w-full grid-cols-[2.5rem_minmax(0,1fr)_1.25rem] items-center gap-3 rounded-lg px-2.5 py-2.5 text-left transition"
+                        :class="activeSearchResultIndex === index ? 'bg-pic-brand-soft text-pic-brand' : 'text-pic-text-main hover:bg-pic-muted-surface'"
+                        @mousedown.prevent
+                        @click="selectSearchResult(module)"
+                     >
+                        <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-pic-muted-surface text-sm text-pic-text-muted" :class="activeSearchResultIndex === index ? 'bg-white text-pic-brand' : ''">
+                           <i :class="module.Icon"></i>
+                        </span>
+                        <span class="min-w-0">
+                           <span class="block truncate text-sm font-black">{{ module.Label }}</span>
+                           <span class="block truncate text-[11px] font-semibold text-pic-text-muted">{{ module.Category }}</span>
+                        </span>
+                        <i class="fa-solid fa-arrow-right text-[10px] text-pic-text-muted"></i>
+                     </button>
+
+                     <div v-if="showSearchEmptyState" class="px-3 py-4 text-center text-xs font-semibold text-pic-text-muted">
+                        No hay modulos disponibles que coincidan con “{{ searchTerm }}”.
+                     </div>
+                  </div>
                </label>
             </div>
 
