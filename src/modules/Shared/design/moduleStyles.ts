@@ -193,6 +193,13 @@ export const MODULE_VISUAL_STYLES: Record<string, ModuleVisualStyle> = {
     accent: 'bg-[hsl(var(--pic-accent-teal))]',
     desc: 'Clasifica conceptos nuevos de ArticulosIC con revision humana y trazabilidad.',
   },
+  CANVAS: {
+    color: 'text-[hsl(var(--pic-accent-purple))]',
+    bg: 'bg-[hsl(var(--pic-accent-purple-soft))]',
+    border: 'border-[hsl(var(--pic-accent-purple))]',
+    accent: 'bg-[hsl(var(--pic-accent-purple))]',
+    desc: 'Explorador temporal multidimensional de brechas de ventas en kilogramos.',
+  },
   UPLOAD_OC: {
     color: 'text-[hsl(var(--pic-accent-orange))]',
     bg: 'bg-[hsl(var(--pic-accent-orange-soft))]',

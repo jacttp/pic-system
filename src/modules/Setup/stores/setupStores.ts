@@ -108,6 +108,7 @@ export const useSetupStore = defineStore('setup', () => {
 
    // Datos Mock para desarrollo (Fallback)
    const MOCK_MODULES: SystemModule[] = [
+      { ModuleId: 13, ModuleKey: 'CANVAS', Label: 'Canvas', Route: '/admin/canvas', Icon: 'fa-solid fa-cubes-stacked', Category: 'Analítica', DisplayOrder: 26, IsActive: true, MinRoleLevel: 3, DevStatus: 'Development', Scope: 'Admin', Description: 'Explorador temporal multidimensional de brechas de ventas en kilogramos.', IconColor: 'text-pic-accent-purple', BgColor: 'bg-pic-accent-purple-soft' },
       { ModuleId: 12, ModuleKey: 'PIC_52S', Label: 'Reporte PIC 52S', Route: '/admin/pic-52s', Icon: 'fa-solid fa-chart-line', Category: 'Analítica', DisplayOrder: 25, IsActive: true, MinRoleLevel: 1, DevStatus: 'Development', Description: 'Comparativo semanal de ventas en kilogramos y pesos para tres años.', IconColor: 'text-pic-accent-blue', BgColor: 'bg-pic-accent-blue-soft' },
       // Analítica
       { ModuleId: 1, ModuleKey: 'HUB', Label: 'Hub Central', Route: '/', Icon: 'fa-solid fa-chart-simple', Category: 'Analítica', DisplayOrder: 10, IsActive: true, MinRoleLevel: 1, DevStatus: 'Finished' },

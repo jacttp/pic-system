@@ -166,6 +166,17 @@ const router = createRouter({
             },
             // NUEVA RUTA: Módulo PIC (Fase 2)
             {
+               path: 'canvas',
+               name: 'canvas',
+               component: () => import('@/modules/Canvas/views/CanvasView.vue'),
+               meta: {
+                  requiresAuth: true,
+                  minRoleLevel: 3,
+                  moduleKey: 'CANVAS',
+                  title: 'Canvas'
+               }
+            },
+            {
                path: 'pic',
                name: 'pic-report',
                component: () => import('@/modules/PIC/views/PicDashboardView.vue')
