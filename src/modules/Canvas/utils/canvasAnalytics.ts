@@ -1,17 +1,46 @@
 import type {
   CanvasAnalysisResult,
   CanvasAxisConfig,
+  CanvasBreakdownSeries,
   CanvasCell,
   CanvasDimension,
   CanvasMetric,
   CanvasRow,
+  CanvasSourceDimension,
 } from '../types/canvasTypes';
 
-const DIMENSIONS: CanvasDimension[] = ['cadena', 'linea', 'familia'];
+const SOURCE_DIMENSIONS: CanvasSourceDimension[] = ['cadena', 'linea', 'familia'];
 
-export const getCanvasDimensionValue = (row: CanvasRow, dimension: CanvasDimension) => row[dimension];
+export const CANVAS_RESULT_RANGES = [
+  'Pérdida crítica · > 50k kg',
+  'Pérdida alta · 10k–50k kg',
+  'Pérdida media · 1k–10k kg',
+  'Pérdida baja · < 1k kg',
+  'Sin cambio',
+  'Ganancia baja · < 1k kg',
+  'Ganancia media · 1k–10k kg',
+  'Ganancia alta · > 10k kg',
+] as const;
+
+export type CanvasResultRange = typeof CANVAS_RESULT_RANGES[number];
+
+export const getCanvasResultRange = (difference: number): CanvasResultRange => {
+  if (difference < -50_000) return CANVAS_RESULT_RANGES[0];
+  if (difference < -10_000) return CANVAS_RESULT_RANGES[1];
+  if (difference < -1_000) return CANVAS_RESULT_RANGES[2];
+  if (difference < 0) return CANVAS_RESULT_RANGES[3];
+  if (difference === 0) return CANVAS_RESULT_RANGES[4];
+  if (difference < 1_000) return CANVAS_RESULT_RANGES[5];
+  if (difference < 10_000) return CANVAS_RESULT_RANGES[6];
+  return CANVAS_RESULT_RANGES[7];
+};
+
+export const getCanvasDimensionValue = (row: CanvasRow, dimension: CanvasDimension) => (
+  dimension === 'resultado' ? getCanvasResultRange(row.diferencia) : row[dimension]
+);
 
 export const uniqueInSourceOrder = (rows: CanvasRow[], dimension: CanvasDimension) => {
+  if (dimension === 'resultado') return [...CANVAS_RESULT_RANGES];
   const seen = new Set<string>();
   return rows.reduce<string[]>((values, row) => {
     const value = getCanvasDimensionValue(row, dimension);
@@ -26,7 +55,7 @@ export const uniqueInSourceOrder = (rows: CanvasRow[], dimension: CanvasDimensio
 export const resolveCanvasFilterDimension = (
   x: CanvasDimension,
   y: CanvasDimension,
-): CanvasDimension => DIMENSIONS.find((dimension) => dimension !== x && dimension !== y) || 'linea';
+): CanvasSourceDimension => SOURCE_DIMENSIONS.find((dimension) => dimension !== x && dimension !== y) || 'linea';
 
 export const createCanvasAxisConfig = (
   x: CanvasDimension = 'cadena',
@@ -84,6 +113,7 @@ export const analyzeCanvasRows = (
   const filterSet = new Set(effectiveFilterValues);
   const filteredRows = rows.filter((row) => filterSet.has(getCanvasDimensionValue(row, axis.filter)));
   const grouped = new Map<string, CanvasRow[]>();
+  const hasResultAxis = axis.x === 'resultado' || axis.y === 'resultado';
 
   filteredRows.forEach((row) => {
     const x = getCanvasDimensionValue(row, axis.x);
@@ -94,19 +124,28 @@ export const analyzeCanvasRows = (
     grouped.set(key, existing);
   });
 
-  const expectedCount = effectiveFilterValues.length;
+  const sourceAxes = new Set<CanvasSourceDimension>(
+    [axis.x, axis.y].filter((dimension): dimension is CanvasSourceDimension => dimension !== 'resultado'),
+  );
+  const hiddenSourceDimensions = SOURCE_DIMENSIONS.filter((dimension) => !sourceAxes.has(dimension));
+  const expectedCount = hiddenSourceDimensions.reduce((total, dimension) => {
+    const values = dimension === axis.filter
+      ? effectiveFilterValues
+      : uniqueInSourceOrder(rows, dimension);
+    return total * values.length;
+  }, 1);
   const cells = yValues.flatMap((y) => xValues.map<CanvasCell>((x) => {
     const sourceRows = grouped.get(cellKey(x, y)) || [];
     const observed = sourceRows.length > 0;
     const netDifference = observed
       ? sourceRows.reduce((total, row) => total + row.diferencia, 0)
-      : null;
+      : hasResultAxis ? 0 : null;
     const grossLoss = observed
       ? sourceRows.reduce((total, row) => total + (row.diferencia < 0 ? Math.abs(row.diferencia) : 0), 0)
-      : null;
+      : hasResultAxis ? 0 : null;
     const gains = observed
       ? sourceRows.reduce((total, row) => total + (row.diferencia > 0 ? row.diferencia : 0), 0)
-      : null;
+      : hasResultAxis ? 0 : null;
 
     return {
       key: cellKey(x, y),
@@ -139,7 +178,7 @@ export const analyzeCanvasRows = (
   });
 
   yValues.forEach((y) => {
-    const peers = cells.filter((cell) => cell.y === y && cell.netDifference !== null);
+    const peers = cells.filter((cell) => cell.y === y && cell.observedCount > 0);
     if (peers.length < 3) return;
     const values = peers.map((cell) => cell.netDifference as number);
     const peerMedian = median(values);
@@ -188,7 +227,12 @@ export const analyzeCanvasRows = (
         0,
       ),
       observedCombinations: filteredRows.length,
-      expectedCombinations: xValues.length * yValues.length * effectiveFilterValues.length,
+      expectedCombinations: SOURCE_DIMENSIONS.reduce((total, dimension) => {
+        const values = dimension === axis.filter
+          ? effectiveFilterValues
+          : uniqueInSourceOrder(rows, dimension);
+        return total * values.length;
+      }, 1),
     },
     metricMin: metricValues.length > 0 ? Math.min(...metricValues) : 0,
     metricMax: metricValues.length > 0 ? Math.max(...metricValues) : 0,
@@ -210,3 +254,55 @@ export const canvasDivergingBarValue = (cell: CanvasCell, metric: CanvasMetric) 
 export const canvasVisualColorValue = (cell: CanvasCell, metric: CanvasMetric) => (
   metric === 'netDifference' ? cell.netDifference : canvasMetricValue(cell, metric)
 );
+
+export const buildCanvasBreakdownSeries = (
+  analysis: CanvasAnalysisResult,
+): CanvasBreakdownSeries[] => {
+  const rowsByCellAndFilter = new Map<string, CanvasRow[]>();
+
+  analysis.filteredRows.forEach((row) => {
+    const x = getCanvasDimensionValue(row, analysis.axis.x);
+    const y = getCanvasDimensionValue(row, analysis.axis.y);
+    const filterValue = row[analysis.axis.filter];
+    const key = `${cellKey(x, y)}\u241f${filterValue}`;
+    const grouped = rowsByCellAndFilter.get(key) || [];
+    grouped.push(row);
+    rowsByCellAndFilter.set(key, grouped);
+  });
+
+  const contributionsByCell = new Map<string, Map<string, number>>();
+  analysis.cells.forEach((cell) => {
+    const contributions = new Map<string, number>();
+    analysis.filterValues.forEach((filterValue) => {
+      const rows = rowsByCellAndFilter.get(`${cell.key}\u241f${filterValue}`) || [];
+      contributions.set(filterValue, rows.reduce((total, row) => total + row.diferencia, 0));
+    });
+    contributionsByCell.set(cell.key, contributions);
+  });
+
+  return analysis.filterValues.map((filterValue) => ({
+    filterValue,
+    segments: analysis.cells.map((cell) => {
+      const sourceRows = rowsByCellAndFilter.get(`${cell.key}\u241f${filterValue}`) || [];
+      const contributions = contributionsByCell.get(cell.key) || new Map<string, number>();
+      const rawDifference = contributions.get(filterValue) || 0;
+      const magnitudeTotal = [...contributions.values()].reduce(
+        (total, contribution) => total + Math.abs(contribution),
+        0,
+      );
+
+      return {
+        key: `${cell.key}\u241f${filterValue}`,
+        cellKey: cell.key,
+        x: cell.x,
+        y: cell.y,
+        filterValue,
+        sourceRows,
+        rawDifference,
+        visualValue: -rawDifference,
+        magnitudeShare: magnitudeTotal > 0 ? Math.abs(rawDifference) / magnitudeTotal : 0,
+        cellNetDifference: cell.netDifference || 0,
+      };
+    }),
+  }));
+};

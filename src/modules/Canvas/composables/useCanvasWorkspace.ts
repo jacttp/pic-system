@@ -4,7 +4,6 @@ import type { CanvasInspectorTab, CanvasSelectionSource } from '../types/canvasT
 export const useCanvasWorkspace = (initialOpen = false) => {
   const inspectorOpen = ref(initialOpen);
   const activeTab = ref<CanvasInspectorTab>('priorities');
-  const hasUnreadSelection = ref(false);
 
   const inspectorCollapsed = computed(() => !inspectorOpen.value);
 
@@ -19,30 +18,21 @@ export const useCanvasWorkspace = (initialOpen = false) => {
   const setActiveTab = (tab: CanvasInspectorTab) => {
     activeTab.value = tab;
     inspectorOpen.value = true;
-    if (tab === 'selection') hasUnreadSelection.value = false;
   };
 
-  const registerSelection = (source: CanvasSelectionSource) => {
-    if (source === 'chart') {
-      hasUnreadSelection.value = activeTab.value !== 'selection' || !inspectorOpen.value;
-      return;
-    }
-
+  const registerSelection = (_source: CanvasSelectionSource) => {
     activeTab.value = 'selection';
     inspectorOpen.value = true;
-    hasUnreadSelection.value = false;
   };
 
   const resetContext = () => {
     activeTab.value = 'priorities';
-    hasUnreadSelection.value = false;
   };
 
   return {
     inspectorOpen,
     inspectorCollapsed,
     activeTab,
-    hasUnreadSelection,
     setInspectorOpen,
     toggleInspector,
     setActiveTab,

@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   analyzeCanvasRows,
+  buildCanvasBreakdownSeries,
+  CANVAS_RESULT_RANGES,
   createCanvasAxisConfig,
   uniqueInSourceOrder,
 } from './canvasAnalytics';
@@ -38,5 +40,29 @@ acceptance('archivo comparativo de aceptación', () => {
       familia: 'S. Ros',
     });
     expect(worst?.diferencia).toBeCloseTo(-120_233.23, 2);
+
+    const ranged = analyzeCanvasRows(
+      parsed.rows,
+      createCanvasAxisConfig('resultado', 'cadena'),
+      uniqueInSourceOrder(parsed.rows, 'linea'),
+      'netDifference',
+    );
+    const walmartCritical = ranged.cells.find(
+      (cell) => cell.x === CANVAS_RESULT_RANGES[0] && cell.y === 'Walmart',
+    );
+
+    expect(ranged.xValues).toEqual(CANVAS_RESULT_RANGES);
+    expect(ranged.cells.reduce((total, cell) => total + cell.observedCount, 0)).toBe(72);
+    expect(ranged.kpis.netDifference).toBeCloseTo(-624_022.58, 2);
+    expect(walmartCritical?.sourceRows.some((row) => row.diferencia === worst?.diferencia)).toBe(true);
+
+    const breakdown = buildCanvasBreakdownSeries(ranged);
+    ranged.cells.forEach((cell, cellIndex) => {
+      const segmentTotal = breakdown.reduce(
+        (total, series) => total + (series.segments[cellIndex]?.rawDifference || 0),
+        0,
+      );
+      expect(segmentTotal).toBeCloseTo(cell.netDifference || 0, 8);
+    });
   });
 });

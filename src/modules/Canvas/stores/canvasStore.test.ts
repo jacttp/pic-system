@@ -25,6 +25,18 @@ describe('useCanvasStore', () => {
     expect(store.selectedFilterValues).toEqual(['A', 'B']);
   });
 
+  it('acepta el rango de resultado como eje y conserva un filtro de origen', () => {
+    const store = useCanvasStore();
+    store.rows = [...rows];
+    store.selectedFilterValues = ['Granel', 'Paquetería'];
+
+    store.setAxisDimension('x', 'resultado');
+
+    expect(store.axis).toEqual({ x: 'resultado', y: 'familia', filter: 'cadena' });
+    expect(store.selectedFilterValues).toEqual(['A', 'B']);
+    expect(store.analysis.xValues).toHaveLength(8);
+  });
+
   it('mantiene al menos un filtro, coordina métrica/selección y restablece la sesión', () => {
     const store = useCanvasStore();
     store.rows = [...rows];

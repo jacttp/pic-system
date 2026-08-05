@@ -14,13 +14,12 @@ describe('useCanvasWorkspace', () => {
     expect(workspace.activeTab.value).toBe('evidence');
   });
 
-  it('notifica una selección desde gráfica sin forzar la apertura', () => {
+  it('abre Selección al elegir una columna desde la gráfica', () => {
     const workspace = useCanvasWorkspace(false);
     workspace.registerSelection('chart');
 
-    expect(workspace.inspectorOpen.value).toBe(false);
-    expect(workspace.activeTab.value).toBe('priorities');
-    expect(workspace.hasUnreadSelection.value).toBe(true);
+    expect(workspace.inspectorOpen.value).toBe(true);
+    expect(workspace.activeTab.value).toBe('selection');
   });
 
   it('abre Selección cuando el origen es el ranking', () => {
@@ -29,7 +28,12 @@ describe('useCanvasWorkspace', () => {
 
     expect(workspace.inspectorOpen.value).toBe(true);
     expect(workspace.activeTab.value).toBe('selection');
-    expect(workspace.hasUnreadSelection.value).toBe(false);
+  });
+
+  it('inicia colapsado cuando no se solicita apertura explícita', () => {
+    const workspace = useCanvasWorkspace();
+    expect(workspace.inspectorOpen.value).toBe(false);
+    expect(workspace.inspectorCollapsed.value).toBe(true);
   });
 
   it('restablece contexto al cambiar el escenario', () => {
@@ -39,7 +43,6 @@ describe('useCanvasWorkspace', () => {
     workspace.resetContext();
 
     expect(workspace.activeTab.value).toBe('priorities');
-    expect(workspace.hasUnreadSelection.value).toBe(false);
     expect(workspace.inspectorOpen.value).toBe(true);
   });
 });

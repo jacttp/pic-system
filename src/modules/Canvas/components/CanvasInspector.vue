@@ -19,7 +19,6 @@ import CanvasRanking from './CanvasRanking.vue';
 interface Props {
   open: boolean;
   activeTab: CanvasInspectorTab;
-  unreadSelection: boolean;
   analysis: CanvasAnalysisResult;
   selectedCell: CanvasCell | null;
   selectedKey?: string | null;
@@ -84,7 +83,6 @@ const selectedTitle = computed(() => props.selectedCell
         >
           <i :class="tab.icon"></i>
           {{ tab.label }}
-          <span v-if="tab.id === 'selection' && unreadSelection" class="absolute right-1.5 top-1.5 h-2 w-2 rounded-md bg-pic-brand" aria-label="Nueva selección"></span>
         </button>
       </nav>
 
@@ -129,8 +127,8 @@ const selectedTitle = computed(() => props.selectedCell
                 <dd class="mt-1 font-mono text-xs font-black text-pic-text-main">{{ formatCanvasPercent(selectedCell.lossShare) }}</dd>
               </div>
               <div class="rounded-lg border border-pic-border p-3">
-                <dt class="text-[9px] font-black uppercase text-pic-text-muted">Cobertura</dt>
-                <dd class="mt-1 font-mono text-xs font-black text-pic-text-main">{{ selectedCell.observedCount }}/{{ selectedCell.expectedCount }}</dd>
+                <dt class="text-[9px] font-black uppercase text-pic-text-muted">{{ analysis.axis.x === 'resultado' || analysis.axis.y === 'resultado' ? 'Filas fuente' : 'Cobertura' }}</dt>
+                <dd class="mt-1 font-mono text-xs font-black text-pic-text-main">{{ analysis.axis.x === 'resultado' || analysis.axis.y === 'resultado' ? selectedCell.observedCount : `${selectedCell.observedCount}/${selectedCell.expectedCount}` }}</dd>
               </div>
               <div class="rounded-lg border border-pic-border p-3">
                 <dt class="text-[9px] font-black uppercase text-pic-text-muted">Score par</dt>
@@ -203,7 +201,6 @@ const selectedTitle = computed(() => props.selectedCell
       </button>
       <button v-for="tab in tabs" :key="tab.id" type="button" class="relative grid h-9 w-9 place-items-center rounded-md text-pic-text-muted transition hover:bg-pic-muted-surface hover:text-pic-brand" :aria-label="tab.label" @click="emit('tab', tab.id)">
         <i :class="tab.icon"></i>
-        <span v-if="tab.id === 'selection' && unreadSelection" class="absolute right-1 top-1 h-2 w-2 rounded-md bg-pic-brand"></span>
       </button>
     </nav>
   </aside>

@@ -5,7 +5,11 @@ import type { CanvasAnalysisResult, CanvasMetric } from '../types/canvasTypes';
 import { CANVAS_DIMENSION_LABELS, CANVAS_METRIC_LABELS } from '../types/canvasTypes';
 import { canvasMetricValue, canvasVisualColorValue } from '../utils/canvasAnalytics';
 import { escapeCanvasHtml, formatCanvasMetric } from '../utils/canvasFormatters';
-import { canvasSignedChartColor, readCanvasChartPalette } from '../utils/canvasWebgl';
+import {
+  canvasSignedChartColor,
+  createCanvasSignedHeatmapVisualMap,
+  readCanvasChartPalette,
+} from '../utils/canvasWebgl';
 
 interface Props {
   analysis: CanvasAnalysisResult;
@@ -43,6 +47,7 @@ let chart: echarts.ECharts | null = null;
 let resizeObserver: ResizeObserver | null = null;
 
 const title = computed(() => `${CANVAS_METRIC_LABELS[props.metric]} por ${CANVAS_DIMENSION_LABELS[props.analysis.axis.x]} y ${CANVAS_DIMENSION_LABELS[props.analysis.axis.y]}`);
+const formatAxisLabel = (value: string) => value.replace(' · ', '\n');
 
 const option = computed(() => {
   const palette = readCanvasChartPalette();
@@ -119,7 +124,9 @@ const option = computed(() => {
           `<strong>${escapeCanvasHtml(cell.x)} · ${escapeCanvasHtml(cell.y)}</strong>`,
           `${CANVAS_METRIC_LABELS[props.metric]}: <strong>${formatCanvasMetric(cell.metricValue, props.metric)}</strong>`,
           `Diferencia neta: ${formatCanvasMetric(cell.netDifference, 'netDifference')}`,
-          `Cobertura: ${cell.observedCount}/${cell.expectedCount}`,
+          props.analysis.axis.x === 'resultado' || props.analysis.axis.y === 'resultado'
+            ? `Filas fuente en el rango: ${cell.observedCount}`
+            : `Cobertura: ${cell.observedCount}/${cell.expectedCount}`,
           benchmark,
         ].filter(Boolean).join('<br>');
       },
@@ -128,7 +135,7 @@ const option = computed(() => {
       type: 'category',
       name: CANVAS_DIMENSION_LABELS[props.analysis.axis.x],
       data: props.analysis.xValues,
-      axisLabel: { color: palette.text, fontSize: 10, interval: 0, rotate: props.analysis.xValues.some((value) => value.length > 12) ? 24 : 0 },
+      axisLabel: { color: palette.text, fontSize: 10, interval: 0, rotate: props.analysis.axis.x === 'resultado' ? 0 : props.analysis.xValues.some((value) => value.length > 12) ? 24 : 0, formatter: formatAxisLabel },
       axisLine: { lineStyle: { color: palette.border } },
       nameLocation: 'middle',
       nameGap: 54,
@@ -137,12 +144,18 @@ const option = computed(() => {
       type: 'category',
       name: CANVAS_DIMENSION_LABELS[props.analysis.axis.y],
       data: props.analysis.yValues,
-      axisLabel: { color: palette.text, fontSize: 10 },
+      axisLabel: { color: palette.text, fontSize: 10, formatter: formatAxisLabel },
       axisLine: { lineStyle: { color: palette.border } },
       nameLocation: 'middle',
       nameGap: 76,
     },
-    visualMap: props.metric === 'netDifference' ? undefined : {
+    visualMap: props.metric === 'netDifference'
+      ? createCanvasSignedHeatmapVisualMap(colorValues, {
+        loss: palette.orange,
+        neutral: '#f8fafc',
+        gain: palette.blue,
+      })
+      : {
       type: 'continuous',
       min: divergent ? Math.min(0, colorMin) : 0,
       max: divergent ? Math.max(0.0001, colorMax) : Math.max(0.0001, max),

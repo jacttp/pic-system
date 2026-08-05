@@ -9,6 +9,179 @@ export const supportsCanvasWebGL = () => {
   }
 };
 
+export const CANVAS_BREAKDOWN_COLORS = [
+  '#E1E651',
+  '#2B97C7',
+  '#FBC5DB',
+  '#C72C45',
+  '#8bcddd',
+  '#DD7182',
+  '#b5d184',
+  '#9F59F4',
+] as const;
+
+export const CANVAS_PARTICIPATION_MATERIAL = {
+  shading: 'lambert',
+  bevelSize: 0,
+  bevelSmoothness: 0,
+  label: { show: false },
+  itemStyle: { opacity: 1 },
+  emphasis: {
+    label: { show: false },
+    itemStyle: { opacity: 1 },
+  },
+} as const;
+
+export const CANVAS_3D_LIGHT = {
+  main: {
+    color: '#ffffff',
+    intensity: 1.05,
+    alpha: 45,
+    beta: 35,
+    shadow: true,
+    shadowQuality: 'medium',
+  },
+  ambient: {
+    color: '#ffffff',
+    intensity: 0.3,
+  },
+} as const;
+
+export const CANVAS_3D_POST_EFFECT = {
+  enable: true,
+  bloom: { enable: false },
+  depthOfField: { enable: false },
+  screenSpaceAmbientOcclusion: {
+    enable: true,
+    radius: 2,
+    intensity: 1.25,
+    quality: 'medium',
+  },
+  edge: { enable: true },
+  FXAA: { enable: true },
+  colorCorrection: {
+    enable: true,
+    exposure: 0,
+    brightness: 0,
+    contrast: 1.06,
+    saturation: 1,
+  },
+} as const;
+
+export const canvas3DBarSize = (
+  boxWidth: number,
+  boxDepth: number,
+  xCount: number,
+  yCount: number,
+  fillRatio = 0.62,
+) => [
+  (boxWidth / Math.max(1, xCount)) * fillRatio,
+  (boxDepth / Math.max(1, yCount)) * fillRatio,
+] as const;
+
+interface CanvasOriginDeckOptions {
+  xCount: number;
+  yCount: number;
+  boxWidth: number;
+  boxDepth: number;
+  thickness: number;
+  color: string;
+}
+
+export const createCanvasOriginDeckSeries = ({
+  xCount,
+  yCount,
+  boxWidth,
+  boxDepth,
+  thickness,
+  color,
+}: CanvasOriginDeckOptions) => {
+  const data = Array.from({ length: Math.max(0, xCount * yCount) }, (_, index) => [
+    index % xCount,
+    Math.floor(index / xCount),
+    -Math.abs(thickness),
+  ]);
+
+  return {
+    type: 'bar3D' as const,
+    name: 'Base de origen',
+    coordinateSystem: 'cartesian3D' as const,
+    data,
+    barSize: [
+      boxWidth / Math.max(1, xCount),
+      boxDepth / Math.max(1, yCount),
+    ],
+    shading: 'color' as const,
+    bevelSize: 0,
+    bevelSmoothness: 0,
+    silent: true,
+    animation: false,
+    itemStyle: {
+      color,
+      opacity: 0.40,
+    },
+    label: { show: false },
+    emphasis: { label: { show: false } },
+    tooltip: { show: false },
+  };
+};
+
+interface CanvasSelectionMarkerOptions {
+  xIndex: number;
+  yIndex: number;
+  value: number;
+  color: string;
+  surfaceColor: string;
+  textColor: string;
+}
+
+export const createCanvasSelectionMarkerSeries = ({
+  xIndex,
+  yIndex,
+  value,
+  color,
+  surfaceColor,
+  textColor,
+}: CanvasSelectionMarkerOptions) => ({
+  type: 'scatter3D' as const,
+  name: 'Selección actual',
+  coordinateSystem: 'cartesian3D' as const,
+  data: [[xIndex, yIndex, value]],
+  symbol: 'diamond',
+  symbolSize: 18,
+  silent: true,
+  animation: false,
+  itemStyle: {
+    color,
+    opacity: 1,
+  },
+  label: {
+    show: true,
+    formatter: 'Selección',
+    distance: 7,
+    textStyle: {
+      color: textColor,
+      fontSize: 10,
+      fontWeight: 'bold',
+      backgroundColor: surfaceColor,
+      borderColor: color,
+      borderWidth: 1,
+      borderRadius: 4,
+      padding: [4, 6],
+    },
+  },
+  emphasis: { label: { show: true } },
+  tooltip: { show: false },
+});
+
+export const canvasBreakdownColor = (value: string, domain: string[]) => {
+  const index = domain.indexOf(value);
+  const stableIndex = index >= 0
+    ? index
+    : [...value].reduce((total, character) => total + character.charCodeAt(0), 0);
+  return CANVAS_BREAKDOWN_COLORS[stableIndex % CANVAS_BREAKDOWN_COLORS.length]!;
+};
+
 export const canvasHslTokenToHex = (token: string, fallback: string) => {
   const match = token.trim().match(/^(-?\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)%\s+(\d+(?:\.\d+)?)%$/);
   if (!match) return fallback;
@@ -57,6 +230,24 @@ export const canvasSignedChartColor = (
   return value < 0
     ? mixCanvasHexColor(colors.lossSoft, colors.loss, intensity)
     : mixCanvasHexColor(colors.gainSoft, colors.gain, intensity);
+};
+
+export const createCanvasSignedHeatmapVisualMap = (
+  values: number[],
+  colors: { loss: string; neutral: string; gain: string },
+) => {
+  const maxMagnitude = Math.max(1, ...values.map((value) => Math.abs(value)));
+  return {
+    show: false,
+    type: 'continuous' as const,
+    min: -maxMagnitude,
+    max: maxMagnitude,
+    dimension: 3,
+    calculable: false,
+    inRange: {
+      color: [colors.loss, colors.neutral, colors.gain],
+    },
+  };
 };
 
 export const readCanvasChartPalette = () => {

@@ -1,4 +1,6 @@
-export type CanvasDimension = 'cadena' | 'linea' | 'familia';
+export type CanvasSourceDimension = 'cadena' | 'linea' | 'familia';
+
+export type CanvasDimension = CanvasSourceDimension | 'resultado';
 
 export type CanvasMetric =
   | 'netDifference'
@@ -7,6 +9,8 @@ export type CanvasMetric =
   | 'peerDeviation';
 
 export type CanvasViewMode = 'bar3d' | 'heatmap';
+
+export type CanvasBarMode = 'result' | 'participation';
 
 export type CanvasInspectorTab = 'priorities' | 'selection' | 'evidence';
 
@@ -24,7 +28,7 @@ export interface CanvasRow {
 export interface CanvasAxisConfig {
   x: CanvasDimension;
   y: CanvasDimension;
-  filter: CanvasDimension;
+  filter: CanvasSourceDimension;
 }
 
 export type CanvasValidationCode =
@@ -67,6 +71,24 @@ export interface CanvasCell {
   metricValue: number | null;
 }
 
+export interface CanvasBreakdownSegment {
+  key: string;
+  cellKey: string;
+  x: string;
+  y: string;
+  filterValue: string;
+  sourceRows: CanvasRow[];
+  rawDifference: number;
+  visualValue: number;
+  magnitudeShare: number;
+  cellNetDifference: number;
+}
+
+export interface CanvasBreakdownSeries {
+  filterValue: string;
+  segments: CanvasBreakdownSegment[];
+}
+
 export interface CanvasKpis {
   netDifference: number;
   grossLoss: number;
@@ -105,6 +127,7 @@ export const CANVAS_DIMENSION_LABELS: Record<CanvasDimension, string> = {
   cadena: 'Cadena',
   linea: 'Línea',
   familia: 'Familia',
+  resultado: 'Rango de resultado',
 };
 
 export const CANVAS_METRIC_LABELS: Record<CanvasMetric, string> = {

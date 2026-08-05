@@ -5,6 +5,7 @@ import {
   StdButton,
   StdPageHeader,
   StdSection,
+  StdSwitch,
 } from '@/modules/Shared/components/std';
 import CanvasBar3D from '../components/CanvasBar3D.vue';
 import CanvasControls from '../components/CanvasControls.vue';
@@ -14,6 +15,7 @@ import CanvasInspector from '../components/CanvasInspector.vue';
 import { useCanvasWorkspace } from '../composables/useCanvasWorkspace';
 import { useCanvasStore } from '../stores/canvasStore';
 import type {
+  CanvasBarMode,
   CanvasDimension,
   CanvasInspectorTab,
   CanvasMetric,
@@ -36,6 +38,7 @@ const webglAvailable = ref(true);
 const bar3d = ref<InstanceType<typeof CanvasBar3D> | null>(null);
 const chartWorkspace = ref<HTMLElement | null>(null);
 const isFullscreen = ref(false);
+const barMode = ref<CanvasBarMode>('result');
 const fullscreenError = ref('');
 const fullscreenSupported = computed(() => Boolean(document.fullscreenEnabled));
 let desktopMedia: MediaQueryList | null = null;
@@ -45,6 +48,9 @@ const activeView = computed<CanvasViewMode>(() => (
   store.viewMode === 'bar3d' && webglAvailable.value ? 'bar3d' : 'heatmap'
 ));
 const isLossScenario = computed(() => store.analysis.kpis.netDifference < 0);
+const effectiveBarMode = computed<CanvasBarMode>(() => (
+  store.metric === 'netDifference' ? barMode.value : 'result'
+));
 
 const evidenceRows = computed<CanvasTableRow[]>(() => {
   const sourceRows = store.selectedCell?.sourceRows || [];
@@ -69,18 +75,15 @@ const evidenceRows = computed<CanvasTableRow[]>(() => {
   });
 });
 
-const syncInspectorForViewport = (matchesDesktop: boolean) => {
-  workspace.setInspectorOpen(matchesDesktop);
-};
-
 const handleFile = async (file: File) => {
   await store.loadFile(file);
   workspace.resetContext();
-  if (store.hasData) syncInspectorForViewport(Boolean(desktopMedia?.matches));
+  workspace.setInspectorOpen(false);
 };
 
 const changeFile = () => {
   store.reset();
+  barMode.value = 'result';
   workspace.resetContext();
   workspace.setInspectorOpen(false);
 };
@@ -92,6 +95,13 @@ const handleAxis = (target: 'x' | 'y', dimension: CanvasDimension) => {
 
 const handleMetric = (metric: CanvasMetric) => {
   store.setMetric(metric);
+  if (metric !== 'netDifference') barMode.value = 'result';
+  workspace.resetContext();
+};
+
+const setBarMode = (mode: CanvasBarMode) => {
+  barMode.value = mode;
+  store.selectCell(null);
   workspace.resetContext();
 };
 
@@ -142,7 +152,7 @@ const toggleFullscreen = async () => {
 };
 
 const handleViewportChange = (event: MediaQueryListEvent) => {
-  workspace.setInspectorOpen(event.matches);
+  if (!event.matches) workspace.setInspectorOpen(false);
 };
 
 const handleEscape = (event: KeyboardEvent) => {
@@ -157,7 +167,6 @@ const handleEscape = (event: KeyboardEvent) => {
 onMounted(() => {
   webglAvailable.value = supportsCanvasWebGL();
   desktopMedia = window.matchMedia('(min-width: 1280px)');
-  workspace.setInspectorOpen(desktopMedia.matches);
   desktopMedia.addEventListener('change', handleViewportChange);
   document.addEventListener('fullscreenchange', syncFullscreenState);
   window.addEventListener('keydown', handleEscape);
@@ -253,6 +262,15 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="order-2 ml-auto flex shrink-0 items-center gap-1 xl:order-3">
+          <StdSwitch
+            v-if="activeView === 'bar3d' && store.metric === 'netDifference'"
+            class="h-9 px-1.5"
+            :model-value="effectiveBarMode === 'participation'"
+            :label="effectiveBarMode === 'participation' ? 'Participación' : 'Resultado'"
+            aria-label="Alternar entre resultado y participación"
+            :title="effectiveBarMode === 'participation' ? 'Mostrar resultado por pérdida y ganancia' : `Desglosar por ${store.axis.filter}`"
+            @update:model-value="setBarMode($event ? 'participation' : 'result')"
+          />
           <div class="inline-grid h-9 grid-cols-2 gap-0.5 rounded-lg bg-pic-muted-surface p-0.5">
             <button type="button" class="rounded-md px-2 text-[10px] font-black transition" :class="activeView === 'bar3d' ? 'bg-pic-surface text-pic-brand shadow-sm' : 'text-pic-text-muted'" :disabled="!webglAvailable" aria-label="Vista 3D" @click="setView('bar3d')"><i class="fa-solid fa-cubes-stacked"></i></button>
             <button type="button" class="rounded-md px-2 text-[10px] font-black transition" :class="activeView === 'heatmap' ? 'bg-pic-surface text-pic-brand shadow-sm' : 'text-pic-text-muted'" aria-label="Mapa 2D" @click="setView('heatmap')"><i class="fa-solid fa-table-cells"></i></button>
@@ -260,7 +278,6 @@ onBeforeUnmount(() => {
           <button v-if="activeView === 'bar3d'" type="button" class="grid h-9 w-9 place-items-center rounded-lg text-pic-text-muted transition hover:bg-pic-muted-surface hover:text-pic-brand" aria-label="Restablecer cámara" title="Restablecer cámara" @click="bar3d?.resetCamera()"><i class="fa-solid fa-camera-rotate"></i></button>
           <button type="button" class="relative grid h-9 w-9 place-items-center rounded-lg text-pic-text-muted transition hover:bg-pic-muted-surface hover:text-pic-brand" :aria-pressed="workspace.inspectorOpen.value" aria-label="Mostrar inspector" title="Inspector" @click="workspace.toggleInspector()">
             <i class="fa-solid fa-table-columns"></i>
-            <span v-if="workspace.hasUnreadSelection.value" class="absolute right-1 top-1 h-2 w-2 rounded-md bg-pic-brand"></span>
           </button>
           <button type="button" class="grid h-9 w-9 place-items-center rounded-lg text-pic-text-muted transition hover:bg-pic-muted-surface hover:text-pic-brand disabled:opacity-40" :disabled="!fullscreenSupported" :aria-label="isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'" :title="isFullscreen ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'" @click="toggleFullscreen"><i class="fa-solid" :class="isFullscreen ? 'fa-compress' : 'fa-expand'"></i></button>
           <button type="button" class="grid h-9 w-9 place-items-center rounded-lg text-pic-text-muted transition hover:bg-pic-muted-surface hover:text-pic-brand" aria-label="Cambiar archivo" title="Cambiar archivo" @click="changeFile"><i class="fa-solid fa-file-arrow-up"></i></button>
@@ -290,6 +307,8 @@ onBeforeUnmount(() => {
             class="h-full min-h-0"
             :analysis="store.analysis"
             :metric="store.metric"
+            :mode="effectiveBarMode"
+            :filter-domain="store.filterValues"
             :selected-key="store.selectedCellKey"
             :fullscreen="isFullscreen"
             fill-available
@@ -311,7 +330,6 @@ onBeforeUnmount(() => {
         <CanvasInspector
           :open="workspace.inspectorOpen.value"
           :active-tab="workspace.activeTab.value"
-          :unread-selection="workspace.hasUnreadSelection.value"
           :analysis="store.analysis"
           :selected-cell="store.selectedCell"
           :selected-key="store.selectedCellKey"

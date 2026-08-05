@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { CanvasRow } from '../types/canvasTypes';
 import {
   analyzeCanvasRows,
+  buildCanvasBreakdownSeries,
+  CANVAS_RESULT_RANGES,
   canvasVisualColorValue,
   canvasDivergingBarValue,
   createCanvasAxisConfig,
+  getCanvasResultRange,
   resolveCanvasFilterDimension,
 } from './canvasAnalytics';
 
@@ -95,6 +98,33 @@ describe('analyzeCanvasRows', () => {
     expect(resolveCanvasFilterDimension('familia', 'cadena')).toBe('linea');
   });
 
+  it('clasifica la diferencia en rangos fijos y permite usar el resultado como eje', () => {
+    expect(getCanvasResultRange(-50_001)).toBe(CANVAS_RESULT_RANGES[0]);
+    expect(getCanvasResultRange(-50_000)).toBe(CANVAS_RESULT_RANGES[1]);
+    expect(getCanvasResultRange(-1_000)).toBe(CANVAS_RESULT_RANGES[3]);
+    expect(getCanvasResultRange(0)).toBe(CANVAS_RESULT_RANGES[4]);
+    expect(getCanvasResultRange(999)).toBe(CANVAS_RESULT_RANGES[5]);
+    expect(getCanvasResultRange(10_000)).toBe(CANVAS_RESULT_RANGES[7]);
+
+    const result = analyzeCanvasRows(
+      rows,
+      createCanvasAxisConfig('resultado', 'cadena'),
+      ['Granel', 'Paquetería'],
+      'netDifference',
+    );
+    const aLossLow = result.cells.find((cell) => cell.x === CANVAS_RESULT_RANGES[3] && cell.y === 'A');
+    const aGainLow = result.cells.find((cell) => cell.x === CANVAS_RESULT_RANGES[5] && cell.y === 'A');
+    const emptyCritical = result.cells.find((cell) => cell.x === CANVAS_RESULT_RANGES[0] && cell.y === 'A');
+
+    expect(result.axis.filter).toBe('linea');
+    expect(result.xValues).toEqual(CANVAS_RESULT_RANGES);
+    expect(aLossLow).toMatchObject({ netDifference: -12, observedCount: 2, expectedCount: 4 });
+    expect(aGainLow).toMatchObject({ netDifference: 5, observedCount: 1 });
+    expect(emptyCritical).toMatchObject({ netDifference: 0, observedCount: 0 });
+    expect(result.missingCells).toHaveLength(0);
+    expect(result.kpis.expectedCombinations).toBe(12);
+  });
+
   it('coloca pérdidas sobre cero y ganancias bajo cero sin alterar el signo original', () => {
     const result = analyzeCanvasRows(
       rows,
@@ -110,5 +140,23 @@ describe('analyzeCanvasRows', () => {
     expect(canvasVisualColorValue(loss, 'netDifference')).toBe(-10);
     expect(canvasDivergingBarValue(gain, 'netDifference')).toBe(-30);
     expect(canvasVisualColorValue(gain, 'netDifference')).toBe(30);
+  });
+
+  it('descompone cada celda en aportaciones firmadas de la dimension filtro', () => {
+    const result = analyzeCanvasRows(
+      rows,
+      createCanvasAxisConfig('cadena', 'familia'),
+      ['Granel', 'Paquetería'],
+      'netDifference',
+    );
+    const breakdown = buildCanvasBreakdownSeries(result);
+    const granel = breakdown.find((series) => series.filterValue === 'Granel');
+    const paqueteria = breakdown.find((series) => series.filterValue === 'Paquetería');
+    const granelAF1 = granel?.segments.find((segment) => segment.x === 'A' && segment.y === 'F1');
+    const paqueteriaAF1 = paqueteria?.segments.find((segment) => segment.x === 'A' && segment.y === 'F1');
+
+    expect(granelAF1).toMatchObject({ rawDifference: -10, visualValue: 10, magnitudeShare: 2 / 3 });
+    expect(paqueteriaAF1).toMatchObject({ rawDifference: 5, visualValue: -5, magnitudeShare: 1 / 3 });
+    expect((granelAF1?.rawDifference || 0) + (paqueteriaAF1?.rawDifference || 0)).toBe(-5);
   });
 });

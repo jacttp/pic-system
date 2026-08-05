@@ -33,7 +33,7 @@ const emit = defineEmits<{
   (event: 'all-filters'): void;
 }>();
 
-const dimensions: CanvasDimension[] = ['cadena', 'linea', 'familia'];
+const dimensions: CanvasDimension[] = ['cadena', 'linea', 'familia', 'resultado'];
 const metrics: CanvasMetric[] = ['netDifference', 'absoluteGap', 'lossShare', 'peerDeviation'];
 const metricGuides: MetricGuide[] = [
   {
@@ -63,6 +63,7 @@ const metricGuides: MetricGuide[] = [
 ];
 
 const mobileOpen = ref(false);
+const controlsRoot = ref<HTMLDivElement | null>(null);
 const filterLabel = computed(() => CANVAS_DIMENSION_LABELS[props.axis.filter]);
 const allSelected = computed(() => props.filterValues.length > 0
   && props.selectedFilterValues.length === props.filterValues.length);
@@ -76,16 +77,46 @@ const handleMetric = (event: Event) => {
   emit('metric', (event.target as HTMLSelectElement).value as CanvasMetric);
 };
 
-const handleEscape = (event: KeyboardEvent) => {
-  if (event.key === 'Escape' && mobileOpen.value) mobileOpen.value = false;
+const canvasPopovers = () => Array.from(
+  controlsRoot.value?.querySelectorAll<HTMLDetailsElement>('details[data-canvas-popover]') || [],
+);
+
+const closePopovers = (except?: HTMLDetailsElement) => {
+  canvasPopovers().forEach((popover) => {
+    if (popover !== except) popover.open = false;
+  });
 };
 
-onMounted(() => window.addEventListener('keydown', handleEscape));
-onBeforeUnmount(() => window.removeEventListener('keydown', handleEscape));
+const handlePopoverToggle = (event: Event) => {
+  const popover = event.currentTarget as HTMLDetailsElement;
+  if (popover.open) closePopovers(popover);
+};
+
+const handleOutsidePointer = (event: PointerEvent) => {
+  const target = event.target as Node | null;
+  if (!target) return;
+  const activePopover = canvasPopovers().find((popover) => popover.open);
+  if (activePopover && !activePopover.contains(target)) closePopovers();
+};
+
+const handleEscape = (event: KeyboardEvent) => {
+  if (event.key !== 'Escape') return;
+  closePopovers();
+  if (mobileOpen.value) mobileOpen.value = false;
+};
+
+onMounted(() => {
+  window.addEventListener('keydown', handleEscape);
+  document.addEventListener('pointerdown', handleOutsidePointer);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleEscape);
+  document.removeEventListener('pointerdown', handleOutsidePointer);
+});
 </script>
 
 <template>
-  <div class="min-w-0">
+  <div ref="controlsRoot" class="min-w-0">
     <div class="hidden min-w-max items-center gap-1.5 md:flex">
       <label class="inline-flex h-9 items-center overflow-hidden rounded-lg border border-pic-border bg-pic-surface shadow-sm">
         <span class="grid h-full w-8 place-items-center border-r border-pic-border bg-pic-muted-surface text-[10px] font-black text-pic-brand">X</span>
@@ -115,7 +146,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleEscape));
         </select>
       </label>
 
-      <details class="group relative">
+      <details data-canvas-popover class="group relative" @toggle="handlePopoverToggle">
         <summary class="inline-flex h-9 cursor-pointer list-none items-center gap-2 rounded-lg border border-pic-border bg-pic-surface px-3 text-xs font-black text-pic-text-main shadow-sm transition hover:border-pic-brand-border [&::-webkit-details-marker]:hidden">
           <i class="fa-solid fa-filter text-[10px] text-pic-brand"></i>
           {{ filterLabel }}
@@ -161,7 +192,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleEscape));
         </select>
       </label>
 
-      <details class="group relative">
+      <details data-canvas-popover class="group relative" @toggle="handlePopoverToggle">
         <summary class="grid h-9 w-9 cursor-pointer list-none place-items-center rounded-lg border border-pic-border bg-pic-surface text-xs font-black text-pic-brand shadow-sm transition hover:border-pic-brand hover:bg-pic-brand hover:text-white [&::-webkit-details-marker]:hidden" aria-label="Abrir guía de métricas" title="Guía de métricas">
           ?
         </summary>
@@ -238,7 +269,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleEscape));
           </select>
         </label>
 
-        <details class="mt-4 rounded-lg border border-pic-border bg-pic-muted-surface p-3">
+        <details data-canvas-popover class="mt-4 rounded-lg border border-pic-border bg-pic-muted-surface p-3" @toggle="handlePopoverToggle">
           <summary class="cursor-pointer text-xs font-black text-pic-brand">¿Cómo se interpreta cada métrica?</summary>
           <div class="mt-3 space-y-3">
             <div v-for="guide in metricGuides" :key="guide.id">
