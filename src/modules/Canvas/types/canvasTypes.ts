@@ -12,6 +12,8 @@ export type CanvasViewMode = 'bar3d' | 'heatmap';
 
 export type CanvasBarMode = 'result' | 'participation';
 
+export type CanvasSignOrientation = 'lossUp' | 'gainUp';
+
 export type CanvasInspectorTab = 'priorities' | 'selection' | 'evidence';
 
 export type CanvasSelectionSource = 'chart' | 'ranking';

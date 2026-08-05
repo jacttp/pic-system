@@ -6,6 +6,7 @@ import type {
   CanvasDimension,
   CanvasMetric,
   CanvasRow,
+  CanvasSignOrientation,
   CanvasSourceDimension,
 } from '../types/canvasTypes';
 
@@ -246,9 +247,14 @@ export const canvasMetricValue = (cell: CanvasCell, metric: CanvasMetric) => ({
   peerDeviation: cell.peerDeviation,
 })[metric];
 
-export const canvasDivergingBarValue = (cell: CanvasCell, metric: CanvasMetric) => {
+export const canvasDivergingBarValue = (
+  cell: CanvasCell,
+  metric: CanvasMetric,
+  orientation: CanvasSignOrientation = 'lossUp',
+) => {
   const value = canvasMetricValue(cell, metric);
-  return metric === 'netDifference' && value !== null ? -value : value;
+  if (metric !== 'netDifference' || value === null) return value;
+  return orientation === 'lossUp' ? -value : value;
 };
 
 export const canvasVisualColorValue = (cell: CanvasCell, metric: CanvasMetric) => (
@@ -257,6 +263,7 @@ export const canvasVisualColorValue = (cell: CanvasCell, metric: CanvasMetric) =
 
 export const buildCanvasBreakdownSeries = (
   analysis: CanvasAnalysisResult,
+  orientation: CanvasSignOrientation = 'lossUp',
 ): CanvasBreakdownSeries[] => {
   const rowsByCellAndFilter = new Map<string, CanvasRow[]>();
 
@@ -299,7 +306,7 @@ export const buildCanvasBreakdownSeries = (
         filterValue,
         sourceRows,
         rawDifference,
-        visualValue: -rawDifference,
+        visualValue: orientation === 'lossUp' ? -rawDifference : rawDifference,
         magnitudeShare: magnitudeTotal > 0 ? Math.abs(rawDifference) / magnitudeTotal : 0,
         cellNetDifference: cell.netDifference || 0,
       };

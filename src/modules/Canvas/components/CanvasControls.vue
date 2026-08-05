@@ -40,7 +40,7 @@ const metricGuides: MetricGuide[] = [
     id: 'netDifference',
     formula: 'Σ Dif',
     description: 'Saldo 2026 − 2025 después de compensar pérdidas y ganancias.',
-    reading: 'Negativo es pérdida y positivo ganancia; en 3D la pérdida sube y la ganancia baja.',
+    reading: 'Negativo es pérdida y positivo ganancia; en 3D el usuario elige cuál resultado se muestra sobre cero.',
   },
   {
     id: 'absoluteGap',

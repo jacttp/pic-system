@@ -20,6 +20,7 @@ import type {
   CanvasInspectorTab,
   CanvasMetric,
   CanvasSelectionSource,
+  CanvasSignOrientation,
   CanvasTableRow,
   CanvasViewMode,
 } from '../types/canvasTypes';
@@ -39,6 +40,7 @@ const bar3d = ref<InstanceType<typeof CanvasBar3D> | null>(null);
 const chartWorkspace = ref<HTMLElement | null>(null);
 const isFullscreen = ref(false);
 const barMode = ref<CanvasBarMode>('result');
+const signOrientation = ref<CanvasSignOrientation>('lossUp');
 const fullscreenError = ref('');
 const fullscreenSupported = computed(() => Boolean(document.fullscreenEnabled));
 let desktopMedia: MediaQueryList | null = null;
@@ -77,6 +79,7 @@ const evidenceRows = computed<CanvasTableRow[]>(() => {
 
 const handleFile = async (file: File) => {
   await store.loadFile(file);
+  signOrientation.value = 'lossUp';
   workspace.resetContext();
   workspace.setInspectorOpen(false);
 };
@@ -84,6 +87,7 @@ const handleFile = async (file: File) => {
 const changeFile = () => {
   store.reset();
   barMode.value = 'result';
+  signOrientation.value = 'lossUp';
   workspace.resetContext();
   workspace.setInspectorOpen(false);
 };
@@ -271,6 +275,15 @@ onBeforeUnmount(() => {
             :title="effectiveBarMode === 'participation' ? 'Mostrar resultado por pérdida y ganancia' : `Desglosar por ${store.axis.filter}`"
             @update:model-value="setBarMode($event ? 'participation' : 'result')"
           />
+          <StdSwitch
+            v-if="activeView === 'bar3d' && store.metric === 'netDifference'"
+            class="h-9 px-1.5"
+            :model-value="signOrientation === 'gainUp'"
+            :label="signOrientation === 'gainUp' ? 'Ganancia ↑' : 'Pérdida ↑'"
+            aria-label="Elegir qué resultado se muestra sobre cero"
+            :title="signOrientation === 'gainUp' ? 'Mostrar pérdidas sobre cero' : 'Mostrar ganancias sobre cero'"
+            @update:model-value="signOrientation = $event ? 'gainUp' : 'lossUp'"
+          />
           <div class="inline-grid h-9 grid-cols-2 gap-0.5 rounded-lg bg-pic-muted-surface p-0.5">
             <button type="button" class="rounded-md px-2 text-[10px] font-black transition" :class="activeView === 'bar3d' ? 'bg-pic-surface text-pic-brand shadow-sm' : 'text-pic-text-muted'" :disabled="!webglAvailable" aria-label="Vista 3D" @click="setView('bar3d')"><i class="fa-solid fa-cubes-stacked"></i></button>
             <button type="button" class="rounded-md px-2 text-[10px] font-black transition" :class="activeView === 'heatmap' ? 'bg-pic-surface text-pic-brand shadow-sm' : 'text-pic-text-muted'" aria-label="Mapa 2D" @click="setView('heatmap')"><i class="fa-solid fa-table-cells"></i></button>
@@ -308,6 +321,7 @@ onBeforeUnmount(() => {
             :analysis="store.analysis"
             :metric="store.metric"
             :mode="effectiveBarMode"
+            :sign-orientation="signOrientation"
             :filter-domain="store.filterValues"
             :selected-key="store.selectedCellKey"
             :fullscreen="isFullscreen"

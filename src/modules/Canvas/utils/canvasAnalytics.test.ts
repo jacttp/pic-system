@@ -137,8 +137,10 @@ describe('analyzeCanvasRows', () => {
 
     expect(loss.netDifference).toBe(-10);
     expect(canvasDivergingBarValue(loss, 'netDifference')).toBe(10);
+    expect(canvasDivergingBarValue(loss, 'netDifference', 'gainUp')).toBe(-10);
     expect(canvasVisualColorValue(loss, 'netDifference')).toBe(-10);
     expect(canvasDivergingBarValue(gain, 'netDifference')).toBe(-30);
+    expect(canvasDivergingBarValue(gain, 'netDifference', 'gainUp')).toBe(30);
     expect(canvasVisualColorValue(gain, 'netDifference')).toBe(30);
   });
 
@@ -158,5 +160,15 @@ describe('analyzeCanvasRows', () => {
     expect(granelAF1).toMatchObject({ rawDifference: -10, visualValue: 10, magnitudeShare: 2 / 3 });
     expect(paqueteriaAF1).toMatchObject({ rawDifference: 5, visualValue: -5, magnitudeShare: 1 / 3 });
     expect((granelAF1?.rawDifference || 0) + (paqueteriaAF1?.rawDifference || 0)).toBe(-5);
+
+    const gainUpBreakdown = buildCanvasBreakdownSeries(result, 'gainUp');
+    const gainUpGranelAF1 = gainUpBreakdown
+      .find((series) => series.filterValue === 'Granel')
+      ?.segments.find((segment) => segment.x === 'A' && segment.y === 'F1');
+    const gainUpPaqueteriaAF1 = gainUpBreakdown
+      .find((series) => series.filterValue === 'Paquetería')
+      ?.segments.find((segment) => segment.x === 'A' && segment.y === 'F1');
+    expect(gainUpGranelAF1).toMatchObject({ rawDifference: -10, visualValue: -10 });
+    expect(gainUpPaqueteriaAF1).toMatchObject({ rawDifference: 5, visualValue: 5 });
   });
 });

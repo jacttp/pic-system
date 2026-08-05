@@ -2,7 +2,12 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import * as echarts from 'echarts';
 import 'echarts-gl';
-import type { CanvasAnalysisResult, CanvasBarMode, CanvasMetric } from '../types/canvasTypes';
+import type {
+  CanvasAnalysisResult,
+  CanvasBarMode,
+  CanvasMetric,
+  CanvasSignOrientation,
+} from '../types/canvasTypes';
 import { CANVAS_DIMENSION_LABELS, CANVAS_METRIC_LABELS } from '../types/canvasTypes';
 import {
   buildCanvasBreakdownSeries,
@@ -30,6 +35,7 @@ interface Props {
   fullscreen?: boolean;
   fillAvailable?: boolean;
   mode?: CanvasBarMode;
+  signOrientation?: CanvasSignOrientation;
   filterDomain?: string[];
 }
 
@@ -53,6 +59,7 @@ const props = withDefaults(defineProps<Props>(), {
   fullscreen: false,
   fillAvailable: false,
   mode: 'result',
+  signOrientation: 'lossUp',
   filterDomain: () => [],
 });
 const emit = defineEmits<{
@@ -71,8 +78,14 @@ const participationActive = computed(() => props.mode === 'participation' && pro
 const option = computed(() => {
   const palette = readCanvasChartPalette();
   const cells = props.analysis.observedCells.filter((cell) => cell.metricValue !== null);
-  const breakdown = participationActive.value ? buildCanvasBreakdownSeries(props.analysis) : [];
-  const aggregateValues = cells.map((cell) => canvasDivergingBarValue(cell, props.metric) as number);
+  const breakdown = participationActive.value
+    ? buildCanvasBreakdownSeries(props.analysis, props.signOrientation)
+    : [];
+  const aggregateValues = cells.map((cell) => canvasDivergingBarValue(
+    cell,
+    props.metric,
+    props.signOrientation,
+  ) as number);
   const stackedPositiveValues = props.analysis.cells.map((_, cellIndex) => breakdown.reduce(
     (total, series) => total + Math.max(0, series.segments[cellIndex]?.visualValue || 0),
     0,
@@ -143,7 +156,7 @@ const option = computed(() => {
       value: [
         props.analysis.xValues.indexOf(cell.x),
         props.analysis.yValues.indexOf(cell.y),
-        canvasDivergingBarValue(cell, props.metric) as number,
+        canvasDivergingBarValue(cell, props.metric, props.signOrientation) as number,
         canvasVisualColorValue(cell, props.metric) as number,
       ],
       canvasKey: cell.key,
@@ -208,7 +221,7 @@ const option = computed(() => {
       ? Math.abs(stackedPositiveValues[selectedCellIndex] || 0) >= Math.abs(stackedNegativeValues[selectedCellIndex] || 0)
         ? stackedPositiveValues[selectedCellIndex] || 0
         : stackedNegativeValues[selectedCellIndex] || 0
-      : canvasDivergingBarValue(selectedCell, props.metric) as number
+      : canvasDivergingBarValue(selectedCell, props.metric, props.signOrientation) as number
     : null;
   const selectionMarkerSeries = selectedCell && selectedEndpoint !== null
     ? [createCanvasSelectionMarkerSeries({
@@ -262,11 +275,12 @@ const option = computed(() => {
         const benchmark = cell.peerMedian === null || cell.peerMad === null
           ? 'Benchmark: sin variación suficiente'
           : `Benchmark: mediana ${formatCanvasMetric(cell.peerMedian, 'netDifference')}; MAD ${formatCanvasMetric(cell.peerMad, 'netDifference')}; n=${peers}`;
+        const visualValue = canvasDivergingBarValue(cell, props.metric, props.signOrientation) as number;
         return [
           `<strong>${escapeCanvasHtml(cell.x)} · ${escapeCanvasHtml(cell.y)}</strong>`,
           `${CANVAS_METRIC_LABELS[props.metric]}: <strong>${formatCanvasMetric(cell.metricValue, props.metric)}</strong>`,
           props.metric === 'netDifference'
-            ? `Posición visual: ${formatCanvasMetric(canvasDivergingBarValue(cell, props.metric), 'netDifference')} · ${cell.netDifference! < 0 ? 'sobre cero' : 'bajo cero'}`
+            ? `Posición visual: ${formatCanvasMetric(visualValue, 'netDifference')} · ${visualValue >= 0 ? 'sobre cero' : 'bajo cero'}`
             : '',
           `Diferencia neta: ${formatCanvasMetric(cell.netDifference, 'netDifference')}`,
           coverage,
@@ -317,7 +331,11 @@ const option = computed(() => {
         ? '%'
         : props.metric === 'peerDeviation'
           ? 'score'
-          : props.metric === 'netDifference' ? 'kg: pérdida (+) / ganancia (−)' : 'kg',
+          : props.metric === 'netDifference'
+            ? props.signOrientation === 'lossUp'
+              ? 'kg: pérdida (+) / ganancia (−)'
+              : 'kg: ganancia (+) / pérdida (−)'
+            : 'kg',
       min: paddedMin,
       max: stableMax,
       axisLabel: {
@@ -427,7 +445,9 @@ onBeforeUnmount(() => {
           {{ value }}
         </span>
       </div>
-      <p class="mt-1.5 text-right text-[8px] font-bold text-pic-text-muted">Pérdida sobre cero · ganancia bajo cero</p>
+      <p class="mt-1.5 text-right text-[8px] font-bold text-pic-text-muted">
+        {{ signOrientation === 'lossUp' ? 'Pérdida sobre cero · ganancia bajo cero' : 'Ganancia sobre cero · pérdida bajo cero' }}
+      </p>
     </div>
     <div ref="root" class="absolute inset-0" role="img" :aria-label="title"></div>
   </div>
