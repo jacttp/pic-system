@@ -59,10 +59,11 @@ export const pic52Api = {
     years: number[],
     transaction: string,
     filters: Pic52Filters,
+    dimensions?: Array<keyof Pic52ProductOptions>,
   ): Promise<Pic52ProductOptions> {
     const { data } = await api.post<Pic52ApiResponse<Pic52ProductOptions>>(
       '/pic-52s/product-options',
-      { years, transaction, filters },
+      { years, transaction, filters, dimensions },
     );
     return data.data;
   },

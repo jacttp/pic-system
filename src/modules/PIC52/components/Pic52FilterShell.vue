@@ -48,6 +48,7 @@ const {
   options,
   productOptions,
   dependentLoading,
+  productLoadingKey,
   isReportLoading,
   isInitializing,
   isReady,
@@ -187,7 +188,7 @@ const filterOptions = (filter: FilterDefinition) => {
 };
 
 const isFilterLoading = (filter: FilterDefinition) => {
-  if (filter.productKey) return dependentLoading.value.products;
+  if (filter.productKey) return productLoadingKey.value === filter.productKey;
   if (filter.key === 'jefaturas') return dependentLoading.value.jefaturas;
   if (filter.key === 'rutas') return dependentLoading.value.rutas;
   return false;
@@ -195,11 +196,26 @@ const isFilterLoading = (filter: FilterDefinition) => {
 
 const isFilterDisabled = (filter: FilterDefinition) => {
   if (!isReady.value) return true;
+  if (
+    filter.productKey
+    && dependentLoading.value.products
+    && productLoadingKey.value !== filter.productKey
+  ) {
+    return true;
+  }
   if (filter.key === 'gerencias') return isGerenciaLocked.value;
   if (filter.key === 'jefaturas') {
     return isJefaturaLocked.value || selected.value.gerencias.length === 0;
   }
   if (filter.key === 'rutas') return selected.value.jefaturas.length === 0;
+  if (filter.productKey === 'gruposSku') return selected.value.marcas.length === 0;
+  if (filter.productKey === 'categorias') return selected.value.gruposSku.length === 0;
+  if (
+    filter.productKey === 'gruposComercialesA'
+    || filter.productKey === 'gruposComercialesB'
+  ) {
+    return selected.value.categorias.length === 0;
+  }
   return false;
 };
 
@@ -225,8 +241,14 @@ const toggleMobileSection = (section: MobileSection) => {
   mobileSections[section] = !mobileSections[section];
 };
 
-const handleDropdownOpen = (isOpen: boolean) => {
+const handleDropdownOpen = (
+  isOpen: boolean,
+  productKey?: keyof Pic52ProductOptions,
+) => {
   openDropdownCount.value = Math.max(0, openDropdownCount.value + (isOpen ? 1 : -1));
+  if (isOpen && productKey) {
+    void store.ensureProductOptions(productKey);
+  }
 };
 
 const handleClickOutside = (event: MouseEvent) => {
@@ -414,7 +436,7 @@ onUnmounted(() => {
                   :disabled="isFilterDisabled(filter)"
                   :loading="isFilterLoading(filter)"
                   @change="handleFilterChange(filter)"
-                  @open-change="handleDropdownOpen"
+                  @open-change="isOpen => handleDropdownOpen(isOpen, filter.productKey)"
                 />
                 <p
                   v-if="filter.key === 'gerencias' && isGerenciaLocked"

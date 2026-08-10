@@ -73,6 +73,7 @@ export const usePic52Store = defineStore('pic52', () => {
   });
   const productOptions = reactive<Pic52ProductOptions>(emptyProducts());
   const dependentLoading = reactive({ jefaturas: false, rutas: false, products: false });
+  const productLoadingKey = ref<keyof Pic52ProductOptions | null>(null);
   const isInitializing = ref(false);
   const isReady = ref(false);
   const initializationError = ref('');
@@ -93,6 +94,10 @@ export const usePic52Store = defineStore('pic52', () => {
   let reportRequestId = 0;
   let trendRequestId = 0;
   let productOptionsTransaction = '';
+  let hasRequestedProductOptions = false;
+  let productOptionsFailed = false;
+  let lastProductDimensions: Array<keyof Pic52ProductOptions> = ['gruposSku'];
+  const loadedProductDimensions = new Set<keyof Pic52ProductOptions>(['marcas']);
 
   const isGerenciaLocked = computed(() => Boolean(context.value?.gerencia));
   const isJefaturaLocked = computed(() => Boolean(context.value?.jefatura));
@@ -193,44 +198,101 @@ export const usePic52Store = defineStore('pic52', () => {
   };
 
   const clearProductSelection = () => {
+    productRequestId += 1;
     productOrder.forEach(key => {
       selected[key] = [];
-      productOptions[key] = [];
+      productOptions[key] = key === 'marcas'
+        ? [...(catalogs.value?.productBrands ?? [])]
+        : [];
     });
+    productOptionsTransaction = '';
+    hasRequestedProductOptions = false;
+    productOptionsFailed = false;
+    lastProductDimensions = ['gruposSku'];
+    loadedProductDimensions.clear();
+    loadedProductDimensions.add('marcas');
+    dependentLoading.products = false;
+    productLoadingKey.value = null;
   };
 
-  const refreshProductOptions = async (updateFromIndex = 0) => {
+  const refreshProductOptions = async (
+    dimensions: Array<keyof Pic52ProductOptions>,
+  ) => {
     if (!catalogs.value || selectedYears.value.length === 0 || !transaction.value) return;
+    if (dimensions.length === 0) return;
     const requestId = ++productRequestId;
+    hasRequestedProductOptions = true;
+    lastProductDimensions = [...dimensions];
     dependentLoading.products = true;
+    productLoadingKey.value = dimensions.length === 1 ? dimensions[0] : null;
     dependentError.value = '';
     try {
+      const requestFilters: Pic52Filters = {
+        ...emptyFilters(),
+        marcas: [...selected.marcas],
+        gruposSku: [...selected.gruposSku],
+        categorias: [...selected.categorias],
+        gruposComercialesA: [...selected.gruposComercialesA],
+        gruposComercialesB: [...selected.gruposComercialesB],
+        skus: [...selected.skus],
+      };
+      if (dimensions.length === 1 && dimensions[0] === 'gruposComercialesA') {
+        requestFilters.gruposComercialesB = [];
+      }
+      if (dimensions.length === 1 && dimensions[0] === 'gruposComercialesB') {
+        requestFilters.gruposComercialesA = [];
+      }
       const data = await pic52Api.getProductOptions(
         [...selectedYears.value],
         transaction.value,
-        {
-          ...emptyFilters(),
-          marcas: [...selected.marcas],
-          gruposSku: [...selected.gruposSku],
-          categorias: [...selected.categorias],
-          gruposComercialesA: [...selected.gruposComercialesA],
-          gruposComercialesB: [...selected.gruposComercialesB],
-          skus: [...selected.skus],
-        },
+        requestFilters,
+        dimensions,
       );
       if (requestId === productRequestId) {
-        productOrder.slice(updateFromIndex).forEach(key => {
+        dimensions.forEach(key => {
           productOptions[key] = data[key];
+          loadedProductDimensions.add(key);
         });
         productOptionsTransaction = transaction.value;
+        productOptionsFailed = false;
       }
     } catch (error) {
       if (requestId === productRequestId) {
+        productOptionsFailed = true;
         dependentError.value = errorMessage(error, 'No fue posible cargar la cascada de producto.');
       }
     } finally {
-      if (requestId === productRequestId) dependentLoading.products = false;
+      if (requestId === productRequestId) {
+        dependentLoading.products = false;
+        productLoadingKey.value = null;
+      }
     }
+  };
+
+  const ensureProductOptions = async (
+    productKey: keyof Pic52ProductOptions,
+    force = false,
+  ) => {
+    if (productKey === 'marcas') return;
+    if (!force && dependentLoading.products) return;
+    if (
+      !force
+      && loadedProductDimensions.has(productKey)
+      && productOptionsTransaction === transaction.value
+    ) {
+      return;
+    }
+    await refreshProductOptions([productKey]);
+  };
+
+  const invalidateProductDimensions = (
+    dimensions: Array<keyof Pic52ProductOptions>,
+  ) => {
+    dimensions.forEach(key => {
+      selected[key] = [];
+      productOptions[key] = [];
+      loadedProductDimensions.delete(key);
+    });
   };
 
   const applyContext = async () => {
@@ -264,6 +326,9 @@ export const usePic52Store = defineStore('pic52', () => {
         pic52Api.getFormatos(),
       ]);
       catalogs.value = catalogData;
+      productOptions.marcas = [...(catalogData.productBrands ?? [])];
+      loadedProductDimensions.clear();
+      loadedProductDimensions.add('marcas');
       context.value = contextData;
       options.canales = canales;
       options.gerencias = gerencias;
@@ -282,7 +347,6 @@ export const usePic52Store = defineStore('pic52', () => {
       weeks.value = [...weekValues.value];
       await applyContext();
       isReady.value = true;
-      await refreshProductOptions();
       filtersDirty.value = true;
     } catch (error) {
       isReady.value = false;
@@ -309,15 +373,16 @@ export const usePic52Store = defineStore('pic52', () => {
     await loadRutas();
   };
 
-  const handleProductChange = async (key: keyof Pic52ProductOptions) => {
-    const changedIndex = productOrder.indexOf(key);
-    productOrder.slice(changedIndex + 1).forEach(downstreamKey => {
-      selected[downstreamKey] = [];
-      productOptions[downstreamKey] = [];
-    });
-    if (changedIndex < productOrder.length - 1) {
-      await refreshProductOptions(changedIndex + 1);
-    }
+  const handleProductChange = (key: keyof Pic52ProductOptions) => {
+    const dependents: Record<keyof Pic52ProductOptions, Array<keyof Pic52ProductOptions>> = {
+      marcas: ['gruposSku', 'categorias', 'gruposComercialesA', 'gruposComercialesB', 'skus'],
+      gruposSku: ['categorias', 'gruposComercialesA', 'gruposComercialesB', 'skus'],
+      categorias: ['gruposComercialesA', 'gruposComercialesB', 'skus'],
+      gruposComercialesA: ['skus'],
+      gruposComercialesB: ['skus'],
+      skus: [],
+    };
+    invalidateProductDimensions(dependents[key]);
   };
 
   const handleConfigurationChange = async () => {
@@ -331,13 +396,11 @@ export const usePic52Store = defineStore('pic52', () => {
       : orderedWeeks.filter(week => weekValues.value.includes(week));
     if (weeks.value.length === 0) weeks.value = weekValues.value.filter(week => week <= 52);
     clearProductSelection();
-    await refreshProductOptions();
   };
 
   const handleTransactionChange = async () => {
     if (transaction.value === productOptionsTransaction) return;
     clearProductSelection();
-    await refreshProductOptions();
   };
 
   const setTransactionSelections = (values: string[]) => {
@@ -499,7 +562,6 @@ export const usePic52Store = defineStore('pic52', () => {
 
     dependentError.value = '';
     await applyContext();
-    await refreshProductOptions();
     filtersDirty.value = true;
   };
 
@@ -507,6 +569,9 @@ export const usePic52Store = defineStore('pic52', () => {
     dependentError.value = '';
     if (selected.gerencias.length > 0) await loadJefaturas();
     if (selected.jefaturas.length > 0) await loadRutas();
+    if (hasRequestedProductOptions && productOptionsFailed) {
+      await refreshProductOptions(lastProductDimensions);
+    }
   };
 
   return {
@@ -521,6 +586,7 @@ export const usePic52Store = defineStore('pic52', () => {
     options,
     productOptions,
     dependentLoading,
+    productLoadingKey,
     isInitializing,
     isReady,
     initializationError,
@@ -556,6 +622,7 @@ export const usePic52Store = defineStore('pic52', () => {
     setTransactionSelections,
     setCompareTransactions,
     refreshProductOptions,
+    ensureProductOptions,
     clearProductSelection,
     retryDependentOptions,
     applyFilters,

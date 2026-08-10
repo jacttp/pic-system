@@ -44,6 +44,7 @@ export interface Pic52Catalogs {
   years: number[];
   defaultReferenceYear: number;
   defaultYears: number[];
+  productBrands: string[];
   transactions: Pic52TransactionOption[];
   weeksByYear: Record<string, number[]>;
   defaultWeeks: number[];
@@ -65,7 +66,13 @@ export interface Pic52UserContext {
 }
 
 export interface Pic52MatrixOption {
+  clientId: string;
+  clientName: string;
   matriz: string;
+  chain: string;
+  format: string;
+  clientType: string;
+  strategy: string;
   clientCount: number;
 }
 

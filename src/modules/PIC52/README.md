@@ -20,10 +20,19 @@ patrón existente; cualquier excepción deberá quedar justificada en este docum
 - Service Axios basado exclusivamente en `@/api/axios`; el JWT permanece a cargo
   del interceptor global.
 - Store Pinia con catálogos, contexto comercial, bloqueos por rol y estado pendiente.
+- Marca usa el catálogo fijo `Corona`, `Ros` y `Wali` entregado por `/catalogs`.
+  Cada dimensión restante se consulta únicamente al abrir su selector y siempre
+  se restringe a esas marcas. La cadena habilitada es Marca → Grupo SKU →
+  Categoría → Grupos Comerciales A/B; SKU permanece disponible como acceso directo.
 - Cascadas Gerencia → Jefatura → Ruta y jerarquía completa de producto.
 - Las cascadas comercial y de producto están aisladas: cambiar Canal, Gerencia,
   Jefatura, Ruta, Matriz o Formato no recarga ni limpia Marca/producto.
-- Selector paginado por Matriz.
+- Selector paginado por Matriz con la misma anatomía visual de
+  `PIC/components/modals/PicClientModal.vue`: modal amplio, búsqueda, tabla
+  seleccionable con ID, Matriz, Cadena, Nombre, Formato, Tipo y Estrategia,
+  orden local, loading superpuesto y paginación. Conserva Matriz como llave del
+  reporte y un borrador propio porque PIC52 aplica o cancela la selección de forma
+  explícita.
 - El selector muestra `Venta` y `NC` por defecto; el payload conserva el contrato
   `transaction: "Ventas"` para que el backend agregue ambas operaciones.
 - El selector de años es multicheck y preselecciona los tres últimos disponibles;
