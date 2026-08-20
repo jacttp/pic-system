@@ -67,13 +67,13 @@ onMounted(() => {
     />
 
     <!-- Main Content Area -->
-    <main class="flex-1 overflow-y-auto bg-slate-50/30">
-      <div class="max-w-4xl mx-auto px-8 py-12">
+    <main class="min-w-0 flex-1 overflow-y-auto bg-slate-50/30">
+      <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
         <div v-if="loading" class="flex items-center justify-center h-64">
           <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
         
-        <div v-else class="bg-white rounded-xl shadow-sm border border-slate-200 p-10 min-h-[80vh]">
+        <div v-else class="min-w-0 min-h-[80vh] rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 lg:p-10">
           <DocRenderer :content="content" />
         </div>
 

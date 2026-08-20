@@ -52,6 +52,7 @@ export interface CpfrApprovalRow extends Record<string, unknown> {
    num_pedido: string
    sku_muliix: string
    source_type: string
+   marca?: string
    cant_pedida: number
    fec_fin_embarque?: string | null
    lead_time: number

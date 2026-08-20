@@ -29,10 +29,17 @@ const groupedOrders = computed(() => {
   return Object.entries(groups).map(([key, records]) => ({ key, records }))
 })
 
-const totalPages = () => Math.ceil(store.totalRecords / store.pagination.limit)
+const totalPages = computed(() => Math.ceil(store.totalRecords / store.pagination.limit))
+const firstVisibleOrder = computed(() => (
+  store.totalRecords === 0 ? 0 : ((store.pagination.page - 1) * store.pagination.limit) + 1
+))
+const lastVisibleOrder = computed(() => Math.min(
+  store.pagination.page * store.pagination.limit,
+  store.totalRecords
+))
 
 const handlePageChange = async (newPage: number) => {
-  if (newPage < 1 || newPage > totalPages()) return
+  if (newPage < 1 || newPage > totalPages.value) return
   store.pagination.page = newPage
   await store.fetchOrders()
 }
@@ -203,7 +210,7 @@ const statusClasses = (status?: string) => {
 
       <div class="flex flex-col gap-3 border-t border-slate-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
         <p class="text-sm font-medium text-slate-500">
-          Mostrando 1 a {{ groupedOrders.length }} de {{ store.totalRecords }} resultados
+          Mostrando {{ firstVisibleOrder }} a {{ lastVisibleOrder }} de {{ store.totalRecords }} órdenes
         </p>
         <div class="flex items-center gap-2">
           <button
@@ -218,7 +225,7 @@ const statusClasses = (status?: string) => {
           </span>
           <button
             class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-brand-200 hover:text-brand-600 disabled:opacity-40"
-            :disabled="store.pagination.page >= totalPages() || store.isLoading"
+            :disabled="store.pagination.page >= totalPages || store.isLoading"
             @click="handlePageChange(store.pagination.page + 1)"
           >
             <i class="fa-solid fa-chevron-right text-xs"></i>

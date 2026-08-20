@@ -50,7 +50,7 @@ export interface UploadOcBatchResponse {
  */
 export interface UploadOcListFilters {
     cadenas: string[]
-    numPedido: string
+    busqueda: string
     estado: EstadoOC | ''
     fecPedidoInicio?: string
     fecPedidoFin?: string

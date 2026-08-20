@@ -64,7 +64,7 @@ const applyFilters = async () => {
 }
 
 const clearFilters = async () => {
-  store.filters.numPedido = ''
+  store.filters.busqueda = ''
   store.filters.estado = 'pendiente'
   store.filters.fecPedidoInicio = ''
   store.filters.fecPedidoFin = ''
@@ -81,11 +81,11 @@ const clearFilters = async () => {
 <template>
   <section class="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_14px_35px_rgba(15,23,42,0.04)]">
     <div class="flex flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-      <div class="relative w-full lg:w-[300px]">
+      <div class="relative w-full lg:w-[360px]">
         <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
         <Input
-          v-model="store.filters.numPedido"
-          placeholder="Buscar por N° de pedido..."
+          v-model="store.filters.busqueda"
+          placeholder="Buscar OC, código o tienda..."
           class="h-12 rounded-lg border-slate-200 bg-white pl-12 text-sm font-semibold text-slate-700 shadow-sm placeholder:text-slate-400 focus-visible:ring-brand-100"
           @keyup.enter="applyFilters"
         />

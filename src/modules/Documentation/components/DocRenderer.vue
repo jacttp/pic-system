@@ -40,4 +40,7 @@ const renderedMarkdown = computed(() => {
 .prose ul {
   @apply list-disc list-inside mb-4 space-y-1 text-slate-600;
 }
+.prose table {
+  @apply block max-w-full overflow-x-auto;
+}
 </style>

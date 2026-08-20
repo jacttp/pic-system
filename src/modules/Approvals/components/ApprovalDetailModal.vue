@@ -46,6 +46,7 @@ interface CpfrPreviewRow {
    promedio_sellout_pz: number
    promedio_sellout_kg: number
    unidad_inventario: number
+   marca: string
    cobertura_calculada: number | null
    sku_muliix: string
    sku_cadena: string
@@ -577,6 +578,7 @@ const cpfrPreviewRows = computed(() => {
          promedio_sellout_pz: Number(row.promedio_sellout_pz ?? row.venta_prom_uni ?? 0),
          promedio_sellout_kg: Number(row.promedio_sellout_kg ?? row.venta_prom_kg ?? 0),
          unidad_inventario: unidad,
+         marca: String(row.marca ?? ''),
          cobertura_calculada: row.cobertura_calculada == null ? null : Number(row.cobertura_calculada),
          sku_muliix: String(row.sku_muliix ?? ''),
          sku_cadena: String(row.sku_cadena ?? ''),
@@ -622,6 +624,7 @@ const cpfrPreviewRows = computed(() => {
       promedio_sellout_pz: 0,
       promedio_sellout_kg: 0,
       unidad_inventario: 0,
+      marca: '',
       cobertura_calculada: null,
       sku_muliix: '',
       sku_cadena: '',
@@ -709,6 +712,25 @@ const expiredCpfrOrders = computed(() =>
       store.orders.filter(order => order.isExpired)
    )
 );
+
+const cpfrSummaryMetrics = computed(() => {
+   let coronaKg = 0;
+   let rosKg = 0;
+
+   for (const row of cpfrPreviewRows.value) {
+      const brand = row.marca.trim().toLocaleLowerCase('es-MX');
+      if (brand === 'corona') coronaKg += row.pedido_kg;
+      if (brand === 'ros') rosKg += row.pedido_kg;
+   }
+
+   return {
+      stores: cpfrStoreGroups.value.length,
+      skus: cpfrPreviewRows.value.length,
+      totalKg: cpfrStoreGroups.value.reduce((sum, store) => sum + store.totalKg, 0),
+      coronaKg,
+      rosKg,
+   };
+});
 const expiredCpfrOrderNumbers = computed(() =>
    expiredCpfrOrders.value.map(order => order.num_pedido)
 );
@@ -1298,18 +1320,26 @@ const handleCancel = async () => {
                            <span class="text-white/25">/</span>
                            <span class="font-semibold text-pic-nav-text">Template OV</span>
                         </div>
-                        <dl class="grid grid-cols-3 divide-x divide-pic-brand-border rounded-lg border border-pic-brand-border bg-pic-brand-soft text-center">
+                        <dl class="grid grid-cols-2 overflow-hidden rounded-lg border border-pic-brand-border bg-pic-brand-soft text-center sm:grid-cols-5">
                            <div class="min-w-[72px] px-3 py-1.5">
-                              <dd class="text-sm font-bold text-pic-brand">{{ cpfrStoreGroups.length }}</dd>
+                              <dd class="text-sm font-bold text-pic-brand">{{ cpfrSummaryMetrics.stores }}</dd>
                               <dt class="mt-0.5 font-bold text-[10px] text-pic-text-main">Tiendas</dt>
                            </div>
-                           <div class="min-w-[72px] px-3 py-1.5">
-                              <dd class="text-sm font-bold text-pic-brand">{{ cpfrPreviewRows.length }}</dd>
+                           <div class="min-w-[72px] border-l border-pic-brand-border px-3 py-1.5">
+                              <dd class="text-sm font-bold text-pic-brand">{{ cpfrSummaryMetrics.skus }}</dd>
                               <dt class="mt-0.5 font-bold text-[10px] text-pic-text-main">SKU</dt>
                            </div>
-                           <div class="min-w-[72px] px-3 py-1.5">
-                              <dd class="text-sm font-bold text-pic-brand">{{ formatNumber(cpfrStoreGroups.reduce((sum, store) => sum + store.totalKg, 0), 1) }}</dd>
+                           <div class="min-w-[72px] border-t border-pic-brand-border px-3 py-1.5 sm:border-l sm:border-t-0">
+                              <dd class="text-sm font-bold text-pic-brand">{{ formatNumber(cpfrSummaryMetrics.totalKg, 1) }}</dd>
                               <dt class="mt-0.5 font-bold text-[10px] text-pic-text-main">Kg</dt>
+                           </div>
+                           <div class="min-w-[72px] border-l border-t border-pic-brand-border px-3 py-1.5 sm:border-t-0">
+                              <dd class="text-sm font-bold text-pic-brand">{{ formatNumber(cpfrSummaryMetrics.coronaKg, 1) }}</dd>
+                              <dt class="mt-0.5 font-bold text-[10px] text-pic-text-main">Kg Corona</dt>
+                           </div>
+                           <div class="col-span-2 min-w-[72px] border-t border-pic-brand-border px-3 py-1.5 sm:col-span-1 sm:border-l sm:border-t-0">
+                              <dd class="text-sm font-bold text-pic-brand">{{ formatNumber(cpfrSummaryMetrics.rosKg, 1) }}</dd>
+                              <dt class="mt-0.5 font-bold text-[10px] text-pic-text-main">Kg ROS</dt>
                            </div>
                         </dl>
                      </div>

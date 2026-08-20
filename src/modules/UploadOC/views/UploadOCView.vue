@@ -12,7 +12,7 @@ const store = useUploadOcStore()
 const { toast } = useToast()
 
 onMounted(async () => {
-  await store.fetchOrders()
+  await store.fetchRecentOrders()
 })
 
 const onUploadSuccess = (message: string) => {

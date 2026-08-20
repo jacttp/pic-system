@@ -38,13 +38,13 @@ onMounted(() => {
                </div>
 
                <div class="flex flex-col gap-3 min-w-full xl:min-w-[420px]">
-                  <a
-                     href="http://localhost:5173/admin/cpfr"
+                  <RouterLink
+                     :to="{ name: 'cpfr' }"
                      class="inline-flex items-center justify-center gap-2 self-start xl:self-end rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
                   >
                      <i class="fa-solid fa-arrow-left"></i>
                      Ir a CPFR
-                  </a>
+                  </RouterLink>
 
                   <div class="grid grid-cols-3 gap-3">
                      <div class="rounded-lg border border-slate-100 bg-slate-50 p-3">

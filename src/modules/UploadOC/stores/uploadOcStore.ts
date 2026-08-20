@@ -61,6 +61,8 @@ const GW_NUMERIC_COLUMNS = new Set<keyof UploadOcGatewayRecord>([
     'ID5'
 ])
 
+const RECENT_ORDERS_LIMIT = 10
+
 const nullableText = (value: unknown): string | null => {
     const text = String(value ?? '').trim()
     return text === '' ? null : text
@@ -84,7 +86,7 @@ export const useUploadOcStore = defineStore('uploadOc', () => {
 
     const filters = reactive<UploadOcListFilters>({
         cadenas: [], 
-        numPedido: '',
+        busqueda: '',
         estado: 'pendiente',
         fecPedidoInicio: '',
         fecPedidoFin: '',
@@ -97,7 +99,7 @@ export const useUploadOcStore = defineStore('uploadOc', () => {
     // Paginación
     const pagination = reactive<UploadOcListPagination>({
         page: 1,
-        limit: 50
+        limit: RECENT_ORDERS_LIMIT
     })
 
     // Resultados de la última carga (para UI alerts)
@@ -321,6 +323,15 @@ export const useUploadOcStore = defineStore('uploadOc', () => {
     }
 
     /**
+     * Restablece el listado al bloque ligero de OC recientes.
+     */
+    const fetchRecentOrders = async () => {
+        pagination.page = 1
+        pagination.limit = RECENT_ORDERS_LIMIT
+        await fetchOrders()
+    }
+
+    /**
      * Actualiza el filtro de cadenas simulando el comportamiento de pestañas.
      */
     const setChainFilter = async (chain: string) => {
@@ -331,6 +342,7 @@ export const useUploadOcStore = defineStore('uploadOc', () => {
         }
         filters.estado = 'pendiente'
         pagination.page = 1
+        pagination.limit = RECENT_ORDERS_LIMIT
         await fetchOrders()
     }
 
@@ -346,6 +358,7 @@ export const useUploadOcStore = defineStore('uploadOc', () => {
         // Actions
         uploadBatch,
         fetchOrders,
+        fetchRecentOrders,
         setChainFilter
     }
 })
