@@ -872,6 +872,7 @@ const cpfrPdfItems = computed<ExportTiendaItem[]>(() => {
          num_pedido: row.num_pedido,
          cant_pedida: row.cant_pedida,
          pedido_kg: row.pedido_kg,
+         marca: row.marca,
          inv_actual_pz: row.inv_actual_pz,
          promedio_sellout_pz: row.promedio_sellout_pz,
          cobertura_calculada: calcularCoberturaDinamica(row),
@@ -1331,7 +1332,7 @@ const handleCancel = async () => {
                            </div>
                            <div class="min-w-[72px] border-t border-pic-brand-border px-3 py-1.5 sm:border-l sm:border-t-0">
                               <dd class="text-sm font-bold text-pic-brand">{{ formatNumber(cpfrSummaryMetrics.totalKg, 1) }}</dd>
-                              <dt class="mt-0.5 font-bold text-[10px] text-pic-text-main">Kg</dt>
+                              <dt class="mt-0.5 font-bold text-[10px] text-pic-text-main">KG totales</dt>
                            </div>
                            <div class="min-w-[72px] border-l border-t border-pic-brand-border px-3 py-1.5 sm:border-t-0">
                               <dd class="text-sm font-bold text-pic-brand">{{ formatNumber(cpfrSummaryMetrics.coronaKg, 1) }}</dd>

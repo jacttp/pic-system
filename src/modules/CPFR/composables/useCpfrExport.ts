@@ -25,6 +25,7 @@ export interface ExportRow {
     num_pedido: string
     cant_pedida: number   // pedido_sugerido_pz_red
     pedido_kg: number
+    marca?: string
     inv_actual_pz: number
     promedio_sellout_pz: number
     cobertura_calculada: number | null
@@ -121,6 +122,24 @@ function groupItemsByStore(items: ExportTiendaItem[]): ExportTiendaItem[] {
     }
 
     return Array.from(map.values())
+}
+
+function calculateBrandKgSummary(rows: ExportRow[]) {
+    let totalKg = 0
+    let coronaKg = 0
+    let rosKg = 0
+
+    for (const row of rows) {
+        const kg = Number(row.pedido_kg)
+        if (!Number.isFinite(kg)) continue
+
+        totalKg += kg
+        const brand = String(row.marca ?? '').trim().toLocaleLowerCase('es-MX')
+        if (brand === 'corona') coronaKg += kg
+        if (brand === 'ros') rosKg += kg
+    }
+
+    return { totalKg, coronaKg, rosKg }
 }
 
 function filterPositiveQuantityItems(items: ExportTiendaItem[]): ExportTiendaItem[] {
@@ -317,6 +336,7 @@ export function buildExportItems(dias: any[]): ExportTiendaItem[] {
                         num_pedido: sku.num_pedido || '',
                         cant_pedida: finalPieces,
                         pedido_kg: finalPieces * (sku.unidad_inventario ?? 0),
+                        marca: String(sku.marca ?? sku.Marca ?? ''),
                         inv_actual_pz: sku.inv_actual_pz ?? 0,
                         promedio_sellout_pz: sku.promedio_sellout_pz ?? 0,
                         cobertura_calculada: calcularCoberturaDinamica(sku),
@@ -471,7 +491,7 @@ export function useCpfrExport() {
             }
 
             const totalPz = storeItem.rows.reduce((a, r) => a + r.cant_pedida, 0)
-            const totalKg = storeItem.rows.reduce((a, r) => a + r.pedido_kg, 0)
+            const kgSummary = calculateBrandKgSummary(storeItem.rows)
             const jefatura = storeItem.jefatura || storeItem.rows[0]?.jefatura || 'N/D'
             const sucursal = storeItem.rows[0]?.sucursal || '-'
 
@@ -489,7 +509,8 @@ export function useCpfrExport() {
             pdf.setFont('helvetica', 'bold')
             pdf.setFontSize(8)
             pdf.text(`${rowsByOc.size} OC`, pageWidth - margin - 5, y + 10, { align: 'right' })
-            pdf.text(`${storeItem.rows.length} SKU | ${formatNumber(totalPz, 0)} pz | ${formatNumber(totalKg, 1)} kg`, pageWidth - margin - 5, y + 17, { align: 'right' })
+            pdf.setFontSize(7.1)
+            pdf.text(`Total: ${formatNumber(kgSummary.totalKg, 1)}kg | Corona: ${formatNumber(kgSummary.coronaKg, 1)}kg | Ros: ${formatNumber(kgSummary.rosKg, 1)}kg`, pageWidth - margin - 5, y + 17, { align: 'right' })
             y += 31
 
             setFill(grayBand)
@@ -638,7 +659,7 @@ export function useCpfrExport() {
             }
 
             const totalPz = storeItem.rows.reduce((total, row) => total + row.cant_pedida, 0)
-            const totalKg = storeItem.rows.reduce((total, row) => total + row.pedido_kg, 0)
+            const kgSummary = calculateBrandKgSummary(storeItem.rows)
             const jefatura = storeItem.jefatura || storeItem.rows[0]?.jefatura || 'N/D'
             const sucursal = storeItem.rows[0]?.sucursal || '-'
             const orderSections = Array.from(rowsByOc.entries()).map(([oc, rows]) => {
@@ -683,7 +704,8 @@ export function useCpfrExport() {
                     .store-card { min-height:84px; flex:1; border-radius:10px; background:#c7121f; color:#fff; padding:17px 19px; display:flex; justify-content:space-between; gap:14px; }
                     .store-card h1 { margin:0 0 9px; font-size:22px; line-height:1.05; letter-spacing:.2px; }
                     .store-card p, .store-card b { margin:0; font-size:12px; line-height:1.45; }
-                    .store-summary { min-width:155px; text-align:right; }
+                    .store-summary { min-width:245px; text-align:right; }
+                    .store-summary span { display:block; white-space:nowrap; font-size:10px; line-height:1.45; }
                     .meta-band { margin-top:17px; border-radius:8px; background:#f6f4f4; padding:11px 14px; display:flex; justify-content:space-between; gap:12px; color:#2d3748; font-size:11px; font-weight:700; }
                     .status { color:#99111b; text-align:right; }
                     .oc-section { margin-top:19px; }
@@ -709,8 +731,8 @@ export function useCpfrExport() {
                                 <p>Cliente ${escapeHtml(storeItem.id_cliente)} | Jefatura ${escapeHtml(jefatura)}</p>
                             </div>
                             <div class="store-summary">
-                                <b>${rowsByOc.size} OC</b><br>
-                                <b>${storeItem.rows.length} SKU | ${escapeHtml(formatNumber(totalPz, 0))} pz | ${escapeHtml(formatNumber(totalKg, 1))} kg</b>
+                                <b>${rowsByOc.size} OC</b>
+                                <span>Total: ${escapeHtml(formatNumber(kgSummary.totalKg, 1))}kg | Corona: ${escapeHtml(formatNumber(kgSummary.coronaKg, 1))}kg | Ros: ${escapeHtml(formatNumber(kgSummary.rosKg, 1))}kg</span>
                             </div>
                         </div>
                     </header>
