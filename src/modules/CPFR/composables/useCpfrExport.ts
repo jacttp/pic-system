@@ -397,7 +397,7 @@ export function useCpfrExport() {
             for (const row of item.rows) {
                 const shipmentDate = formatDateForSams(row.fec_fin_embarque)
                 allRows.push([
-                    row.sku_cadena,
+                    row.upc,
                     row.desc,
                     'EMBUTIDOS CORONA SA CV',
                     item.id_cliente,
