@@ -7,7 +7,7 @@ defineOptions({
 })
 import { useCpfrStore } from '../stores/cpfrStore'
 import { toast } from '@/components/ui/toast/use-toast'
-import type { CpfrSkuDash, CpfrStoreDash } from '../types/cpfrTypes'
+import type { CpfrDiaDash, CpfrSkuDash, CpfrStoreDash } from '../types/cpfrTypes'
 import CpfrZ8Panel from '../components/CpfrZ8Panel.vue'
 import CpfrProductBehaviorPanel from '../components/CpfrProductBehaviorPanel.vue'
 import { buildVisibleCpfrDias } from '../composables/useCpfrVisibility'
@@ -875,9 +875,28 @@ function shipmentDeadlineTitle(
     return `Alerta: la OC ya no alcanza a embarcar considerando ${days} día${days === 1 ? '' : 's'} de lead time.`
 }
 
+function filterSamsDias(dias: CpfrDiaDash[]) {
+    if (store.nom_cadena.toUpperCase() !== 'SAMS') return dias
+
+    return dias
+        .map(dia => ({
+            ...dia,
+            tiendas: dia.tiendas
+                .map(tienda => ({
+                    ...tienda,
+                    skus: tienda.skus.filter(sku => String(sku.nom_cadena || '').trim().toUpperCase() === 'SAMS'),
+                }))
+                .filter(tienda => tienda.skus.length > 0),
+        }))
+        .filter(dia => dia.tiendas.length > 0)
+}
+
+const samsScopedDias = computed(() => filterSamsDias(store.dias))
+const samsScopedHistorialDias = computed(() => filterSamsDias(store.historialDias))
+
 const filteredDias = computed(() => buildVisibleCpfrDias({
     activeTab: currentTab.value,
-    dias: store.dias,
+    dias: samsScopedDias.value,
     statusFilters: store.statusFilters,
     criterioGlobal: store.criterio_global,
     selectedFilterWeek: selectedFilterWeek.value,
@@ -1200,7 +1219,7 @@ const historialStoreGroups = computed<HistorialStoreGroup[]>(() => {
     const term = store.historialSearch.trim().toLowerCase()
     const map = new Map<string, HistorialStoreGroup>()
 
-    for (const dia of store.historialDias) {
+    for (const dia of samsScopedHistorialDias.value) {
         for (const tienda of dia.tiendas) {
             for (const sku of tienda.skus) {
                 const state = sku.estado_oc

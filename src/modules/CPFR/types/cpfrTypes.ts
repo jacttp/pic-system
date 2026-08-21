@@ -38,6 +38,7 @@ export interface CpfrSkuDash {
     pedido_generado_id?: number | null  // PK de CPFR_PedidoGenerado cuando existe persistencia CPFR
     sku_muliix: string | null           // null si la OC no tiene homologación
     sku_nombre: string                  // nombre del SKU (o desc_art / sku_cadena como fallback)
+    nom_cadena: string | null           // cadena de la OC fuente; protege la vista de datos de otra cadena
 
     // Datos de la OC
     num_pedido: string | null
