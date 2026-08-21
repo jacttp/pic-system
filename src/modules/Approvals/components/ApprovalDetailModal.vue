@@ -876,6 +876,7 @@ const cpfrPdfItems = computed<ExportTiendaItem[]>(() => {
 
       const exportRow: ExportRow = {
          sku_key: row.sku_muliix || row.sku_cadena || row.upc || row.desc,
+         sku_cadena: row.sku_cadena || row.upc || '',
          cliente: row.cliente,
          nombre: row.nombre,
          sucursal: row.sucursal,

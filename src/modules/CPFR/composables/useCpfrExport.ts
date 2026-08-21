@@ -15,6 +15,7 @@ const DAY_MAP: Record<number, string> = {
 
 export interface ExportRow {
     sku_key: string
+    sku_cadena: string
     cliente: string       // id_cliente parte antes de 's'
     nombre: string        // nombre_tienda
     sucursal: string      // id_cliente parte después de 's'
@@ -72,6 +73,13 @@ function normalizeOrderState(value: unknown): string | null {
 function formatDateToAAAAMMDD(dateStr: string | null | undefined): string {
     if (!dateStr) return ''
     return dateStr.slice(0, 10).replace(/-/g, '')
+}
+
+function formatDateForSams(dateValue: string): string {
+    const compactDate = String(dateValue || '').replace(/\D/g, '')
+    if (compactDate.length !== 8) return ''
+
+    return `${compactDate.slice(4, 6)}/${compactDate.slice(6, 8)}/${compactDate.slice(0, 4)}`
 }
 
 function calcularCoberturaDinamica(sku: any): number | null {
@@ -326,6 +334,7 @@ export function buildExportItems(dias: any[]): ExportTiendaItem[] {
                     const finalPieces = cpfrSkuFinalPieces(sku)
                     return {
                         sku_key: String(sku.oc_id ?? sku.sku_muliix ?? sku.sku_cadena ?? sku.upc_cadena ?? sku.sku_nombre ?? ''),
+                        sku_cadena: String(sku.sku_cadena ?? sku.upc_cadena ?? ''),
                         cliente,
                         nombre: tienda.nombre_tienda,
                         sucursal,
@@ -341,7 +350,7 @@ export function buildExportItems(dias: any[]): ExportTiendaItem[] {
                         promedio_sellout_pz: sku.promedio_sellout_pz ?? 0,
                         cobertura_calculada: calcularCoberturaDinamica(sku),
                         upc: sku.upc_cadena || '',
-                        desc: sku.sku_nombre || '',
+                        desc: sku.desc_art || sku.sku_nombre || '',
                         estado_oc: normalizeOrderState(sku.estado_oc ?? sku.estado ?? sku.estado_pedido ?? tienda.estado_pedido)
                     }
                 })
@@ -366,7 +375,78 @@ export function buildExportItems(dias: any[]): ExportTiendaItem[] {
 
 export function useCpfrExport() {
 
-    function generateExcel(selectedItems: ExportTiendaItem[], dayNums: number[]): string {
+    function generateSamsExcel(selectedItems: ExportTiendaItem[], dayNums: number[]): string {
+        const exportItems = filterPositiveQuantityItems(selectedItems)
+        const allRows: (string | number)[][] = [[
+            'Num Artículo',
+            'Signing Desc',
+            'Nombre Proveedor',
+            'Num Proveedor',
+            'Num de Tienda',
+            'Nombre Tienda/Club',
+            'Número OC',
+            'Fecha Pedido OC',
+            'Fecha Cancelado OC',
+            'Fecha de Embarque de la OC',
+            'Estado OC',
+            'Total de Piezas Pedidas p/Tienda',
+            'Total de Piezas Recibidas p/Tienda',
+        ]]
+
+        for (const item of exportItems) {
+            for (const row of item.rows) {
+                const shipmentDate = formatDateForSams(row.fec_fin_embarque)
+                allRows.push([
+                    row.sku_cadena,
+                    row.desc,
+                    'EMBUTIDOS CORONA SA CV',
+                    item.id_cliente,
+                    row.sucursal,
+                    row.nombre,
+                    row.num_pedido,
+                    formatDateForSams(row.fec_pedido_cadena),
+                    shipmentDate,
+                    shipmentDate,
+                    'A',
+                    row.cant_pedida,
+                    0,
+                ])
+            }
+        }
+
+        const wb = XLSX.utils.book_new()
+        const ws = XLSX.utils.aoa_to_sheet(allRows)
+        ws['!cols'] = [
+            { wch: 16 },
+            { wch: 48 },
+            { wch: 30 },
+            { wch: 16 },
+            { wch: 15 },
+            { wch: 36 },
+            { wch: 16 },
+            { wch: 16 },
+            { wch: 18 },
+            { wch: 24 },
+            { wch: 12 },
+            { wch: 30 },
+            { wch: 32 },
+        ]
+
+        XLSX.utils.book_append_sheet(wb, ws, 'Template OV')
+
+        const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+        const dayCode = dayNums.length === 1 ? (DAY_MAP[dayNums[0]] || 'XX') : 'MIX'
+        const filename = `CPFR_Sams_${dayCode}_${dateStr}.xlsx`
+
+        XLSX.writeFile(wb, filename)
+        return filename
+    }
+
+    function generateExcel(selectedItems: ExportTiendaItem[], dayNums: number[], nomCadena = 'SORIANA'): string {
+        if (String(nomCadena).trim().toUpperCase() === 'SAMS') {
+            return generateSamsExcel(selectedItems, dayNums)
+        }
+
         const exportItems = filterPositiveQuantityItems(selectedItems)
         const allRows: (string | number)[][] = []
 

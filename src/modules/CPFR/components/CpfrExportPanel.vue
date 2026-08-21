@@ -427,7 +427,11 @@ async function handleExcelExport() {
             ...item,
             rows: item.rows.map(row => ({ ...row })),
         }))
-        const filename = generateExcel(exportedItems, Array.from(selectedDays.value))
+        const filename = generateExcel(
+            exportedItems,
+            Array.from(selectedDays.value),
+            store.nom_cadena,
+        )
         const statusResult = await store.updateStatusBulk({
             num_pedidos: orderNumbers,
             year: store.currentWeek.anio,
