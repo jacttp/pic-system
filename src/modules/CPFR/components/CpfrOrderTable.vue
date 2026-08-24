@@ -142,9 +142,26 @@ function startEdit(sku: CpfrSkuDash) {
 }
 function cancelEdit() { editingId.value = null }
 
+function packagingStep(sku: CpfrSkuDash): number {
+    const step = sku.variable_bolsa === 0 ? Number(sku.pzas_caja || 0) : Number(sku.pzas_bolsa || 0)
+    return step > 0 ? step : 0
+}
+
+function packagingLabel(sku: CpfrSkuDash): string {
+    return sku.variable_bolsa === 0 ? 'caja' : 'bolsa'
+}
+
 async function confirmEdit(sku: CpfrSkuDash, id_cliente: string) {
-    const bolsa = sku.pzas_bolsa || 1;
-    let finalValue = Math.round(editValue.value / bolsa) * bolsa;
+    const step = packagingStep(sku)
+    if (step <= 0) {
+        toast({
+            title: 'Empaque incompleto',
+            description: 'El SKU no tiene configurado el multiplo de empaque seleccionado.',
+            variant: 'destructive',
+        })
+        return
+    }
+    let finalValue = Math.ceil(editValue.value / step) * step
     if (finalValue < 0) finalValue = 0;
 
     if (finalValue === sku.pedido_sugerido_pz_red) { cancelEdit(); return }
@@ -220,12 +237,12 @@ function ocFinalOrderTotal(oc: GroupedOC): number {
 }
 
 function canDecreaseAdjustment(sku: CpfrSkuDash): boolean {
-    const step = Number(sku.pzas_bolsa || 0)
+    const step = packagingStep(sku)
     return step > 0 && skuBaseQuantity(sku) + skuAdjustment(sku) - step >= 0
 }
 
 function canIncreaseAdjustment(sku: CpfrSkuDash): boolean {
-    const step = Number(sku.pzas_bolsa || 0)
+    const step = packagingStep(sku)
     return step > 0 && skuAdjustment(sku) < 0 && skuBaseQuantity(sku) + skuAdjustment(sku) + step <= skuBaseQuantity(sku)
 }
 
@@ -233,9 +250,9 @@ function adjustmentTooltip(idCliente: string, sku: CpfrSkuDash): string {
     if (currentTab.value === 'aprobada') return 'Ajuste aprobado de solo lectura'
     if (currentTab.value !== 'revision') return 'Ajuste disponible solo en revision'
     if (!sku.sku_muliix || !sku.num_pedido || !sku.fec_pedido_cadena) return 'Faltan datos para ajustar este SKU'
-    if (!sku.pzas_bolsa || sku.pzas_bolsa <= 0) return 'Este SKU no tiene pzas_bolsa configurado'
+    if (packagingStep(sku) <= 0) return 'Este SKU no tiene configurado el multiplo de empaque seleccionado'
     if (!store.getCachedApprovalIdForSku(idCliente, sku)) return 'No se encontro la solicitud de aprobacion pendiente'
-    return `Ajuste por bolsa: ${n(sku.pzas_bolsa, 0)} pz`
+    return `Ajuste por ${packagingLabel(sku)}: ${n(packagingStep(sku), 0)} pz`
 }
 
 async function adjustReviewSku(idCliente: string, sku: CpfrSkuDash, direction: 1 | -1) {
@@ -2369,7 +2386,7 @@ const totalUniqueOCs = computed(() => {
                             <div v-if="currentTab === 'centralizados' && editingId === sku.sku_muliix && sku.sku_muliix" class="flex items-center gap-1.5 justify-end h-full">
                               <input
                                 v-model.number="editValue"
-                                type="number" min="0" :step="sku.pzas_bolsa || 1"
+                                type="number" min="0" :step="packagingStep(sku) || 1"
                                 class="w-full h-7 rounded-md border border-brand-300 px-2 text-xs text-right font-bold text-slate-800 shadow-inner focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all bg-white"
                                 autofocus
                                 @keyup.enter="confirmEdit(sku, tienda.id_cliente)"
@@ -2619,7 +2636,7 @@ const totalUniqueOCs = computed(() => {
                           <div v-if="currentTab === 'centralizados' && editingId === sku.sku_muliix && sku.sku_muliix" class="flex items-center gap-1.5 justify-end h-full">
                             <input
                               v-model.number="editValue"
-                              type="number" min="0" :step="sku.pzas_bolsa || 1"
+                              type="number" min="0" :step="packagingStep(sku) || 1"
                               class="w-full h-7 rounded-md border border-brand-300 px-2 text-xs text-right font-bold text-slate-800 shadow-inner focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all bg-white"
                               autofocus
                               @keyup.enter="confirmEdit(sku, tienda.id_cliente)"
@@ -3044,7 +3061,7 @@ const totalUniqueOCs = computed(() => {
                                                             <div v-if="currentTab === 'centralizados' && editingId === sku.sku_muliix" class="flex items-center justify-center gap-1">
                                                                 <input 
                                                                     v-model.number="editValue" 
-                                                                    type="number" min="0" :step="sku.pzas_bolsa || 1"
+                                                                    type="number" min="0" :step="packagingStep(sku) || 1"
                                                                     class="w-12 h-6 text-[10px] font-black text-right border border-brand-400 rounded-md px-1 outline-none shadow-sm"
                                                                     autofocus
                                                                     @keyup.enter="confirmEdit(sku, tienda.id_cliente)"

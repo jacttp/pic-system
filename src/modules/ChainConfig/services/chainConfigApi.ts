@@ -4,6 +4,9 @@ import type {
    ChainSkuMappingPayload,
    ChainSkuUnit,
    ChainSkuUnitPayload,
+   ChainPackagingModeSummary,
+   ChainPackagingModeUpdateResult,
+   PackagingModeFlag,
    ChainStoreConfig,
    ChainStoreConfigPayload,
    ChainConfigDiagnostics,
@@ -47,6 +50,24 @@ export const chainConfigApi = {
 
    async updateSkuUnit(sku: string, payload: Partial<ChainSkuUnitPayload>): Promise<void> {
       await api.patch(`/cpfr/units/${encodeURIComponent(sku)}`, payload);
+   },
+
+   async getPackagingMode(nomCadena: string, requestedMode?: PackagingModeFlag): Promise<ChainPackagingModeSummary> {
+      const { data } = await api.get('/cpfr/orders/packaging-mode', {
+         params: {
+            nom_cadena: normalizeChain(nomCadena),
+            ...(requestedMode === undefined ? {} : { variable_bolsa: requestedMode }),
+         },
+      });
+      return data.data;
+   },
+
+   async updatePackagingMode(nomCadena: string, variableBolsa: PackagingModeFlag): Promise<ChainPackagingModeUpdateResult> {
+      const { data } = await api.patch('/cpfr/orders/packaging-mode', {
+         nom_cadena: normalizeChain(nomCadena),
+         variable_bolsa: variableBolsa,
+      });
+      return data.data;
    },
 
    async getSkuMappings(): Promise<ChainSkuMapping[]> {

@@ -1,13 +1,65 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
 import { useChainConfigStore } from '../stores/chainConfigStore';
-import type { ChainSkuUnit } from '../types/chainConfigTypes';
+import type { ChainSkuUnit, PackagingModeFlag } from '../types/chainConfigTypes';
+import { ALLOWED_CHAINS, type AllowedChain } from '../utils/chainConfigOptions';
+import { StdButton } from '@/modules/Shared/components/std';
 
 const store = useChainConfigStore();
 const search = ref('');
 const localRows = reactive<Record<string, ChainSkuUnit>>({});
 const modifiedSkus = ref<Set<string>>(new Set());
 const message = ref('');
+const packagingMessage = ref('');
+const selectedChain = ref<AllowedChain>('SORIANA');
+
+const activePackagingMode = computed<PackagingModeFlag>(() =>
+   store.packagingModeSummary?.variable_bolsa === 0 ? 0 : 1
+);
+
+watch(selectedChain, async chain => {
+   packagingMessage.value = '';
+   await store.fetchPackagingMode(chain);
+}, { immediate: true });
+
+async function selectPackagingMode(mode: PackagingModeFlag) {
+   if (store.loadingPackagingMode || store.saving || mode === activePackagingMode.value) return;
+
+   packagingMessage.value = 'Validando pedidos abiertos...';
+   const preview = await store.fetchPackagingMode(selectedChain.value, mode);
+   if (!preview) {
+      packagingMessage.value = 'No se pudo validar el cambio de empaque.';
+      return;
+   }
+
+   if (preview.editable_rows === 0) {
+      packagingMessage.value = 'No hay pedidos abiertos de esta cadena para establecer la bandera.';
+      return;
+   }
+
+   const modeLabel = mode === 1 ? 'BOLSA' : 'CAJA';
+   const details = [
+      `Se actualizaran ${preview.editable_rows - preview.skipped_mix_rows - preview.invalid_unit_rows} renglones editables.`,
+      `${preview.rows_to_round} cantidades se redondearan hacia arriba.`,
+      preview.skipped_mix_rows ? `${preview.skipped_mix_rows} renglones Mix se omitiran.` : '',
+      preview.invalid_unit_rows ? `${preview.invalid_unit_rows} renglones no tienen la conversion requerida.` : '',
+   ].filter(Boolean).join('\n');
+
+   if (!window.confirm(`Cambiar ${selectedChain.value} a ${modeLabel}?\n\n${details}`)) {
+      packagingMessage.value = 'Cambio cancelado.';
+      return;
+   }
+
+   packagingMessage.value = `Aplicando modo ${modeLabel.toLowerCase()}...`;
+   const result = await store.updatePackagingMode(selectedChain.value, mode);
+   if (!result) {
+      packagingMessage.value = 'No se pudo actualizar el modo de empaque.';
+      return;
+   }
+
+   packagingMessage.value = `${result.updated_rows} renglones actualizados; ${result.rounded_rows} redondeados hacia arriba.`
+      + (result.skipped_mix_rows ? ` ${result.skipped_mix_rows} Mix omitidos.` : '');
+}
 
 watch(() => store.skuUnits, (rows) => {
    rows.forEach(row => {
@@ -76,13 +128,56 @@ async function saveChanges() {
             <h2 class="text-sm font-black text-slate-800 uppercase tracking-tight">Unidades SKU</h2>
             <p class="text-xs text-slate-500">Solo conversiones operativas; codigo y nombre son de solo lectura.</p>
          </div>
-         <input
-            v-model="search"
-            type="text"
-            placeholder="Buscar SKU o producto..."
-            class="h-10 w-full lg:w-80 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-semibold outline-none focus:border-brand-400 focus:bg-white"
-         >
+         <div class="flex w-full flex-col gap-2 sm:flex-row sm:items-end lg:w-auto">
+            <div class="flex min-w-0 flex-1 flex-col gap-1 lg:flex-none">
+               <label for="packaging-chain" class="text-[10px] font-black uppercase tracking-widest text-pic-text-muted">Cadena</label>
+               <select
+                  id="packaging-chain"
+                  v-model="selectedChain"
+                  :disabled="store.loadingPackagingMode || store.saving"
+                  class="h-9 min-w-[9rem] rounded-lg border border-pic-border bg-pic-muted-surface px-2.5 text-xs font-bold text-pic-text-main outline-none focus:border-pic-brand disabled:opacity-50"
+               >
+                  <option v-for="chain in ALLOWED_CHAINS" :key="chain" :value="chain">{{ chain }}</option>
+               </select>
+            </div>
+
+            <div class="flex flex-col gap-1">
+               <span class="text-[10px] font-black uppercase tracking-widest text-pic-text-muted">Ajustar por</span>
+               <div class="inline-flex rounded-xl border border-pic-border bg-pic-muted-surface p-0.5" role="group" aria-label="Modo de empaque">
+                  <StdButton
+                     size="sm"
+                     :variant="activePackagingMode === 1 ? 'primary' : 'ghost'"
+                     :disabled="store.loadingPackagingMode || store.saving"
+                     icon="fa-solid fa-bag-shopping"
+                     @click="selectPackagingMode(1)"
+                  >Bolsa</StdButton>
+                  <StdButton
+                     size="sm"
+                     :variant="activePackagingMode === 0 ? 'primary' : 'ghost'"
+                     :disabled="store.loadingPackagingMode || store.saving"
+                     icon="fa-solid fa-box"
+                     @click="selectPackagingMode(0)"
+                  >Caja</StdButton>
+               </div>
+            </div>
+
+            <div class="flex min-w-0 flex-1 flex-col gap-1 lg:w-80 lg:flex-none">
+               <label for="sku-unit-search" class="text-[10px] font-black uppercase tracking-widest text-pic-text-muted">Buscar</label>
+               <input
+                  id="sku-unit-search"
+                  v-model="search"
+                  type="text"
+                  placeholder="SKU o producto..."
+                  class="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-semibold outline-none focus:border-brand-400 focus:bg-white"
+               >
+            </div>
+         </div>
       </header>
+
+      <div v-if="packagingMessage" class="border-b border-pic-border bg-pic-brand-soft px-5 py-2 text-xs font-semibold text-pic-text-main" role="status">
+         <i v-if="store.loadingPackagingMode || store.saving" class="fa-solid fa-circle-notch fa-spin mr-1.5 text-pic-brand"></i>
+         {{ packagingMessage }}
+      </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 p-5 border-b border-slate-100 bg-slate-50">
          <div class="bg-white border border-slate-100 rounded-lg p-3">

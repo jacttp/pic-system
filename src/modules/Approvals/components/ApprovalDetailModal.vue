@@ -38,6 +38,8 @@ interface CpfrPreviewRow {
    ajuste: number
    ajuste_mix: number
    pzas_bolsa: number
+   pzas_caja: number
+   variable_bolsa: 0 | 1
    ajusteValido: boolean
    cantidad_oc: number
    pedido_kg: number
@@ -561,7 +563,10 @@ const cpfrPreviewRows = computed(() => {
          const unidad = toNumericValue(row.unidad_inventario);
          const ajuste = toNumericValue(row.ajuste);
          const ajusteMix = toNumericValue(row.ajuste_mix);
-         const pzasBolsa = toNumericValue(row.pzas_bolsa ?? row.pzas_caja);
+         const pzasBolsa = toNumericValue(row.pzas_bolsa);
+         const pzasCaja = toNumericValue(row.pzas_caja);
+         const variableBolsa: 0 | 1 = Number(row.variable_bolsa) === 0 ? 0 : 1;
+         const packagingMultiple = variableBolsa === 0 ? pzasCaja : pzasBolsa;
          const cantidadBase = toNumericValue(
             row.cantidad_base_uni ?? row.cantidad_final_uni ?? row.pedido_sugerido_pz_red ?? row.cant_pedida ?? row.total_pzas_sugeridas
          );
@@ -584,7 +589,9 @@ const cpfrPreviewRows = computed(() => {
          ajuste,
          ajuste_mix: ajusteMix,
          pzas_bolsa: pzasBolsa,
-         ajusteValido: isAdjustmentMultiple(ajuste, pzasBolsa),
+         pzas_caja: pzasCaja,
+         variable_bolsa: variableBolsa,
+         ajusteValido: isAdjustmentMultiple(ajuste, packagingMultiple),
          cantidad_oc: Number(row.cantidad_oc ?? row.cant_pedida_oc ?? 0),
          pedido_kg: Number(row.pedido_kg ?? (cantPedida * unidad)),
          inv_actual_pz: Number(row.inv_actual_pz ?? row.inv_actual_uni ?? 0),
@@ -630,6 +637,8 @@ const cpfrPreviewRows = computed(() => {
       ajuste: 0,
       ajuste_mix: 0,
       pzas_bolsa: 0,
+      pzas_caja: 0,
+      variable_bolsa: 1,
       ajusteValido: true,
       cantidad_oc: Number(p.total_pzas_cadena ?? 0),
       pedido_kg: 0,
@@ -780,8 +789,11 @@ function syncConversionQuantities() {
 const getConversionQuantity = (row: CpfrPreviewRow) =>
    Number(conversionQuantities[getConversionRowKey(row)] ?? row.cant_pedida ?? 0);
 
+const getPackagingStep = (row: CpfrPreviewRow) =>
+   row.variable_bolsa === 0 ? Number(row.pzas_caja || 0) : Number(row.pzas_bolsa || 0);
+
 const getConversionStep = (row: CpfrPreviewRow) =>
-   Math.max(1, Number(row.pzas_bolsa || 0));
+   Math.max(1, getPackagingStep(row));
 
 const canDecreaseConversion = (row: CpfrPreviewRow) =>
    getConversionQuantity(row) > 0;
@@ -911,9 +923,9 @@ const canExportCpfrPdf = computed(() =>
 
 const formatDate = (dateStr?: string) => {
    if (!dateStr) return '—';
-   return new Date(dateStr).toLocaleString('es-MX', { 
-      day: '2-digit', month: 'short', year: 'numeric', 
-      hour: '2-digit', minute: '2-digit' 
+   return new Date(dateStr).toLocaleString('es-MX', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
    });
 };
 
@@ -982,12 +994,12 @@ const getCpfrRowKey = (row: CpfrPreviewRow) =>
 const isRowAdjusting = (row: CpfrPreviewRow) => adjustingRows.value.has(getCpfrRowKey(row));
 
 const canDecreaseCpfrRow = (row: CpfrPreviewRow) => {
-   const step = Number(row.pzas_bolsa || 0);
+   const step = getPackagingStep(row);
    return step > 0 && row.cantidad_base_uni + row.ajuste - step >= 0;
 };
 
 const canIncreaseCpfrRow = (row: CpfrPreviewRow) => {
-   const step = Number(row.pzas_bolsa || 0);
+   const step = getPackagingStep(row);
    return step > 0;
 };
 
@@ -1011,9 +1023,9 @@ const refreshCpfrDetail = async () => {
 const handleAdjustPedido = async (row: CpfrPreviewRow, direction: 1 | -1) => {
    if (!props.approval || !canEditCpfrOrder.value || row.is_expired || isRowAdjusting(row)) return;
 
-   const step = Number(row.pzas_bolsa || 0);
+   const step = getPackagingStep(row);
    if (step <= 0) {
-      errorMessage.value = 'Este SKU no tiene pzas_bolsa configurado para ajustar.';
+      errorMessage.value = 'Este SKU no tiene configurado el multiplo de empaque seleccionado.';
       return;
    }
 
@@ -1347,7 +1359,7 @@ const handleCancel = async () => {
                            </div>
                            <div class="min-w-[72px] border-t border-pic-brand-border px-3 py-1.5 sm:border-l sm:border-t-0">
                               <dd class="text-sm font-bold text-pic-brand">{{ formatNumber(cpfrSummaryMetrics.totalKg, 1) }}</dd>
-                              <dt class="mt-0.5 font-bold text-[10px] text-pic-text-main">KG totales</dt>
+                              <dt class="mt-0.5 font-bold text-[10px] text-pic-text-main">Total Kg</dt>
                            </div>
                            <div class="min-w-[72px] border-l border-t border-pic-brand-border px-3 py-1.5 sm:border-t-0">
                               <dd class="text-sm font-bold text-pic-brand">{{ formatNumber(cpfrSummaryMetrics.coronaKg, 1) }}</dd>
@@ -1355,7 +1367,7 @@ const handleCancel = async () => {
                            </div>
                            <div class="col-span-2 min-w-[72px] border-t border-pic-brand-border px-3 py-1.5 sm:col-span-1 sm:border-l sm:border-t-0">
                               <dd class="text-sm font-bold text-pic-brand">{{ formatNumber(cpfrSummaryMetrics.rosKg, 1) }}</dd>
-                              <dt class="mt-0.5 font-bold text-[10px] text-pic-text-main">Kg ROS</dt>
+                              <dt class="mt-0.5 font-bold text-[10px] text-pic-text-main">Kg Ros</dt>
                            </div>
                         </dl>
                      </div>
@@ -2039,7 +2051,7 @@ const handleCancel = async () => {
 
             <div v-if="canResolve">
                <label class="block text-xs font-medium text-slate-600 mb-1">Comentarios <span class="text-slate-400">(opcional)</span></label>
-               <textarea 
+               <textarea
                   v-model="resolutionComment"
                   rows="2"
                   class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none resize-none text-sm"

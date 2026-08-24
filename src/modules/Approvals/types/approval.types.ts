@@ -54,6 +54,9 @@ export interface CpfrApprovalRow extends Record<string, unknown> {
    source_type: string
    marca?: string
    cant_pedida: number
+   variable_bolsa: 0 | 1
+   pzas_bolsa: number
+   pzas_caja: number
    fec_fin_embarque?: string | null
    lead_time: number
    z8_eligible: boolean

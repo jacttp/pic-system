@@ -499,8 +499,10 @@ export const useCpfrStore = defineStore('cpfr', () => {
             return { ok: false, message: 'Faltan datos del SKU para ajustar.' }
         }
 
-        const step = Number(sku.pzas_bolsa || 0)
-        if (step <= 0) return { ok: false, message: 'Este SKU no tiene pzas_bolsa configurado.' }
+        const step = sku.variable_bolsa === 0
+            ? Number(sku.pzas_caja || 0)
+            : Number(sku.pzas_bolsa || 0)
+        if (step <= 0) return { ok: false, message: 'Este SKU no tiene configurado el multiplo de empaque seleccionado.' }
 
         const base = getSkuBaseQuantity(sku)
         const currentAdjustment = getSkuAdjustment(sku)

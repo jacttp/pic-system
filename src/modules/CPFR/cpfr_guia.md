@@ -7,7 +7,7 @@ Esta guía detalla la lógica de cálculo del pedido sugerido y los indicadores 
 El motor de cálculo opera bajo dos escenarios principales basados en la **cobertura actual** del SKU y aplica protecciones de seguridad para garantizar el abastecimiento.
 
 ### Definiciones Base
-- **Múltiplo de Empaque (Bolsa)**: Todo pedido se redondea siempre a múltiplos de `pzas_bolsa`.
+- **Múltiplo de empaque por cadena**: `CPFR_PedidoGenerado.variable_bolsa` define el empaque operativo de cada pedido (`1` o `NULL` = bolsa; `0` = caja). El motor matemático conserva sus escenarios y guardias; después de calcular, el resultado final se redondea hacia arriba con `pzas_bolsa` o `pzas_caja`. Los ajustes manuales usan el mismo múltiplo persistido.
 - **Criterio de Semanas**: El objetivo de cobertura (por defecto 2.5 semanas).
 
 ---
@@ -26,7 +26,7 @@ El inventario está fuera de rango. El sistema calcula matemáticamente la neces
 
 ### Caso Especial: Sin Histórico de Venta (Producto Nuevo)
 Si el SKU no tiene promedio de venta (sellout):
-- **Acción**: Se ignora el cálculo matemático y se respeta el **Pedido Cadena** (`cant_pedida`), redondeado al múltiplo de bolsa.
+- **Acción**: Se ignora el cálculo matemático y se respeta el **Pedido Cadena** (`cant_pedida`); el resultado final se normaliza al múltiplo de empaque seleccionado.
 
 ---
 

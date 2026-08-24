@@ -50,6 +50,8 @@ export interface CpfrSkuDash {
     cant_pedida: number                 // cantidad pedida por la cadena (antes pedido_cadena_pz)
     unidad_inventario: number
     pzas_bolsa: number
+    pzas_caja: number
+    variable_bolsa: 0 | 1
     uni_com: string | null
     cap_emp: number
     desc_art: string | null

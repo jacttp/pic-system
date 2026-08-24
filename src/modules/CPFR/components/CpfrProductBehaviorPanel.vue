@@ -141,8 +141,9 @@ const insightItems = computed(() => {
         items.push('La cobertura actual esta alineada con el objetivo operativo.')
     }
 
-    if (props.sku.pzas_bolsa && props.sku.pzas_bolsa > 1) {
-        items.push(`El pedido se redondea en multiplos de ${props.sku.pzas_bolsa} pz.`)
+    const packagingMultiple = props.sku.variable_bolsa === 0 ? props.sku.pzas_caja : props.sku.pzas_bolsa
+    if (packagingMultiple && packagingMultiple > 1) {
+        items.push(`El pedido se redondea por ${props.sku.variable_bolsa === 0 ? 'caja' : 'bolsa'} en multiplos de ${packagingMultiple} pz.`)
     }
 
     if (props.sku.fill_rate != null) {

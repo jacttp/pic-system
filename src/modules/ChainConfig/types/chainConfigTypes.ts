@@ -33,6 +33,27 @@ export interface ChainSkuUnit {
 
 export type ChainSkuUnitPayload = Omit<ChainSkuUnit, 'sku_muliix' | 'sku_nombre'>;
 
+export type PackagingModeFlag = 0 | 1;
+
+export interface ChainPackagingModeSummary {
+   nom_cadena: string;
+   variable_bolsa: PackagingModeFlag;
+   requested_variable_bolsa: PackagingModeFlag;
+   editable_rows: number;
+   rows_to_round: number;
+   skipped_mix_rows: number;
+   invalid_unit_rows: number;
+}
+
+export interface ChainPackagingModeUpdateResult {
+   nom_cadena: string;
+   variable_bolsa: PackagingModeFlag;
+   updated_rows: number;
+   rounded_rows: number;
+   skipped_mix_rows: number;
+   invalid_unit_rows: number;
+}
+
 export interface ChainSkuMapping {
    idskuscadenas: number;
    sku_muliix: string;

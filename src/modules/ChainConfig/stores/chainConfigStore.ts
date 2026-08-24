@@ -6,6 +6,9 @@ import type {
    ChainSkuMappingPayload,
    ChainSkuUnit,
    ChainSkuUnitPayload,
+   ChainPackagingModeSummary,
+   ChainPackagingModeUpdateResult,
+   PackagingModeFlag,
    ChainStoreConfig,
    ChainStoreConfigPayload,
    ChainConfigDiagnostics,
@@ -21,12 +24,14 @@ export const useChainConfigStore = defineStore('chain-config', () => {
    const skuMappings = ref<ChainSkuMapping[]>([]);
    const z8Catalog = ref<ChainZ8CatalogItem[]>([]);
    const diagnostics = ref<ChainConfigDiagnostics | null>(null);
+   const packagingModeSummary = ref<ChainPackagingModeSummary | null>(null);
 
    const loadingStores = ref(false);
    const loadingSkuUnits = ref(false);
    const loadingMappings = ref(false);
    const loadingZ8Catalog = ref(false);
    const loadingDiagnostics = ref(false);
+   const loadingPackagingMode = ref(false);
    const loadingBulk = ref(false);
    const saving = ref(false);
    const error = ref<string | null>(null);
@@ -70,6 +75,38 @@ export const useChainConfigStore = defineStore('chain-config', () => {
          console.error('[chainConfigStore.fetchSkuUnits]', e);
       } finally {
          loadingSkuUnits.value = false;
+      }
+   }
+
+   async function fetchPackagingMode(chain: string, requestedMode?: PackagingModeFlag): Promise<ChainPackagingModeSummary | null> {
+      loadingPackagingMode.value = true;
+      error.value = null;
+      try {
+         const summary = await chainConfigApi.getPackagingMode(chain, requestedMode);
+         packagingModeSummary.value = summary;
+         return summary;
+      } catch (e) {
+         error.value = 'No se pudo cargar el modo de empaque de la cadena.';
+         console.error('[chainConfigStore.fetchPackagingMode]', e);
+         return null;
+      } finally {
+         loadingPackagingMode.value = false;
+      }
+   }
+
+   async function updatePackagingMode(chain: string, mode: PackagingModeFlag): Promise<ChainPackagingModeUpdateResult | null> {
+      saving.value = true;
+      error.value = null;
+      try {
+         const result = await chainConfigApi.updatePackagingMode(chain, mode);
+         await fetchPackagingMode(chain);
+         return result;
+      } catch (e) {
+         error.value = 'No se pudo actualizar el modo de empaque de la cadena.';
+         console.error('[chainConfigStore.updatePackagingMode]', e);
+         return null;
+      } finally {
+         saving.value = false;
       }
    }
 
@@ -272,11 +309,13 @@ export const useChainConfigStore = defineStore('chain-config', () => {
       skuMappings,
       z8Catalog,
       diagnostics,
+      packagingModeSummary,
       loadingStores,
       loadingSkuUnits,
       loadingMappings,
       loadingZ8Catalog,
       loadingDiagnostics,
+      loadingPackagingMode,
       loadingBulk,
       saving,
       error,
@@ -288,6 +327,8 @@ export const useChainConfigStore = defineStore('chain-config', () => {
       fetchSkuMappings,
       fetchZ8Catalog,
       fetchDiagnostics,
+      fetchPackagingMode,
+      updatePackagingMode,
       saveStoreConfig,
       saveSkuUnit,
       createSkuMapping,

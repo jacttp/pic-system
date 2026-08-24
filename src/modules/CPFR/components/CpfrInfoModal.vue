@@ -48,7 +48,7 @@ function handleBackdropClick(e: MouseEvent) {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div class="p-4 rounded-xl border border-slate-100 bg-slate-50/30">
                     <p class="text-[10px] font-bold text-brand-600 uppercase mb-1">Múltiplo de Empaque</p>
-                    <p class="text-[12px] text-slate-600 leading-relaxed italic">Todo pedido se redondea siempre a múltiplos de la <b>bolsa</b> del SKU.</p>
+                    <p class="text-[12px] text-slate-600 leading-relaxed italic">El resultado final se redondea hacia arriba por <b>bolsa o caja</b>, según la bandera vigente de la cadena.</p>
                 </div>
                 <div class="p-4 rounded-xl border border-slate-100 bg-slate-50/30">
                     <p class="text-[10px] font-bold text-brand-600 uppercase mb-1">Criterio de Semanas</p>
