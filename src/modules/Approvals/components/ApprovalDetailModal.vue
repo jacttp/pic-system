@@ -275,13 +275,18 @@ const cpfrTotalSugeridas = computed(() => Number(cpfrSource.value.total_pzas_sug
 const isSamsCpfrApproval = computed(() =>
    props.approval?.type === 'CPFR_ORDER' && cpfrChain.value === 'SAMS'
 );
-// Sams permanece en modo de preparación: muestra los ajustes sin permitirlos.
-// Soriana conserva el flujo de edición vigente.
+// Sams permanece en modo de preparación: solo permite disminuir pedidos.
+// Soriana conserva el flujo completo de edición vigente.
 const canEditCpfrOrder = computed(() =>
    props.approval?.type === 'CPFR_ORDER'
    && props.approval?.status === 'PENDING'
    && props.canResolve
    && !isSamsCpfrApproval.value
+);
+const canDecreaseSamsCpfrOrder = computed(() =>
+   isSamsCpfrApproval.value
+   && props.approval?.status === 'PENDING'
+   && props.canResolve
 );
 const isApprovalSubmissionDisabled = computed(() =>
    isSubmitting.value
@@ -1021,7 +1026,8 @@ const refreshCpfrDetail = async () => {
 };
 
 const handleAdjustPedido = async (row: CpfrPreviewRow, direction: 1 | -1) => {
-   if (!props.approval || !canEditCpfrOrder.value || row.is_expired || isRowAdjusting(row)) return;
+   const canAdjust = canEditCpfrOrder.value || (direction === -1 && canDecreaseSamsCpfrOrder.value);
+   if (!props.approval || !canAdjust || row.is_expired || isRowAdjusting(row)) return;
 
    const step = getPackagingStep(row);
    if (step <= 0) {
@@ -1675,12 +1681,12 @@ const handleCancel = async () => {
                                           @click="adjustConversionQuantity(row, 1)"
                                        ><i class="fa-solid fa-plus text-xs"></i></button>
                                     </div>
-                                    <div v-else-if="canShowCpfrStepper(row)" class="flex h-11 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" :class="{ 'bg-slate-50 opacity-60': isCpfrAdjustmentPreview }">
+                                    <div v-else-if="canShowCpfrStepper(row)" class="flex h-11 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" :class="{ 'bg-slate-50': isCpfrAdjustmentPreview }">
                                        <button
                                           type="button"
                                           class="flex h-11 w-11 items-center justify-center text-slate-600 transition active:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-35"
-                                          :title="isCpfrAdjustmentPreview ? undefined : (isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Disminuir pedido')"
-                                          :disabled="isCpfrAdjustmentPreview || isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canDecreaseCpfrRow(row)"
+                                          :title="isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Disminuir pedido'"
+                                          :disabled="(!canEditCpfrOrder && !canDecreaseSamsCpfrOrder) || isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canDecreaseCpfrRow(row)"
                                           @click="handleAdjustPedido(row, -1)"
                                        ><i class="fa-solid fa-minus text-xs"></i></button>
                                        <button
@@ -1774,8 +1780,8 @@ const handleCancel = async () => {
                                                 <button
                                                    type="button"
                                                    class="flex h-9 w-9 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
-                                                   :title="isCpfrAdjustmentPreview ? undefined : (isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Disminuir pedido')"
-                                                   :disabled="isCpfrAdjustmentPreview || isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canDecreaseCpfrRow(row)"
+                                                   :title="isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Disminuir pedido'"
+                                                   :disabled="(!canEditCpfrOrder && !canDecreaseSamsCpfrOrder) || isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canDecreaseCpfrRow(row)"
                                                    @click="handleAdjustPedido(row, -1)"
                                                 >
                                                    <i class="fa-solid fa-minus text-[10px]"></i>
