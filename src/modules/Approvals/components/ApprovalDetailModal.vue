@@ -275,15 +275,15 @@ const cpfrTotalSugeridas = computed(() => Number(cpfrSource.value.total_pzas_sug
 const isSamsCpfrApproval = computed(() =>
    props.approval?.type === 'CPFR_ORDER' && cpfrChain.value === 'SAMS'
 );
-// Sams permanece en modo de preparación: solo permite disminuir pedidos.
-// Soriana conserva el flujo completo de edición vigente.
+// Sams permanece en modo de preparación: permite disminuir y regresar al pedido base,
+// sin superar la cantidad inicial. Soriana conserva el flujo completo de edición vigente.
 const canEditCpfrOrder = computed(() =>
    props.approval?.type === 'CPFR_ORDER'
    && props.approval?.status === 'PENDING'
    && props.canResolve
    && !isSamsCpfrApproval.value
 );
-const canDecreaseSamsCpfrOrder = computed(() =>
+const canAdjustSamsCpfrOrder = computed(() =>
    isSamsCpfrApproval.value
    && props.approval?.status === 'PENDING'
    && props.canResolve
@@ -1005,7 +1005,12 @@ const canDecreaseCpfrRow = (row: CpfrPreviewRow) => {
 
 const canIncreaseCpfrRow = (row: CpfrPreviewRow) => {
    const step = getPackagingStep(row);
-   return step > 0;
+   if (step <= 0) return false;
+   if (isSamsCpfrApproval.value) {
+      const adjustment = Number(row.ajuste || 0);
+      return adjustment < 0 && adjustment + step <= 0;
+   }
+   return true;
 };
 
 const setRowAdjusting = (row: CpfrPreviewRow, isAdjusting: boolean) => {
@@ -1026,7 +1031,7 @@ const refreshCpfrDetail = async () => {
 };
 
 const handleAdjustPedido = async (row: CpfrPreviewRow, direction: 1 | -1) => {
-   const canAdjust = canEditCpfrOrder.value || (direction === -1 && canDecreaseSamsCpfrOrder.value);
+   const canAdjust = canEditCpfrOrder.value || canAdjustSamsCpfrOrder.value;
    if (!props.approval || !canAdjust || row.is_expired || isRowAdjusting(row)) return;
 
    const step = getPackagingStep(row);
@@ -1036,6 +1041,8 @@ const handleAdjustPedido = async (row: CpfrPreviewRow, direction: 1 | -1) => {
    }
 
    const nextAdjustment = row.ajuste + (step * direction);
+   if (isSamsCpfrApproval.value && direction === 1 && row.ajuste >= 0) return;
+   if (isSamsCpfrApproval.value && nextAdjustment > 0) return;
    const nextTotal = row.cantidad_base_uni + nextAdjustment;
    if (nextTotal < 0) return;
 
@@ -1686,14 +1693,14 @@ const handleCancel = async () => {
                                           type="button"
                                           class="flex h-11 w-11 items-center justify-center text-slate-600 transition active:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-35"
                                           :title="isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Disminuir pedido'"
-                                          :disabled="(!canEditCpfrOrder && !canDecreaseSamsCpfrOrder) || isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canDecreaseCpfrRow(row)"
+                                          :disabled="(!canEditCpfrOrder && !canAdjustSamsCpfrOrder) || isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canDecreaseCpfrRow(row)"
                                           @click="handleAdjustPedido(row, -1)"
                                        ><i class="fa-solid fa-minus text-xs"></i></button>
                                        <button
                                           type="button"
                                           class="flex h-11 w-11 items-center justify-center border-l border-slate-200 text-slate-600 transition active:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-35"
-                                          :title="isCpfrAdjustmentPreview ? undefined : (isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Regresar hacia pedido base')"
-                                          :disabled="isCpfrAdjustmentPreview || isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canIncreaseCpfrRow(row)"
+                                          :title="isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Regresar hacia pedido base'"
+                                          :disabled="(!canEditCpfrOrder && !canAdjustSamsCpfrOrder) || isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canIncreaseCpfrRow(row)"
                                           @click="handleAdjustPedido(row, 1)"
                                        ><i class="fa-solid fa-plus text-xs"></i></button>
                                     </div>
@@ -1781,7 +1788,7 @@ const handleCancel = async () => {
                                                    type="button"
                                                    class="flex h-9 w-9 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
                                                    :title="isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Disminuir pedido'"
-                                                   :disabled="(!canEditCpfrOrder && !canDecreaseSamsCpfrOrder) || isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canDecreaseCpfrRow(row)"
+                                                   :disabled="(!canEditCpfrOrder && !canAdjustSamsCpfrOrder) || isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canDecreaseCpfrRow(row)"
                                                    @click="handleAdjustPedido(row, -1)"
                                                 >
                                                    <i class="fa-solid fa-minus text-[10px]"></i>
@@ -1797,8 +1804,8 @@ const handleCancel = async () => {
                                                 <button
                                                    type="button"
                                                    class="flex h-9 w-9 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
-                                                   :title="isCpfrAdjustmentPreview ? undefined : (isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Regresar hacia pedido base')"
-                                                   :disabled="isCpfrAdjustmentPreview || isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canIncreaseCpfrRow(row)"
+                                                   :title="isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Regresar hacia pedido base'"
+                                                   :disabled="(!canEditCpfrOrder && !canAdjustSamsCpfrOrder) || isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canIncreaseCpfrRow(row)"
                                                    @click="handleAdjustPedido(row, 1)"
                                                 >
                                                    <i class="fa-solid fa-plus text-[10px]"></i>
