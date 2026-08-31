@@ -6,6 +6,8 @@ import { useAuthStore } from '@/modules/Auth/views/stores/authStore';
 import { useSetupStore } from '@/modules/Setup/stores/setupStores';
 import { useProfileStore } from '@/modules/UserProfile/stores/profileStore';
 import { useApprovalsStore } from '@/modules/Approvals/stores/approvalsStore';
+import { approvalsApi } from '@/modules/Approvals/services/approvalsApi';
+import type { Approval } from '@/modules/Approvals/types/approval.types';
 import { getModuleVisualStyle } from '@/modules/Shared/design/moduleStyles';
 import CacheProgress from '@/modules/Shared/components/CacheProgress.vue';
 import ModuleCard from '../components/ModuleCard.vue';
@@ -36,6 +38,56 @@ const profileStore = useProfileStore();
 const approvalsStore = useApprovalsStore();
 const route = useRoute();
 
+const isManager = computed(() => String(auth.user?.role || '').trim().toLocaleLowerCase('es-MX') === 'gerente');
+
+const isAssignedToCurrentUser = (approval: Approval) => {
+    const currentUserId = Number(auth.user?.id);
+    if (!Number.isInteger(currentUserId) || currentUserId <= 0) return false;
+
+    const payloadIds = Array.isArray(approval.payload?.assigned_to_ids)
+        ? approval.payload.assigned_to_ids
+        : [];
+    const assignedIds = [approval.assignedToId, ...payloadIds]
+        .map(Number)
+        .filter(id => Number.isInteger(id) && id > 0);
+
+    return assignedIds.includes(currentUserId);
+};
+
+const upsertAssignedApproval = (approval: Approval) => {
+    const index = approvalsStore.assignedApprovals.findIndex(item => item.id === approval.id);
+    if (index === -1) {
+        approvalsStore.assignedApprovals.unshift(approval);
+        return;
+    }
+
+    approvalsStore.assignedApprovals[index] = approval;
+};
+
+const loadManagerApprovalsFromNotifications = async () => {
+    if (!isManager.value) return;
+
+    const approvalIds = [...new Set(profileStore.notifications
+        .filter(notification => notification.type === 'approval_request')
+        .map(notification => {
+            const actionUrl = notification.actionUrl || '';
+            const queryMatch = actionUrl.match(/[?&]approvalId=(\d+)/i);
+            const pathMatch = actionUrl.match(/\/approvals\/(\d+)/i);
+            return Number(queryMatch?.[1] || pathMatch?.[1]);
+        })
+        .filter(id => Number.isInteger(id) && id > 0))];
+
+    const results = await Promise.allSettled(
+        approvalIds.map(id => approvalsApi.getApprovalById(id))
+    );
+
+    results.forEach(result => {
+        if (result.status === 'fulfilled' && isAssignedToCurrentUser(result.value)) {
+            upsertAssignedApproval(result.value);
+        }
+    });
+};
+
 onMounted(async () => {
     if (setupStore.modules.length === 0) {
         await setupStore.fetchModules();
@@ -44,8 +96,12 @@ onMounted(async () => {
     }
 
     await setupStore.fetchHubConfig();
-    approvalsStore.fetchAssignedApprovals();
-    approvalsStore.fetchApprovals();
+    await Promise.all([
+        approvalsStore.fetchAssignedApprovals(),
+        approvalsStore.fetchApprovals(),
+        profileStore.fetchNotifications(),
+    ]);
+    await loadManagerApprovalsFromNotifications();
 });
 
 const dashboardModules = computed(() =>
@@ -97,6 +153,15 @@ const resolvedRecentCount = computed(() =>
     approvalsStore.assignedApprovals.filter(approval => approval.status !== 'PENDING').length
 );
 
+const activePendingCount = computed(() => new Set([
+    ...approvalsStore.assignedApprovals
+        .filter(approval => approval.status === 'PENDING')
+        .map(approval => approval.id),
+    ...approvalsStore.approvals
+        .filter(approval => approval.status === 'PENDING' && approval.requestedById === auth.user?.id)
+        .map(approval => approval.id),
+]).size);
+
 const activeHubFeatureCount = computed(() =>
     Object.values(setupStore.hubFeatureVisibility).filter(Boolean).length
 );
@@ -127,7 +192,9 @@ const hubKpiCards = computed<HubKpiCard[]>(() => [
     },
     {
         label: 'Pendientes',
-        value: formatCount(approvalsStore.assignedPendingCount + myPendingCount.value),
+        value: formatCount(isManager.value
+            ? activePendingCount.value
+            : approvalsStore.assignedPendingCount + myPendingCount.value),
         caption: 'Solicitudes activas',
         icon: 'fa-solid fa-inbox',
         tone: 'blue',

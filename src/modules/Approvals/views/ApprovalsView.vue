@@ -12,6 +12,7 @@ import ApprovalStatusSelector from '../components/ApprovalStatusSelector.vue';
 import ManagementTray from '@/modules/Shared/components/ManagementTray.vue';
 import StdButton from '@/modules/Shared/components/std/StdButton.vue';
 import { toast } from '@/components/ui/toast/use-toast';
+import { approvalsApi } from '../services/approvalsApi';
 
 type SortField = 'embarque' | 'creation' | 'requester';
 type SortDirection = 'asc' | 'desc';
@@ -90,6 +91,7 @@ const isActiveLoading = computed(() =>
 );
 
 const isSuperAdmin = computed(() => authStore.userLevel >= 4);
+const isManager = computed(() => String(authStore.user?.role || '').trim().toLocaleLowerCase('es-MX') === 'gerente');
 const canResolveSelected = computed(() => {
    const approval = selectedApproval.value;
    return Boolean(approval?.status === 'PENDING' && (isSuperAdmin.value || assignedIds.value.has(approval.id)));
@@ -253,7 +255,10 @@ onMounted(async () => {
    await Promise.all([
       approvalsStore.fetchAssignedApprovals(),
       approvalsStore.fetchApprovals(),
+      profileStore.fetchNotifications(),
    ]);
+
+   await loadManagerApprovalsFromNotifications();
 
    await openApprovalFromRoute(route.query.approvalId);
 });
@@ -382,6 +387,57 @@ const changePage = (page: number) => {
    currentPage.value = Math.min(Math.max(page, 1), totalPages.value);
 };
 
+const isAssignedToCurrentUser = (approval: Approval) => {
+   const currentUserId = Number(authStore.user?.id);
+   if (!Number.isInteger(currentUserId) || currentUserId <= 0) return false;
+
+   const payloadIds = Array.isArray(approval.payload?.assigned_to_ids)
+      ? approval.payload.assigned_to_ids
+      : [];
+   const assignedIds = [approval.assignedToId, ...payloadIds]
+      .map(Number)
+      .filter(id => Number.isInteger(id) && id > 0);
+
+   return assignedIds.includes(currentUserId);
+};
+
+const upsertAssignedApproval = (approval: Approval) => {
+   const index = approvalsStore.assignedApprovals.findIndex(item => item.id === approval.id);
+   if (index === -1) {
+      approvalsStore.assignedApprovals.unshift(approval);
+      return;
+   }
+
+   approvalsStore.assignedApprovals[index] = approval;
+};
+
+const loadManagerApprovalsFromNotifications = async () => {
+   if (!isManager.value) return;
+
+   const approvalIds = [...new Set(profileStore.notifications
+      .filter(notification => notification.type === 'approval_request')
+      .map(notification => {
+         const actionUrl = notification.actionUrl || '';
+         const queryMatch = actionUrl.match(/[?&]approvalId=(\d+)/i);
+         const pathMatch = actionUrl.match(/\/approvals\/(\d+)/i);
+         return Number(queryMatch?.[1] || pathMatch?.[1]);
+      })
+      .filter(id => Number.isInteger(id) && id > 0))];
+
+   const results = await Promise.allSettled(
+      approvalIds.map(id => approvalsApi.getApprovalById(id))
+   );
+
+   results.forEach(result => {
+      if (
+         result.status === 'fulfilled'
+         && isAssignedToCurrentUser(result.value)
+      ) {
+         upsertAssignedApproval(result.value);
+      }
+   });
+};
+
 const openApprovalFromRoute = async (approvalId: unknown) => {
    const id = Number(Array.isArray(approvalId) ? approvalId[0] : approvalId);
    if (!Number.isInteger(id) || id <= 0) return;
@@ -391,6 +447,10 @@ const openApprovalFromRoute = async (approvalId: unknown) => {
    if (!approval) {
       await approvalsStore.fetchApprovalById(id);
       approval = approvalsStore.selectedApproval;
+
+      if (approval && isAssignedToCurrentUser(approval)) {
+         upsertAssignedApproval(approval);
+      }
    }
 
    if (approval) {
