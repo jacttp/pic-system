@@ -15,6 +15,7 @@ import type {
     CpfrUpdateStatusBody,
     CpfrBulkUpdateStatusBody,
     CpfrUpdateStatusResponse,
+    CpfrMuliixResponse,
     CpfrUploadOCResponse,
     CpfrStoreConfig,
     CpfrSkuOverride,
@@ -114,6 +115,18 @@ export const cpfrApi = {
     async updateStatusBulk(body: CpfrBulkUpdateStatusBody): Promise<CpfrUpdateStatusResponse> {
         const { data } = await api.patch('/cpfr/orders/status/bulk', body)
         return data
+    },
+
+    async sendApprovedOrdersToMuliix(body: {
+        num_pedidos: string[]
+        year: number
+        week: number
+        nom_cadena: 'SORIANA'
+    }): Promise<CpfrMuliixResponse> {
+        const response = await api.post('/cpfr/orders/muliix', body, {
+            validateStatus: status => status === 200 || status === 206 || status === 412,
+        })
+        return response.data
     },
 
     // ── Upload OC ─────────────────────────────────────────────────────────────

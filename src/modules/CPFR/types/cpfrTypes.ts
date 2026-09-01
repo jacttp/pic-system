@@ -197,6 +197,50 @@ export interface CpfrUpdateStatusResponse {
     order_transitions?: CpfrOrderStatusTransition[]
 }
 
+// ─── POST /cpfr/orders/muliix ────────────────────────────────────────────────
+
+export interface CpfrMuliixRejectedOrder {
+    oc: string
+    status: string
+    message: string
+    invalid_sku: string | null
+}
+
+export interface CpfrMuliixRequestPayload {
+    sub: string
+    id: string
+    username: string
+    cadena: string
+    cliente: string
+    sucursales: Array<{
+        sucursal: string
+        pedidos: Array<{
+            num_pedido: string
+            fec_fin_embarque: string
+            articulos: Array<{ sku: string; cantidad: number }>
+        }>
+    }>
+}
+
+export interface CpfrMuliixResponse {
+    success: boolean
+    partial: boolean
+    attempt_id: string
+    external_http_status: number
+    processed_count: number
+    rejected_count: number
+    previously_converted_count: number
+    zero_order_count: number
+    processed_orders: string[]
+    unprocessed_orders: CpfrMuliixRejectedOrder[]
+    order_transitions: CpfrOrderStatusTransition[]
+    sent_orders: number
+    closed_zero_orders: number
+    deleted_zero_z8_orders: number
+    /** TEMPORAL: retirar al concluir la validación del contrato Muliix. */
+    debug_muliix_requests: CpfrMuliixRequestPayload[]
+}
+
 // ─── Config de tienda — GET|PUT /api/v2/cpfr/config/:id_cliente ─────────────
 // (usado por CpfrStoreConfigModal)
 

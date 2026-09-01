@@ -29,6 +29,14 @@ export interface CpfrExcelExportAuditDetail {
         z8_eliminadas_cero: number;
         error: string | null;
     };
+    integracion_muliix?: {
+        habilitada: true;
+        intento_id: string;
+        codigo_http: number;
+        ocs_convertidas: number;
+        ocs_rechazadas: number;
+        ocs_previamente_convertidas: number;
+    };
     dias: Array<{ numero: number; nombre: string }>;
     semanas: string[];
     resumen: { tiendas: number; ocs: number; skus: number; piezas: number; kilogramos: number };

@@ -2,14 +2,16 @@
 // src/modules/CPFR/components/CpfrExportPanel.vue
 import { ref, computed, watch } from 'vue'
 import { useCpfrStore } from '../stores/cpfrStore'
+import { cpfrApi } from '../services/cpfrApi'
 import { useCpfrExport, buildExportItems } from '../composables/useCpfrExport'
 import type { ExportRow, ExportTiendaItem } from '../composables/useCpfrExport'
-import type { CpfrDiaDash } from '../types/cpfrTypes'
+import type { CpfrDiaDash, CpfrMuliixResponse } from '../types/cpfrTypes'
 import { buildVisibleCpfrDias, normalizeCpfrOrderState } from '../composables/useCpfrVisibility'
 import { toast } from '@/components/ui/toast/use-toast'
 import { auditApi } from '@/modules/Audit/services/auditApi'
 import type { CpfrExcelExportAuditDetail } from '@/types/audit'
 import { isShipmentDeadlineExpired } from '../utils/shipmentDeadline'
+import { StdSwitch } from '@/modules/Shared/components/std'
 
 const emit = defineEmits<{
     (e: 'close'): void
@@ -23,6 +25,10 @@ const store = useCpfrStore()
 const { generateExcel, generateStorePdfs } = useCpfrExport()
 const panelTab = computed(() => props.tab || store.activeTab)
 const isCentralizedReview = computed(() => panelTab.value === 'centralizados')
+const muliixEnabled = ref(false)
+const muliixResult = ref<CpfrMuliixResponse | null>(null)
+const muliixErrorMessage = ref<string | null>(null)
+const isSoriana = computed(() => store.nom_cadena.trim().toUpperCase() === 'SORIANA')
 
 // ── Day Labels ────────────────────────────────────────────────────────────────
 const DAY_LABELS: Record<number, string> = { 1: 'L', 2: 'M', 3: 'X', 4: 'J', 5: 'V', 6: 'S', 7: 'D' }
@@ -328,6 +334,14 @@ const pdfProcessing = ref(false)
 const excelProcessing = ref(false)
 const reviewProcessing = ref(false)
 const canDownloadExcel = computed(() => panelTab.value === 'aprobada')
+const showMuliixExperimental = computed(() => canDownloadExcel.value && isSoriana.value)
+
+watch(showMuliixExperimental, enabled => {
+    if (enabled) return
+    muliixEnabled.value = false
+    muliixResult.value = null
+    muliixErrorMessage.value = null
+})
 const excelRestrictionMessage = 'El Excel final solo se genera desde Aprobados: envía las OC con cantidad y cierra las OC oficiales totalmente en cero.'
 
 function buildExcelAuditDetail(
@@ -335,7 +349,14 @@ function buildExcelAuditDetail(
     downloadedAt: Date,
     sentItems: ExportTiendaItem[],
     orderCount: number,
-    statusResult: { ok: boolean; error?: string; sentOrders?: number; closedZeroOrders?: number; deletedZeroZ8Orders?: number }
+    statusResult: {
+        ok: boolean
+        error?: string
+        sentOrders?: number
+        closedZeroOrders?: number
+        deletedZeroZ8Orders?: number
+        muliix?: CpfrMuliixResponse
+    }
 ): CpfrExcelExportAuditDetail {
     const sentOrders = statusResult.sentOrders ?? (statusResult.ok ? orderCount : 0)
     const closedZeroOrders = statusResult.closedZeroOrders ?? 0
@@ -354,7 +375,7 @@ function buildExcelAuditDetail(
         }
     })
 
-    return {
+    const detail: CpfrExcelExportAuditDetail = {
         tipo: 'CPFR_EXCEL_FINAL',
         fecha_descarga: downloadedAt.toISOString(),
         archivo: filename,
@@ -392,6 +413,17 @@ function buildExcelAuditDetail(
         },
         ocs: orderDetails
     }
+    if (statusResult.muliix) {
+        detail.integracion_muliix = {
+            habilitada: true,
+            intento_id: statusResult.muliix.attempt_id,
+            codigo_http: statusResult.muliix.external_http_status,
+            ocs_convertidas: statusResult.muliix.processed_count,
+            ocs_rechazadas: statusResult.muliix.rejected_count,
+            ocs_previamente_convertidas: statusResult.muliix.previously_converted_count,
+        }
+    }
+    return detail
 }
 
 async function handleExcelExport() {
@@ -406,6 +438,10 @@ async function handleExcelExport() {
     }
 
     excelProcessing.value = true
+    if (muliixEnabled.value) {
+        muliixResult.value = null
+        muliixErrorMessage.value = null
+    }
     try {
         if (!store.currentWeek) {
             toast({ title: 'Contexto no disponible', description: 'No se pudo identificar la semana activa.', variant: 'destructive' })
@@ -432,6 +468,72 @@ async function handleExcelExport() {
             Array.from(selectedDays.value),
             store.nom_cadena,
         )
+
+        if (muliixEnabled.value && showMuliixExperimental.value) {
+            try {
+                const result = await cpfrApi.sendApprovedOrdersToMuliix({
+                    num_pedidos: orderNumbers,
+                    year: store.currentWeek.anio,
+                    week: store.currentWeek.semana,
+                    nom_cadena: 'SORIANA',
+                })
+                // TEMPORAL CPFR/Muliix: retirar después de validar el contrato real del endpoint.
+                console.info('[CpfrExportPanel.muliix.request][TEMPORAL]', result.debug_muliix_requests)
+                console.info('[CpfrExportPanel.muliix.response][TEMPORAL]', result)
+                muliixResult.value = result
+                muliixErrorMessage.value = null
+                const statusResult = {
+                    ok: result.rejected_count === 0,
+                    sentOrders: result.sent_orders,
+                    closedZeroOrders: result.closed_zero_orders,
+                    deletedZeroZ8Orders: result.deleted_zero_z8_orders,
+                    error: result.rejected_count > 0 ? `${result.rejected_count} OC no fueron convertidas por Muliix.` : undefined,
+                    muliix: result,
+                }
+
+                try {
+                    await auditApi.createCpfrExcelExportLog(
+                        buildExcelAuditDetail(filename, downloadedAt, sentItems, orderNumbers.length, statusResult)
+                    )
+                } catch (auditError) {
+                    console.error('[CpfrExportPanel.audit.muliix]', auditError)
+                    toast({
+                        title: 'Archivo e integración sin bitácora general',
+                        description: 'La respuesta Muliix sí quedó en su tabla, pero falló la bitácora de descarga.',
+                        variant: 'destructive',
+                    })
+                }
+
+                if (result.order_transitions.length > 0) await store.loadDashboard()
+                toast({
+                    title: result.rejected_count > 0 ? 'Muliix respondió con observaciones' : 'Integración Muliix completada',
+                    description: [
+                        `${result.processed_count} OC convertidas`,
+                        result.rejected_count > 0 ? `${result.rejected_count} rechazadas permanecen aprobadas` : null,
+                        result.previously_converted_count > 0 ? `${result.previously_converted_count} ya estaban convertidas` : null,
+                        `Excel ${filename} descargado`,
+                    ].filter(Boolean).join('; '),
+                    variant: result.rejected_count > 0 ? 'destructive' : 'default',
+                    duration: 8000,
+                })
+            } catch (muliixError: any) {
+                console.error('[CpfrExportPanel.muliix]', {
+                    error: muliixError,
+                    status: muliixError?.response?.status,
+                    response: muliixError?.response?.data,
+                })
+                const message = muliixError?.response?.data?.message || muliixError?.message || 'No fue posible contactar Muliix.'
+                muliixErrorMessage.value = message
+                toast({
+                    title: 'Excel descargado; Muliix no procesado',
+                    description: `${message} Las OC permanecen aprobadas.`,
+                    variant: 'destructive',
+                    duration: 9000,
+                })
+            }
+            return
+        }
+
         const statusResult = await store.updateStatusBulk({
             num_pedidos: orderNumbers,
             year: store.currentWeek.anio,
@@ -687,6 +789,71 @@ async function handlePdfExport() {
                     </label>
                 </div>
 
+                <div
+                    v-if="showMuliixExperimental"
+                    class="rounded-xl border px-3 py-2 transition-colors"
+                    :class="muliixEnabled ? 'border-pic-brand-border bg-pic-brand-soft' : 'border-pic-border bg-pic-surface'"
+                >
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex min-w-0 items-center gap-2">
+                            <span class="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-pic-brand text-[10px] text-white">
+                                <i class="fa-solid fa-plug"></i>
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[10px] font-black uppercase tracking-wider text-pic-text-main">Conectar con Muliix (exp)</p>
+                                <p class="text-[8px] font-bold text-pic-text-muted">El Excel se conserva como respaldo</p>
+                            </div>
+                        </div>
+                        <StdSwitch
+                            v-model="muliixEnabled"
+                            aria-label="Conectar con Muliix experimental"
+                            size="compact"
+                            :disabled="excelProcessing"
+                        />
+                    </div>
+
+                    <div v-if="muliixResult" class="mt-2.5 border-t border-pic-brand-border pt-2.5">
+                        <div class="grid grid-cols-4 gap-1.5 text-center">
+                            <div class="rounded-md bg-pic-surface px-1 py-1.5">
+                                <p class="font-mono text-[10px] font-black text-pic-text-main">{{ muliixResult.external_http_status }}</p>
+                                <p class="text-[7px] font-black uppercase text-pic-text-muted">HTTP</p>
+                            </div>
+                            <div class="rounded-md bg-emerald-50 px-1 py-1.5">
+                                <p class="font-mono text-[10px] font-black text-emerald-700">{{ muliixResult.processed_count }}</p>
+                                <p class="text-[7px] font-black uppercase text-emerald-700">Convertidas</p>
+                            </div>
+                            <div class="rounded-md bg-rose-50 px-1 py-1.5">
+                                <p class="font-mono text-[10px] font-black text-rose-700">{{ muliixResult.rejected_count }}</p>
+                                <p class="text-[7px] font-black uppercase text-rose-700">Rechazadas</p>
+                            </div>
+                            <div class="rounded-md bg-amber-50 px-1 py-1.5">
+                                <p class="font-mono text-[10px] font-black text-amber-700">{{ muliixResult.previously_converted_count }}</p>
+                                <p class="text-[7px] font-black uppercase text-amber-700">Previas</p>
+                            </div>
+                        </div>
+                        <div v-if="muliixResult.unprocessed_orders.length" class="mt-2 space-y-1">
+                            <p
+                                v-for="order in muliixResult.unprocessed_orders.slice(0, 4)"
+                                :key="`${order.oc}-${order.status}`"
+                                class="rounded-md bg-rose-50 px-2 py-1 text-[8px] font-bold leading-3 text-rose-700"
+                            >
+                                <span class="font-mono">{{ order.oc }}</span> · {{ order.message }}
+                            </p>
+                            <p v-if="muliixResult.unprocessed_orders.length > 4" class="text-[8px] font-bold text-pic-text-muted">
+                                +{{ muliixResult.unprocessed_orders.length - 4 }} resultados en la tabla de integración
+                            </p>
+                        </div>
+                        <p class="mt-2 truncate font-mono text-[7px] text-pic-text-muted" :title="muliixResult.attempt_id">
+                            Intento {{ muliixResult.attempt_id }}
+                        </p>
+                    </div>
+                    <div v-else-if="muliixErrorMessage" class="mt-2.5 border-t border-rose-200 pt-2.5">
+                        <p class="rounded-md bg-rose-50 px-2 py-1.5 text-[8px] font-bold leading-3 text-rose-700">
+                            <i class="fa-solid fa-triangle-exclamation mr-1"></i>{{ muliixErrorMessage }} Las OC permanecen aprobadas.
+                        </p>
+                    </div>
+                </div>
+
                 <div class="flex items-center gap-2">
                     <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider w-10">Días:</span>
                     <div class="flex flex-wrap items-center gap-1 flex-1">
@@ -896,8 +1063,8 @@ async function handlePdfExport() {
                         class="w-full h-9 border-2 border-brand-600 text-brand-700 hover:bg-brand-50 disabled:bg-slate-50 disabled:text-slate-300 disabled:border-slate-200 rounded-xl font-black text-[11px] transition-all flex items-center justify-center gap-2 group"
                     >
                         <i v-if="excelProcessing" class="fa-solid fa-circle-notch fa-spin"></i>
-                        <i v-else class="fa-solid fa-file-excel transition-transform group-hover:scale-110"></i>
-                        {{ excelProcessing ? 'REGISTRANDO...' : 'GENERAR Y ENVIAR' }}
+                        <i v-else :class="muliixEnabled && showMuliixExperimental ? 'fa-solid fa-plug' : 'fa-solid fa-file-excel'" class="transition-transform group-hover:scale-110"></i>
+                        {{ excelProcessing ? (muliixEnabled ? 'CONECTANDO...' : 'REGISTRANDO...') : (muliixEnabled ? 'GENERAR Y CONECTAR' : 'GENERAR Y ENVIAR') }}
                     </button>
 
                     <button

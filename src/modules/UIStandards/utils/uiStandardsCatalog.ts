@@ -188,6 +188,8 @@ export const uiCatalogEntries: UiCatalogEntry[] = [
       { name: 'modelValue', type: 'boolean', description: 'Estado controlado.', required: true },
       { name: 'label', type: 'string', description: 'Etiqueta visible del control.' },
       { name: 'disabled', type: 'boolean', description: 'Impide interacción.' },
+      { name: 'ariaLabel', type: 'string', description: 'Nombre accesible cuando la etiqueta se presenta fuera del control.' },
+      { name: 'size', type: "'compact' | 'default'", description: 'Tamaño normal o compacto para toolbars densas.' },
     ],
     events: [{ name: 'update:modelValue', type: 'boolean', description: 'Solicita actualizar el estado.' }],
     states: ['activo', 'inactivo', 'disabled'],
