@@ -59,6 +59,7 @@ interface CpfrPreviewRow {
    fill_rate: number | null
    source_type: string
    permiso_oc: string
+   no_resurtible_adjusted: boolean
    par_muliix: string
    mixbase: number | null
    mixpar: number | null
@@ -163,6 +164,7 @@ const dirtyMixKeys = ref<Set<string>>(new Set());
 const selectedMixRowKey = ref('');
 const confirmedMixKey = ref('');
 let mixPreviewTimer: ReturnType<typeof setTimeout> | null = null;
+const MIN_ADJUSTMENT_COMMENT_LENGTH = 10;
 
 // Reset al abrir
 watch(() => props.modelValue, (open) => {
@@ -288,15 +290,6 @@ const canAdjustSamsCpfrOrder = computed(() =>
    && props.approval?.status === 'PENDING'
    && props.canResolve
 );
-const isApprovalSubmissionDisabled = computed(() =>
-   isSubmitting.value
-   || isCancelling.value
-   || (
-      props.approval?.type === 'CPFR_ORDER'
-      && (isLoadingCpfrDetail.value || cpfrDetail.value === null)
-   )
-);
-
 const splitClientId = (idCliente: string) => {
    const idx = idCliente.toLowerCase().indexOf('s');
    if (idx === -1) return { cliente: idCliente || '—', sucursal: '—' };
@@ -394,11 +387,13 @@ const selectedMixGroup = computed(() => {
 });
 
 const isMixPairRow = (row: CpfrPreviewRow) => String(row.permiso_oc || '').toLowerCase() === 'mix';
+const isNoResurtibleRow = (row: CpfrPreviewRow) =>
+   row.no_resurtible_adjusted || String(row.permiso_oc || '').trim().toLowerCase() === 'noresurtible';
 const isCpfrAdjustmentPreview = computed(() =>
    isSamsCpfrApproval.value && props.approval?.status === 'PENDING'
 );
 const canShowCpfrStepper = (row: CpfrPreviewRow) =>
-   (canEditCpfrOrder.value || isCpfrAdjustmentPreview.value) && !row.is_expired;
+   (canEditCpfrOrder.value || isCpfrAdjustmentPreview.value) && !row.is_expired && !isNoResurtibleRow(row);
 const getMixRowKey = (row: CpfrPreviewRow) => `${row.source_type}|${row.num_pedido}|${row.sku_muliix}`;
 const getRowMixGroup = (row: CpfrPreviewRow) => cpfrMixGroupsByRowKey.value.get(getMixRowKey(row)) || null;
 const rowHasMixMetadata = (row: CpfrPreviewRow) =>
@@ -615,6 +610,7 @@ const cpfrPreviewRows = computed(() => {
          fill_rate: row.fill_rate == null ? null : Number(row.fill_rate),
          source_type: String(row.source_type ?? 'pedido_generado'),
          permiso_oc: String(row.permiso_oc ?? ''),
+         no_resurtible_adjusted: Boolean(row.no_resurtible_adjusted),
          par_muliix: String(row.par_muliix ?? ''),
          mixbase: row.mixbase == null ? null : Number(row.mixbase),
          mixpar: row.mixpar == null ? null : Number(row.mixpar),
@@ -663,6 +659,7 @@ const cpfrPreviewRows = computed(() => {
       fill_rate: null,
       source_type: '',
       permiso_oc: '',
+      no_resurtible_adjusted: false,
       par_muliix: '',
       mixbase: null,
       mixpar: null,
@@ -671,6 +668,38 @@ const cpfrPreviewRows = computed(() => {
       z8_permiso_oc: '',
       is_expired: false,
    } satisfies CpfrPreviewRow];
+});
+
+const hasManualCpfrAdjustment = computed(() =>
+   props.approval?.type === 'CPFR_ORDER'
+   && cpfrPreviewRows.value.some(row => Math.abs(Number(row.ajuste || 0)) > 0.0001)
+);
+const normalizedResolutionComment = computed(() => resolutionComment.value.trim());
+const resolutionCommentLength = computed(() =>
+   normalizedResolutionComment.value.replace(/[\r\n\u2028\u2029]/g, '').length
+);
+const isResolutionCommentRequired = computed(() => hasManualCpfrAdjustment.value);
+const isResolutionCommentValid = computed(() =>
+   !isResolutionCommentRequired.value
+   || resolutionCommentLength.value >= MIN_ADJUSTMENT_COMMENT_LENGTH
+);
+const isApprovalSubmissionDisabled = computed(() =>
+   isSubmitting.value
+   || isCancelling.value
+   || !isResolutionCommentValid.value
+   || (
+      props.approval?.type === 'CPFR_ORDER'
+      && (isLoadingCpfrDetail.value || cpfrDetail.value === null)
+   )
+);
+const approvalSubmissionTitle = computed(() => {
+   if (props.approval?.type === 'CPFR_ORDER' && cpfrDetail.value === null) {
+      return 'Espera a que cargue la validación de OCs caducadas';
+   }
+   if (!isResolutionCommentValid.value) {
+      return `Agrega un comentario de al menos ${MIN_ADJUSTMENT_COMMENT_LENGTH} caracteres por el ajuste realizado`;
+   }
+   return 'Aprobar solicitud';
 });
 
 const cpfrStoreGroups = computed<CpfrStoreGroup[]>(() => {
@@ -999,11 +1028,13 @@ const getCpfrRowKey = (row: CpfrPreviewRow) =>
 const isRowAdjusting = (row: CpfrPreviewRow) => adjustingRows.value.has(getCpfrRowKey(row));
 
 const canDecreaseCpfrRow = (row: CpfrPreviewRow) => {
+   if (isNoResurtibleRow(row)) return false;
    const step = getPackagingStep(row);
    return step > 0 && row.cantidad_base_uni + row.ajuste - step >= 0;
 };
 
 const canIncreaseCpfrRow = (row: CpfrPreviewRow) => {
+   if (isNoResurtibleRow(row)) return false;
    const step = getPackagingStep(row);
    if (step <= 0) return false;
    if (isSamsCpfrApproval.value) {
@@ -1032,7 +1063,7 @@ const refreshCpfrDetail = async () => {
 
 const handleAdjustPedido = async (row: CpfrPreviewRow, direction: 1 | -1) => {
    const canAdjust = canEditCpfrOrder.value || canAdjustSamsCpfrOrder.value;
-   if (!props.approval || !canAdjust || row.is_expired || isRowAdjusting(row)) return;
+   if (!props.approval || !canAdjust || row.is_expired || isNoResurtibleRow(row) || isRowAdjusting(row)) return;
 
    const step = getPackagingStep(row);
    if (step <= 0) {
@@ -1166,7 +1197,7 @@ const submitApproval = async () => {
       }
       await approvalsStore.resolveApproval(props.approval.id, {
          status: 'APPROVED',
-         rejectionReason: resolutionComment.value.trim() || undefined,
+         rejectionReason: normalizedResolutionComment.value || undefined,
       });
       emit('resolved');
       closeModal();
@@ -1620,7 +1651,18 @@ const handleCancel = async () => {
                                  <div class="border-b border-slate-100 px-3 py-3 md:flex md:items-center md:border-b-0 md:border-r md:py-2.5">
                                     <div class="flex items-start justify-between gap-3">
                                        <div class="min-w-0">
-                                          <p class="line-clamp-2 text-[11px] font-black uppercase leading-snug text-slate-800" :title="row.desc">{{ row.desc }}</p>
+                                           <div class="flex items-start gap-2">
+                                              <p class="line-clamp-2 min-w-0 text-[11px] font-black uppercase leading-snug text-slate-800" :title="row.desc">{{ row.desc }}</p>
+                                              <span
+                                                 v-if="isNoResurtibleRow(row)"
+                                                 class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-violet-200 bg-violet-50 text-violet-700"
+                                                 title="Sugerencia CPFR anulada: este SKU está marcado como NoResurtible para la tienda."
+                                                 role="img"
+                                                 aria-label="Sugerencia anulada por permiso NoResurtible"
+                                              >
+                                                 <i class="fa-solid fa-triangle-exclamation text-[9px]" aria-hidden="true"></i>
+                                              </span>
+                                           </div>
                                           <p class="mt-1 truncate font-mono text-[9px] font-bold text-slate-400">
                                              SKU {{ row.sku_muliix || row.sku_cadena || row.upc || '-' }}
                                           </p>
@@ -1662,7 +1704,7 @@ const handleCancel = async () => {
                                        </p>
                                        <p
                                           class="mt-0.5 text-xl font-black leading-none"
-                                          :class="row.is_expired ? 'text-amber-700' : 'text-brand-700'"
+                                          :class="row.is_expired ? 'text-amber-700' : (isNoResurtibleRow(row) ? 'text-violet-700' : 'text-brand-700')"
                                        >
                                           <i v-if="isRowAdjusting(row)" class="fa-solid fa-circle-notch fa-spin text-sm"></i>
                                           <span v-else>{{ formatNumber(row.is_expired && row.z8_eligible ? getConversionQuantity(row) : row.cant_pedida, 0) }}</span><span class="ml-1 text-[10px]">pz</span>
@@ -1707,9 +1749,9 @@ const handleCancel = async () => {
                                     <span
                                        v-else
                                        class="text-right text-[9px] font-black uppercase"
-                                       :class="row.is_expired ? 'text-rose-700' : 'text-emerald-700'"
+                                       :class="row.is_expired ? 'text-rose-700' : (isNoResurtibleRow(row) ? 'text-violet-700' : 'text-emerald-700')"
                                     >
-                                       {{ row.is_expired ? (row.z8_eligible ? 'Solo lectura' : 'No transferible a Z8') : (isMixPairRow(row) ? 'Generado por mix' : 'Sin edición') }}
+                                       {{ row.is_expired ? (row.z8_eligible ? 'Solo lectura' : 'No transferible a Z8') : (isNoResurtibleRow(row) ? 'NoResurtible' : (isMixPairRow(row) ? 'Generado por mix' : 'Sin edición')) }}
                                     </span>
                                  </div>
                               </article>
@@ -1733,7 +1775,18 @@ const handleCancel = async () => {
                                        :class="idx % 2 === 1 ? 'bg-slate-50/40' : 'bg-white'"
                                     >
                                        <td class="px-3 py-2">
-                                          <p class="truncate font-black uppercase text-slate-700" :title="row.desc">{{ row.desc }}</p>
+                                          <div class="flex items-center gap-2">
+                                              <p class="min-w-0 flex-1 truncate font-black uppercase text-slate-700" :title="row.desc">{{ row.desc }}</p>
+                                              <span
+                                                 v-if="isNoResurtibleRow(row)"
+                                                 class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-violet-200 bg-violet-50 text-violet-700"
+                                                 title="Sugerencia CPFR anulada: este SKU está marcado como NoResurtible para la tienda."
+                                                 role="img"
+                                                 aria-label="Sugerencia anulada por permiso NoResurtible"
+                                              >
+                                                 <i class="fa-solid fa-triangle-exclamation text-[9px]" aria-hidden="true"></i>
+                                              </span>
+                                           </div>
                                           <p class="mt-0.5 truncate font-mono text-[8px] font-bold text-slate-400">
                                              {{ row.sku_muliix || row.sku_cadena || row.upc || '-' }}
                                           </p>
@@ -1826,9 +1879,10 @@ const handleCancel = async () => {
                                           <p
                                              v-else
                                              class="text-right font-black"
-                                             :class="row.is_expired ? 'text-rose-700' : (isMixPairRow(row) ? 'text-emerald-700' : 'text-brand-700')"
+                                             :class="row.is_expired ? 'text-rose-700' : (isNoResurtibleRow(row) ? 'text-violet-700' : (isMixPairRow(row) ? 'text-emerald-700' : 'text-brand-700'))"
                                           >
                                              {{ formatNumber(row.cant_pedida, 0) }} pz
+                                             <span v-if="isNoResurtibleRow(row)" class="ml-1 rounded-md bg-violet-50 px-1.5 py-0.5 text-[8px] font-black uppercase text-violet-700">NoResurtible</span>
                                              <span v-if="isMixPairRow(row)" class="ml-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[8px] font-black uppercase text-emerald-700">mix</span>
                                              <span v-else-if="row.is_expired && !row.z8_eligible" class="ml-1 rounded-md bg-rose-50 px-1.5 py-0.5 text-[8px] font-black uppercase text-rose-700">No Z8</span>
                                           </p>
@@ -2060,16 +2114,41 @@ const handleCancel = async () => {
 
          <!-- Acciones de resolución -->
          <div v-if="canResolve && approval.status === 'PENDING'" class="border-t border-slate-100 pt-4 space-y-3">
-            <p class="text-sm font-semibold text-slate-700">Resolver solicitud</p>
+            <p class="text-sm font-semibold text-slate-700">
+               {{ isResolutionCommentRequired ? 'Especifica el motivo de los ajustes' : 'Comentarios de la resolución' }}
+            </p>
 
             <div v-if="canResolve">
-               <label class="block text-xs font-medium text-slate-600 mb-1">Comentarios <span class="text-slate-400">(opcional)</span></label>
+               <label for="approval-resolution-comment" class="mb-1 block text-xs font-medium text-slate-600">
+                  Comentarios
+                  <span v-if="isResolutionCommentRequired" class="font-bold text-amber-700">(obligatorio por ajuste)</span>
+                  <span v-else class="text-slate-400">(opcional)</span>
+               </label>
                <textarea
+                  id="approval-resolution-comment"
                   v-model="resolutionComment"
                   rows="2"
-                  class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none resize-none text-sm"
-                  placeholder="Agrega comentarios para esta aprobacion..."
+                  :required="isResolutionCommentRequired"
+                  :aria-invalid="isResolutionCommentRequired && !isResolutionCommentValid"
+                  aria-describedby="approval-resolution-comment-help"
+                  class="w-full resize-none rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2"
+                  :class="isResolutionCommentRequired && !isResolutionCommentValid
+                     ? 'border-amber-300 bg-amber-50/40 focus:border-amber-500 focus:ring-amber-100'
+                     : 'border-slate-200 focus:border-brand-500 focus:ring-brand-100'"
+                  :placeholder="isResolutionCommentRequired
+                     ? 'Explica el motivo del ajuste al pedido sugerido...'
+                     : 'Agrega comentarios para esta aprobación...'"
                ></textarea>
+               <div id="approval-resolution-comment-help" class="mt-1 flex items-start justify-between gap-3 text-[11px] font-semibold">
+                  <span :class="isResolutionCommentRequired ? 'text-amber-700' : 'text-slate-400'">
+                     {{ isResolutionCommentRequired
+                        ? `El ajuste requiere al menos ${MIN_ADJUSTMENT_COMMENT_LENGTH} caracteres; no cuentan espacios al inicio o final ni saltos de línea.`
+                        : 'El mix por sí solo no requiere comentario.' }}
+                  </span>
+                  <span v-if="isResolutionCommentRequired" class="shrink-0 font-mono" :class="isResolutionCommentValid ? 'text-emerald-700' : 'text-amber-700'">
+                     {{ resolutionCommentLength }}/{{ MIN_ADJUSTMENT_COMMENT_LENGTH }}
+                  </span>
+               </div>
             </div>
 
             <div class="flex justify-end">
@@ -2077,7 +2156,7 @@ const handleCancel = async () => {
                   v-if="canResolve"
                   @click="handleConfirm"
                   :disabled="isApprovalSubmissionDisabled"
-                  :title="approval.type === 'CPFR_ORDER' && cpfrDetail === null ? 'Espera a que cargue la validación de OCs caducadas' : 'Aprobar solicitud'"
+                  :title="approvalSubmissionTitle"
                   class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-70 sm:w-auto"
                >
                   <i :class="isSubmitting ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-check'" class="text-xs"></i>

@@ -61,6 +61,7 @@ export interface CpfrApprovalRow extends Record<string, unknown> {
    lead_time: number
    z8_eligible: boolean
    z8_permiso_oc?: 'z8' | 'z8carnes' | null
+   no_resurtible_adjusted?: boolean
    is_expired: boolean
 }
 
