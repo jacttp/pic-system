@@ -30,8 +30,8 @@ function selectChain(chain: string) {
       :key="chain.id"
       class="group flex h-[54px] min-w-[132px] items-center gap-3 rounded-xl border bg-white px-3.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-[0_12px_24px_rgba(15,23,42,0.08)] disabled:cursor-wait disabled:opacity-70"
       :class="activeChain === chain.id
-        ? 'border-brand-200 bg-brand-50/30 shadow-[0_10px_22px_rgba(217,31,38,0.08)]'
-        : 'border-slate-200 shadow-[0_8px_18px_rgba(15,23,42,0.04)]'"
+        ? 'border-brand-500 bg-brand-50/30 shadow-[0_10px_22px_rgba(217,31,38,0.08)]'
+        : 'border-slate-300 shadow-[0_8px_18px_rgba(15,23,42,0.04)]'"
       :disabled="store.loading && activeChain !== chain.id"
       @click="selectChain(chain.id)"
     >

@@ -72,8 +72,8 @@ const sizeClasses = {
                 <!-- Backdrop oscuro -->
                 <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" aria-hidden="true" @click="close"></div>
 
-                <div class="fixed inset-0 z-10 overflow-y-auto">
-                    <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+                <div class="fixed inset-0 z-10 overflow-y-auto" @click.self="close">
+                    <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0" @click.self="close">
                         
                         <!-- Panel del Modal -->
                         <div ref="panel" tabindex="-1"

@@ -3,12 +3,14 @@ import { onMounted, ref, computed, onUnmounted, reactive } from 'vue';
 import { usePicFilterStore } from '../stores/picFilterStore';
 import FilterDropdown from '@/modules/Shared/components/FilterDropdown.vue';
 import PicClientModal from './modals/PicClientModal.vue';
+import PicSkuModal from './modals/PicSkuModal.vue';
 
 const store = usePicFilterStore();
 const filterPanel = ref<HTMLElement | null>(null);
 const isCollapsed = ref(true);
 const overflowVisible = ref(false);
 const showClientModal = ref(false);
+const showSkuModal = ref(false);
 const openDropdownCount = ref(0);
 
 const mobileSections = reactive<Record<string, boolean>>({
@@ -55,6 +57,13 @@ const clientButtonText = computed(() => {
     if (count === 0) return 'Buscar cliente';
     if (count === 1) return store.selectedClients.values().next().value;
     return `${count} clientes`;
+});
+
+const skuButtonText = computed(() => {
+    const count = store.selected.SKU.length;
+    if (count === 0) return 'Buscar SKU';
+    if (count === 1) return store.selected.SKU[0];
+    return `${count} SKU`;
 });
 
 const periodSummary = computed(() => {
@@ -111,7 +120,7 @@ function showToast(type: ToastType, message: string, detail?: string) {
 }
 
 const handleClickOutside = (event: MouseEvent) => {
-    if (isCollapsed.value || showClientModal.value || openDropdownCount.value > 0) return;
+    if (isCollapsed.value || showClientModal.value || showSkuModal.value || openDropdownCount.value > 0) return;
 
     if (filterPanel.value && filterPanel.value.contains(event.target as Node)) {
         return;
@@ -154,6 +163,7 @@ onUnmounted(() => {
         :class="isCollapsed ? 'shrink-0 self-start justify-self-end' : 'col-span-2 w-full basis-full justify-self-stretch'"
     >
         <PicClientModal v-model="showClientModal" />
+        <PicSkuModal v-model="showSkuModal" :options="store.depOptions.skus" :loading="store.depLoading.skus" />
 
         <Transition
             enter-active-class="transition-all duration-300 ease-out"
@@ -396,7 +406,28 @@ onUnmounted(() => {
                             <FilterDropdown density="compact" label="Marca" :options="store.options.marcas" v-model="store.selected.Marca" @change="store.handleMarcaChange" @open-change="handleDropdownOpen" />
                             <FilterDropdown density="compact" label="Grupo" :options="store.depOptions.grupos" v-model="store.selected.grupo" :disabled="store.depOptions.grupos.length === 0" :loading="store.depLoading.grupos" @change="store.handleGrupoChange" @open-change="handleDropdownOpen" />
                             <FilterDropdown density="compact" label="Categoria" :options="store.depOptions.categorias" v-model="store.selected.Categorias" :disabled="store.depOptions.categorias.length === 0" :loading="store.depLoading.categorias" @open-change="handleDropdownOpen" />
-                            <FilterDropdown density="compact" label="SKU" :options="store.depOptions.skus" v-model="store.selected.SKU" :disabled="store.depOptions.skus.length === 0" :loading="store.depLoading.skus" placeholder="Buscar SKU" @open-change="handleDropdownOpen" />
+                            <div>
+                                <label class="mb-1 ml-1 block text-[9px] font-bold uppercase tracking-wider text-pic-text-muted">
+                                    SKU
+                                </label>
+                                <button
+                                    type="button"
+                                    class="flex h-8 w-full items-center justify-between rounded-lg border border-pic-border bg-pic-surface px-2.5 text-left text-xs shadow-sm transition-all hover:border-pic-brand-border hover:shadow-md disabled:cursor-not-allowed disabled:bg-pic-muted-surface disabled:opacity-60"
+                                    :class="{ 'border-pic-brand ring-1 ring-pic-brand-border': store.selected.SKU.length > 0 }"
+                                    :disabled="store.depLoading.skus || store.depOptions.skus.length === 0"
+                                    @click="showSkuModal = true"
+                                >
+                                    <span class="mr-2 flex min-w-0 items-center truncate font-medium" :class="store.selected.SKU.length > 0 ? 'text-pic-brand' : 'text-pic-text-muted'">
+                                        <i v-if="store.depLoading.skus" class="fa-solid fa-circle-notch fa-spin mr-1.5"></i>
+                                        <i v-else class="fa-solid fa-magnifying-glass mr-1.5 opacity-50"></i>
+                                        {{ store.depLoading.skus ? 'Cargando...' : skuButtonText }}
+                                    </span>
+                                    <i
+                                        class="fa-solid text-[10px]"
+                                        :class="store.selected.SKU.length > 0 ? 'fa-check text-pic-brand' : 'fa-arrow-up-right-from-square text-pic-text-muted'"
+                                    ></i>
+                                </button>
+                            </div>
                         </div>
                     </section>
 
