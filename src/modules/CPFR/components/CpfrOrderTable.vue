@@ -249,6 +249,7 @@ function canIncreaseAdjustment(sku: CpfrSkuDash): boolean {
 function adjustmentTooltip(idCliente: string, sku: CpfrSkuDash): string {
     if (currentTab.value === 'aprobada') return 'Ajuste aprobado de solo lectura'
     if (currentTab.value !== 'revision') return 'Ajuste disponible solo en revision'
+    if (!store.adjustmentsEnabled) return 'Los ajustes manuales están deshabilitados para esta cadena'
     if (!sku.sku_muliix || !sku.num_pedido || !sku.fec_pedido_cadena) return 'Faltan datos para ajustar este SKU'
     if (packagingStep(sku) <= 0) return 'Este SKU no tiene configurado el multiplo de empaque seleccionado'
     if (!store.getCachedApprovalIdForSku(idCliente, sku)) return 'No se encontro la solicitud de aprobacion pendiente'
@@ -2430,7 +2431,7 @@ const totalUniqueOCs = computed(() => {
                                 type="button"
                                 class="flex h-8 w-8 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-35"
                                 title="Disminuir ajuste"
-                                :disabled="adjustingSkuKey === adjustmentKey(tienda.id_cliente, sku) || !canDecreaseAdjustment(sku) || !store.getCachedApprovalIdForSku(tienda.id_cliente, sku)"
+                                :disabled="!store.adjustmentsEnabled || adjustingSkuKey === adjustmentKey(tienda.id_cliente, sku) || !canDecreaseAdjustment(sku) || !store.getCachedApprovalIdForSku(tienda.id_cliente, sku)"
                                 @click.stop="adjustReviewSku(tienda.id_cliente, sku, -1)"
                               >
                                 <i class="fa-solid fa-minus text-[10px]"></i>
@@ -2446,7 +2447,7 @@ const totalUniqueOCs = computed(() => {
                                 type="button"
                                 class="flex h-8 w-8 shrink-0 items-center justify-center text-slate-400 transition disabled:cursor-not-allowed disabled:opacity-35"
                                 title="Regresar hacia pedido base"
-                                :disabled="adjustingSkuKey === adjustmentKey(tienda.id_cliente, sku) || !canIncreaseAdjustment(sku) || !store.getCachedApprovalIdForSku(tienda.id_cliente, sku)"
+                                :disabled="!store.adjustmentsEnabled || adjustingSkuKey === adjustmentKey(tienda.id_cliente, sku) || !canIncreaseAdjustment(sku) || !store.getCachedApprovalIdForSku(tienda.id_cliente, sku)"
                                 @click.stop="adjustReviewSku(tienda.id_cliente, sku, 1)"
                               >
                                 <i class="fa-solid fa-plus text-[10px]"></i>
@@ -2680,7 +2681,7 @@ const totalUniqueOCs = computed(() => {
                               type="button"
                               class="flex h-8 w-8 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-35"
                               title="Disminuir ajuste"
-                              :disabled="adjustingSkuKey === adjustmentKey(tienda.id_cliente, sku) || !canDecreaseAdjustment(sku) || !store.getCachedApprovalIdForSku(tienda.id_cliente, sku)"
+                              :disabled="!store.adjustmentsEnabled || adjustingSkuKey === adjustmentKey(tienda.id_cliente, sku) || !canDecreaseAdjustment(sku) || !store.getCachedApprovalIdForSku(tienda.id_cliente, sku)"
                               @click.stop="adjustReviewSku(tienda.id_cliente, sku, -1)"
                             >
                               <i class="fa-solid fa-minus text-[10px]"></i>
@@ -2696,7 +2697,7 @@ const totalUniqueOCs = computed(() => {
                               type="button"
                               class="flex h-8 w-8 shrink-0 items-center justify-center text-slate-400 transition disabled:cursor-not-allowed disabled:opacity-35"
                               title="Regresar hacia pedido base"
-                              :disabled="adjustingSkuKey === adjustmentKey(tienda.id_cliente, sku) || !canIncreaseAdjustment(sku) || !store.getCachedApprovalIdForSku(tienda.id_cliente, sku)"
+                              :disabled="!store.adjustmentsEnabled || adjustingSkuKey === adjustmentKey(tienda.id_cliente, sku) || !canIncreaseAdjustment(sku) || !store.getCachedApprovalIdForSku(tienda.id_cliente, sku)"
                               @click.stop="adjustReviewSku(tienda.id_cliente, sku, 1)"
                             >
                               <i class="fa-solid fa-plus text-[10px]"></i>

@@ -37,6 +37,7 @@ interface CpfrPreviewRow {
    cantidad_base_uni: number
    ajuste: number
    ajuste_mix: number
+   ajustes_habilitados: boolean
    pzas_bolsa: number
    pzas_caja: number
    variable_bolsa: 0 | 1
@@ -389,11 +390,14 @@ const selectedMixGroup = computed(() => {
 const isMixPairRow = (row: CpfrPreviewRow) => String(row.permiso_oc || '').toLowerCase() === 'mix';
 const isNoResurtibleRow = (row: CpfrPreviewRow) =>
    row.no_resurtible_adjusted || String(row.permiso_oc || '').trim().toLowerCase() === 'noresurtible';
+const rowAllowsManualAdjustments = (row: CpfrPreviewRow) => row.ajustes_habilitados;
 const isCpfrAdjustmentPreview = computed(() =>
    isSamsCpfrApproval.value && props.approval?.status === 'PENDING'
 );
 const canShowCpfrStepper = (row: CpfrPreviewRow) =>
-   (canEditCpfrOrder.value || isCpfrAdjustmentPreview.value) && !row.is_expired && !isNoResurtibleRow(row);
+   (canEditCpfrOrder.value || isCpfrAdjustmentPreview.value)
+   && !row.is_expired
+   && !isNoResurtibleRow(row);
 const getMixRowKey = (row: CpfrPreviewRow) => `${row.source_type}|${row.num_pedido}|${row.sku_muliix}`;
 const getRowMixGroup = (row: CpfrPreviewRow) => cpfrMixGroupsByRowKey.value.get(getMixRowKey(row)) || null;
 const rowHasMixMetadata = (row: CpfrPreviewRow) =>
@@ -588,6 +592,7 @@ const cpfrPreviewRows = computed(() => {
          cantidad_base_uni: cantidadBase,
          ajuste,
          ajuste_mix: ajusteMix,
+         ajustes_habilitados: row.ajustes_habilitados !== false && row.ajustes_habilitados !== 0,
          pzas_bolsa: pzasBolsa,
          pzas_caja: pzasCaja,
          variable_bolsa: variableBolsa,
@@ -637,6 +642,7 @@ const cpfrPreviewRows = computed(() => {
       cantidad_base_uni: Number(p.total_pzas_sugeridas ?? 0),
       ajuste: 0,
       ajuste_mix: 0,
+      ajustes_habilitados: true,
       pzas_bolsa: 0,
       pzas_caja: 0,
       variable_bolsa: 1,
@@ -678,7 +684,9 @@ const normalizedResolutionComment = computed(() => resolutionComment.value.trim(
 const resolutionCommentLength = computed(() =>
    normalizedResolutionComment.value.replace(/[\r\n\u2028\u2029]/g, '').length
 );
-const isResolutionCommentRequired = computed(() => hasManualCpfrAdjustment.value);
+const isResolutionCommentRequired = computed(() =>
+   isSamsCpfrApproval.value && hasManualCpfrAdjustment.value
+);
 const isResolutionCommentValid = computed(() =>
    !isResolutionCommentRequired.value
    || resolutionCommentLength.value >= MIN_ADJUSTMENT_COMMENT_LENGTH
@@ -1063,7 +1071,7 @@ const refreshCpfrDetail = async () => {
 
 const handleAdjustPedido = async (row: CpfrPreviewRow, direction: 1 | -1) => {
    const canAdjust = canEditCpfrOrder.value || canAdjustSamsCpfrOrder.value;
-   if (!props.approval || !canAdjust || row.is_expired || isNoResurtibleRow(row) || isRowAdjusting(row)) return;
+   if (!props.approval || !canAdjust || !rowAllowsManualAdjustments(row) || row.is_expired || isNoResurtibleRow(row) || isRowAdjusting(row)) return;
 
    const step = getPackagingStep(row);
    if (step <= 0) {
@@ -1734,15 +1742,15 @@ const handleCancel = async () => {
                                        <button
                                           type="button"
                                           class="flex h-11 w-11 items-center justify-center text-slate-600 transition active:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-35"
-                                          :title="isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Disminuir pedido'"
-                                          :disabled="(!canEditCpfrOrder && !canAdjustSamsCpfrOrder) || isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canDecreaseCpfrRow(row)"
+                                          :title="!rowAllowsManualAdjustments(row) ? 'Los ajustes manuales están deshabilitados para esta tienda.' : (isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Disminuir pedido')"
+                                          :disabled="!rowAllowsManualAdjustments(row) || (!canEditCpfrOrder && !canAdjustSamsCpfrOrder) || isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canDecreaseCpfrRow(row)"
                                           @click="handleAdjustPedido(row, -1)"
                                        ><i class="fa-solid fa-minus text-xs"></i></button>
                                        <button
                                           type="button"
                                           class="flex h-11 w-11 items-center justify-center border-l border-slate-200 text-slate-600 transition active:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-35"
-                                          :title="isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Regresar hacia pedido base'"
-                                          :disabled="(!canEditCpfrOrder && !canAdjustSamsCpfrOrder) || isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canIncreaseCpfrRow(row)"
+                                          :title="!rowAllowsManualAdjustments(row) ? 'Los ajustes manuales están deshabilitados para esta tienda.' : (isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Regresar hacia pedido base')"
+                                          :disabled="!rowAllowsManualAdjustments(row) || (!canEditCpfrOrder && !canAdjustSamsCpfrOrder) || isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canIncreaseCpfrRow(row)"
                                           @click="handleAdjustPedido(row, 1)"
                                        ><i class="fa-solid fa-plus text-xs"></i></button>
                                     </div>
@@ -1840,8 +1848,8 @@ const handleCancel = async () => {
                                                 <button
                                                    type="button"
                                                    class="flex h-9 w-9 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
-                                                   :title="isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Disminuir pedido'"
-                                                   :disabled="(!canEditCpfrOrder && !canAdjustSamsCpfrOrder) || isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canDecreaseCpfrRow(row)"
+                                                   :title="!rowAllowsManualAdjustments(row) ? 'Los ajustes manuales están deshabilitados para esta tienda.' : (isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Disminuir pedido')"
+                                                   :disabled="!rowAllowsManualAdjustments(row) || (!canEditCpfrOrder && !canAdjustSamsCpfrOrder) || isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canDecreaseCpfrRow(row)"
                                                    @click="handleAdjustPedido(row, -1)"
                                                 >
                                                    <i class="fa-solid fa-minus text-[10px]"></i>
@@ -1857,8 +1865,8 @@ const handleCancel = async () => {
                                                 <button
                                                    type="button"
                                                    class="flex h-9 w-9 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
-                                                   :title="isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Regresar hacia pedido base'"
-                                                   :disabled="(!canEditCpfrOrder && !canAdjustSamsCpfrOrder) || isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canIncreaseCpfrRow(row)"
+                                                   :title="!rowAllowsManualAdjustments(row) ? 'Los ajustes manuales están deshabilitados para esta tienda.' : (isMixAdjustmentLocked(row) ? 'Mix aplicado: ajusta las piezas desde Mix.' : 'Regresar hacia pedido base')"
+                                                   :disabled="!rowAllowsManualAdjustments(row) || (!canEditCpfrOrder && !canAdjustSamsCpfrOrder) || isMixAdjustmentLocked(row) || isRowAdjusting(row) || !row.sku_muliix || !canIncreaseCpfrRow(row)"
                                                    @click="handleAdjustPedido(row, 1)"
                                                 >
                                                    <i class="fa-solid fa-plus text-[10px]"></i>

@@ -253,6 +253,7 @@ export interface CpfrStoreConfig {
     semanas_objetivo: number
     semanas_sellout: number
     factor_ajuste?: number       // SOLO LECTURA
+    ajustes_habilitados?: boolean
 }
 
 // ─── SKU Overrides — GET /api/v2/cpfr/config/:id_cliente/skus ───────────────

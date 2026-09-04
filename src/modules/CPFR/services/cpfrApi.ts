@@ -179,6 +179,16 @@ export const cpfrApi = {
         return data.data
     },
 
+    async getChainAdjustmentsEnabled(nomCadena: string): Promise<{ ajustes_habilitados: boolean; total_tiendas: number }> {
+        const { data } = await api.get(`/v2/cpfr/config/chain/${encodeURIComponent(nomCadena)}/adjustments`)
+        return data.data
+    },
+
+    async updateChainAdjustmentsEnabled(nomCadena: string, ajustes_habilitados: boolean): Promise<{ ajustes_habilitados: boolean; total_tiendas: number }> {
+        const { data } = await api.patch(`/v2/cpfr/config/chain/${encodeURIComponent(nomCadena)}/adjustments`, { ajustes_habilitados })
+        return data.data
+    },
+
     /**
      * GET /api/v2/cpfr/config/:id_cliente
      */

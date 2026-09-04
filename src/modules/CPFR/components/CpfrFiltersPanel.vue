@@ -3,6 +3,8 @@
 import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useCpfrStore } from '../stores/cpfrStore'
 import CpfrCriteriaPanel from './CpfrCriteriaPanel.vue'
+import { StdSwitch } from '@/modules/Shared/components/std'
+import { toast } from '@/components/ui/toast/use-toast'
 
 const store = useCpfrStore()
 
@@ -113,6 +115,17 @@ async function triggerGenerateZ8() {
     if (!canRunCentralizedActions.value) return
     await store.generateZ8()
 }
+
+async function toggleChainAdjustments(value: boolean) {
+    const ok = await store.updateChainAdjustmentsEnabled(value)
+    if (!ok) {
+        toast({
+            title: 'No se actualizaron los ajustes',
+            description: 'Se restauró el estado anterior. Intenta nuevamente.',
+            variant: 'destructive',
+        })
+    }
+}
 </script>
 
 <template>
@@ -191,6 +204,16 @@ async function triggerGenerateZ8() {
           >
             <i class="fa-solid fa-trash-can-arrow-up text-[14px]"></i>
           </button>
+          <div class="flex h-[34px] items-center rounded-lg border border-slate-200 bg-slate-50 px-2" :title="`Permitir ajustes manuales para todas las tiendas de ${store.nom_cadena}`">
+            <StdSwitch
+              :model-value="store.adjustmentsEnabled"
+              :disabled="store.adjustmentsLoading || store.adjustmentsSaving"
+              size="compact"
+              label="Ajustes"
+              :aria-label="`Ajustes manuales para ${store.nom_cadena}`"
+              @update:model-value="toggleChainAdjustments"
+            />
+          </div>
         </div>
         </div>
 

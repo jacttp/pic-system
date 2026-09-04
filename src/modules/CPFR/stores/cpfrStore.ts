@@ -55,6 +55,9 @@ export const useCpfrStore = defineStore('cpfr', () => {
 
     const criterio_global = ref<number>(2.5)
     const nom_cadena = ref<string>((localStorage.getItem('cpfr_nom_cadena') || 'SORIANA').toUpperCase())
+    const adjustmentsEnabled = ref(true)
+    const adjustmentsLoading = ref(false)
+    const adjustmentsSaving = ref(false)
 
     // Filtros activos — se incluyen en el body del POST
     const filters = reactive<CpfrFilters>({
@@ -110,6 +113,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
 
         nom_cadena.value = normalized
         localStorage.setItem('cpfr_nom_cadena', normalized)
+        void fetchChainAdjustmentsEnabled()
         resetHistorialState()
         activeTab.value = 'centralizados'
         loadDashboard()
@@ -141,6 +145,37 @@ export const useCpfrStore = defineStore('cpfr', () => {
             nom_cadena: nom_cadena.value.toUpperCase(),
             criterio_global: criterio_global.value,
             filters: { ...filters, estado_pedido: estadoPedido },
+        }
+    }
+
+    async function fetchChainAdjustmentsEnabled(): Promise<void> {
+        adjustmentsLoading.value = true
+        try {
+            const data = await cpfrApi.getChainAdjustmentsEnabled(nom_cadena.value)
+            adjustmentsEnabled.value = Boolean(data.ajustes_habilitados)
+        } catch (e) {
+            console.error('[cpfrStore.fetchChainAdjustmentsEnabled]', e)
+            adjustmentsEnabled.value = true
+        } finally {
+            adjustmentsLoading.value = false
+        }
+    }
+
+    async function updateChainAdjustmentsEnabled(value: boolean): Promise<boolean> {
+        if (adjustmentsSaving.value || adjustmentsEnabled.value === value) return true
+        const previous = adjustmentsEnabled.value
+        adjustmentsEnabled.value = value
+        adjustmentsSaving.value = true
+        try {
+            const data = await cpfrApi.updateChainAdjustmentsEnabled(nom_cadena.value, value)
+            adjustmentsEnabled.value = Boolean(data.ajustes_habilitados)
+            return true
+        } catch (e) {
+            console.error('[cpfrStore.updateChainAdjustmentsEnabled]', e)
+            adjustmentsEnabled.value = previous
+            return false
+        } finally {
+            adjustmentsSaving.value = false
         }
     }
 
@@ -494,6 +529,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         sku: CpfrSkuDash,
         direction: 1 | -1
     ): Promise<{ ok: boolean; message?: string }> {
+        if (!adjustmentsEnabled.value) return { ok: false, message: 'Los ajustes manuales están deshabilitados para esta cadena.' }
         if (activeTab.value !== 'revision') return { ok: false, message: 'Solo se puede ajustar en revision.' }
         if (!sku.sku_muliix || !sku.num_pedido || !sku.fec_pedido_cadena) {
             return { ok: false, message: 'Faltan datos del SKU para ajustar.' }
@@ -604,7 +640,8 @@ export const useCpfrStore = defineStore('cpfr', () => {
             await fetchCurrentWeek()
             await Promise.all([
                 loadDashboard(),
-                fetchAllCpfrWeeks()
+                fetchAllCpfrWeeks(),
+                fetchChainAdjustmentsEnabled()
             ])
         } catch (e: any) {
             error.value = 'Error al inicializar el módulo CPFR.'
@@ -968,14 +1005,14 @@ export const useCpfrStore = defineStore('cpfr', () => {
         historialDias, historialLoading, historialLoaded, historialError,
         historialSelectedWeeks, historialSearch, historialPage, historialPageSize, historialPagination,
         approvalIdsByOrder,
-        criterio_global, nom_cadena, filters, overrides, expandedStores,
+        criterio_global, nom_cadena, adjustmentsEnabled, adjustmentsLoading, adjustmentsSaving, filters, overrides, expandedStores,
         statusFilters, viewMode, activeTab, groupByOC,
         // Actions
         init, fetchCurrentWeek, fetchAllCpfrWeeks, loadDashboard, loadHistorial, loadHistorialPage, setHistorialPageSize, recalculate, generateZ8,
         adjustSku, adjustReviewSkuAdjustment, resolveApprovalIdForSku, getCachedApprovalIdForSku, updateStatus, updateStatusBulk,
         toggleStore, expandAll, collapseAll, expandAllOCs, collapseAllOCs,
         setFilter, clearFilters,
-        toggleStatusFilter, clearStatusFilters, setViewMode, setActiveTab, setGroupByOC, setNomCadena,
+        toggleStatusFilter, clearStatusFilters, setViewMode, setActiveTab, setGroupByOC, setNomCadena, fetchChainAdjustmentsEnabled, updateChainAdjustmentsEnabled,
         // Computed
         diaOptions, jefaturaOptions, tiendaOptions,
         // Config de tienda (para CpfrStoreConfigModal)
