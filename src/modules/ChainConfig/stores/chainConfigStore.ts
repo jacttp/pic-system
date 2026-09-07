@@ -172,6 +172,21 @@ export const useChainConfigStore = defineStore('chain-config', () => {
       }
    }
 
+   async function updateStoreAdjustmentsEnabled(idCliente: string, ajustesHabilitados: boolean): Promise<boolean> {
+      saving.value = true;
+      try {
+         await chainConfigApi.updateStoreAdjustmentsEnabled(idCliente, ajustesHabilitados);
+         const row = storeConfigs.value.find(item => item.id_cliente === idCliente);
+         if (row) row.ajustes_habilitados = ajustesHabilitados;
+         return true;
+      } catch (e) {
+         console.error('[chainConfigStore.updateStoreAdjustmentsEnabled]', e);
+         return false;
+      } finally {
+         saving.value = false;
+      }
+   }
+
    async function saveSkuUnit(sku: string, payload: Partial<ChainSkuUnitPayload>) {
       saving.value = true;
       try {
@@ -323,6 +338,7 @@ export const useChainConfigStore = defineStore('chain-config', () => {
       storeOptions,
       init,
       fetchStoreConfigs,
+      updateStoreAdjustmentsEnabled,
       fetchSkuUnits,
       fetchSkuMappings,
       fetchZ8Catalog,

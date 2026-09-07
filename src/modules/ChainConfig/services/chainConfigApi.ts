@@ -43,6 +43,10 @@ export const chainConfigApi = {
       await api.put(`${V2}/cpfr/config/${encodeURIComponent(idCliente)}`, payload);
    },
 
+   async updateStoreAdjustmentsEnabled(idCliente: string, ajustes_habilitados: boolean): Promise<void> {
+      await api.patch(`${V2}/cpfr/config/${encodeURIComponent(idCliente)}/adjustments`, { ajustes_habilitados });
+   },
+
    async getSkuUnits(): Promise<ChainSkuUnit[]> {
       const { data } = await api.get('/cpfr/units');
       return data.data || [];

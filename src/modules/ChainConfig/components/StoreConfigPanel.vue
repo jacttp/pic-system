@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { useChainConfigStore } from '../stores/chainConfigStore';
 import type { ChainStoreConfig } from '../types/chainConfigTypes';
 import { DAY_OPTIONS } from '../utils/chainConfigOptions';
+import { StdSwitch } from '@/modules/Shared/components/std';
 
 const store = useChainConfigStore();
 const search = ref('');
@@ -42,11 +43,16 @@ function markChanged(idCliente: string) {
    modifiedIds.value.add(idCliente);
 }
 
-function resetRow(idCliente: string) {
-   const original = store.storeConfigs.find(row => row.id_cliente === idCliente);
-   if (!original) return;
-   localRows[idCliente] = { ...original };
-   modifiedIds.value.delete(idCliente);
+async function toggleStoreAdjustments(row: ChainStoreConfig, enabled: boolean) {
+   const previous = row.ajustes_habilitados !== false;
+   row.ajustes_habilitados = enabled;
+   const ok = await store.updateStoreAdjustmentsEnabled(row.id_cliente, enabled);
+   if (ok) {
+      message.value = `Ajustes ${enabled ? 'habilitados' : 'deshabilitados'} para ${row.nombre_tienda || row.id_cliente}.`;
+      return;
+   }
+   row.ajustes_habilitados = previous;
+   message.value = 'No se pudo actualizar el ajuste de la tienda.';
 }
 
 async function saveChanges() {
@@ -115,7 +121,7 @@ async function saveChanges() {
                   <th class="w-[9%] px-3 py-3 text-center">Sem. Obj.</th>
                   <th class="w-[9%] px-3 py-3 text-center">Sellout</th>
                   <th class="w-[9%] px-3 py-3 text-center">Factor</th>
-                  <th class="w-[12%] px-4 py-3 text-right">Accion</th>
+                  <th class="w-[12%] px-4 py-3 text-center">Ajuste</th>
                </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
@@ -145,8 +151,14 @@ async function saveChanges() {
                   <td class="px-3 py-3 text-center"><input v-model.number="row.semanas_objetivo" type="number" min="0.5" step="0.5" class="cell-input" @input="markChanged(row.id_cliente)"></td>
                   <td class="px-3 py-3 text-center"><input v-model.number="row.semanas_sellout" type="number" min="1" class="cell-input" @input="markChanged(row.id_cliente)"></td>
                   <td class="px-3 py-3 text-center font-mono text-xs text-slate-500">{{ row.factor_ajuste ?? 'N/D' }}</td>
-                  <td class="px-4 py-3 text-right">
-                     <button v-if="modifiedIds.has(row.id_cliente)" class="text-xs font-bold text-slate-400 hover:text-rose-500" @click="resetRow(row.id_cliente)">Restaurar</button>
+                  <td class="px-4 py-3 text-center">
+                     <StdSwitch
+                        :model-value="row.ajustes_habilitados !== false"
+                        :disabled="store.saving"
+                        size="compact"
+                        :aria-label="`Ajustes manuales para ${row.nombre_tienda || row.id_cliente}`"
+                        @update:model-value="toggleStoreAdjustments(row, $event)"
+                     />
                   </td>
                </tr>
             </tbody>

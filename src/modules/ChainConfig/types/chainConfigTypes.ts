@@ -11,12 +11,13 @@ export interface ChainStoreConfig {
    semanas_objetivo: number;
    semanas_sellout: number;
    factor_ajuste?: number;
+   ajustes_habilitados?: boolean;
    fecha_mod?: string;
 }
 
 export type ChainStoreConfigPayload = Omit<
    ChainStoreConfig,
-   'id_cliente' | 'nombre_tienda' | 'Jefatura' | 'jefatura' | 'factor_ajuste' | 'fecha_mod'
+   'id_cliente' | 'nombre_tienda' | 'Jefatura' | 'jefatura' | 'factor_ajuste' | 'ajustes_habilitados' | 'fecha_mod'
 >;
 
 export interface ChainSkuUnit {
