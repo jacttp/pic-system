@@ -20,6 +20,8 @@ import type {
     CpfrSkuUnit,
     CpfrSkuUnitPayload,
     CpfrHistorialPagination,
+    CpfrCallbookStoreStatus,
+    CpfrCallbookAdjustmentLine,
 } from '../types/cpfrTypes'
 
 export const useCpfrStore = defineStore('cpfr', () => {
@@ -58,6 +60,10 @@ export const useCpfrStore = defineStore('cpfr', () => {
     const adjustmentsEnabled = ref(true)
     const adjustmentsLoading = ref(false)
     const adjustmentsSaving = ref(false)
+    const callbookStatusLoading = ref(false)
+    const callbookStores = reactive<Record<string, CpfrCallbookStoreStatus>>({})
+    const callbookApprovalIds = reactive<Record<string, number>>({})
+    const callbookDetectionError = ref<string | null>(null)
 
     // Filtros activos — se incluyen en el body del POST
     const filters = reactive<CpfrFilters>({
@@ -185,6 +191,84 @@ export const useCpfrStore = defineStore('cpfr', () => {
         preview.value = data.preview === true
         // Expand all stores by default
         expandAll()
+    }
+
+    function applyCallbookStatus(stores: CpfrCallbookStoreStatus[]) {
+        Object.keys(callbookStores).forEach(key => delete callbookStores[key])
+        for (const callbookStore of stores) callbookStores[callbookStore.id_cliente] = callbookStore
+        for (const dia of dias.value) {
+            for (const tienda of dia.tiendas) {
+                const status = callbookStores[tienda.id_cliente]
+                if (!status) continue
+                for (const sku of tienda.skus) {
+                    const product = status.products.find(row => row.sku === sku.sku_muliix)
+                    if (!product) continue
+                    sku.callbook = product
+                    if (product.cantidad_efectiva !== null && product.cantidad_efectiva !== undefined) {
+                        sku.inv_actual_pz = Number(product.cantidad_efectiva)
+                        sku.inv_actual_kg = sku.inv_actual_pz * Number(sku.unidad_inventario || 0)
+                    }
+                }
+                _recalcStoreResumen(tienda)
+            }
+        }
+    }
+
+    async function loadCallbookStatus(): Promise<void> {
+        Object.keys(callbookStores).forEach(key => delete callbookStores[key])
+        Object.keys(callbookApprovalIds).forEach(key => delete callbookApprovalIds[key])
+        if (nom_cadena.value.toUpperCase() !== 'SAMS' || !dias.value.length) return
+        const ids = [...new Set(dias.value.flatMap(dia => dia.tiendas.map(tienda => tienda.id_cliente)))]
+        if (!ids.length) return
+        callbookStatusLoading.value = true
+        try {
+            const result = await cpfrApi.getCallbookStatus(ids)
+            applyCallbookStatus(result.stores || [])
+            callbookDetectionError.value = null
+            try {
+                const approvals = await cpfrApi.detectCallbookAdjustments(ids)
+                for (const approval of approvals) callbookApprovalIds[approval.id_cliente] = approval.approval_id
+            } catch (error: any) {
+                callbookDetectionError.value = error?.response?.data?.message || 'No se pudieron generar las solicitudes de conteo.'
+                console.error('[cpfrStore.detectCallbookAdjustments]', error)
+            }
+        } catch (error) {
+            console.error('[cpfrStore.loadCallbookStatus]', error)
+        } finally {
+            callbookStatusLoading.value = false
+        }
+    }
+
+    function getCallbookStoreStatus(idCliente: string): CpfrCallbookStoreStatus | null {
+        return callbookStores[idCliente] || null
+    }
+
+    async function adjustCallbook(idCliente: string, products: CpfrCallbookAdjustmentLine[], adjustmentId: string): Promise<boolean> {
+        if (!currentWeek.value || nom_cadena.value.toUpperCase() !== 'SAMS') return false
+        const result = await cpfrApi.adjustCallbook({
+            id_cliente: idCliente,
+            year: currentWeek.value.anio,
+            week: currentWeek.value.semana,
+            nom_cadena: 'SAMS',
+            id_ajuste: adjustmentId,
+            products,
+        })
+        for (const dia of dias.value) {
+            const tienda = dia.tiendas.find(row => row.id_cliente === idCliente)
+            if (!tienda) continue
+            for (const row of result.rows || []) {
+                const sku = tienda.skus.find(item => item.sku_muliix === row.sku_muliix && item.num_pedido === row.num_pedido)
+                if (!sku) continue
+                sku.inv_actual_kg = Number(row.inv_actual_kg)
+                sku.inv_actual_pz = Number(row.inv_actual_pz)
+                sku.pedido_sugerido_pz_red = Number(row.pedido_sugerido_pz_red)
+                sku.pedido_sugerido_kg = Number(row.pedido_sugerido_kg)
+                sku.fill_rate = row.fill_rate
+            }
+            _recalcStoreResumen(tienda)
+        }
+        await loadCallbookStatus()
+        return true
     }
 
     function skuYear(sku: CpfrSkuDash): string {
@@ -462,6 +546,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         try {
             const res = await cpfrApi.loadDashboard(buildDashBody())
             applyResponse(res)
+            await loadCallbookStatus()
             await hydrateApprovalAdjustmentsForCurrentTab()
         } catch (e: any) {
             error.value = 'Error al cargar el dashboard CPFR.'
@@ -1001,6 +1086,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
     return {
         // State
         currentWeek, context, dias, loading, preview, error,
+        callbookStatusLoading, callbookStores, callbookApprovalIds, callbookDetectionError,
         z8Loading, z8Result, allCpfrWeeks, weeksLoading,
         historialDias, historialLoading, historialLoaded, historialError,
         historialSelectedWeeks, historialSearch, historialPage, historialPageSize, historialPagination,
@@ -1009,7 +1095,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         statusFilters, viewMode, activeTab, groupByOC,
         // Actions
         init, fetchCurrentWeek, fetchAllCpfrWeeks, loadDashboard, loadHistorial, loadHistorialPage, setHistorialPageSize, recalculate, generateZ8,
-        adjustSku, adjustReviewSkuAdjustment, resolveApprovalIdForSku, getCachedApprovalIdForSku, updateStatus, updateStatusBulk,
+        adjustSku, adjustReviewSkuAdjustment, resolveApprovalIdForSku, getCachedApprovalIdForSku, updateStatus, updateStatusBulk, adjustCallbook, getCallbookStoreStatus, loadCallbookStatus,
         toggleStore, expandAll, collapseAll, expandAllOCs, collapseAllOCs,
         setFilter, clearFilters,
         toggleStatusFilter, clearStatusFilters, setViewMode, setActiveTab, setGroupByOC, setNomCadena, fetchChainAdjustmentsEnabled, updateChainAdjustmentsEnabled,

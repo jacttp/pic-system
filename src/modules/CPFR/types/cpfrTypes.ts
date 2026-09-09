@@ -86,6 +86,64 @@ export interface CpfrSkuDash {
     enviado_pz: number | null
     factor_ajuste: number
     sellout_semanas?: Array<{ semana: number, kg: number }>
+    callbook?: CpfrCallbookProductStatus
+}
+
+export type CpfrCallbookFreshness = 'FRESCO' | 'VENCIDO' | 'SIN_CONTEO' | 'FECHA_FUTURA'
+
+export interface CpfrCallbookProductStatus {
+    sku: string
+    id_auditoria: number | null
+    cantidad_reportada: number | null
+    ajuste: number | null
+    cantidad_efectiva: number | null
+    ult_fecha_reportada: string | null
+    fecha_auditoria: string | null
+    status: CpfrCallbookFreshness
+    is_fresh: boolean
+    age_days: number | null
+    limit_days: number
+}
+
+export interface CpfrCallbookStoreStatus {
+    id_cliente: string
+    blocked: boolean
+    products: CpfrCallbookProductStatus[]
+}
+
+export interface CpfrCallbookStatusResponse {
+    success: boolean
+    business_date: string
+    stores: CpfrCallbookStoreStatus[]
+}
+
+export interface CpfrCallbookAdjustmentLine {
+    sku: string
+    base_audit_id: number
+    ajuste: number
+    confirmed: boolean
+}
+
+export interface CpfrCallbookDetection {
+    approval_id: number
+    id_cliente: string
+    created: boolean
+}
+
+export interface CpfrCallbookAdjustmentResponse {
+    success: boolean
+    id_ajuste: string
+    rows: Array<{
+        id_cliente: string
+        sku_muliix: string
+        num_pedido: string
+        fec_pedido_cadena: string | null
+        inv_actual_kg: number
+        inv_actual_pz: number
+        pedido_sugerido_pz_red: number
+        pedido_sugerido_kg: number
+        fill_rate: number | null
+    }>
 }
 
 /** Resumen de nivel tienda (buildStoreResumen en controller) */

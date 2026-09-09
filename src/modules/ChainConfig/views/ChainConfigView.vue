@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { useChainConfigStore } from '../stores/chainConfigStore';
 import ChainConfigTabs from '../components/ChainConfigTabs.vue';
 import StoreConfigPanel from '../components/StoreConfigPanel.vue';
@@ -8,14 +8,22 @@ import SkuChainMappingPanel from '../components/SkuChainMappingPanel.vue';
 import Z8CatalogPanel from '../components/Z8CatalogPanel.vue';
 import CompletenessPanel from '../components/CompletenessPanel.vue';
 import BulkUploadPanel from '../components/BulkUploadPanel.vue';
+import CallbookFreshnessPanel from '../components/CallbookFreshnessPanel.vue';
 
-type TabId = 'stores' | 'skuUnits' | 'mappings' | 'z8' | 'diagnostics' | 'bulk';
+type TabId = 'stores' | 'skuUnits' | 'mappings' | 'z8' | 'freshness' | 'diagnostics' | 'bulk';
 
 const store = useChainConfigStore();
 const activeTab = ref<TabId>('stores');
+let initialization: Promise<void> | null = null;
 
 onMounted(() => {
-   store.init();
+   initialization = store.init();
+});
+
+watch(activeTab, async tab => {
+   if (tab !== 'freshness' || store.callbookFreshness) return;
+   if (initialization) await initialization;
+   await store.fetchCallbookFreshness();
 });
 </script>
 
@@ -75,6 +83,7 @@ onMounted(() => {
          <SkuUnitsPanel v-else-if="activeTab === 'skuUnits'" />
          <SkuChainMappingPanel v-else-if="activeTab === 'mappings'" />
          <Z8CatalogPanel v-else-if="activeTab === 'z8'" />
+         <CallbookFreshnessPanel v-else-if="activeTab === 'freshness'" />
          <CompletenessPanel v-else-if="activeTab === 'diagnostics'" />
          <BulkUploadPanel v-else />
       </div>

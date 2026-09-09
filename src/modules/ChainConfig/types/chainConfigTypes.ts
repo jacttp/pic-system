@@ -5,6 +5,7 @@ export interface ChainStoreConfig {
    nombre_tienda?: string;
    Jefatura?: string;
    jefatura?: string;
+   Cadena?: string;
    dia_cadena: number;
    dia_ventas: number;
    lead_time: number;
@@ -17,7 +18,7 @@ export interface ChainStoreConfig {
 
 export type ChainStoreConfigPayload = Omit<
    ChainStoreConfig,
-   'id_cliente' | 'nombre_tienda' | 'Jefatura' | 'jefatura' | 'factor_ajuste' | 'ajustes_habilitados' | 'fecha_mod'
+   'id_cliente' | 'nombre_tienda' | 'Jefatura' | 'jefatura' | 'Cadena' | 'factor_ajuste' | 'ajustes_habilitados' | 'fecha_mod'
 >;
 
 export interface ChainSkuUnit {
@@ -44,6 +45,38 @@ export interface ChainPackagingModeSummary {
    rows_to_round: number;
    skipped_mix_rows: number;
    invalid_unit_rows: number;
+}
+
+export type ChainCallbookFreshness = 'FRESCO' | 'VENCIDO' | 'SIN_CONTEO' | 'FECHA_FUTURA';
+
+export interface ChainCallbookProductStatus {
+   matriz: string;
+   sku: string;
+   id_auditoria: number | null;
+   cantidad_reportada: number | null;
+   ajuste: number | null;
+   cantidad_efectiva: number | null;
+   ult_fecha_reportada: string | null;
+   fecha_auditoria: string | null;
+   status: ChainCallbookFreshness;
+   is_fresh: boolean;
+   age_days: number | null;
+   limit_days: number;
+   business_date: string;
+   expires_on: string | null;
+   days_until_expiration: number | null;
+}
+
+export interface ChainCallbookStoreStatus {
+   id_cliente: string;
+   blocked: boolean;
+   products: ChainCallbookProductStatus[];
+}
+
+export interface ChainCallbookStatusResponse {
+   success: boolean;
+   stores: ChainCallbookStoreStatus[];
+   business_date: string;
 }
 
 export interface ChainPackagingModeUpdateResult {

@@ -16,6 +16,7 @@ import type {
    ChainConfigBulkType,
    ChainZ8CatalogItem,
    ChainZ8CatalogPayload,
+   ChainCallbookStatusResponse,
 } from '../types/chainConfigTypes';
 
 export const useChainConfigStore = defineStore('chain-config', () => {
@@ -25,6 +26,8 @@ export const useChainConfigStore = defineStore('chain-config', () => {
    const z8Catalog = ref<ChainZ8CatalogItem[]>([]);
    const diagnostics = ref<ChainConfigDiagnostics | null>(null);
    const packagingModeSummary = ref<ChainPackagingModeSummary | null>(null);
+   const callbookFreshness = ref<ChainCallbookStatusResponse | null>(null);
+   const callbookFreshnessUpdatedAt = ref<string | null>(null);
 
    const loadingStores = ref(false);
    const loadingSkuUnits = ref(false);
@@ -33,8 +36,10 @@ export const useChainConfigStore = defineStore('chain-config', () => {
    const loadingDiagnostics = ref(false);
    const loadingPackagingMode = ref(false);
    const loadingBulk = ref(false);
+   const loadingCallbookFreshness = ref(false);
    const saving = ref(false);
    const error = ref<string | null>(null);
+   const callbookFreshnessError = ref<string | null>(null);
 
    const skuOptions = computed(() =>
       skuUnits.value
@@ -169,6 +174,31 @@ export const useChainConfigStore = defineStore('chain-config', () => {
          return false;
       } finally {
          saving.value = false;
+      }
+   }
+
+   async function fetchCallbookFreshness(): Promise<void> {
+      const clientIds = [...new Set(storeConfigs.value
+         .filter(row => String(row.Cadena || '').trim().toUpperCase() === 'SAMS')
+         .map(row => row.id_cliente)
+         .filter(Boolean))];
+
+      callbookFreshnessError.value = null;
+      if (!clientIds.length) {
+         callbookFreshness.value = { success: true, stores: [], business_date: '' };
+         callbookFreshnessUpdatedAt.value = new Date().toISOString();
+         return;
+      }
+
+      loadingCallbookFreshness.value = true;
+      try {
+         callbookFreshness.value = await chainConfigApi.getCallbookFreshness(clientIds);
+         callbookFreshnessUpdatedAt.value = new Date().toISOString();
+      } catch (e) {
+         callbookFreshnessError.value = 'No se pudo consultar la frescura de Callbook.';
+         console.error('[chainConfigStore.fetchCallbookFreshness]', e);
+      } finally {
+         loadingCallbookFreshness.value = false;
       }
    }
 
@@ -325,6 +355,8 @@ export const useChainConfigStore = defineStore('chain-config', () => {
       z8Catalog,
       diagnostics,
       packagingModeSummary,
+      callbookFreshness,
+      callbookFreshnessUpdatedAt,
       loadingStores,
       loadingSkuUnits,
       loadingMappings,
@@ -332,8 +364,10 @@ export const useChainConfigStore = defineStore('chain-config', () => {
       loadingDiagnostics,
       loadingPackagingMode,
       loadingBulk,
+      loadingCallbookFreshness,
       saving,
       error,
+      callbookFreshnessError,
       skuOptions,
       storeOptions,
       init,
@@ -343,6 +377,7 @@ export const useChainConfigStore = defineStore('chain-config', () => {
       fetchSkuMappings,
       fetchZ8Catalog,
       fetchDiagnostics,
+      fetchCallbookFreshness,
       fetchPackagingMode,
       updatePackagingMode,
       saveStoreConfig,

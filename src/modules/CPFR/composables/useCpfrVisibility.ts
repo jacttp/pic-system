@@ -200,6 +200,8 @@ export function buildVisibleCpfrDias(options: CpfrVisibilityOptions): CpfrDiaDas
                 } else if (activeTab === 'revision') {
                     if ((!isCurrentWeek(sku) && !isPreviousWeek(sku)) || state !== 'revision') return false
                 } else if (activeTab === 'aprobada') {
+                    // Aprobados es una bandeja operativa: conserva OC pendientes de
+                    // salida aunque pertenezcan a semanas anteriores.
                     if (state !== 'aprobado') return false
                 } else if (activeTab === 'sin_embarcar') {
                     if (state !== 'cerrado') return false

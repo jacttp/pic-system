@@ -73,6 +73,7 @@ const isCompactFiltersOpen = ref(false);
 const typeOptions: { value: ApprovalType | ''; label: string }[] = [
    { value: '', label: 'Todos los tipos' },
    { value: 'CPFR_ORDER', label: 'Pedido CPFR' },
+   { value: 'CALLBOOK_ADJUSTMENT', label: 'Ajuste Callbook' },
    { value: 'PROMOTION', label: 'Promocion' },
    { value: 'USER_ROLE_CHANGE', label: 'Cambio de rol' },
    { value: 'REPORT_ACCESS', label: 'Acceso reporte' },
@@ -92,9 +93,18 @@ const isActiveLoading = computed(() =>
 
 const isSuperAdmin = computed(() => authStore.userLevel >= 4);
 const isManager = computed(() => String(authStore.user?.role || '').trim().toLocaleLowerCase('es-MX') === 'gerente');
+function canResolveApproval(approval: Approval): boolean {
+   if (approval.status !== 'PENDING') return false;
+
+   // TEMPORAL PRUEBAS CALLBOOK: retirar esta excepción al habilitar nuevamente
+   // la confirmación para jefe y gerente dentro de su estructura comercial.
+   if (approval.type === 'CALLBOOK_ADJUSTMENT') return isSuperAdmin.value;
+
+   return isSuperAdmin.value || assignedIds.value.has(approval.id);
+}
 const canResolveSelected = computed(() => {
    const approval = selectedApproval.value;
-   return Boolean(approval?.status === 'PENDING' && (isSuperAdmin.value || assignedIds.value.has(approval.id)));
+   return approval ? canResolveApproval(approval) : false;
 });
 
 const unifiedApprovals = computed(() => {
@@ -312,7 +322,8 @@ const handleResolved = () => {
 };
 
 const canCancelApproval = (approval: Approval) =>
-   isSuperAdmin.value && ['PENDING', 'APPROVED'].includes(approval.status);
+   approval.type !== 'CALLBOOK_ADJUSTMENT'
+   && isSuperAdmin.value && ['PENDING', 'APPROVED'].includes(approval.status);
 
 const statusChangeOptions = (approval: Approval): ApprovalStatus[] =>
    canCancelApproval(approval) ? ['CANCELLED'] : [];
@@ -486,7 +497,6 @@ function toApprovalRow(approval: Approval): ApprovalRow {
    };
    const statusConfig = APPROVAL_STATUS_CONFIG[approval.status] || APPROVAL_STATUS_CONFIG.PENDING;
    const requestedAt = new Date(approval.requestedAt);
-   const isAssigned = assignedIds.value.has(approval.id);
    const embarque = buildEmbarqueInfo(approval);
 
    return {
@@ -500,7 +510,7 @@ function toApprovalRow(approval: Approval): ApprovalRow {
       embarqueLabel: embarque.label,
       embarqueTone: embarque.tone,
       embarqueStatusLabel: embarque.statusLabel,
-      canResolve: approval.status === 'PENDING' && (isSuperAdmin.value || isAssigned),
+      canResolve: canResolveApproval(approval),
    };
 }
 
@@ -518,6 +528,7 @@ function normalizeSearchText(value: string): string {
 }
 
 function buildOrderLabel(approval: Approval) {
+   if (approval.type === 'CALLBOOK_ADJUSTMENT') return 'Catálogo z8';
    const payload = approval.payload || {};
    if (Array.isArray(payload.num_pedidos)) {
       return payload.num_pedidos.map(item => String(item)).join(', ');
@@ -526,6 +537,15 @@ function buildOrderLabel(approval: Approval) {
 }
 
 function buildEmbarqueInfo(approval: Approval) {
+   if (approval.type === 'CALLBOOK_ADJUSTMENT') {
+      const raw = readPayloadValue(approval.payload || {}, ['oldest_reported_date']);
+      const date = raw ? new Date(`${raw}T12:00:00`) : null;
+      return {
+         label: date && !Number.isNaN(date.getTime()) ? formatDate(date) : 'Sin conteo',
+         statusLabel: approval.status === 'PENDING' ? 'Requiere verificación' : 'Conteo atendido',
+         tone: approval.status === 'PENDING' ? 'warning' as const : 'neutral' as const,
+      };
+   }
    const date = getEmbarqueDate(approval);
 
    if (!date) {
@@ -879,9 +899,9 @@ function formatTime(date: Date) {
                                     <i :class="row.typeIcon"></i>
                                  </span>
                                  <span class="min-w-0">
-                                    <span class="block text-[10px] font-bold text-pic-text-muted">{{ row.approval.type === 'CPFR_ORDER' ? 'Pedido CPFR' : 'Solicitud' }}</span>
+                                    <span class="block text-[10px] font-bold text-pic-text-muted">{{ APPROVAL_TYPE_CONFIG[row.approval.type]?.label || 'Solicitud' }}</span>
                                     <span class="mt-0.5 block text-base font-black leading-5 text-pic-text-main sm:text-lg">{{ row.storeName }}</span>
-                                    <span class="mt-1 block break-words text-xs font-semibold leading-5 text-pic-text-muted">OC {{ row.orderLabel }}</span>
+                                    <span class="mt-1 block break-words text-xs font-semibold leading-5 text-pic-text-muted">{{ row.approval.type === 'CALLBOOK_ADJUSTMENT' ? row.orderLabel : `OC ${row.orderLabel}` }}</span>
                                  </span>
                               </button>
                               <ApprovalStatusSelector

@@ -8,6 +8,8 @@ import type {
    CpfrApprovalDetail,
    CpfrZ8ConversionLine,
    CpfrZ8ConversionResponse,
+   CallbookApprovalDetail,
+   CallbookConfirmationLine,
 } from '../types/approval.types';
 
 const mapApproval = (row: any): Approval => ({
@@ -46,6 +48,19 @@ export const approvalsApi = {
 
    async getCpfrOrderDetail(id: number): Promise<CpfrApprovalDetail> {
       const { data } = await api.get(`/v2/approvals/${id}/cpfr-order-detail`);
+      return data.data;
+   },
+
+   async getCallbookDetail(id: number): Promise<CallbookApprovalDetail> {
+      const { data } = await api.get(`/v2/approvals/${id}/callbook-detail`);
+      return data.data;
+   },
+
+   async confirmCallbook(id: number, payload: {
+      id_ajuste: string
+      products: CallbookConfirmationLine[]
+   }): Promise<CallbookApprovalDetail> {
+      const { data } = await api.post(`/v2/approvals/${id}/callbook-confirm`, payload);
       return data.data;
    },
 

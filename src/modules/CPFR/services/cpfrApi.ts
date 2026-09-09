@@ -23,6 +23,10 @@ import type {
     CpfrSkuUnitPayload,
     CpfrInventoryHistoryRecord,
     CpfrYoySalesPoint,
+    CpfrCallbookStatusResponse,
+    CpfrCallbookAdjustmentLine,
+    CpfrCallbookAdjustmentResponse,
+    CpfrCallbookDetection,
 } from '../types/cpfrTypes'
 
 import type { CpfrDashZ8Response } from '../types/cpfrZ8Types'
@@ -114,6 +118,28 @@ export const cpfrApi = {
 
     async updateStatusBulk(body: CpfrBulkUpdateStatusBody): Promise<CpfrUpdateStatusResponse> {
         const { data } = await api.patch('/cpfr/orders/status/bulk', body)
+        return data
+    },
+
+    async getCallbookStatus(client_ids: string[]): Promise<CpfrCallbookStatusResponse> {
+        const { data } = await api.post('/cpfr/callbook/status', { client_ids })
+        return data
+    },
+
+    async detectCallbookAdjustments(client_ids: string[]): Promise<CpfrCallbookDetection[]> {
+        const { data } = await api.post('/cpfr/callbook/detect', { client_ids })
+        return data.approvals || []
+    },
+
+    async adjustCallbook(body: {
+        id_cliente: string
+        year: number
+        week: number
+        nom_cadena: string
+        id_ajuste: string
+        products: CpfrCallbookAdjustmentLine[]
+    }): Promise<CpfrCallbookAdjustmentResponse> {
+        const { data } = await api.post('/cpfr/callbook/adjust-and-recalculate', body)
         return data
     },
 

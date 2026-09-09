@@ -5,6 +5,7 @@ export type ApprovalType =
    | 'USER_ROLE_CHANGE'
    | 'REPORT_ACCESS'
    | 'CPFR_ORDER'
+   | 'CALLBOOK_ADJUSTMENT'
 
 export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
 
@@ -109,6 +110,37 @@ export interface CpfrZ8ConversionResponse {
    detail: CpfrApprovalDetail
 }
 
+export interface CallbookApprovalProduct {
+   sku: string
+   sku_nombre: string
+   id_auditoria: number | null
+   cantidad_reportada: number | null
+   ajuste: number | null
+   cantidad_efectiva: number | null
+   ult_fecha_reportada: string | null
+   fecha_auditoria: string | null
+   status: 'FRESCO' | 'VENCIDO' | 'SIN_CONTEO' | 'FECHA_FUTURA'
+   is_fresh: boolean
+}
+
+export interface CallbookApprovalDetail {
+   id_cliente: string
+   nombre_tienda: string
+   business_date: string
+   oldest_reported_date: string | null
+   products: CallbookApprovalProduct[]
+   historical: boolean
+   id_ajuste?: string
+   recalculated_rows?: unknown[]
+}
+
+export interface CallbookConfirmationLine {
+   sku: string
+   base_audit_id: number
+   ajuste: number
+   confirmed: true
+}
+
 // Labels y colores para UI
 export const APPROVAL_STATUS_CONFIG: Record<ApprovalStatus, { label: string; color: string; bg: string; icon: string }> = {
    PENDING: { label: 'Pendiente', color: 'text-pic-brand', bg: 'bg-pic-brand-soft border-pic-brand-border', icon: 'fa-solid fa-clock' },
@@ -122,4 +154,5 @@ export const APPROVAL_TYPE_CONFIG: Record<string, { label: string; color: string
    USER_ROLE_CHANGE: { label: 'Cambio de Rol', color: 'text-blue-600', icon: 'fa-solid fa-user-gear' },
    REPORT_ACCESS: { label: 'Acceso Reporte', color: 'text-teal-600', icon: 'fa-solid fa-file-shield' },
    CPFR_ORDER: { label: 'Pedido CPFR', color: 'text-indigo-600', icon: 'fa-solid fa-truck-fast' },
+   CALLBOOK_ADJUSTMENT: { label: 'Ajuste Callbook', color: 'text-pic-warning', icon: 'fa-solid fa-clipboard-check' },
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-type TabId = 'stores' | 'skuUnits' | 'mappings' | 'z8' | 'diagnostics' | 'bulk';
+type TabId = 'stores' | 'skuUnits' | 'mappings' | 'z8' | 'freshness' | 'diagnostics' | 'bulk';
 
 defineProps<{
    activeTab: TabId;
@@ -14,13 +14,14 @@ const tabs: Array<{ id: TabId; label: string; icon: string; detail: string }> = 
    { id: 'skuUnits', label: 'Unidades SKU', icon: 'fa-solid fa-scale-balanced', detail: 'Conversiones operativas' },
    { id: 'mappings', label: 'SKU por Cadena', icon: 'fa-solid fa-link', detail: 'UPC y nombres externos' },
    { id: 'z8', label: 'Catalogo Z8', icon: 'fa-solid fa-layer-group', detail: 'Permisos y pares de resurtido' },
+   { id: 'freshness', label: 'Frescura Sellout', icon: 'fa-solid fa-hourglass-half', detail: 'Conteos operativos Sams' },
    { id: 'diagnostics', label: 'Validacion', icon: 'fa-solid fa-triangle-exclamation', detail: 'Faltantes y duplicados' },
    { id: 'bulk', label: 'Carga Masiva', icon: 'fa-solid fa-file-import', detail: 'Plantillas y prevalidacion' },
 ];
 </script>
 
 <template>
-   <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3">
+   <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7 gap-3">
       <button
          v-for="tab in tabs"
          :key="tab.id"

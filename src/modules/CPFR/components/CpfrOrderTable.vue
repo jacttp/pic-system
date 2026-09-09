@@ -1,6 +1,7 @@
 ﻿<script setup lang="ts">
 // src/modules/CPFR/components/CpfrOrderTable.vue
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useRouter } from 'vue-router'
 
 defineOptions({
   inheritAttrs: false
@@ -21,6 +22,7 @@ import {
 } from '../utils/shipmentDeadline'
 
 const showZ8Panel = ref(false)
+const router = useRouter()
 const selectedProductContext = ref<{ tienda: CpfrStoreDash; sku: CpfrSkuDash } | null>(null)
 
 const store = useCpfrStore()
@@ -133,9 +135,91 @@ const savedId   = ref<string | null>(null)
 const submittingOC = ref<string | null>(null)
 const adjustingSkuKey = ref<string | null>(null)
 
-function startEdit(sku: CpfrSkuDash) {
+function callbookStatus(tienda: CpfrStoreDash) {
+    return store.getCallbookStoreStatus(tienda.id_cliente)
+}
+
+function isCallbookBlocked(tienda: CpfrStoreDash) {
+    // TEMPORAL: Revisión permite abrir el ajuste para operar OCs que ya se
+    // enviaron. Retirar esta excepción al integrar el flujo de solicitudes.
+    return ['centralizados', 'revision'].includes(currentTab.value) && store.nom_cadena === 'SAMS' && (
+        store.callbookStatusLoading || callbookStatus(tienda)?.blocked === true
+    )
+}
+
+function formatCallbookDate(value: string | null | undefined): string {
+    if (!value) return 'sin fecha'
+    const date = new Date(`${String(value).slice(0, 10)}T12:00:00`)
+    if (Number.isNaN(date.getTime())) return 'sin fecha'
+    return date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }).replace('.', '')
+}
+
+function callbookBadge(tienda: CpfrStoreDash): { label: string; title: string; cls: string; icon: string } | null {
+    if (store.nom_cadena.trim().toUpperCase() !== 'SAMS') return null
+    const status = callbookStatus(tienda)
+    if (store.callbookStatusLoading) {
+        return {
+            label: 'Callbook · consultando',
+            title: 'Consultando la última fecha reportada de los SKU resurtibles de la tienda.',
+            cls: 'border-slate-200 bg-slate-50 text-slate-500',
+            icon: 'fa-solid fa-circle-notch fa-spin',
+        }
+    }
+    if (!status?.products.length) {
+        return {
+            label: 'Callbook · sin datos',
+            title: 'No se obtuvo información de Callbook para los SKU resurtibles de esta tienda.',
+            cls: 'border-[#cbb596] bg-[#f4eee5] text-[#75563b]',
+            icon: 'fa-solid fa-circle-exclamation',
+        }
+    }
+    const blockingProducts = status.products.filter(product => !product.is_fresh)
+    // La etiqueta representa la revisión completa del catálogo: siempre usa
+    // el conteo disponible más antiguo, incluso si otro SKU es el que bloquea.
+    const dated = status.products
+        .filter(product => product.ult_fecha_reportada)
+        .sort((a, b) => String(a.ult_fecha_reportada).localeCompare(String(b.ult_fecha_reportada)))
+    const missingCount = status.products.filter(product => !product.ult_fecha_reportada).length
+    const date = dated[0]?.ult_fecha_reportada || null
+    if (!status.blocked) {
+        return {
+            label: `Callbook · ${formatCallbookDate(date)}`,
+            title: `Conteo fresco. Fecha más antigua validada: ${date || 'sin fecha'}.`,
+            cls: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+            icon: 'fa-solid fa-leaf',
+        }
+    }
+    return {
+        label: `Callbook · ${missingCount ? 'sin conteo' : formatCallbookDate(date)}`,
+        title: missingCount
+            ? `${missingCount} producto(s) resurtible(s) no tienen conteo; requiere verificación.`
+            : `Conteo vencido. Fecha que bloquea la tienda: ${date || 'sin fecha'}.`,
+        cls: 'border-[#cbb596] bg-[#f4eee5] text-[#75563b]',
+        icon: 'fa-solid fa-hourglass-half',
+    }
+}
+
+async function openCallbookApproval(tienda: CpfrStoreDash) {
+    let approvalId = store.callbookApprovalIds[tienda.id_cliente]
+    if (!approvalId) {
+        await store.loadCallbookStatus()
+        approvalId = store.callbookApprovalIds[tienda.id_cliente]
+    }
+    if (!approvalId) {
+        toast({
+            title: 'Solicitud aún no disponible',
+            description: store.callbookDetectionError || 'La detección no generó una solicitud para esta tienda y día.',
+            variant: 'destructive',
+        })
+        return
+    }
+    await router.push({ path: '/admin/approvals', query: { approvalId: String(approvalId) } })
+}
+
+function startEdit(sku: CpfrSkuDash, idCliente?: string) {
     if (currentTab.value !== 'centralizados') return;
     if (sku.no_resurtible_adjusted) return;
+    if (idCliente && store.getCallbookStoreStatus(idCliente)?.blocked) return;
     if (!sku.sku_muliix) return;
     editingId.value = sku.sku_muliix
     editValue.value = sku.pedido_sugerido_pz_red
@@ -1353,6 +1437,13 @@ const totalUniqueOCs = computed(() => {
 </script>
 
 <template>
+  <div
+    v-if="store.callbookDetectionError && store.nom_cadena === 'SAMS'"
+    class="mb-3 flex items-center justify-between gap-3 rounded-lg border border-[hsl(var(--pic-warning)/0.28)] bg-[hsl(var(--pic-warning)/0.08)] px-3 py-2 text-xs font-semibold text-pic-warning"
+  >
+    <span><i class="fa-solid fa-triangle-exclamation mr-2"></i>{{ store.callbookDetectionError }}</span>
+    <button type="button" class="shrink-0 font-black underline" @click="store.loadCallbookStatus">Reintentar</button>
+  </div>
   <!-- Envoltura principal: Ahora incluye la Toolbar y la Tabla, con bordes redondeados y sombra sutil -->
   <div 
     v-bind="$attrs"
@@ -1759,6 +1850,12 @@ const totalUniqueOCs = computed(() => {
                   ></i>
                   <div class="min-w-0">
                     <p class="truncate text-sm font-black text-slate-800">{{ tienda.nombre_tienda }}</p>
+                    <span
+                      v-if="callbookBadge(tienda)"
+                      class="mt-1 inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide"
+                      :class="callbookBadge(tienda)!.cls"
+                      :title="callbookBadge(tienda)!.title"
+                    ><i :class="callbookBadge(tienda)!.icon"></i>{{ callbookBadge(tienda)!.label }}</span>
                     <p class="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-600">{{ tienda.jefatura }}</p>
                   </div>
                 </div>
@@ -2055,6 +2152,14 @@ const totalUniqueOCs = computed(() => {
                         <div class="min-w-0">
                           <div class="flex items-center gap-2 min-w-0">
                             <p class="font-bold text-slate-800 truncate leading-tight">{{ tienda.nombre_tienda }}</p>
+                            <span
+                              v-if="callbookBadge(tienda)"
+                              class="inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide"
+                              :class="callbookBadge(tienda)!.cls"
+                              :title="callbookBadge(tienda)!.title"
+                            >
+                              <i :class="callbookBadge(tienda)!.icon"></i>{{ callbookBadge(tienda)!.label }}
+                            </span>
                             <div
                               v-if="currentTab === 'centralizados' && storeVisibleStatusBadge(tienda.skus) && getVisibleEditableOCNumbers(tienda.skus).length"
                               class="relative shrink-0"
@@ -2097,6 +2202,14 @@ const totalUniqueOCs = computed(() => {
                                 </button>
                               </div>
                             </div>
+                            <button
+                              v-if="isCallbookBlocked(tienda) && store.callbookApprovalIds[tienda.id_cliente]"
+                              class="inline-flex h-6 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 text-[9px] font-black uppercase tracking-wide text-amber-800"
+                              title="El pedido sugerido está bloqueado hasta verificar el conteo Callbook."
+                              @click.stop="openCallbookApproval(tienda)"
+                            >
+                              <i class="fa-solid fa-clipboard-check"></i> Atender solicitud
+                            </button>
                           </div>
                           <p class="text-[10px] text-brand-600 mt-0.5 font-bold uppercase tracking-wider">
                             {{ tienda.jefatura }}
@@ -2310,13 +2423,13 @@ const totalUniqueOCs = computed(() => {
                           <td class="px-2.5 py-2 text-slate-500 text-[10px] font-mono truncate">{{ sku.upc_cadena ?? '—' }}</td>
 
                           <!-- Inv. Actual (pz) -->
-                          <td class="px-2.5 py-2 text-right text-slate-700 cursor-help"
+                          <td class="px-2.5 py-2 text-right cursor-help" :class="sku.callbook && !sku.callbook.is_fresh ? 'bg-amber-50 text-amber-900' : 'text-slate-700'"
                               :title="`${n(sku.inv_actual_kg, 2)} kg (Inv. uni. = ${sku.unidad_inventario} kg/pz)`">
                             <span class="border-b border-dashed border-slate-300">{{ n(sku.inv_actual_pz, 2) }}</span>
                           </td>
 
                           <!-- Vta. Prom. Semanal (pz) -->
-                          <td class="px-2.5 py-2 text-right text-slate-700 relative cursor-pointer group/cell hover:bg-slate-100 transition-colors rounded-lg"
+                          <td class="px-2.5 py-2 text-right relative cursor-pointer group/cell hover:bg-slate-100 transition-colors rounded-lg" :class="sku.callbook && !sku.callbook.is_fresh ? 'bg-amber-50 text-amber-900' : 'text-slate-700'"
                               @click.stop="toggleSellout(tienda.id_cliente + '_' + sku.sku_cadena)">
                             
                             <div class="cursor-help" :title="`${n(sku.promedio_sellout_kg, 2)} kg (Inv. uni. = ${sku.unidad_inventario} kg/pz)`">
@@ -2406,8 +2519,8 @@ const totalUniqueOCs = computed(() => {
                               :title="esSinSellout(sku)
                                 ? '⚠️ Sin sellout promedio — producto nuevo o sin histórico. Se usa el pedido cadena como referencia.'
                                 : 'Clic para editar cantidad'"
-                              :disabled="sku.no_resurtible_adjusted"
-                              @click="startEdit(sku)"
+                              :disabled="sku.no_resurtible_adjusted || isCallbookBlocked(tienda)"
+                              @click="startEdit(sku, tienda.id_cliente)"
                             >
                               <span class="flex items-center gap-1">
                                 <i v-if="sku.no_resurtible_adjusted" class="fa-solid fa-ban text-[10px] text-violet-600"></i>
@@ -2656,8 +2769,8 @@ const totalUniqueOCs = computed(() => {
                             :title="esSinSellout(sku)
                               ? '⚠️ Sin sellout promedio — producto nuevo o sin histórico. Se usa el pedido cadena como referencia.'
                               : 'Clic para editar cantidad'"
-                            :disabled="sku.no_resurtible_adjusted"
-                            @click="startEdit(sku)"
+                              :disabled="sku.no_resurtible_adjusted || isCallbookBlocked(tienda)"
+                              @click="startEdit(sku, tienda.id_cliente)"
                           >
                             <span class="flex items-center gap-1">
                               <i v-if="sku.no_resurtible_adjusted" class="fa-solid fa-ban text-[10px] text-violet-600"></i>
@@ -2775,6 +2888,12 @@ const totalUniqueOCs = computed(() => {
                                     </div>
                                     <div class="min-w-0">
                                         <h3 class="font-black text-slate-800 text-lg leading-tight truncate group-hover/card:text-brand-700 transition-colors">{{ tienda.nombre_tienda }}</h3>
+                                        <span
+                                          v-if="callbookBadge(tienda)"
+                                          class="mt-1 inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide"
+                                          :class="callbookBadge(tienda)!.cls"
+                                          :title="callbookBadge(tienda)!.title"
+                                        ><i :class="callbookBadge(tienda)!.icon"></i>{{ callbookBadge(tienda)!.label }}</span>
                                         <p class="text-[10px] text-slate-500 font-bold flex items-center gap-1.5 mt-0.5 uppercase tracking-wide">
                                             <i class="fa-solid fa-location-dot text-slate-300"></i>
                                             {{ tienda.jefatura }}
@@ -3072,7 +3191,7 @@ const totalUniqueOCs = computed(() => {
                                                                   <i :class="saving ? 'fa-solid fa-circle-notch fa-spin text-[10px]' : 'fa-solid fa-check text-[11px]'"></i>
                                                                 </button>
                                                             </div>
-                                                            <button v-else-if="currentTab === 'centralizados'" :disabled="sku.no_resurtible_adjusted" @click="startEdit(sku)" class="h-7 w-[70px] bg-white border border-slate-200 hover:border-brand-400 rounded-lg flex items-center justify-center gap-1 transition-all group/edit disabled:cursor-not-allowed disabled:border-violet-200 disabled:bg-violet-50" :class="{ 'ring-2 ring-emerald-400 border-transparent bg-emerald-50': savedId === sku.sku_muliix }" :title="sku.no_resurtible_adjusted ? 'Sugerencia CPRF anulada: este SKU está marcado como NoResurtible para la tienda.' : 'Clic para editar cantidad'">
+                                    <button v-else-if="currentTab === 'centralizados'" :disabled="sku.no_resurtible_adjusted || isCallbookBlocked(tienda)" @click="startEdit(sku, tienda.id_cliente)" class="h-7 w-[70px] bg-white border border-slate-200 hover:border-brand-400 rounded-lg flex items-center justify-center gap-1 transition-all group/edit disabled:cursor-not-allowed disabled:border-violet-200 disabled:bg-violet-50" :class="{ 'ring-2 ring-emerald-400 border-transparent bg-emerald-50': savedId === sku.sku_muliix }" :title="isCallbookBlocked(tienda) ? 'Conteo Callbook vencido: actualiza el conteo para editar.' : (sku.no_resurtible_adjusted ? 'Sugerencia CPRF anulada: este SKU está marcado como NoResurtible para la tienda.' : 'Clic para editar cantidad')">
                                                                 <i v-if="sku.no_resurtible_adjusted" class="fa-solid fa-ban text-[8px] text-violet-600 shrink-0"></i>
                                                                 <i v-else-if="esSinSellout(sku)" class="fa-solid fa-seedling text-[8px] text-amber-500 shrink-0"></i>
                                                                 <span class="text-[12px] font-black truncate" :class="sku.pedido_sugerido_pz_red > 0 ? 'text-brand-700' : 'text-slate-800'">{{ n(sku.pedido_sugerido_pz_red, 0) }}</span>

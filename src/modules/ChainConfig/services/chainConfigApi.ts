@@ -14,6 +14,7 @@ import type {
    ChainConfigBulkType,
    ChainZ8CatalogItem,
    ChainZ8CatalogPayload,
+   ChainCallbookStatusResponse,
 } from '../types/chainConfigTypes';
 import { normalizeChain, normalizeZ8Permission } from '../utils/chainConfigOptions';
 
@@ -123,6 +124,11 @@ export const chainConfigApi = {
    async getDiagnostics(): Promise<ChainConfigDiagnostics> {
       const { data } = await api.get(`${V2}/chain-config/diagnostics`);
       return data.data;
+   },
+
+   async getCallbookFreshness(clientIds: string[]): Promise<ChainCallbookStatusResponse> {
+      const { data } = await api.post('/cpfr/callbook/status', { client_ids: clientIds });
+      return data;
    },
 
    async previewBulk(type: ChainConfigBulkType, rows: Record<string, unknown>[]): Promise<ChainConfigBulkSummary> {

@@ -11,6 +11,7 @@ import { cpfrApi } from '@/modules/CPFR/services/cpfrApi';
 import { toast } from '@/components/ui/toast/use-toast';
 import { StdAlert, StdButton } from '@/modules/Shared/components/std';
 import ApprovalStatusSelector from './ApprovalStatusSelector.vue';
+import CallbookAdjustmentDetail from './CallbookAdjustmentDetail.vue';
 import logoUrl from '@/assets/logo.png';
 
 const props = withDefaults(defineProps<{
@@ -1259,7 +1260,14 @@ const handleCancel = async () => {
 
 <template>
    <section v-if="modelValue && approval" class="space-y-4">
-      <div class="space-y-4">
+      <CallbookAdjustmentDetail
+         v-if="approval.type === 'CALLBOOK_ADJUSTMENT'"
+         :approval="approval"
+         :can-resolve="canResolve"
+         @close="closeModal"
+         @resolved="emit('resolved')"
+      />
+      <div v-else class="space-y-4">
 
          <!-- Header visual -->
          <div v-if="approval.type !== 'CPFR_ORDER'" class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
