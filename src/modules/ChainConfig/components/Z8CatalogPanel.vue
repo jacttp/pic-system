@@ -8,6 +8,7 @@ const store = useChainConfigStore();
 const storeSearch = ref('');
 const skuPairSearch = ref('');
 const selectedPermission = ref<string>('');
+const selectedChain = ref<string>('');
 const editingId = ref<number | null>(null);
 const expandedStores = ref<Set<string>>(new Set());
 const message = ref('');
@@ -30,12 +31,21 @@ const editForm = reactive<ChainZ8CatalogPayload>({
    mixpar: null,
 });
 
+const availableChains = computed(() =>
+   Array.from(new Set(
+      store.z8Catalog
+         .map(item => item.Cadena?.trim())
+         .filter((chain): chain is string => Boolean(chain))
+   )).sort((a, b) => a.localeCompare(b))
+);
+
 const filteredItems = computed(() => {
    const storeQuery = storeSearch.value.trim().toLowerCase();
    const skuPairQuery = skuPairSearch.value.trim().toLowerCase();
 
    return store.z8Catalog.filter(item => {
       const matchesPermission = !selectedPermission.value || item.permiso_oc === selectedPermission.value;
+      const matchesChain = !selectedChain.value || item.Cadena?.trim() === selectedChain.value;
       const matchesStore = !storeQuery ||
          item.id_cliente.toLowerCase().includes(storeQuery) ||
          (item.nombre_tienda || '').toLowerCase().includes(storeQuery);
@@ -45,7 +55,7 @@ const filteredItems = computed(() => {
          (item.par_muliix || '').toLowerCase().includes(skuPairQuery) ||
          (item.par_nombre || '').toLowerCase().includes(skuPairQuery);
 
-      return matchesPermission && matchesStore && matchesSkuPair;
+      return matchesPermission && matchesChain && matchesStore && matchesSkuPair;
    });
 });
 
@@ -88,7 +98,7 @@ const noResurtibleCount = computed(() =>
    store.z8Catalog.filter(item => item.permiso_oc === 'NoResurtible').length
 );
 
-watch([storeSearch, skuPairSearch, selectedPermission], () => {
+watch([storeSearch, skuPairSearch, selectedPermission, selectedChain], () => {
    expandedStores.value = new Set();
 });
 
@@ -177,12 +187,19 @@ function toggleStore(idCliente: string) {
             <h2 class="text-sm font-black text-slate-800 uppercase tracking-tight">Catalogo Z8</h2>
             <p class="text-xs text-slate-500">Asocia tiendas existentes con SKUs internos y permisos Z8.</p>
          </div>
-         <div class="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-[11rem_15rem_15rem]">
+         <div class="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-[11rem_11rem_15rem_15rem]">
             <label class="block">
                <span class="field-label">Permiso OC</span>
                <select v-model="selectedPermission" class="control w-full">
                   <option value="">Todos los permisos</option>
                   <option v-for="permission in Z8_PERMISSION_OPTIONS" :key="permission" :value="permission">{{ permission }}</option>
+               </select>
+            </label>
+            <label class="block">
+               <span class="field-label">Cadena</span>
+               <select v-model="selectedChain" class="control w-full">
+                  <option value="">Todas las cadenas</option>
+                  <option v-for="chain in availableChains" :key="chain" :value="chain">{{ chain }}</option>
                </select>
             </label>
             <label class="block">

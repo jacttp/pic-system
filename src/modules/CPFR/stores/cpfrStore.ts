@@ -580,9 +580,9 @@ export const useCpfrStore = defineStore('cpfr', () => {
         id_cliente: string, sku_muliix: string, anio: number, semana_ic: string,
         num_pedido: string | null, fec_pedido_cadena: string | null,
         body: { cantidad_final_pz: number, fill_rate?: number | null, factor_ajuste?: number }
-    ): Promise<boolean> {
+    ): Promise<{ ok: boolean, message?: string }> {
         try {
-            await cpfrApi.adjustSku({ id_cliente, sku_muliix, anio, semana_ic, num_pedido, fec_pedido_cadena, ...body })
+            const response = await cpfrApi.adjustSku({ id_cliente, sku_muliix, anio, semana_ic, num_pedido, fec_pedido_cadena, ...body })
             // Actualizar localmente sin re-fetch completo
             for (const dia of dias.value) {
                 const tiendaRow = dia.tiendas.find(t => t.id_cliente === id_cliente)
@@ -593,7 +593,13 @@ export const useCpfrStore = defineStore('cpfr', () => {
                         s.fec_pedido_cadena === fec_pedido_cadena
                     )
                     if (sku) {
-                        sku.pedido_sugerido_pz_red = body.cantidad_final_pz
+                        const persisted = response.data
+                        sku.pedido_sugerido_pz_red = persisted?.cantidad_final_pz ?? body.cantidad_final_pz
+                        if (persisted) {
+                            sku.cantidad_base_uni = persisted.cantidad_base_uni
+                            sku.ajuste = persisted.ajuste
+                            sku.ajuste_mix = persisted.ajuste_mix
+                        }
                         if (body.semanas_objetivo != null) sku.semanas_objetivo = body.semanas_objetivo
                         if (body.enviado_pz != null) sku.enviado_pz = body.enviado_pz
                         if (body.fill_rate !== undefined) sku.fill_rate = body.fill_rate
@@ -602,10 +608,10 @@ export const useCpfrStore = defineStore('cpfr', () => {
                     break
                 }
             }
-            return true
+            return { ok: true }
         } catch (e: any) {
             console.error('[cpfrStore.adjustSku]', e)
-            return false
+            return { ok: false, message: e?.response?.data?.message || 'No se pudo guardar el pedido sugerido.' }
         }
     }
 

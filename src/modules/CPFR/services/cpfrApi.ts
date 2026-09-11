@@ -98,7 +98,16 @@ export const cpfrApi = {
      * PATCH /api/cpfr/order/adjust
      * Ajuste manual de un SKU.
      */
-    async adjustSku(body: any): Promise<{ success: boolean; message: string }> {
+    async adjustSku(body: any): Promise<{
+        success: boolean
+        message: string
+        data?: {
+            cantidad_final_pz: number
+            cantidad_base_uni: number
+            ajuste: number
+            ajuste_mix: number
+        }
+    }> {
         const { data } = await api.patch('/cpfr/order/adjust', body)
         return data
     },

@@ -251,11 +251,9 @@ async function confirmEdit(sku: CpfrSkuDash, id_cliente: string) {
     if (finalValue === sku.pedido_sugerido_pz_red) { cancelEdit(); return }
     
     saving.value = true;
-    sku.pedido_sugerido_pz_red = finalValue;
+    const newFillRate = sku.cant_pedida > 0 ? finalValue / sku.cant_pedida : null;
 
-    const newFillRate = calcularFillRateDinamico(sku);
-
-    const ok = await store.adjustSku(
+    const result = await store.adjustSku(
         id_cliente,
         sku.sku_muliix!,
         store.currentWeek!.anio,
@@ -269,7 +267,16 @@ async function confirmEdit(sku: CpfrSkuDash, id_cliente: string) {
         }
     )
     saving.value = false
-    if (ok) { savedId.value = sku.sku_muliix; setTimeout(() => { savedId.value = null }, 1800) }
+    if (result.ok) {
+        savedId.value = sku.sku_muliix
+        setTimeout(() => { savedId.value = null }, 1800)
+    } else {
+        toast({
+            title: 'No se guardó el pedido sugerido',
+            description: result.message,
+            variant: 'destructive',
+        })
+    }
     editingId.value = null
 }
 
