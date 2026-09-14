@@ -95,11 +95,6 @@ const isSuperAdmin = computed(() => authStore.userLevel >= 4);
 const isManager = computed(() => String(authStore.user?.role || '').trim().toLocaleLowerCase('es-MX') === 'gerente');
 function canResolveApproval(approval: Approval): boolean {
    if (approval.status !== 'PENDING') return false;
-
-   // TEMPORAL PRUEBAS CALLBOOK: retirar esta excepción al habilitar nuevamente
-   // la confirmación para jefe y gerente dentro de su estructura comercial.
-   if (approval.type === 'CALLBOOK_ADJUSTMENT') return isSuperAdmin.value;
-
    return isSuperAdmin.value || assignedIds.value.has(approval.id);
 }
 const canResolveSelected = computed(() => {
