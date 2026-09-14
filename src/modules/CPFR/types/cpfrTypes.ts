@@ -146,6 +146,26 @@ export interface CpfrCallbookAdjustmentResponse {
     }>
 }
 
+export interface CpfrForceFillrateResult {
+    nom_cadena: 'SAMS'
+    year: number
+    week: number
+    dia: number
+    requested_stores: number
+    enabled_stores: number
+    disabled_stores: number
+    matched_skus: number
+    updated_skus: number
+    updated_orders: number
+    excluded_no_resurtible_skus: number
+    updated_rows: Array<{
+        pedido_generado_id: number
+        id_cliente: string
+        num_pedido: string
+        cantidad_final_uni: number
+    }>
+}
+
 /** Resumen de nivel tienda (buildStoreResumen en controller) */
 export interface CpfrStoreResumen {
     inv_actual_kg: number

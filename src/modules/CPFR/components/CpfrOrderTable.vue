@@ -2167,6 +2167,14 @@ const totalUniqueOCs = computed(() => {
                             >
                               <i :class="callbookBadge(tienda)!.icon"></i>{{ callbookBadge(tienda)!.label }}
                             </span>
+                            <button
+                              v-if="isCallbookBlocked(tienda)"
+                              class="inline-flex h-6 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 text-[9px] font-black uppercase tracking-wide text-amber-800"
+                              title="El pedido sugerido está bloqueado hasta verificar el conteo Callbook."
+                              @click.stop="openCallbookApproval(tienda)"
+                            >
+                              <i class="fa-solid fa-clipboard-check"></i> Ajustar
+                            </button>
                             <div
                               v-if="currentTab === 'centralizados' && storeVisibleStatusBadge(tienda.skus) && getVisibleEditableOCNumbers(tienda.skus).length"
                               class="relative shrink-0"
@@ -2209,14 +2217,7 @@ const totalUniqueOCs = computed(() => {
                                 </button>
                               </div>
                             </div>
-                            <button
-                              v-if="isCallbookBlocked(tienda) && store.callbookApprovalIds[tienda.id_cliente]"
-                              class="inline-flex h-6 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 text-[9px] font-black uppercase tracking-wide text-amber-800"
-                              title="El pedido sugerido está bloqueado hasta verificar el conteo Callbook."
-                              @click.stop="openCallbookApproval(tienda)"
-                            >
-                              <i class="fa-solid fa-clipboard-check"></i> Atender solicitud
-                            </button>
+                            
                           </div>
                           <p class="text-[10px] text-brand-600 mt-0.5 font-bold uppercase tracking-wider">
                             {{ tienda.jefatura }}

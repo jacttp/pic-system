@@ -22,6 +22,7 @@ import type {
     CpfrHistorialPagination,
     CpfrCallbookStoreStatus,
     CpfrCallbookAdjustmentLine,
+    CpfrForceFillrateResult,
 } from '../types/cpfrTypes'
 
 export const useCpfrStore = defineStore('cpfr', () => {
@@ -64,6 +65,8 @@ export const useCpfrStore = defineStore('cpfr', () => {
     const callbookStores = reactive<Record<string, CpfrCallbookStoreStatus>>({})
     const callbookApprovalIds = reactive<Record<string, number>>({})
     const callbookDetectionError = ref<string | null>(null)
+    const forceFillrateLoading = ref(false)
+    let callbookNotificationDecision: { key: string; send: boolean } | null = null
 
     // Filtros activos — se incluyen en el body del POST
     const filters = reactive<CpfrFilters>({
@@ -226,7 +229,34 @@ export const useCpfrStore = defineStore('cpfr', () => {
             applyCallbookStatus(result.stores || [])
             callbookDetectionError.value = null
             try {
-                const approvals = await cpfrApi.detectCallbookAdjustments(ids)
+                const selectedDay = Number(filters.dia)
+                const selectedDayIsValid = Number.isInteger(selectedDay) && selectedDay >= 1 && selectedDay <= 7
+                const businessDate = /^\d{4}-\d{2}-\d{2}$/.test(result.business_date)
+                    ? new Date(`${result.business_date}T12:00:00Z`)
+                    : null
+                const currentBusinessDay = businessDate && !Number.isNaN(businessDate.getTime())
+                    ? businessDate.getUTCDay() || 7
+                    : null
+                let sendNotifications = true
+                const hasBlockedStores = (result.stores || []).some(item => item.blocked === true)
+                if (selectedDayIsValid && currentBusinessDay && selectedDay !== currentBusinessDay && hasBlockedStores) {
+                    const decisionKey = `${currentWeek.value?.anio || ''}-${currentWeek.value?.semana || ''}-${selectedDay}`
+                    if (callbookNotificationDecision?.key !== decisionKey) {
+                        const dayNames = ['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
+                        callbookNotificationDecision = {
+                            key: decisionKey,
+                            send: window.confirm(
+                                `Estás consultando OCs del ${dayNames[selectedDay]}, pero hoy no corresponde a ese día.\n\n¿Deseas enviar la notificación de actualización Callbook a los responsables?\n\nLa solicitud se conservará aunque elijas Cancelar.`,
+                            ),
+                        }
+                    }
+                    sendNotifications = callbookNotificationDecision.send
+                }
+                const approvals = await cpfrApi.detectCallbookAdjustments(
+                    ids,
+                    selectedDayIsValid ? selectedDay : undefined,
+                    sendNotifications,
+                )
                 for (const approval of approvals) callbookApprovalIds[approval.id_cliente] = approval.approval_id
             } catch (error: any) {
                 callbookDetectionError.value = error?.response?.data?.message || 'No se pudieron generar las solicitudes de conteo.'
@@ -615,6 +645,69 @@ export const useCpfrStore = defineStore('cpfr', () => {
         }
     }
 
+    async function forceFillrate(): Promise<{
+        ok: boolean
+        blockedStores: number
+        data?: CpfrForceFillrateResult
+        message?: string
+    }> {
+        const day = Number(filters.dia)
+        if (!currentWeek.value || activeTab.value !== 'centralizados' || nom_cadena.value.toUpperCase() !== 'SAMS' || !Number.isInteger(day)) {
+            return { ok: false, blockedStores: 0, message: 'Forzar fillrate requiere Sams, Centralizados y un día seleccionado.' }
+        }
+        if (callbookStatusLoading.value) {
+            return { ok: false, blockedStores: 0, message: 'Espera a que termine de cargar el estado de Pedido Sugerido.' }
+        }
+
+        const dayGroup = dias.value.find(item => item.dia_num === day)
+        const storesForDay = dayGroup?.tiendas || []
+        const blockedStores = storesForDay.filter(item => callbookStores[item.id_cliente]?.blocked === true).length
+        const unlockedStoreIds = storesForDay
+            .filter(item => callbookStores[item.id_cliente]?.blocked !== true)
+            .map(item => item.id_cliente)
+
+        if (!unlockedStoreIds.length) {
+            return { ok: false, blockedStores, message: 'No hay tiendas con Pedido Sugerido desbloqueado para este día.' }
+        }
+
+        forceFillrateLoading.value = true
+        try {
+            const data = await cpfrApi.forceFillrate({
+                year: currentWeek.value.anio,
+                week: currentWeek.value.semana,
+                nom_cadena: 'SAMS',
+                dia: day,
+                unlocked_store_ids: unlockedStoreIds,
+            })
+            const updatedRows = new Map(data.updated_rows.map(row => [row.pedido_generado_id, row]))
+            for (const dayItem of dias.value) {
+                for (const tienda of dayItem.tiendas) {
+                    let changed = false
+                    for (const sku of tienda.skus) {
+                        const updated = sku.pedido_generado_id == null ? undefined : updatedRows.get(sku.pedido_generado_id)
+                        if (!updated) continue
+                        sku.cantidad_base_uni = updated.cantidad_final_uni
+                        sku.pedido_sugerido_pz_red = updated.cantidad_final_uni
+                            + Number(sku.ajuste || 0)
+                            + Number(sku.ajuste_mix || 0)
+                        changed = true
+                    }
+                    if (changed) _recalcStoreResumen(tienda)
+                }
+            }
+            return { ok: true, blockedStores, data }
+        } catch (e: any) {
+            console.error('[cpfrStore.forceFillrate]', e)
+            return {
+                ok: false,
+                blockedStores,
+                message: e?.response?.data?.message || 'No se pudo forzar fillrate.',
+            }
+        } finally {
+            forceFillrateLoading.value = false
+        }
+    }
+
     async function adjustReviewSkuAdjustment(
         id_cliente: string,
         sku: CpfrSkuDash,
@@ -795,6 +888,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         }
 
         if (key === 'dia' && previousValue !== value) {
+            callbookNotificationDecision = null
             resetHistorialState()
         }
     }
@@ -806,7 +900,10 @@ export const useCpfrStore = defineStore('cpfr', () => {
         delete filters.id_cliente
         delete filters.nombre_tienda
         filters.semanas_sellout = 6
-        if (hadDia) resetHistorialState()
+        if (hadDia) {
+            callbookNotificationDecision = null
+            resetHistorialState()
+        }
     }
 
     function toggleStatusFilter(key: keyof typeof statusFilters) {
@@ -1092,7 +1189,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
     return {
         // State
         currentWeek, context, dias, loading, preview, error,
-        callbookStatusLoading, callbookStores, callbookApprovalIds, callbookDetectionError,
+        callbookStatusLoading, callbookStores, callbookApprovalIds, callbookDetectionError, forceFillrateLoading,
         z8Loading, z8Result, allCpfrWeeks, weeksLoading,
         historialDias, historialLoading, historialLoaded, historialError,
         historialSelectedWeeks, historialSearch, historialPage, historialPageSize, historialPagination,
@@ -1101,7 +1198,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         statusFilters, viewMode, activeTab, groupByOC,
         // Actions
         init, fetchCurrentWeek, fetchAllCpfrWeeks, loadDashboard, loadHistorial, loadHistorialPage, setHistorialPageSize, recalculate, generateZ8,
-        adjustSku, adjustReviewSkuAdjustment, resolveApprovalIdForSku, getCachedApprovalIdForSku, updateStatus, updateStatusBulk, adjustCallbook, getCallbookStoreStatus, loadCallbookStatus,
+        adjustSku, adjustReviewSkuAdjustment, resolveApprovalIdForSku, getCachedApprovalIdForSku, updateStatus, updateStatusBulk, adjustCallbook, forceFillrate, getCallbookStoreStatus, loadCallbookStatus,
         toggleStore, expandAll, collapseAll, expandAllOCs, collapseAllOCs,
         setFilter, clearFilters,
         toggleStatusFilter, clearStatusFilters, setViewMode, setActiveTab, setGroupByOC, setNomCadena, fetchChainAdjustmentsEnabled, updateChainAdjustmentsEnabled,

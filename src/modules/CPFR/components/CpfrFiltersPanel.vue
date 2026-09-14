@@ -116,6 +116,37 @@ async function triggerGenerateZ8() {
     await store.generateZ8()
 }
 
+const canForceFillrate = computed(() =>
+    canRunCentralizedActions.value &&
+    store.nom_cadena.toUpperCase() === 'SAMS' &&
+    Boolean(store.currentWeek) &&
+    Boolean(store.filters.dia) &&
+    !store.callbookStatusLoading &&
+    !store.forceFillrateLoading
+)
+
+async function confirmForceFillrate() {
+    if (!canForceFillrate.value) return
+    const accepted = confirm(`Forzar fillrate copiará Centralizado sobre Pedido Generado para las tiendas habilitadas de Sams del día ${store.filters.dia}.\n\n¿Deseas continuar?`)
+    if (!accepted) return
+
+    const result = await store.forceFillrate()
+    if (!result.ok || !result.data) {
+        toast({
+            title: 'No se pudo forzar fillrate',
+            description: result.message || 'La operación no pudo completarse.',
+            variant: 'destructive',
+        })
+        return
+    }
+
+    const data = result.data
+    toast({
+        title: `${data.updated_skus} SKU actualizados en ${data.updated_orders} OC`,
+        description: `${data.disabled_stores} tiendas deshabilitadas, ${result.blockedStores} con Pedido Sugerido bloqueado y ${data.excluded_no_resurtible_skus} SKU NoResurtible excluidos.`,
+    })
+}
+
 async function toggleChainAdjustments(value: boolean) {
     const ok = await store.updateChainAdjustmentsEnabled(value)
     if (!ok) {
@@ -223,6 +254,15 @@ async function toggleChainAdjustments(value: boolean) {
           </button>
 
           <div class="flex items-center gap-1 bg-white border border-slate-200 rounded-lg shadow-sm p-0.5">
+            <button
+              v-if="store.nom_cadena.toUpperCase() === 'SAMS' && canRunCentralizedActions"
+              class="inline-flex h-8 w-8 items-center justify-center rounded-md bg-emerald-50 text-emerald-700 transition-all hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
+              :disabled="!canForceFillrate"
+              :title="store.filters.dia ? 'Forzar fillrate: igualar Pedido Generado con Centralizado' : 'Selecciona un día para forzar fillrate'"
+              @click.stop="confirmForceFillrate"
+            >
+              <i class="fa-solid text-[11px]" :class="store.forceFillrateLoading ? 'fa-circle-notch fa-spin' : 'fa-percent'"></i>
+            </button>
             <div class="flex flex-col items-end gap-0.5 relative group/z8info">
               <button
                 class="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 h-8 rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"

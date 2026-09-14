@@ -27,6 +27,7 @@ import type {
     CpfrCallbookAdjustmentLine,
     CpfrCallbookAdjustmentResponse,
     CpfrCallbookDetection,
+    CpfrForceFillrateResult,
 } from '../types/cpfrTypes'
 
 import type { CpfrDashZ8Response } from '../types/cpfrZ8Types'
@@ -112,6 +113,17 @@ export const cpfrApi = {
         return data
     },
 
+    async forceFillrate(body: {
+        year: number
+        week: number
+        nom_cadena: 'SAMS'
+        dia: number
+        unlocked_store_ids: string[]
+    }): Promise<CpfrForceFillrateResult> {
+        const { data } = await api.post('/cpfr/orders/force-fillrate', body)
+        return data.data
+    },
+
     // ── Estado del pedido de tienda ───────────────────────────────────────────
 
     /**
@@ -135,8 +147,8 @@ export const cpfrApi = {
         return data
     },
 
-    async detectCallbookAdjustments(client_ids: string[]): Promise<CpfrCallbookDetection[]> {
-        const { data } = await api.post('/cpfr/callbook/detect', { client_ids })
+    async detectCallbookAdjustments(client_ids: string[], dia?: number, send_notifications = true): Promise<CpfrCallbookDetection[]> {
+        const { data } = await api.post('/cpfr/callbook/detect', { client_ids, dia, send_notifications })
         return data.approvals || []
     },
 

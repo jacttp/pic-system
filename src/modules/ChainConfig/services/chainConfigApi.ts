@@ -48,6 +48,10 @@ export const chainConfigApi = {
       await api.patch(`${V2}/cpfr/config/${encodeURIComponent(idCliente)}/adjustments`, { ajustes_habilitados });
    },
 
+   async updateStoreForceFillrate(idCliente: string, forzar_fillrate: boolean): Promise<void> {
+      await api.patch(`${V2}/cpfr/config/${encodeURIComponent(idCliente)}/force-fillrate`, { forzar_fillrate });
+   },
+
    async getSkuUnits(): Promise<ChainSkuUnit[]> {
       const { data } = await api.get('/cpfr/units');
       return data.data || [];

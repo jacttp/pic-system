@@ -8,6 +8,7 @@ import { StdSwitch } from '@/modules/Shared/components/std';
 const store = useChainConfigStore();
 const search = ref('');
 const selectedDay = ref<number | ''>('');
+const selectedChain = ref('');
 const localRows = reactive<Record<string, ChainStoreConfig>>({});
 const modifiedIds = ref<Set<string>>(new Set());
 const message = ref('');
@@ -24,13 +25,20 @@ const filteredRows = computed(() => {
    const query = search.value.trim().toLowerCase();
    return Object.values(localRows).filter(row => {
       const matchesDay = selectedDay.value === '' || row.dia_ventas === Number(selectedDay.value);
+      const matchesChain = !selectedChain.value || String(row.Cadena || '').trim().toUpperCase() === selectedChain.value;
       const matchesSearch = !query ||
          row.id_cliente.toLowerCase().includes(query) ||
          (row.nombre_tienda || '').toLowerCase().includes(query) ||
          (row.Jefatura || row.jefatura || '').toLowerCase().includes(query);
-      return matchesDay && matchesSearch;
+      return matchesDay && matchesChain && matchesSearch;
    });
 });
+
+const chainOptions = computed(() => [...new Set(
+   Object.values(localRows)
+      .map(row => String(row.Cadena || '').trim().toUpperCase())
+      .filter(Boolean)
+)].sort());
 
 const modifiedCount = computed(() => modifiedIds.value.size);
 
@@ -53,6 +61,18 @@ async function toggleStoreAdjustments(row: ChainStoreConfig, enabled: boolean) {
    }
    row.ajustes_habilitados = previous;
    message.value = 'No se pudo actualizar el ajuste de la tienda.';
+}
+
+async function toggleStoreForceFillrate(row: ChainStoreConfig, enabled: boolean) {
+   const previous = row.forzar_fillrate === true;
+   row.forzar_fillrate = enabled;
+   const ok = await store.updateStoreForceFillrate(row.id_cliente, enabled);
+   if (ok) {
+      message.value = `Forzar fillrate ${enabled ? 'habilitado' : 'deshabilitado'} para ${row.nombre_tienda || row.id_cliente}.`;
+      return;
+   }
+   row.forzar_fillrate = previous;
+   message.value = 'No se pudo actualizar Forzar fillrate de la tienda.';
 }
 
 async function saveChanges() {
@@ -96,11 +116,18 @@ async function saveChanges() {
                class="h-10 w-full sm:w-72 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-semibold outline-none focus:border-brand-400 focus:bg-white"
             >
             <select
-               v-model="selectedDay"
+              v-model="selectedDay"
                class="h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-600 outline-none focus:border-brand-400 focus:bg-white"
             >
                <option value="">Todos los dias</option>
                <option v-for="day in DAY_OPTIONS" :key="day.value" :value="day.value">{{ day.label }}</option>
+            </select>
+            <select
+               v-model="selectedChain"
+               class="h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-600 outline-none focus:border-brand-400 focus:bg-white"
+            >
+               <option value="">Todas las cadenas</option>
+               <option v-for="chain in chainOptions" :key="chain" :value="chain">{{ chain }}</option>
             </select>
          </div>
       </header>
@@ -114,14 +141,15 @@ async function saveChanges() {
          <table class="w-full text-sm table-fixed">
             <thead class="bg-slate-50 text-[10px] uppercase tracking-widest text-slate-400 border-b border-slate-100">
                <tr>
-                  <th class="w-[32%] px-4 py-3 text-left">Tienda</th>
+                  <th class="w-[26%] px-4 py-3 text-left">Tienda</th>
                   <th class="w-[10%] px-3 py-3 text-center">Dia Cadena</th>
                   <th class="w-[10%] px-3 py-3 text-center">Dia Ventas</th>
                   <th class="w-[9%] px-3 py-3 text-center">Lead Time</th>
                   <th class="w-[9%] px-3 py-3 text-center">Sem. Obj.</th>
                   <th class="w-[9%] px-3 py-3 text-center">Sellout</th>
                   <th class="w-[9%] px-3 py-3 text-center">Factor</th>
-                  <th class="w-[12%] px-4 py-3 text-center">Ajuste</th>
+                  <th class="w-[9%] px-3 py-3 text-center">Ajuste</th>
+                  <th class="w-[9%] px-3 py-3 text-center">Forzar fillrate</th>
                </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
@@ -158,6 +186,15 @@ async function saveChanges() {
                         size="compact"
                         :aria-label="`Ajustes manuales para ${row.nombre_tienda || row.id_cliente}`"
                         @update:model-value="toggleStoreAdjustments(row, $event)"
+                     />
+                  </td>
+                  <td class="px-3 py-3 text-center">
+                     <StdSwitch
+                        :model-value="row.forzar_fillrate === true"
+                        :disabled="store.saving"
+                        size="compact"
+                        :aria-label="`Forzar fillrate para ${row.nombre_tienda || row.id_cliente}`"
+                        @update:model-value="toggleStoreForceFillrate(row, $event)"
                      />
                   </td>
                </tr>
