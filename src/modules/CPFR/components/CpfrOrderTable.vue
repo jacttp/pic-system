@@ -28,6 +28,7 @@ const selectedProductContext = ref<{ tienda: CpfrStoreDash; sku: CpfrSkuDash } |
 const store = useCpfrStore()
 const showZeroZ8 = ref(false)
 const showExpiredCloseModal = ref(false)
+const showExpiredDraftCloseModal = ref(false)
 const showApprovedZeroPurgeModal = ref(false)
 const useLegacyArchiveView = false
 
@@ -1080,6 +1081,14 @@ const expiredCloseSummary = computed(() => ({
     skus: expiredCentralizedOCs.value.reduce((acc, oc) => acc + oc.sku_count, 0),
 }))
 
+const expiredDraftCloseSummary = computed(() => store.expiredDraftSummary ?? {
+    total_ocs: 0,
+    total_tiendas: 0,
+    total_skus: 0,
+    total_piezas_cadena: 0,
+    total_piezas_sugeridas: 0,
+})
+
 type ApprovedZeroPurgeRow = {
     id: number
     id_cliente: string
@@ -1288,6 +1297,59 @@ function openExpiredCloseModal() {
 function closeExpiredCloseModal() {
     if (submittingOC.value === 'expired-centralized') return
     showExpiredCloseModal.value = false
+}
+
+async function openExpiredDraftCloseModal() {
+    if (store.expiredDraftLoading || store.expiredDraftClosing) return
+    const result = await store.loadExpiredDraftCandidates()
+
+    if (!result.ok) {
+        toast({
+            title: 'No se pudo completar la búsqueda',
+            description: result.message,
+            variant: 'destructive',
+            duration: 5000,
+        })
+        return
+    }
+
+    if (!store.expiredDraftCandidates.length) {
+        toast({
+            title: 'Sin borradores caducados',
+            description: 'No hay OC pendientes con cálculo en borrador fuera del margen protegido de dos semanas.',
+            duration: 4500,
+        })
+        return
+    }
+
+    showExpiredDraftCloseModal.value = true
+}
+
+function closeExpiredDraftCloseModal() {
+    if (store.expiredDraftClosing) return
+    showExpiredDraftCloseModal.value = false
+}
+
+async function confirmCloseExpiredDrafts() {
+    if (store.expiredDraftClosing || !store.expiredDraftCandidates.length) return
+    const result = await store.closeExpiredDraftCandidates()
+
+    if (!result.ok) {
+        toast({
+            title: 'No se pudieron cerrar las OC',
+            description: result.message,
+            variant: 'destructive',
+            duration: 5000,
+        })
+        return
+    }
+
+    showExpiredDraftCloseModal.value = false
+    toast({
+        title: 'Borradores caducados cerrados',
+        description: `${result.closed} OC movida(s) a Sin Embarcar.`,
+        duration: 5000,
+    })
 }
 
 function formatShortDate(value: string | null | undefined): string {
@@ -1513,6 +1575,18 @@ const totalUniqueOCs = computed(() => {
             <i v-else class="fa-solid fa-lock"></i>
             Cerrar caducadas
             <span class="rounded bg-white/70 px-1.5 py-0.5 text-[9px]">{{ expiredCentralizedOCs.length }}</span>
+          </button>
+
+          <button
+            v-if="currentTab === 'sin_embarcar'"
+            class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="store.expiredDraftLoading || store.expiredDraftClosing"
+            title="Buscar OC pendientes cuyo cálculo sigue en borrador y que son anteriores al margen protegido de dos semanas"
+            @click.stop="openExpiredDraftCloseModal"
+          >
+            <i v-if="store.expiredDraftLoading || store.expiredDraftClosing" class="fa-solid fa-circle-notch fa-spin"></i>
+            <i v-else class="fa-solid fa-clock-rotate-left"></i>
+            Buscar borradores
           </button>
 
           <button
@@ -3443,6 +3517,128 @@ const totalUniqueOCs = computed(() => {
                 <i v-if="submittingOC === 'approved-zero-purge'" class="fa-solid fa-circle-notch fa-spin"></i>
                 <i v-else class="fa-solid fa-trash-can"></i>
                 Eliminar renglones
+              </button>
+            </div>
+          </div>
+        </footer>
+      </section>
+    </div>
+  </Teleport>
+
+  <Teleport to="body">
+    <div
+      v-if="showExpiredDraftCloseModal"
+      class="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/35 px-4 py-6 backdrop-blur-[2px]"
+      @click.self="closeExpiredDraftCloseModal"
+    >
+      <section class="flex max-h-[82vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-amber-200 bg-white shadow-2xl">
+        <header class="shrink-0 border-b border-amber-100 bg-amber-50 px-5 py-4">
+          <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+              <div class="mb-1 flex items-center gap-2">
+                <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-amber-600 text-white shadow-sm">
+                  <i class="fa-solid fa-clock-rotate-left text-[11px]"></i>
+                </span>
+                <h3 class="text-sm font-black uppercase tracking-wider text-slate-800">Cerrar borradores caducados</h3>
+              </div>
+              <p class="text-xs font-medium leading-relaxed text-slate-600">
+                La OC sigue pendiente en OrdenCompra y su cálculo permanece completamente en borrador.
+                Se protegen la semana actual y las dos semanas más recientes.
+              </p>
+            </div>
+            <button
+              class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-amber-100 bg-white text-slate-400 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-60"
+              :disabled="store.expiredDraftClosing"
+              title="Cerrar ventana"
+              @click="closeExpiredDraftCloseModal"
+            >
+              <i class="fa-solid fa-xmark text-[12px]"></i>
+            </button>
+          </div>
+        </header>
+
+        <div class="shrink-0 border-b border-slate-100 bg-white px-5 py-3">
+          <div class="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            <div class="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
+              <p class="text-[9px] font-black uppercase tracking-wider text-amber-700">OC</p>
+              <p class="mt-0.5 text-lg font-black text-amber-800">{{ expiredDraftCloseSummary.total_ocs }}</p>
+            </div>
+            <div class="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+              <p class="text-[9px] font-black uppercase tracking-wider text-slate-500">Tiendas</p>
+              <p class="mt-0.5 text-lg font-black text-slate-800">{{ expiredDraftCloseSummary.total_tiendas }}</p>
+            </div>
+            <div class="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+              <p class="text-[9px] font-black uppercase tracking-wider text-slate-500">SKUs</p>
+              <p class="mt-0.5 text-lg font-black text-slate-800">{{ expiredDraftCloseSummary.total_skus }}</p>
+            </div>
+            <div class="rounded-lg border border-sky-100 bg-sky-50 px-3 py-2">
+              <p class="text-[9px] font-black uppercase tracking-wider text-sky-700">Pzas. cadena</p>
+              <p class="mt-0.5 text-lg font-black text-sky-800">{{ n(expiredDraftCloseSummary.total_piezas_cadena, 0) }}</p>
+            </div>
+            <div class="col-span-2 rounded-lg border border-brand-100 bg-brand-50 px-3 py-2 sm:col-span-1">
+              <p class="text-[9px] font-black uppercase tracking-wider text-brand-600">Pzas. sugeridas</p>
+              <p class="mt-0.5 text-lg font-black text-brand-700">{{ n(expiredDraftCloseSummary.total_piezas_sugeridas, 0) }}</p>
+            </div>
+          </div>
+          <p class="mt-2 text-[10px] font-semibold text-slate-500">
+            Corte exclusivo: pedidos anteriores al <span class="font-mono font-black text-slate-700">{{ formatShortDate(store.expiredDraftCutoffDate) }}</span>.
+          </p>
+        </div>
+
+        <div class="min-h-0 flex-1 overflow-auto">
+          <table class="w-full text-left text-[11px]">
+            <thead class="sticky top-0 z-10 border-b border-slate-200 bg-slate-100 text-[9px] uppercase tracking-wider text-slate-500">
+              <tr>
+                <th class="px-4 py-2.5 font-black">OC</th>
+                <th class="px-3 py-2.5 font-black">Tienda</th>
+                <th class="px-3 py-2.5 text-center font-black">Pedido</th>
+                <th class="px-3 py-2.5 text-center font-black">Fin embarque</th>
+                <th class="px-3 py-2.5 text-right font-black">SKUs</th>
+                <th class="px-3 py-2.5 text-right font-black">Cadena</th>
+                <th class="px-4 py-2.5 text-right font-black">Sugerido</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="oc in store.expiredDraftCandidates" :key="`${oc.id_cliente}_${oc.num_pedido}_${oc.fec_pedido_cadena}`" class="hover:bg-amber-50/40">
+                <td class="px-4 py-3">
+                  <p class="font-mono font-black text-slate-800">{{ oc.num_pedido }}</p>
+                  <p class="mt-1 text-[9px] font-bold text-amber-700">Pendiente · Borrador</p>
+                </td>
+                <td class="max-w-[240px] px-3 py-3">
+                  <p class="truncate font-bold text-slate-700" :title="oc.nombre_tienda">{{ oc.nombre_tienda }}</p>
+                  <p class="mt-0.5 font-mono text-[9px] font-bold text-slate-400">{{ oc.id_cliente }}</p>
+                </td>
+                <td class="px-3 py-3 text-center font-mono font-bold text-slate-600">{{ formatShortDate(oc.fec_pedido_cadena) }}</td>
+                <td class="px-3 py-3 text-center font-mono font-bold text-rose-600">{{ formatShortDate(oc.fec_fin_embarque) }}</td>
+                <td class="px-3 py-3 text-right font-black text-slate-700">{{ oc.sku_count }}</td>
+                <td class="px-3 py-3 text-right font-mono font-bold text-slate-600">{{ n(oc.cant_pedida_total, 0) }}</td>
+                <td class="px-4 py-3 text-right font-mono font-black text-brand-700">{{ n(oc.pedido_sugerido_total, 0) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <footer class="shrink-0 border-t border-slate-200 bg-slate-50 px-5 py-3">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-[11px] font-semibold text-slate-500">
+              Al confirmar, ambas tablas se revalidan y actualizan juntas. Las OC aparecerán en Sin Embarcar.
+            </p>
+            <div class="flex justify-end gap-2">
+              <button
+                class="h-9 rounded-lg border border-slate-200 bg-white px-4 text-[11px] font-black uppercase tracking-wider text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-60"
+                :disabled="store.expiredDraftClosing"
+                @click="closeExpiredDraftCloseModal"
+              >
+                Cancelar
+              </button>
+              <button
+                class="inline-flex h-9 items-center gap-2 rounded-lg bg-amber-600 px-4 text-[11px] font-black uppercase tracking-wider text-white shadow-sm transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                :disabled="store.expiredDraftClosing"
+                @click="confirmCloseExpiredDrafts"
+              >
+                <i v-if="store.expiredDraftClosing" class="fa-solid fa-circle-notch fa-spin"></i>
+                <i v-else class="fa-solid fa-lock"></i>
+                Cerrar {{ expiredDraftCloseSummary.total_ocs }} OC
               </button>
             </div>
           </div>

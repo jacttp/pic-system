@@ -193,6 +193,17 @@ const router = createRouter({
                }
             },
             {
+               path: 'sellout-analytics',
+               name: 'sellout-analytics',
+               component: () => import('@/modules/SelloutAnalytics/views/SelloutAnalyticsView.vue'),
+               meta: {
+                  requiresAuth: true,
+                  minRoleLevel: 1,
+                  moduleKey: 'SELLOUT_ANALYTICS',
+                  title: 'Analítico Sellout'
+               }
+            },
+            {
                path: 'pic-logistics',
                name: 'pic-logistics',
                component: () => import('@/modules/PIC/views/PicDashboardView.vue')

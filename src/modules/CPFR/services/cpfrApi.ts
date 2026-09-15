@@ -28,6 +28,7 @@ import type {
     CpfrCallbookAdjustmentResponse,
     CpfrCallbookDetection,
     CpfrForceFillrateResult,
+    CpfrExpiredDraftResponse,
 } from '../types/cpfrTypes'
 
 import type { CpfrDashZ8Response } from '../types/cpfrZ8Types'
@@ -139,6 +140,16 @@ export const cpfrApi = {
 
     async updateStatusBulk(body: CpfrBulkUpdateStatusBody): Promise<CpfrUpdateStatusResponse> {
         const { data } = await api.patch('/cpfr/orders/status/bulk', body)
+        return data
+    },
+
+    async getExpiredDraftOrders(nom_cadena: string): Promise<CpfrExpiredDraftResponse> {
+        const { data } = await api.post('/cpfr/orders/expired-drafts/candidates', { nom_cadena })
+        return data
+    },
+
+    async closeExpiredDraftOrders(nom_cadena: string): Promise<CpfrExpiredDraftResponse> {
+        const { data } = await api.post('/cpfr/orders/expired-drafts/close', { nom_cadena })
         return data
     },
 

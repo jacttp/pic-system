@@ -275,6 +275,34 @@ export interface CpfrUpdateStatusResponse {
     order_transitions?: CpfrOrderStatusTransition[]
 }
 
+export interface CpfrExpiredDraftOrder {
+    num_pedido: string
+    id_cliente: string
+    nombre_tienda: string
+    fec_pedido_cadena: string
+    fec_fin_embarque: string | null
+    sku_count: number
+    cant_pedida_total: number
+    pedido_sugerido_total: number
+}
+
+export interface CpfrExpiredDraftSummary {
+    total_ocs: number
+    total_tiendas: number
+    total_skus: number
+    total_piezas_cadena: number
+    total_piezas_sugeridas: number
+}
+
+export interface CpfrExpiredDraftResponse {
+    success: boolean
+    cutoff_date: string
+    protected_weeks: number
+    summary: CpfrExpiredDraftSummary
+    data: CpfrExpiredDraftOrder[]
+    message?: string
+}
+
 // ─── POST /cpfr/orders/muliix ────────────────────────────────────────────────
 
 export interface CpfrMuliixRejectedOrder {

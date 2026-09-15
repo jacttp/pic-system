@@ -23,6 +23,8 @@ import type {
     CpfrCallbookStoreStatus,
     CpfrCallbookAdjustmentLine,
     CpfrForceFillrateResult,
+    CpfrExpiredDraftOrder,
+    CpfrExpiredDraftSummary,
 } from '../types/cpfrTypes'
 
 export const useCpfrStore = defineStore('cpfr', () => {
@@ -41,6 +43,11 @@ export const useCpfrStore = defineStore('cpfr', () => {
     const z8Result = ref<{ message: string; created: number } | null>(null)
     const allCpfrWeeks = ref<Array<{ anio: number; semana: number; semana_ic: string; key: string }>>([])
     const weeksLoading = ref(false)
+    const expiredDraftCandidates = ref<CpfrExpiredDraftOrder[]>([])
+    const expiredDraftCutoffDate = ref<string | null>(null)
+    const expiredDraftSummary = ref<CpfrExpiredDraftSummary | null>(null)
+    const expiredDraftLoading = ref(false)
+    const expiredDraftClosing = ref(false)
 
     // Archivo — datos enviados cargados bajo demanda por semanas
     const historialDias = ref<CpfrDiaDash[]>([])
@@ -645,6 +652,44 @@ export const useCpfrStore = defineStore('cpfr', () => {
         }
     }
 
+    async function loadExpiredDraftCandidates(): Promise<{ ok: boolean; message?: string }> {
+        expiredDraftLoading.value = true
+        try {
+            const response = await cpfrApi.getExpiredDraftOrders(nom_cadena.value)
+            expiredDraftCandidates.value = response.data
+            expiredDraftCutoffDate.value = response.cutoff_date
+            expiredDraftSummary.value = response.summary
+            return { ok: true }
+        } catch (e: any) {
+            console.error('[cpfrStore.loadExpiredDraftCandidates]', e)
+            return { ok: false, message: e?.response?.data?.message || 'No se pudieron buscar borradores caducados.' }
+        } finally {
+            expiredDraftLoading.value = false
+        }
+    }
+
+    async function closeExpiredDraftCandidates(): Promise<{ ok: boolean; closed: number; message?: string }> {
+        expiredDraftClosing.value = true
+        try {
+            const response = await cpfrApi.closeExpiredDraftOrders(nom_cadena.value)
+            const closed = response.summary.total_ocs
+            expiredDraftCandidates.value = []
+            expiredDraftCutoffDate.value = response.cutoff_date
+            expiredDraftSummary.value = response.summary
+            await loadDashboard()
+            return { ok: true, closed, message: response.message }
+        } catch (e: any) {
+            console.error('[cpfrStore.closeExpiredDraftCandidates]', e)
+            return {
+                ok: false,
+                closed: 0,
+                message: e?.response?.data?.message || 'No se pudieron cerrar borradores caducados.',
+            }
+        } finally {
+            expiredDraftClosing.value = false
+        }
+    }
+
     async function forceFillrate(): Promise<{
         ok: boolean
         blockedStores: number
@@ -1191,6 +1236,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         currentWeek, context, dias, loading, preview, error,
         callbookStatusLoading, callbookStores, callbookApprovalIds, callbookDetectionError, forceFillrateLoading,
         z8Loading, z8Result, allCpfrWeeks, weeksLoading,
+        expiredDraftCandidates, expiredDraftCutoffDate, expiredDraftSummary, expiredDraftLoading, expiredDraftClosing,
         historialDias, historialLoading, historialLoaded, historialError,
         historialSelectedWeeks, historialSearch, historialPage, historialPageSize, historialPagination,
         approvalIdsByOrder,
@@ -1198,6 +1244,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         statusFilters, viewMode, activeTab, groupByOC,
         // Actions
         init, fetchCurrentWeek, fetchAllCpfrWeeks, loadDashboard, loadHistorial, loadHistorialPage, setHistorialPageSize, recalculate, generateZ8,
+        loadExpiredDraftCandidates, closeExpiredDraftCandidates,
         adjustSku, adjustReviewSkuAdjustment, resolveApprovalIdForSku, getCachedApprovalIdForSku, updateStatus, updateStatusBulk, adjustCallbook, forceFillrate, getCallbookStoreStatus, loadCallbookStatus,
         toggleStore, expandAll, collapseAll, expandAllOCs, collapseAllOCs,
         setFilter, clearFilters,

@@ -95,6 +95,13 @@ export const MODULE_VISUAL_STYLES: Record<string, ModuleVisualStyle> = {
     accent: 'bg-[hsl(var(--pic-accent-blue))]',
     desc: 'Comparativo semanal de ventas en kilogramos y pesos para tres años.',
   },
+  SELLOUT_ANALYTICS: {
+    color: 'text-[hsl(var(--pic-accent-teal))]',
+    bg: 'bg-[hsl(var(--pic-accent-teal-soft))]',
+    border: 'border-[hsl(var(--pic-accent-teal))]',
+    accent: 'bg-[hsl(var(--pic-accent-teal))]',
+    desc: 'Desplazamiento semanal en kilogramos por cadena, tienda y SKU.',
+  },
   SEGMENT: {
     color: 'text-[hsl(var(--pic-accent-orange))]',
     bg: 'bg-[hsl(var(--pic-accent-orange-soft))]',
