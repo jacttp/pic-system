@@ -2,6 +2,10 @@ import api from '@/api/axios';
 import type {
   SelloutApiResponse,
   SelloutContext,
+  SelloutComparisonMode,
+  SelloutComparisonOptions,
+  SelloutComparisonSeries,
+  SelloutDropRanking,
   SelloutExportData,
   SelloutFilters,
   SelloutMatrix,
@@ -46,6 +50,39 @@ export const selloutAnalyticsApi = {
   async exportMatrix(payload: SelloutSummaryRequest): Promise<SelloutExportData> {
     const { data } = await api.post<SelloutApiResponse<SelloutExportData>>(
       `${BASE_PATH}/export`,
+      payload,
+    );
+    return data.data;
+  },
+
+  async getDropRanking(payload: SelloutSummaryRequest & {
+    level: SelloutMatrixRequest['level'];
+    limit?: number;
+  }): Promise<SelloutDropRanking> {
+    const { data } = await api.post<SelloutApiResponse<SelloutDropRanking>>(
+      `${BASE_PATH}/drop-ranking`,
+      payload,
+    );
+    return data.data;
+  },
+
+  async getComparisonOptions(payload: SelloutSummaryRequest & {
+    level: SelloutMatrixRequest['level'];
+  }): Promise<SelloutComparisonOptions> {
+    const { data } = await api.post<SelloutApiResponse<SelloutComparisonOptions>>(
+      `${BASE_PATH}/comparison-options`,
+      payload,
+    );
+    return data.data;
+  },
+
+  async getComparisonSeries(payload: SelloutSummaryRequest & {
+    level: SelloutMatrixRequest['level'];
+    entities: string[];
+    comparisonMode: SelloutComparisonMode;
+  }): Promise<SelloutComparisonSeries> {
+    const { data } = await api.post<SelloutApiResponse<SelloutComparisonSeries>>(
+      `${BASE_PATH}/series`,
       payload,
     );
     return data.data;

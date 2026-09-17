@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, type CSSProperties } from 'vue';
 import type {
+  SelloutHeatmapMode,
   SelloutMatrix,
   SelloutMatrixEntity,
   SelloutPeriodKey,
 } from '../types/selloutAnalytics';
+import { calculateHeatmapChanges, calculateSelloutMetrics } from '../utils/selloutMetrics';
 
 interface Props {
   periods: SelloutPeriodKey[];
@@ -14,6 +16,7 @@ interface Props {
   expandedChains: string[];
   expandedStores: string[];
   loadingBranches: string[];
+  overallTotalKg: number;
   loading?: boolean;
 }
 
@@ -22,6 +25,8 @@ interface DisplayCell {
   value: number | null;
   label: string;
   tone: 'missing' | 'zero' | 'negative' | 'positive';
+  title: string;
+  style?: CSSProperties;
 }
 
 interface EntityRow {
@@ -36,6 +41,14 @@ interface EntityRow {
   branchLoading: boolean;
   cells: DisplayCell[];
   totalLabel: string;
+  averageLabel: string;
+  weeklyDeltaLabel: string;
+  weeklyDeltaPctLabel: string;
+  trendLabel: string;
+  trendPctLabel: string;
+  participationLabel: string;
+  weeklyTone: string;
+  trendTone: string;
 }
 
 interface PagerRow {
@@ -67,17 +80,80 @@ const emit = defineEmits<{
 const keyForPeriod = (period: SelloutPeriodKey) => `${period.year}-${period.week}`;
 const keyForStore = (chain: string, store: string) => `${chain}\u001f${store}`;
 const numberFormatter = new Intl.NumberFormat('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+const percentFormatter = new Intl.NumberFormat('es-MX', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const heatmapMode = ref<SelloutHeatmapMode>('values');
+
+const formatKg = (value: number | null, signed = false) => {
+  if (value === null) return '—';
+  const label = numberFormatter.format(value);
+  return signed && value > 0 ? `+${label}` : label;
+};
+const formatPercent = (value: number | null) => {
+  if (value === null) return '—';
+  return `${value > 0 ? '+' : ''}${percentFormatter.format(value)}%`;
+};
+const movementTone = (value: number | null) => (
+  value === null || value === 0 ? 'text-pic-text-muted' : value > 0 ? 'text-pic-success' : 'text-pic-danger'
+);
+
+const visibleEntities = computed(() => {
+  const entities: SelloutMatrixEntity[] = [];
+  (props.root?.entities ?? []).forEach(chain => {
+    entities.push(chain);
+    if (!props.expandedChains.includes(chain.chain)) return;
+    const stores = props.storesByChain[chain.chain];
+    stores?.entities.forEach(store => {
+      entities.push(store);
+      if (!store.store) return;
+      const identity = keyForStore(store.chain, store.store);
+      if (!props.expandedStores.includes(identity)) return;
+      props.skusByStore[identity]?.entities.forEach(sku => entities.push(sku));
+    });
+  });
+  return entities;
+});
+
+const heatScale = computed(() => {
+  const rawValues = visibleEntities.value.flatMap(entity => entity.values.map(value => value.kg));
+  const changes = visibleEntities.value.flatMap(entity => (
+    calculateHeatmapChanges(props.periods, entity.values).filter((value): value is number => value !== null)
+  ));
+  return {
+    volume: Math.max(0, ...rawValues.filter(value => value > 0)),
+    change: Math.max(0, ...changes.map(value => Math.abs(value))),
+  };
+});
+
+const cellStyle = (value: number | null): CSSProperties | undefined => {
+  if (heatmapMode.value === 'values' || value === null || value === 0) return undefined;
+  if (heatmapMode.value === 'volume' && value < 0) {
+    return { backgroundColor: 'hsl(var(--pic-danger) / 0.14)' };
+  }
+  const maximum = heatmapMode.value === 'volume' ? heatScale.value.volume : heatScale.value.change;
+  if (maximum <= 0) return undefined;
+  const opacity = 0.08 + (Math.min(Math.abs(value) / maximum, 1) * 0.42);
+  const token = heatmapMode.value === 'change' && value < 0 ? '--pic-danger' : heatmapMode.value === 'change' ? '--pic-success' : '--pic-brand';
+  return { backgroundColor: `hsl(var(${token}) / ${opacity})` };
+};
 
 const entityRow = (entity: SelloutMatrixEntity, depth: 0 | 1 | 2): EntityRow => {
   const values = new Map(entity.values.map(value => [keyForPeriod(value), value.kg]));
-  const cells = props.periods.map(period => {
+  const changes = calculateHeatmapChanges(props.periods, entity.values);
+  const metrics = calculateSelloutMetrics(props.periods, entity.values, props.overallTotalKg);
+  const cells = props.periods.map((period, index) => {
     const key = keyForPeriod(period);
-    const value = values.has(key) ? values.get(key)! : null;
+    const rawValue = values.has(key) ? values.get(key)! : null;
+    const value = heatmapMode.value === 'change' ? changes[index] : rawValue;
+    const label = value === null ? '—' : formatKg(value, heatmapMode.value === 'change');
     return {
       key,
       value,
-      label: value === null ? '—' : numberFormatter.format(value),
+      label,
       tone: value === null ? 'missing' : value < 0 ? 'negative' : value === 0 ? 'zero' : 'positive',
+      title: heatmapMode.value === 'change'
+        ? (value === null ? 'Sin comparación semanal' : `Cambio semanal: ${label} kg`)
+        : (rawValue === null ? 'Sin registro publicado' : `Volumen: ${formatKg(rawValue)} kg`),
+      style: cellStyle(value),
     } as DisplayCell;
   });
   const storeIdentity = entity.store ? keyForStore(entity.chain, entity.store) : '';
@@ -100,6 +176,14 @@ const entityRow = (entity: SelloutMatrixEntity, depth: 0 | 1 | 2): EntityRow => 
     branchLoading,
     cells,
     totalLabel: numberFormatter.format(entity.totalKg),
+    averageLabel: formatKg(metrics.averageKg),
+    weeklyDeltaLabel: formatKg(metrics.weeklyDeltaKg, true),
+    weeklyDeltaPctLabel: formatPercent(metrics.weeklyDeltaPct),
+    trendLabel: formatKg(metrics.trendDeltaKg, true),
+    trendPctLabel: formatPercent(metrics.trendDeltaPct),
+    participationLabel: metrics.participationPct === null ? '—' : `${percentFormatter.format(metrics.participationPct)}%`,
+    weeklyTone: movementTone(metrics.weeklyDeltaKg),
+    trendTone: movementTone(metrics.trendDeltaKg),
   };
 };
 
@@ -155,7 +239,7 @@ const periodHeaders = computed(() => props.periods.map(period => ({
   year: period.year,
   label: `S${String(period.week).padStart(2, '0')}`,
 })));
-const columnCount = computed(() => props.periods.length + 2);
+const columnCount = computed(() => props.periods.length + 7);
 
 const toggleEntity = (row: EntityRow) => {
   if (row.depth === 0) emit('toggle-chain', row.entity);
@@ -170,15 +254,35 @@ const movePager = (row: PagerRow, page: number) => {
 
 <template>
   <section class="overflow-hidden rounded-xl border border-pic-border bg-pic-surface shadow-sm">
-    <div class="flex flex-col gap-2 border-b border-pic-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex flex-col gap-3 border-b border-pic-border px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
       <div>
         <p class="text-[10px] font-black uppercase tracking-[0.14em] text-pic-brand">Matriz semanal</p>
         <h2 class="mt-1 text-sm font-black text-pic-text-main">Cadena → tienda → SKU</h2>
       </div>
-      <div class="flex flex-wrap items-center gap-3 text-[11px] font-semibold text-pic-text-muted">
-        <span><i class="fa-solid fa-minus mr-1"></i>— = sin registro</span>
-        <span><i class="fa-solid fa-0 mr-1"></i>0 = cero observado</span>
-        <span class="text-pic-danger"><i class="fa-solid fa-arrow-down mr-1"></i>Negativo = neto</span>
+      <div class="flex flex-col gap-2 sm:items-end">
+        <div class="inline-flex w-fit rounded-lg border border-pic-border bg-pic-muted-surface p-1" aria-label="Modo de la matriz">
+          <button
+            v-for="option in ([
+              { value: 'values', label: 'Valores' },
+              { value: 'volume', label: 'Calor volumen' },
+              { value: 'change', label: 'Calor cambio' },
+            ] as const)"
+            :key="option.value"
+            type="button"
+            class="rounded-md px-2.5 py-1 text-[10px] font-black transition"
+            :class="heatmapMode === option.value ? 'bg-pic-brand text-white' : 'text-pic-text-muted hover:text-pic-brand'"
+            :aria-pressed="heatmapMode === option.value"
+            @click="heatmapMode = option.value"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+        <div class="flex flex-wrap items-center gap-3 text-[10px] font-semibold text-pic-text-muted">
+          <span><i class="fa-solid fa-minus mr-1"></i>— sin registro/comparación</span>
+          <span><i class="fa-solid fa-0 mr-1"></i>0 observado</span>
+          <span v-if="heatmapMode !== 'values'">Escala común a filas visibles</span>
+          <span class="text-pic-danger"><i class="fa-solid fa-arrow-down mr-1"></i>Negativo neto</span>
+        </div>
       </div>
     </div>
 
@@ -210,6 +314,17 @@ const movePager = (row: PagerRow, page: number) => {
               <span class="block text-[9px] text-pic-text-muted">{{ period.year }}</span>
               {{ period.label }}
             </th>
+            <th class="min-w-[100px] border-b border-r border-pic-border bg-pic-muted-surface px-2 py-2 text-right font-black text-pic-text-main">
+              Prom. sem.
+              <span class="block text-[9px] text-pic-text-muted">observadas</span>
+            </th>
+            <th class="min-w-[92px] border-b border-r border-pic-border bg-pic-muted-surface px-2 py-2 text-right font-black text-pic-text-main">Δ KG</th>
+            <th class="min-w-[80px] border-b border-r border-pic-border bg-pic-muted-surface px-2 py-2 text-right font-black text-pic-text-main">Δ %</th>
+            <th class="min-w-[110px] border-b border-r border-pic-border bg-pic-muted-surface px-2 py-2 text-right font-black text-pic-text-main">
+              Tend. 4×4
+              <span class="block text-[9px] text-pic-text-muted">promedio</span>
+            </th>
+            <th class="min-w-[82px] border-b border-r border-pic-border bg-pic-muted-surface px-2 py-2 text-right font-black text-pic-text-main">Part.</th>
             <th class="sticky right-0 z-20 min-w-[110px] border-b border-pic-border bg-pic-brand-soft px-3 py-2 text-right font-black text-pic-brand">
               Total KG
             </th>
@@ -253,6 +368,8 @@ const movePager = (row: PagerRow, page: number) => {
                 v-for="cell in row.cells"
                 :key="cell.key"
                 class="border-b border-r border-pic-border px-2 py-2 text-right font-mono font-semibold transition group-hover:bg-pic-brand-soft/40"
+                :style="cell.style"
+                :title="cell.title"
                 :class="{
                   'text-pic-text-muted': cell.tone === 'missing' || cell.tone === 'zero',
                   'text-pic-danger': cell.tone === 'negative',
@@ -260,6 +377,22 @@ const movePager = (row: PagerRow, page: number) => {
                 }"
               >
                 {{ cell.label }}
+              </td>
+              <td class="border-b border-r border-pic-border px-2 py-2 text-right font-mono font-semibold text-pic-text-main">
+                {{ row.averageLabel }}
+              </td>
+              <td class="border-b border-r border-pic-border px-2 py-2 text-right font-mono font-bold" :class="row.weeklyTone">
+                {{ row.weeklyDeltaLabel }}
+              </td>
+              <td class="border-b border-r border-pic-border px-2 py-2 text-right font-mono font-bold" :class="row.weeklyTone">
+                {{ row.weeklyDeltaPctLabel }}
+              </td>
+              <td class="border-b border-r border-pic-border px-2 py-2 text-right font-mono" :class="row.trendTone">
+                <span class="block font-bold">{{ row.trendLabel }}</span>
+                <span class="block text-[9px]">{{ row.trendPctLabel }}</span>
+              </td>
+              <td class="border-b border-r border-pic-border px-2 py-2 text-right font-mono font-semibold text-pic-text-main">
+                {{ row.participationLabel }}
               </td>
               <td class="sticky right-0 border-b border-pic-border bg-pic-surface px-3 py-2 text-right font-mono font-black text-pic-text-main group-hover:bg-pic-brand-soft">
                 {{ row.totalLabel }}

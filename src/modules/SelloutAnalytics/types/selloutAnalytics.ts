@@ -64,6 +64,10 @@ export interface SelloutSummary {
 }
 
 export type SelloutMatrixLevel = 'chain' | 'store' | 'sku';
+export type SelloutHeatmapMode = 'values' | 'volume' | 'change';
+export type SelloutComparisonMode = 'timeline' | 'yearOverYear';
+export type SelloutComparisonMeasure = 'kg' | 'index';
+export type SelloutComparisonWindow = 8 | 13 | 26 | 52 | 'all';
 
 export interface SelloutMatrixRequest extends SelloutSummaryRequest {
   level: SelloutMatrixLevel;
@@ -121,6 +125,48 @@ export interface SelloutExportRow extends SelloutPeriodKey {
 export interface SelloutExportData {
   rows: SelloutExportRow[];
   totalRows: number;
+}
+
+export interface SelloutDropRankingItem {
+  chain: string | null;
+  store: string | null;
+  sku: string | null;
+  brand: string | null;
+  previousKg: number;
+  currentKg: number;
+  deltaKg: number;
+  deltaPct: number | null;
+}
+
+export interface SelloutDropRanking {
+  level: SelloutMatrixLevel;
+  previousPeriod: SelloutPeriodKey;
+  currentPeriod: SelloutPeriodKey;
+  items: SelloutDropRankingItem[];
+}
+
+export interface SelloutComparisonOption {
+  value: string;
+  secondary: string | null;
+  totalKg: number;
+}
+
+export interface SelloutComparisonOptions {
+  level: SelloutMatrixLevel;
+  options: SelloutComparisonOption[];
+}
+
+export interface SelloutComparisonSeriesItem {
+  entity: string;
+  secondary: string | null;
+  points: SelloutMatrixValue[];
+}
+
+export interface SelloutComparisonSeries {
+  level: SelloutMatrixLevel;
+  comparisonMode: SelloutComparisonMode;
+  displayPeriods: SelloutPeriodKey[];
+  series: SelloutComparisonSeriesItem[];
 }
 
 export interface SelloutApiResponse<T> {

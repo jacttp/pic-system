@@ -9,6 +9,9 @@ import {
   StdPageHeader,
 } from '@/modules/Shared/components/std';
 import FilterDropdown from '@/modules/Shared/components/FilterDropdown.vue';
+import type { SelloutComparisonMeasure } from '../types/selloutAnalytics';
+import SelloutComparisonChart from '../components/SelloutComparisonChart.vue';
+import SelloutDiagnosticsPanel from '../components/SelloutDiagnosticsPanel.vue';
 import SelloutMatrixTable from '../components/SelloutMatrixTable.vue';
 import { useSelloutExport } from '../composables/useSelloutExport';
 import { useSelloutAnalyticsStore } from '../stores/selloutAnalyticsStore';
@@ -67,6 +70,9 @@ const handleStorePage = (payload: { chain: string; page: number }) => store.load
 const handleSkuPage = (payload: { chain: string; store: string; page: number }) => (
   store.loadSkus(payload.chain, payload.store, payload.page)
 );
+const handleComparisonMeasure = (measure: SelloutComparisonMeasure) => {
+  store.comparisonMeasure = measure;
+};
 
 onMounted(() => store.initialize());
 </script>
@@ -80,7 +86,7 @@ onMounted(() => store.initialize());
           title="Desplazamiento semanal"
           description="Explora kilogramos netos por cadena, tienda y SKU sobre semanas PIC cerradas."
           icon="fa-solid fa-chart-area"
-          meta="Fase 2 · Matriz operativa"
+          meta="Fase 4 · Comparación histórica"
         >
           <template #actions>
             <StdButton
@@ -247,6 +253,35 @@ onMounted(() => store.initialize());
           </article>
         </section>
 
+        <SelloutDiagnosticsPanel
+          v-if="store.rootMatrix"
+          :periods="reportPeriods"
+          :summary="store.summary"
+          :ranking="store.dropRanking"
+          :ranking-level="store.rankingLevel"
+          :loading-ranking="store.isLoadingRanking"
+          :ranking-error="store.rankingError"
+          @ranking-level="store.loadDropRanking"
+        />
+
+        <SelloutComparisonChart
+          v-if="store.rootMatrix"
+          :level="store.comparisonLevel"
+          :mode="store.comparisonMode"
+          :measure="store.comparisonMeasure"
+          :visible-weeks="store.comparisonWindow"
+          :options="store.comparisonOptions"
+          :selected-entities="store.selectedComparisonEntities"
+          :data="store.comparisonSeries"
+          :loading="store.isLoadingComparison"
+          :error="store.comparisonError"
+          @level-change="store.loadComparisonOptions"
+          @mode-change="store.setComparisonMode"
+          @measure-change="handleComparisonMeasure"
+          @window-change="store.setComparisonWindow"
+          @entities-change="store.setComparisonEntities"
+        />
+
         <SelloutMatrixTable
           :periods="reportPeriods"
           :root="store.rootMatrix"
@@ -255,6 +290,7 @@ onMounted(() => store.initialize());
           :expanded-chains="store.expandedChains"
           :expanded-stores="store.expandedStores"
           :loading-branches="store.loadingBranches"
+          :overall-total-kg="store.totalKg"
           :loading="store.isLoadingReport"
           @toggle-chain="store.toggleChain"
           @toggle-store="store.toggleStore"

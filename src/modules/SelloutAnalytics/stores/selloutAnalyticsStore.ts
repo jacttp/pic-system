@@ -4,9 +4,16 @@ import axios from 'axios';
 import { selloutAnalyticsApi } from '../services/selloutAnalyticsApi';
 import type {
   SelloutContext,
+  SelloutComparisonMeasure,
+  SelloutComparisonMode,
+  SelloutComparisonOption,
+  SelloutComparisonSeries,
+  SelloutComparisonWindow,
+  SelloutDropRanking,
   SelloutFilters,
   SelloutMatrix,
   SelloutMatrixEntity,
+  SelloutMatrixLevel,
   SelloutPeriodKey,
   SelloutSummary,
   SelloutSummaryRequest,
@@ -34,11 +41,24 @@ export const useSelloutAnalyticsStore = defineStore('sellout-analytics', () => {
   const expandedStores = ref<string[]>([]);
   const loadingBranches = ref<string[]>([]);
   const storeOptions = ref<string[]>([]);
+  const dropRanking = ref<SelloutDropRanking | null>(null);
+  const rankingLevel = ref<SelloutMatrixLevel>('store');
+  const comparisonLevel = ref<SelloutMatrixLevel>('chain');
+  const comparisonMode = ref<SelloutComparisonMode>('timeline');
+  const comparisonMeasure = ref<SelloutComparisonMeasure>('kg');
+  const comparisonWindow = ref<SelloutComparisonWindow>(13);
+  const comparisonOptions = ref<SelloutComparisonOption[]>([]);
+  const selectedComparisonEntities = ref<string[]>([]);
+  const comparisonSeries = ref<SelloutComparisonSeries | null>(null);
   const isInitializing = ref(false);
   const isLoadingReport = ref(false);
   const isLoadingStoreOptions = ref(false);
+  const isLoadingRanking = ref(false);
+  const isLoadingComparison = ref(false);
   const error = ref('');
   const branchError = ref('');
+  const rankingError = ref('');
+  const comparisonError = ref('');
   const filtersDirty = ref(true);
 
   const isReady = computed(() => Boolean(context.value));
@@ -89,6 +109,35 @@ export const useSelloutAnalyticsStore = defineStore('sellout-analytics', () => {
       brands: [...filters.brands],
       skus: [...filters.skus],
     },
+  });
+
+  const comparisonPeriods = computed<SelloutPeriodKey[]>(() => {
+    const appliedPeriods = appliedPayload.value?.periods ?? [];
+    const endPeriod = appliedPeriods.at(-1);
+    if (!endPeriod) return [];
+    const endKey = periodKey(endPeriod);
+    const available = closedPeriods.value.filter(period => (
+      period.year < endPeriod.year || (period.year === endPeriod.year && period.week <= endPeriod.week)
+    ));
+    const aligned = comparisonMode.value === 'yearOverYear'
+      ? available.filter(period => period.year === endPeriod.year)
+      : available;
+    const endIndex = aligned.findIndex(period => periodKey(period) === endKey);
+    const candidates = endIndex >= 0 ? aligned.slice(0, endIndex + 1) : aligned;
+    const selected = comparisonWindow.value === 'all'
+      ? candidates
+      : candidates.slice(-comparisonWindow.value);
+    return selected.map(period => ({ year: period.year, week: period.week }));
+  });
+
+  const currentComparisonPayload = (): SelloutSummaryRequest => ({
+    periods: [...comparisonPeriods.value],
+    filters: appliedPayload.value ? {
+      chains: [...appliedPayload.value.filters.chains],
+      stores: [...appliedPayload.value.filters.stores],
+      brands: [...appliedPayload.value.filters.brands],
+      skus: [...appliedPayload.value.filters.skus],
+    } : emptyFilters(),
   });
 
   const clearBranches = () => {
@@ -146,11 +195,122 @@ export const useSelloutAnalyticsStore = defineStore('sellout-analytics', () => {
       rootMatrix.value = matrixResponse.data;
       appliedPayload.value = payload;
       filtersDirty.value = false;
+      await Promise.all([
+        loadDropRanking(rankingLevel.value),
+        loadComparisonOptions(comparisonLevel.value),
+      ]);
     } catch (cause) {
       error.value = errorMessage(cause, 'No fue posible generar la matriz de Sellout.');
     } finally {
       isLoadingReport.value = false;
     }
+  };
+
+  const loadDropRanking = async (level: SelloutMatrixLevel = rankingLevel.value) => {
+    if (!appliedPayload.value) return;
+    rankingLevel.value = level;
+    rankingError.value = '';
+    if (appliedPayload.value.periods.length < 2) {
+      dropRanking.value = null;
+      return;
+    }
+    isLoadingRanking.value = true;
+    try {
+      dropRanking.value = await selloutAnalyticsApi.getDropRanking({
+        ...appliedPayload.value,
+        level,
+        limit: 10,
+      });
+    } catch (cause) {
+      dropRanking.value = null;
+      rankingError.value = errorMessage(cause, 'No fue posible calcular el ranking de caídas.');
+    } finally {
+      isLoadingRanking.value = false;
+    }
+  };
+
+  const loadComparisonSeries = async () => {
+    if (!appliedPayload.value || selectedComparisonEntities.value.length === 0) {
+      comparisonSeries.value = null;
+      return;
+    }
+    isLoadingComparison.value = true;
+    comparisonError.value = '';
+    try {
+      comparisonSeries.value = await selloutAnalyticsApi.getComparisonSeries({
+        ...currentComparisonPayload(),
+        level: comparisonLevel.value,
+        entities: [...selectedComparisonEntities.value],
+        comparisonMode: comparisonMode.value,
+      });
+    } catch (cause) {
+      comparisonSeries.value = null;
+      comparisonError.value = errorMessage(cause, 'No fue posible cargar las líneas comparativas.');
+    } finally {
+      isLoadingComparison.value = false;
+    }
+  };
+
+  const loadComparisonOptions = async (level: SelloutMatrixLevel = comparisonLevel.value) => {
+    if (!appliedPayload.value) return;
+    comparisonLevel.value = level;
+    if (
+      comparisonMode.value === 'yearOverYear'
+      && new Set(appliedPayload.value.periods.map(period => period.year)).size !== 1
+    ) {
+      comparisonMode.value = 'timeline';
+    }
+    isLoadingComparison.value = true;
+    comparisonError.value = '';
+    try {
+      const data = await selloutAnalyticsApi.getComparisonOptions({
+        ...currentComparisonPayload(),
+        level,
+      });
+      comparisonOptions.value = data.options;
+      const available = new Set(data.options.map(option => option.value));
+      const limit = comparisonMode.value === 'yearOverYear' ? 1 : 6;
+      const preserved = selectedComparisonEntities.value.filter(value => available.has(value)).slice(0, limit);
+      selectedComparisonEntities.value = preserved.length
+        ? preserved
+        : data.options.slice(0, Math.min(3, limit)).map(option => option.value);
+      await loadComparisonSeries();
+    } catch (cause) {
+      comparisonOptions.value = [];
+      selectedComparisonEntities.value = [];
+      comparisonSeries.value = null;
+      comparisonError.value = errorMessage(cause, 'No fue posible cargar las entidades comparables.');
+    } finally {
+      isLoadingComparison.value = false;
+    }
+  };
+
+  const toggleComparisonEntity = async (value: string) => {
+    const selected = selectedComparisonEntities.value;
+    if (selected.includes(value)) {
+      selectedComparisonEntities.value = selected.filter(item => item !== value);
+    } else {
+      const limit = comparisonMode.value === 'yearOverYear' ? 1 : 6;
+      selectedComparisonEntities.value = [...selected, value].slice(-limit);
+    }
+    await loadComparisonSeries();
+  };
+
+  const setComparisonEntities = async (values: string[]) => {
+    const limit = comparisonMode.value === 'yearOverYear' ? 1 : 6;
+    selectedComparisonEntities.value = [...new Set(values)].slice(-limit);
+    await loadComparisonSeries();
+  };
+
+  const setComparisonMode = async (mode: SelloutComparisonMode) => {
+    comparisonMode.value = mode;
+    if (mode === 'yearOverYear') selectedComparisonEntities.value = selectedComparisonEntities.value.slice(0, 1);
+    await loadComparisonSeries();
+  };
+
+  const setComparisonWindow = async (window: SelloutComparisonWindow) => {
+    comparisonWindow.value = window;
+    await loadComparisonSeries();
   };
 
   const loadRootPage = async (page: number) => {
@@ -271,11 +431,17 @@ export const useSelloutAnalyticsStore = defineStore('sellout-analytics', () => {
   return {
     context, filters, selectedStartKey, selectedEndKey, appliedPayload, summary, rootMatrix,
     storesByChain, skusByStore, expandedChains, expandedStores, loadingBranches, storeOptions,
-    isInitializing, isLoadingReport, isLoadingStoreOptions, error, branchError, filtersDirty,
+    dropRanking, rankingLevel, comparisonLevel, comparisonMode, comparisonMeasure, comparisonWindow,
+    comparisonPeriods,
+    comparisonOptions, selectedComparisonEntities, comparisonSeries,
+    isInitializing, isLoadingReport, isLoadingStoreOptions, isLoadingRanking, isLoadingComparison,
+    error, branchError, rankingError, comparisonError, filtersDirty,
     isReady, lastClosedPeriod, periodOptions, selectedPeriods, periodSelectionError, activeFilterCount, filterSummary,
     totalKg, observedWeeks, negativeRows,
     initialize, markDirty: () => { filtersDirty.value = true; }, loadStoreOptions, applyFilters,
-    loadRootPage, toggleChain, toggleStore, loadStores, loadSkus,
+    loadRootPage, toggleChain, toggleStore, loadStores, loadSkus, loadDropRanking,
+    loadComparisonOptions, loadComparisonSeries, toggleComparisonEntity, setComparisonEntities,
+    setComparisonMode, setComparisonWindow,
     resetFilters,
   };
 });
