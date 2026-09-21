@@ -402,7 +402,7 @@ const canShowCpfrStepper = (row: CpfrPreviewRow) =>
 const getMixRowKey = (row: CpfrPreviewRow) => `${row.source_type}|${row.num_pedido}|${row.sku_muliix}`;
 const getRowMixGroup = (row: CpfrPreviewRow) => cpfrMixGroupsByRowKey.value.get(getMixRowKey(row)) || null;
 const rowHasMixMetadata = (row: CpfrPreviewRow) =>
-   !row.is_expired && (Boolean(row.par_muliix) || Boolean(getRowMixGroup(row)));
+   !row.is_expired && !isNoResurtibleRow(row) && (Boolean(row.par_muliix) || Boolean(getRowMixGroup(row)));
 const isMixAdjustmentLocked = (row: CpfrPreviewRow) =>
    isMixPairRow(row) || Boolean(getRowMixGroup(row)?.pair_exists);
 const groupPreKg = (group: CpfrMixGroup) => Number(group.pre_mix_quantity || 0) * Number(group.base_unit_kg || 0);
@@ -441,7 +441,7 @@ const getRowMixButtonTitle = (row: CpfrPreviewRow) => {
    return 'Revisar mix de producto';
 };
 const openRowMix = (row: CpfrPreviewRow) => {
-   if (row.is_expired) return;
+   if (row.is_expired || isNoResurtibleRow(row)) return;
    const group = getRowMixGroup(row);
    const key = group ? getMixKey(group) : getMixRowKey(row);
    confirmedMixKey.value = '';

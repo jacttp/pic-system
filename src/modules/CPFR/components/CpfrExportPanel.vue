@@ -564,7 +564,6 @@ async function handleExcelExport() {
             return
         }
 
-        await store.loadDashboard()
         const sentOrders = statusResult.sentOrders ?? orderNumbers.length
         const closedZeroOrders = statusResult.closedZeroOrders ?? 0
         const deletedZeroZ8Orders = statusResult.deletedZeroZ8Orders ?? 0

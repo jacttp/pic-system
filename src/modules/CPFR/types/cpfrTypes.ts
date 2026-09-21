@@ -76,6 +76,7 @@ export interface CpfrSkuDash {
     cantidad_base_uni?: number
     ajuste?: number
     ajuste_mix?: number
+    order_has_nonzero?: boolean        // existe al menos un renglón persistido positivo en la misma OC
     pedido_cadena_pz: number
     escenario: 'A' | 'B' | null
     demanda_requerida_kg: number | null

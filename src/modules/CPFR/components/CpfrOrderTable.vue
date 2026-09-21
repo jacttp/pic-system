@@ -26,7 +26,7 @@ const router = useRouter()
 const selectedProductContext = ref<{ tienda: CpfrStoreDash; sku: CpfrSkuDash } | null>(null)
 
 const store = useCpfrStore()
-const showZeroZ8 = ref(false)
+const showZeroZ8 = ref(true)
 const showExpiredCloseModal = ref(false)
 const showExpiredDraftCloseModal = ref(false)
 const showApprovedZeroPurgeModal = ref(false)
@@ -329,11 +329,13 @@ function ocFinalOrderTotal(oc: GroupedOC): number {
 }
 
 function canDecreaseAdjustment(sku: CpfrSkuDash): boolean {
+    if (sku.no_resurtible_adjusted) return false
     const step = packagingStep(sku)
     return step > 0 && skuBaseQuantity(sku) + skuAdjustment(sku) - step >= 0
 }
 
 function canIncreaseAdjustment(sku: CpfrSkuDash): boolean {
+    if (sku.no_resurtible_adjusted) return false
     const step = packagingStep(sku)
     return step > 0 && skuAdjustment(sku) < 0 && skuBaseQuantity(sku) + skuAdjustment(sku) + step <= skuBaseQuantity(sku)
 }
@@ -341,6 +343,7 @@ function canIncreaseAdjustment(sku: CpfrSkuDash): boolean {
 function adjustmentTooltip(idCliente: string, sku: CpfrSkuDash): string {
     if (currentTab.value === 'aprobada') return 'Ajuste aprobado de solo lectura'
     if (currentTab.value !== 'revision') return 'Ajuste disponible solo en revision'
+    if (sku.no_resurtible_adjusted) return 'Este SKU está marcado como NoResurtible y no permite ajustes'
     if (!store.adjustmentsEnabled) return 'Los ajustes manuales están deshabilitados para esta cadena'
     if (!sku.sku_muliix || !sku.num_pedido || !sku.fec_pedido_cadena) return 'Faltan datos para ajustar este SKU'
     if (packagingStep(sku) <= 0) return 'Este SKU no tiene configurado el multiplo de empaque seleccionado'
@@ -349,6 +352,7 @@ function adjustmentTooltip(idCliente: string, sku: CpfrSkuDash): string {
 }
 
 async function adjustReviewSku(idCliente: string, sku: CpfrSkuDash, direction: 1 | -1) {
+    if (sku.no_resurtible_adjusted) return
     const key = adjustmentKey(idCliente, sku)
     if (adjustingSkuKey.value) return
     adjustingSkuKey.value = key
@@ -733,6 +737,22 @@ function calcularFillRateDinamico(sku: any): number | null {
     if (!sku || !sku.cant_pedida || sku.cant_pedida <= 0) return null;
     const sugerido = sku.pedido_sugerido_pz_red || 0;
     return sugerido / sku.cant_pedida;
+}
+
+function visibleStoreSuggestedTotal(skus: CpfrSkuDash[]): number {
+    return skus.reduce((sum, sku) => sum + Number(sku.pedido_sugerido_pz_red || 0), 0)
+}
+
+function visibleStoreOrderedTotal(skus: CpfrSkuDash[]): number {
+    return skus.reduce((sum, sku) => sum + Number(sku.cant_pedida || 0), 0)
+}
+
+function visibleStoreFillRate(skus: CpfrSkuDash[]): number | null {
+    const rates = skus
+        .map(sku => calcularFillRateDinamico(sku))
+        .filter((rate): rate is number => rate !== null)
+    if (!rates.length) return null
+    return rates.reduce((sum, rate) => sum + rate, 0) / rates.length
 }
 
 async function changeOCStatus(num_pedido: string | null, estado: string) {
@@ -1147,20 +1167,7 @@ async function loadHistoryApprovedZeroCandidates() {
 
 const approvedZeroPurgeRows = computed<ApprovedZeroPurgeRow[]>(() => {
     if (currentTab.value === 'historial') return historyApprovedZeroPurgeRows.value
-    if (!isApprovedTab.value) return []
-
-    const ordersWithNonZeroSku = new Set<string>()
-    for (const dia of filteredDias.value) {
-        for (const tienda of dia.tiendas) {
-            for (const sku of tienda.skus) {
-                if (!sku.num_pedido) continue
-                if (String(sku.estado_oc || '').toLowerCase() !== 'aprobado') continue
-                if (Math.abs(skuFinalOrderQuantity(sku)) > 0.0001) {
-                    ordersWithNonZeroSku.add(sku.num_pedido)
-                }
-            }
-        }
-    }
+    if (!isApprovedTab.value && currentTab.value !== 'sin_embarcar') return []
 
     const map = new Map<number, ApprovedZeroPurgeRow>()
     for (const dia of filteredDias.value) {
@@ -1168,9 +1175,10 @@ const approvedZeroPurgeRows = computed<ApprovedZeroPurgeRow[]>(() => {
             for (const sku of tienda.skus) {
                 const id = Number(sku.pedido_generado_id)
                 if (!Number.isInteger(id) || id <= 0) continue
-                if (String(sku.estado_oc || '').toLowerCase() !== 'aprobado') continue
+                const estado = String(sku.estado_oc || '').toLowerCase()
+                if (estado !== 'cerrado') continue
                 if (Math.abs(skuFinalOrderQuantity(sku)) > 0.0001) continue
-                if (!isZ8(sku.num_pedido) && !ordersWithNonZeroSku.has(String(sku.num_pedido || ''))) continue
+                if (!isZ8(sku.num_pedido) && !sku.order_has_nonzero) continue
 
                 map.set(id, {
                     id,
@@ -1242,13 +1250,13 @@ async function purgeApprovedZeroSkus() {
             title: partial ? 'Purga parcial' : 'Ceros purgados',
             description: partial
                 ? `${deleted} de ${requested} renglón(es) fueron eliminados. Los demás ya no cumplían la condición.`
-                : `${deleted} renglón(es) eliminado(s) de CPFR_PedidoGenerado.`,
+                : `${deleted} renglón(es) en cero eliminado(s).`,
             duration: 5000,
         })
     } catch (err) {
         toast({
             title: 'Error al purgar ceros',
-            description: 'No se pudieron eliminar los renglones aprobados o enviados en cero.',
+            description: 'No se pudieron eliminar los renglones elegibles en cero.',
             variant: 'destructive',
             duration: 5000,
         })
@@ -1590,10 +1598,10 @@ const totalUniqueOCs = computed(() => {
           </button>
 
           <button
-            v-if="(isApprovedTab || currentTab === 'historial') && approvedZeroPurgeRows.length > 0"
+            v-if="(isApprovedTab || currentTab === 'sin_embarcar' || currentTab === 'historial') && approvedZeroPurgeRows.length > 0"
             class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="submittingOC === 'approved-zero-purge' || historyZeroValidationLoading"
-            title="Eliminar de CPFR_PedidoGenerado los SKUs aprobados o enviados cuyo total final es cero"
+            title="Eliminar los SKUs elegibles cuyo total final es cero, incluidos los Z8 cerrados"
             @click.stop="openApprovedZeroPurgeModal"
           >
             <i v-if="submittingOC === 'approved-zero-purge' || historyZeroValidationLoading" class="fa-solid fa-circle-notch fa-spin"></i>
@@ -2332,7 +2340,7 @@ const totalUniqueOCs = computed(() => {
                       :class="isApprovedTab ? 'text-emerald-700 bg-emerald-50/50 border-emerald-100' : 'text-amber-700 bg-amber-50/50 border-amber-100'"
                     >
                       <div class="absolute inset-y-0 left-0 w-[4px]" :class="isApprovedTab ? 'bg-emerald-400/30' : 'bg-amber-400/30'"></div>
-                      {{ n(isApprovedTab ? tienda.skus.reduce((sum, sku) => sum + skuFinalOrderQuantity(sku), 0) : tienda.resumen.pedido_sugerido_pz_red, 0) }}
+                      {{ n(isApprovedTab ? tienda.skus.reduce((sum, sku) => sum + skuFinalOrderQuantity(sku), 0) : visibleStoreSuggestedTotal(tienda.skus), 0) }}
                     </td>
 
                     <!-- Ajuste -->
@@ -2344,13 +2352,13 @@ const totalUniqueOCs = computed(() => {
 
                     <!-- Pedido Cadena (cant_pedida de la OC) -->
                     <td v-if="showCentralizedColumn" class="px-2.5 py-2.5 text-right font-semibold text-slate-700">
-                      {{ tienda.resumen.cant_pedida_total.toLocaleString('es-MX') }}
+                      {{ visibleStoreOrderedTotal(tienda.skus).toLocaleString('es-MX') }}
                     </td>
 
 
                     <!-- Fill Rate -->
-                    <td class="px-2.5 py-2.5 text-right font-semibold" :class="fillClass(tienda.resumen.fill_rate)">
-                      {{ tienda.resumen.fill_rate != null ? (tienda.resumen.fill_rate * 100).toFixed(1) + '%' : '—' }}
+                    <td class="px-2.5 py-2.5 text-right font-semibold" :class="fillClass(visibleStoreFillRate(tienda.skus))">
+                      {{ visibleStoreFillRate(tienda.skus) != null ? (visibleStoreFillRate(tienda.skus)! * 100).toFixed(1) + '%' : '—' }}
                     </td>
 
 
@@ -3004,7 +3012,7 @@ const totalUniqueOCs = computed(() => {
                                   :class="isApprovedTab ? 'bg-emerald-50/50 border border-emerald-100 hover:bg-emerald-50' : 'bg-amber-50/50 border border-amber-100 hover:bg-amber-50'"
                                 >
                                     <p class="text-[8px] font-black uppercase tracking-widest mb-0.5" :class="isApprovedTab ? 'text-emerald-500' : 'text-amber-400'">{{ isApprovedTab ? 'Aprobado' : 'Sugerido' }}</p>
-                                    <p class="text-[13px] font-black" :class="isApprovedTab ? 'text-emerald-700' : 'text-amber-700'">{{ n(isApprovedTab ? tienda.skus.reduce((sum, sku) => sum + skuFinalOrderQuantity(sku), 0) : tienda.resumen.pedido_sugerido_pz_red, 0) }}</p>
+                                    <p class="text-[13px] font-black" :class="isApprovedTab ? 'text-emerald-700' : 'text-amber-700'">{{ n(isApprovedTab ? tienda.skus.reduce((sum, sku) => sum + skuFinalOrderQuantity(sku), 0) : visibleStoreSuggestedTotal(tienda.skus), 0) }}</p>
                                 </div>
                                 <div class="bg-slate-50 border border-slate-200 rounded-xl p-2.5 shadow-sm min-w-[100px] hover:bg-slate-100 transition-colors">
                                     <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Cobertura</p>
@@ -3415,7 +3423,7 @@ const totalUniqueOCs = computed(() => {
                 <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500 text-white shadow-sm">
                   <i class="fa-solid fa-broom text-[11px]"></i>
                 </span>
-                <h3 class="text-sm font-black uppercase tracking-wider text-slate-800">Purgar SKUs aprobados o enviados en cero</h3>
+                <h3 class="text-sm font-black uppercase tracking-wider text-slate-800">Purgar SKUs en cero</h3>
               </div>
               <p class="text-xs font-medium leading-relaxed text-slate-600">
                 Las OC oficiales totalmente en cero conservan su referencia para cerrarse al generar; los renglones Z8 en cero sí pueden eliminarse.

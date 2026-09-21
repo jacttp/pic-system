@@ -809,6 +809,10 @@ export const useCpfrStore = defineStore('cpfr', () => {
     async function updateStatus(body: CpfrUpdateStatusBody): Promise<{ ok: boolean; approvalId?: number }> {
         try {
             const res = await cpfrApi.updateStatus(body)
+            if (body.estado === 'aprobado' || body.estado === 'enviado') {
+                await loadDashboard()
+                return { ok: true, approvalId: res.approval_id ?? undefined }
+            }
             const transition = res.order_transitions?.find(item => item.num_pedido === body.num_pedido && item.estado !== 'eliminado')
             const localEstado = transition?.estado || (body.estado === 'pendiente' ? 'borrador' : body.estado)
             // Actualizar localmente sin re-fetch
@@ -972,6 +976,16 @@ export const useCpfrStore = defineStore('cpfr', () => {
     async function updateStatusBulk(body: CpfrBulkUpdateStatusBody): Promise<{ ok: boolean; error?: string; approvalId?: number; approvalCount?: number; updatedOrders?: number; sentOrders?: number; closedZeroOrders?: number; deletedZeroZ8Orders?: number }> {
         try {
             const res = await cpfrApi.updateStatusBulk(body)
+            if (body.estado === 'aprobado' || body.estado === 'enviado') {
+                await loadDashboard()
+                return {
+                    ok: true,
+                    updatedOrders: res.updated_orders ?? body.num_pedidos.length,
+                    sentOrders: res.sent_orders,
+                    closedZeroOrders: res.closed_zero_orders,
+                    deletedZeroZ8Orders: res.deleted_zero_z8_orders,
+                }
+            }
             const nums = new Set(body.num_pedidos)
             const transitions = new Map(
                 (res.order_transitions || [])

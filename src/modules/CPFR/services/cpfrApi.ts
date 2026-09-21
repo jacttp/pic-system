@@ -193,7 +193,7 @@ export const cpfrApi = {
      * POST /api/cpfr/upload-oc  (multipart/form-data)
      * Subir OC desde archivo .xls de Soriana.
      */
-    async purgeApprovedZeroSkus(ids: number[]): Promise<{ success: boolean; requested: number; deleted: number; message?: string }> {
+    async purgeApprovedZeroSkus(ids: number[]): Promise<{ success: boolean; requested: number; deleted: number; deleted_z8?: number; message?: string }> {
         const { data } = await api.delete('/cpfr/orders/approved-zero-skus', { data: { ids } })
         return data
     },
