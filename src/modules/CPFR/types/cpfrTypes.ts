@@ -153,6 +153,7 @@ export interface CpfrForceFillrateResult {
     week: number
     dia: number
     requested_stores: number
+    requested_rows: number
     enabled_stores: number
     disabled_stores: number
     matched_skus: number

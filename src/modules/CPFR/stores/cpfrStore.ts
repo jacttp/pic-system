@@ -3,6 +3,7 @@
 import { defineStore } from 'pinia'
 import { ref, reactive, computed } from 'vue'
 import { cpfrApi } from '../services/cpfrApi'
+import { buildVisibleCpfrDias } from '../composables/useCpfrVisibility'
 import { approvalsApi } from '@/modules/Approvals/services/approvalsApi'
 import type { Approval, ApprovalStatus } from '@/modules/Approvals/types/approval.types'
 import type {
@@ -704,14 +705,24 @@ export const useCpfrStore = defineStore('cpfr', () => {
             return { ok: false, blockedStores: 0, message: 'Espera a que termine de cargar el estado de Pedido Sugerido.' }
         }
 
-        const dayGroup = dias.value.find(item => item.dia_num === day)
+        const visibleDias = buildVisibleCpfrDias({
+            activeTab: activeTab.value,
+            dias: dias.value,
+            statusFilters,
+            criterioGlobal: criterio_global.value,
+        })
+        const dayGroup = visibleDias.find(item => item.dia_num === day)
         const storesForDay = dayGroup?.tiendas || []
         const blockedStores = storesForDay.filter(item => callbookStores[item.id_cliente]?.blocked === true).length
-        const unlockedStoreIds = storesForDay
+        const unlockedStores = storesForDay
             .filter(item => callbookStores[item.id_cliente]?.blocked !== true)
-            .map(item => item.id_cliente)
+        const unlockedStoreIds = unlockedStores.map(item => item.id_cliente)
+        const visiblePedidoGeneradoIds = [...new Set(unlockedStores.flatMap(item => item.skus)
+            .filter(sku => String(sku.nom_cadena || '').trim().toUpperCase() === 'SAMS')
+            .map(sku => Number(sku.pedido_generado_id))
+            .filter(id => Number.isInteger(id) && id > 0))]
 
-        if (!unlockedStoreIds.length) {
+        if (!unlockedStoreIds.length || !visiblePedidoGeneradoIds.length) {
             return { ok: false, blockedStores, message: 'No hay tiendas con Pedido Sugerido desbloqueado para este día.' }
         }
 
@@ -723,6 +734,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
                 nom_cadena: 'SAMS',
                 dia: day,
                 unlocked_store_ids: unlockedStoreIds,
+                pedido_generado_ids: visiblePedidoGeneradoIds,
             })
             const updatedRows = new Map(data.updated_rows.map(row => [row.pedido_generado_id, row]))
             for (const dayItem of dias.value) {

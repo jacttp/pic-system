@@ -120,6 +120,7 @@ export const cpfrApi = {
         nom_cadena: 'SAMS'
         dia: number
         unlocked_store_ids: string[]
+        pedido_generado_ids: number[]
     }): Promise<CpfrForceFillrateResult> {
         const { data } = await api.post('/cpfr/orders/force-fillrate', body)
         return data.data
