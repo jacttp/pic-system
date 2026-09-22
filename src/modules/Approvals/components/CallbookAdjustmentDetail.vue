@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { approvalsApi } from '../services/approvalsApi';
 import type { Approval, CallbookApprovalDetail, CallbookApprovalProduct } from '../types/approval.types';
 import { StdAlert, StdButton } from '@/modules/Shared/components/std';
+import ApprovalStatusSelector from './ApprovalStatusSelector.vue';
 
 const props = defineProps<{ approval: Approval; canResolve: boolean }>();
 const emit = defineEmits<{ (e: 'close'): void; (e: 'resolved'): void }>();
@@ -62,7 +63,7 @@ function statusLabel(row: CallbookApprovalProduct): string {
 function statusClass(row: CallbookApprovalProduct): string {
    return ({
       FRESCO: 'border-[hsl(var(--pic-success)/0.28)] bg-[hsl(var(--pic-success)/0.08)] text-pic-success',
-      VENCIDO: 'border-[hsl(var(--pic-danger)/0.28)] bg-[hsl(var(--pic-danger)/0.08)] text-pic-danger',
+      VENCIDO: 'border-[hsl(var(--pic-brand)/0.28)] bg-[hsl(var(--pic-brand)/0.08)] text-pic-danger',
       SIN_CONTEO: 'border-[hsl(var(--pic-warning)/0.28)] bg-[hsl(var(--pic-warning)/0.10)] text-pic-warning',
       FECHA_FUTURA: 'border-[hsl(var(--pic-info)/0.28)] bg-[hsl(var(--pic-info)/0.08)] text-pic-info',
    } as const)[row.status];
@@ -118,18 +119,51 @@ watch(() => props.approval.id, load, { immediate: true });
 
 <template>
   <section class="@container space-y-4 font-sans">
-    <header class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-      <div class="flex min-w-0 items-start gap-3">
-        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-pic-brand-soft text-pic-brand ring-1 ring-pic-brand-border">
-          <i class="fa-solid fa-clipboard-check"></i>
-        </span>
-        <div class="min-w-0">
-          <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-pic-brand">Ajuste Callbook</p>
-          <h2 class="mt-0.5 break-words text-base font-extrabold leading-5 tracking-tight text-pic-text-main sm:text-lg sm:leading-6">{{ detail?.nombre_tienda || approval.title }}</h2>
-          <p class="mt-1 font-mono text-xs text-pic-text-muted">{{ detail?.id_cliente || approval.payload.id_cliente }}</p>
+    <header class="overflow-hidden rounded-xl border border-white/10 bg-pic-nav text-pic-nav-text shadow-sm">
+      <div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 px-4 py-4 sm:px-5">
+        <div class="flex min-w-0 items-start gap-3">
+          <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-pic-brand-soft text-pic-brand ring-1 ring-pic-brand-border">
+            <i class="fa-solid fa-clipboard-check"></i>
+          </span>
+          <div class="min-w-0">
+            <p class="text-[11px] font-semibold text-pic-nav-text-muted">Ajuste Callbook</p>
+            <h2 class="mt-0.5 break-words text-sm font-bold leading-5 text-pic-nav-text sm:text-base md:text-lg">{{ detail?.nombre_tienda || approval.title }}</h2>
+            <p class="mt-1 font-mono text-xs font-semibold text-pic-nav-text-muted">Cliente {{ detail?.id_cliente || approval.payload.id_cliente }}</p>
+          </div>
+        </div>
+        <div class="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
+          <ApprovalStatusSelector :status="approval.status" :options="[]" :disabled="true" dark />
+          <StdButton variant="secondary" size="sm" icon="fa-solid fa-arrow-left" @click="emit('close')">Volver</StdButton>
         </div>
       </div>
-      <StdButton variant="secondary" size="sm" icon="fa-solid fa-arrow-left" @click="emit('close')">Volver</StdButton>
+      <div v-if="detail" class="border-t border-white/10 px-4 py-3 sm:px-5">
+        <div class="flex flex-col gap-3 @3xl:flex-row @3xl:items-center @3xl:justify-between">
+          <div class="flex items-center gap-2 text-xs text-pic-nav-text-muted">
+            <span class="flex h-6 w-6 items-center justify-center rounded-md bg-pic-brand text-pic-brand-border">
+              <i class="fa-solid fa-store text-[11px]"></i>
+            </span>
+            <span class="font-bold">Datos de la solicitud</span>
+          </div>
+          <dl class="grid grid-cols-2 overflow-hidden rounded-lg border border-pic-brand-border bg-pic-brand-soft text-center @3xl:grid-cols-4">
+            <div class="min-w-[8.5rem] px-3 py-1.5">
+              <dd class="text-sm font-bold text-pic-brand">{{ dateLabel(detail.business_date) }}</dd>
+              <dt class="mt-0.5 text-[10px] font-bold text-pic-text-main">Fecha de negocio</dt>
+            </div>
+            <div class="min-w-[8.5rem] border-l border-pic-brand-border px-3 py-1.5">
+              <dd class="text-sm font-bold text-pic-brand">{{ dateLabel(detail.oldest_reported_date) }}</dd>
+              <dt class="mt-0.5 text-[10px] font-bold text-pic-text-main">Fecha mínima</dt>
+            </div>
+            <div class="min-w-[6rem] border-t border-pic-brand-border px-3 py-1.5 @3xl:border-l @3xl:border-t-0">
+              <dd class="text-sm font-bold text-pic-brand">{{ products.length }}</dd>
+              <dt class="mt-0.5 text-[10px] font-bold text-pic-text-main">Productos</dt>
+            </div>
+            <div class="min-w-[6rem] border-l border-t border-pic-brand-border px-3 py-1.5 @3xl:border-t-0">
+              <dd class="text-sm font-bold text-pic-brand">{{ products.length - confirmedCount }}</dd>
+              <dt class="mt-0.5 text-[10px] font-bold text-pic-text-main">Por confirmar</dt>
+            </div>
+          </dl>
+        </div>
+      </div>
     </header>
 
     <StdAlert title="Actualiza también la app de ventas" description="Este ajuste no exime de actualizar el conteo en la app de ventas." tone="warning" />
@@ -140,38 +174,32 @@ watch(() => props.approval.id, load, { immediate: true });
     </div>
 
     <template v-else-if="detail">
-      <div class="grid grid-cols-2 gap-2 @3xl:grid-cols-4">
-        <div class="rounded-lg border border-pic-border bg-pic-muted-surface px-3 py-2.5"><p class="text-[10px] font-bold uppercase tracking-[0.08em] text-pic-text-muted">Fecha de negocio</p><p class="mt-1 font-mono text-sm font-bold tabular-nums text-pic-text-main">{{ dateLabel(detail.business_date) }}</p></div>
-        <div class="rounded-lg border border-pic-border bg-pic-muted-surface px-3 py-2.5"><p class="text-[10px] font-bold uppercase tracking-[0.08em] text-pic-text-muted">Fecha mínima</p><p class="mt-1 font-mono text-sm font-bold tabular-nums text-pic-text-main">{{ dateLabel(detail.oldest_reported_date) }}</p></div>
-        <div class="rounded-lg border border-pic-border bg-pic-muted-surface px-3 py-2.5"><p class="text-[10px] font-bold uppercase tracking-[0.08em] text-pic-text-muted">Productos</p><p class="mt-1 text-sm font-extrabold text-pic-text-main">{{ products.length }}</p></div>
-        <div class="rounded-lg border border-pic-brand-border bg-pic-brand-soft px-3 py-2.5"><p class="text-[10px] font-bold uppercase tracking-[0.08em] text-pic-brand">Por confirmar</p><p class="mt-1 text-sm font-extrabold text-pic-brand">{{ products.length - confirmedCount }}</p></div>
-      </div>
 
       <div class="space-y-2.5 @4xl:hidden">
-        <article v-for="row in products" :key="row.sku" class="min-w-0 overflow-hidden rounded-lg border border-pic-border bg-pic-surface shadow-sm transition hover:border-pic-brand-border @3xl:grid @3xl:grid-cols-[minmax(0,1fr)_13rem_minmax(18rem,0.8fr)]">
-          <div class="border-b border-pic-border px-3 py-3 @3xl:flex @3xl:items-center @3xl:border-b-0 @3xl:border-r @3xl:py-2.5">
+        <article v-for="row in products" :key="row.sku" class="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm @3xl:grid @3xl:grid-cols-[minmax(0,1fr)_13rem_minmax(18rem,0.8fr)]">
+          <div class="border-b border-slate-100 px-3 py-3 @3xl:flex @3xl:items-center @3xl:border-b-0 @3xl:border-r @3xl:py-2.5">
             <div class="flex w-full items-start justify-between gap-3">
-              <div class="min-w-0"><h3 class="break-words text-sm font-bold leading-5 text-pic-text-main">{{ row.sku_nombre }}</h3><p class="mt-1 font-mono text-[11px] text-pic-text-muted">{{ row.sku }}</p></div>
+              <div class="min-w-0"><h3 class="break-words text-[11px] font-black uppercase leading-snug text-slate-800">{{ row.sku_nombre }}</h3><p class="mt-1 font-mono text-[9px] font-bold text-slate-400">SKU {{ row.sku }}</p></div>
               <span class="shrink-0 rounded-md border px-2 py-1 text-[10px] font-bold" :class="statusClass(row)">{{ statusLabel(row) }}</span>
             </div>
           </div>
 
-          <dl class="grid grid-cols-2 divide-x divide-pic-border border-b border-pic-border bg-pic-muted-surface text-center text-xs @3xl:border-b-0 @3xl:border-r">
+          <dl class="grid grid-cols-2 divide-x divide-slate-100 border-b border-slate-100 bg-slate-50/70 text-center text-xs @3xl:border-b-0 @3xl:border-r">
             <div class="flex flex-col justify-center px-2 py-2.5">
-              <dt class="text-[10px] font-bold uppercase tracking-[0.08em] text-pic-text-muted">Existencia base</dt>
-              <dd class="mt-1 font-mono text-sm font-bold tabular-nums text-pic-text-main">{{ basePieces(row) }} pz</dd>
+              <dt class="text-[8px] font-black uppercase tracking-wide text-slate-400">Existencia base</dt>
+              <dd class="mt-0.5 font-mono text-[11px] font-black text-brand-700">{{ basePieces(row) }} pz</dd>
             </div>
             <div class="flex flex-col justify-center px-2 py-2.5">
-              <dt class="text-[10px] font-bold uppercase tracking-[0.08em] text-pic-text-muted">Último conteo</dt>
-              <dd class="mt-1 font-mono text-xs font-bold tabular-nums text-pic-text-main">{{ dateLabel(row.ult_fecha_reportada) }}</dd>
+              <dt class="text-[8px] font-black uppercase tracking-wide text-slate-400">Último conteo</dt>
+              <dd class="mt-0.5 font-mono text-[11px] font-black text-brand-700">{{ dateLabel(row.ult_fecha_reportada) }}</dd>
             </div>
           </dl>
 
-          <div class="bg-pic-brand-soft px-3 py-3 @3xl:py-2.5">
+          <div class="bg-brand-50/40 px-3 py-3 @3xl:py-2.5">
             <div class="flex items-center justify-between gap-3">
-              <p :id="`quantity-label-${row.sku}`" class="text-[10px] font-bold uppercase tracking-[0.08em] text-pic-text-muted">{{ editable ? 'Cantidad contada' : 'Cantidad confirmada' }}</p>
-              <p v-if="editable && !confirmed[row.sku]" class="text-[10px] font-bold text-pic-brand">Pendiente</p>
-              <p v-else-if="editable" class="text-[10px] font-bold text-pic-success">Confirmada</p>
+              <p :id="`quantity-label-${row.sku}`" class="text-[8px] font-black uppercase tracking-wide text-slate-500">{{ editable ? 'Cantidad contada' : 'Cantidad confirmada' }}</p>
+              <p v-if="editable && !confirmed[row.sku]" class="text-[9px] font-black uppercase text-brand-700">Pendiente</p>
+              <p v-else-if="editable" class="text-[9px] font-black uppercase text-pic-success">Confirmada</p>
             </div>
             <p :id="`quantity-help-${row.sku}`" class="sr-only">Total de piezas físicas contadas.</p>
             <div class="mt-1.5 grid grid-cols-[minmax(6.5rem,0.72fr)_minmax(9.5rem,1.28fr)] gap-2">
@@ -188,13 +216,13 @@ watch(() => props.approval.id, load, { immediate: true });
                   :aria-labelledby="`quantity-label-${row.sku}`"
                   :aria-describedby="`quantity-help-${row.sku}`"
                   :aria-invalid="!quantityValidity[row.sku]"
-                  class="h-14 w-full rounded-lg border bg-pic-surface py-2 pl-2.5 pr-8 text-right font-mono text-xl font-bold tabular-nums text-pic-text-main outline-none transition hover:bg-pic-muted-surface focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border disabled:bg-pic-muted-surface"
-                  :class="quantityValidity[row.sku] ? 'border-pic-border' : 'border-[hsl(var(--pic-danger)/0.55)]'"
+                  class="h-14 w-full rounded-lg border border-slate-200 bg-white py-2 pl-2.5 pr-8 text-right font-mono text-xl font-bold tabular-nums text-brand-700 outline-none transition focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border disabled:bg-slate-50"
+                  :class="quantityValidity[row.sku] ? '' : 'border-[hsl(var(--pic-danger)/0.55)]'"
                   @focus="selectQuantity"
                   @input="markAsPending(row)"
                   @keydown.enter.prevent="confirmAndDismiss(row)"
                 >
-                <span class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-[10px] font-bold uppercase text-pic-text-muted">pz</span>
+                <span class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-[10px] font-bold uppercase text-brand-700">pz</span>
               </div>
               <StdButton
                 v-if="editable"
@@ -213,7 +241,7 @@ watch(() => props.approval.id, load, { immediate: true });
         </article>
       </div>
 
-      <div class="hidden min-w-0 overflow-hidden rounded-xl border border-pic-border bg-pic-surface @4xl:block">
+      <div class="hidden min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white @4xl:block">
         <table class="w-full table-fixed text-left text-xs">
           <colgroup>
             <col>
@@ -222,9 +250,9 @@ watch(() => props.approval.id, load, { immediate: true });
             <col class="w-28 xl:w-32">
             <col class="w-28 xl:w-32">
           </colgroup>
-          <thead class="bg-pic-muted-surface text-[10px] font-bold uppercase text-pic-text-muted"><tr><th class="px-3 py-3">Producto</th><th class="px-2 py-3">Fecha</th><th class="px-2 py-3 text-right">Reportado</th><th class="px-2 py-3 text-center">Cantidad</th><th class="px-2 py-3 text-center">Confirmación</th></tr></thead>
-          <tbody class="divide-y divide-pic-border">
-            <tr v-for="row in products" :key="row.sku" class="transition hover:bg-pic-brand-soft"><td class="px-3 py-3"><p class="break-words font-bold text-pic-text-main">{{ row.sku_nombre }}</p><p class="font-mono text-pic-text-muted">{{ row.sku }}</p></td><td class="px-2 py-3 font-mono text-pic-text-muted">{{ dateLabel(row.ult_fecha_reportada) }}</td><td class="px-2 py-3 text-right font-mono font-bold">{{ basePieces(row) }}</td><td class="px-2 py-3 text-center"><input v-model.number="quantities[row.sku]" type="number" inputmode="numeric" min="0" step="1" :disabled="!editable" :aria-label="`Cantidad actual de ${row.sku_nombre}`" :aria-invalid="!quantityValidity[row.sku]" class="mx-auto block h-10 w-24 max-w-full rounded-lg border bg-pic-surface px-2 text-right font-mono font-bold outline-none focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border disabled:bg-pic-muted-surface xl:w-28" :class="quantityValidity[row.sku] ? 'border-pic-border' : 'border-[hsl(var(--pic-danger)/0.55)]'" @input="markAsPending(row)"></td><td class="px-2 py-3 text-center"><StdButton v-if="editable" variant="primary" size="sm" :disabled="confirmed[row.sku] || !quantityValidity[row.sku]" :aria-pressed="confirmed[row.sku]" :aria-label="`Verificar cantidad de ${row.sku_nombre}`" @click="confirmAndDismiss(row)">Verificar</StdButton><i v-else class="fa-solid fa-check text-pic-success"></i></td></tr>
+          <thead><tr class="border-b border-slate-200 bg-white text-[9px] font-black uppercase tracking-wide text-slate-600"><th class="px-3 py-2">Producto</th><th class="px-2 py-2">Fecha</th><th class="px-2 py-2 text-right">Reportado</th><th class="px-2 py-2 text-center">Cantidad</th><th class="px-2 py-2 text-center">Confirmación</th></tr></thead>
+          <tbody class="divide-y divide-dashed divide-slate-200">
+            <tr v-for="(row, index) in products" :key="row.sku" :class="index % 2 === 1 ? 'bg-slate-50/40 hover:bg-brand-50/30' : 'bg-white hover:bg-brand-50/20'"><td class="px-3 py-2"><p class="break-words font-black uppercase text-slate-700">{{ row.sku_nombre }}</p><p class="mt-0.5 font-mono text-[8px] font-bold text-slate-400">{{ row.sku }}</p></td><td class="px-2 py-2 font-mono text-slate-500">{{ dateLabel(row.ult_fecha_reportada) }}</td><td class="px-2 py-2 text-right font-mono font-black text-brand-700">{{ basePieces(row) }}</td><td class="px-2 py-2 text-center"><input v-model.number="quantities[row.sku]" type="number" inputmode="numeric" min="0" step="1" :disabled="!editable" :aria-label="`Cantidad actual de ${row.sku_nombre}`" :aria-invalid="!quantityValidity[row.sku]" class="mx-auto block h-10 w-24 max-w-full rounded-lg border border-slate-200 bg-white px-2 text-right font-mono font-black text-brand-700 outline-none focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border disabled:bg-slate-50 xl:w-28" :class="quantityValidity[row.sku] ? '' : 'border-[hsl(var(--pic-danger)/0.55)]'" @input="markAsPending(row)"></td><td class="px-2 py-2 text-center"><StdButton v-if="editable" variant="primary" size="sm" :disabled="confirmed[row.sku] || !quantityValidity[row.sku]" :aria-pressed="confirmed[row.sku]" :aria-label="`Verificar cantidad de ${row.sku_nombre}`" @click="confirmAndDismiss(row)">Verificar</StdButton><i v-else class="fa-solid fa-check text-pic-success"></i></td></tr>
           </tbody>
         </table>
       </div>

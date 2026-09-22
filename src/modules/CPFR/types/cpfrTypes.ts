@@ -43,6 +43,8 @@ export interface CpfrSkuDash {
 
     // Datos de la OC
     num_pedido: string | null
+    es_z8_extraordinario?: boolean
+    z8_extra_motivo?: string | null
     permiso_oc_catalogo?: string | null
     no_resurtible_adjusted?: boolean // el permiso NoResurtible mantiene la sugerencia bloqueada en cero
     sku_cadena: string | null           // identificador interno cadena (DESC_ART en Soriana)
@@ -283,6 +285,7 @@ export interface CpfrExpiredDraftOrder {
     nombre_tienda: string
     fec_pedido_cadena: string
     fec_fin_embarque: string | null
+    fec_envio?: string | null
     sku_count: number
     cant_pedida_total: number
     pedido_sugerido_total: number

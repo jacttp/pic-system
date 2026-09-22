@@ -32,6 +32,7 @@ import type {
 } from '../types/cpfrTypes'
 
 import type { CpfrDashZ8Response } from '../types/cpfrZ8Types'
+import type { Z8CalendarOrder, Z8CatalogItem, Z8ExtraCreateInput, Z8ExtraUpdateInput, Z8ManagerOrder, Z8ManagerStore, Z8OrderKey, Z8Tipo } from '../types/cpfrZ8ManagerTypes'
 // ── Body para dash-orders ────────────────────────────────────────────────────
 interface DashOrdersBody {
     year: number
@@ -377,6 +378,46 @@ export const cpfrApi = {
     }> {
         const { data } = await api.delete('/cpfr/z8/drafts', { data: body })
         return data
+    },
+
+    async previewZ8Drafts(body: { fec_inicio: string; fec_fin: string; nom_cadena: string; dia_ventas: number; id_cliente?: string }): Promise<Array<{ id_cliente: string; num_pedido: string; fec_pedido_cadena: string; total_lineas: number }>> {
+        const { data } = await api.post('/cpfr/z8/drafts/preview', body)
+        return data.data ?? []
+    },
+
+    async getZ8ManagerStores(body: { year: number; week: number; nom_cadena: string; filters?: { dia?: number; id_cliente?: string; jefatura?: string } }): Promise<Z8ManagerStore[]> {
+        const { data } = await api.post('/cpfr/z8/manager/stores', body)
+        return data.data ?? []
+    },
+
+    async getZ8ManagerCatalog(body: { id_cliente: string; nom_cadena: string; year: number; week: number; tipo: Z8Tipo; num_pedido?: string }): Promise<Z8CatalogItem[]> {
+        const { data } = await api.post('/cpfr/z8/manager/catalog', body)
+        return data.data ?? []
+    },
+
+    async getZ8ManagerCalendar(body: { id_cliente: string; year: number; month: number }): Promise<Z8CalendarOrder[]> {
+        const { data } = await api.post('/cpfr/z8/manager/calendar', body)
+        return data.data ?? []
+    },
+
+    async getZ8ManagerOrder(body: Z8OrderKey): Promise<Z8ManagerOrder> {
+        const { data } = await api.post('/cpfr/z8/manager/order', body)
+        return data.data
+    },
+
+    async createZ8Extra(body: Z8ExtraCreateInput): Promise<Z8ManagerOrder> {
+        const { data } = await api.post('/cpfr/z8/extras', body)
+        return data.data
+    },
+
+    async updateZ8Extra(body: Z8ExtraUpdateInput): Promise<Z8ManagerOrder> {
+        const { data } = await api.patch('/cpfr/z8/extras', body)
+        return data.data
+    },
+
+    async deleteZ8Extra(body: Z8OrderKey): Promise<{ deleted: number; detail: { pedido_generado: number; ocz8: number } }> {
+        const { data } = await api.delete('/cpfr/z8/extras', { data: body })
+        return data.data
     },
 
     async getProductInventoryHistory(body: {

@@ -606,7 +606,8 @@ function storeRowBgClass(isExpanded: boolean): string {
         : 'bg-white border-l-[3px] border-l-transparent border-b border-slate-100 hover:bg-slate-50/80'
 }
 
-function escenarioCls(esc: 'A' | 'B' | null, numPedido?: string | null) {
+function escenarioCls(esc: 'A' | 'B' | null, numPedido?: string | null, esExtraordinario = false) {
+    if (esExtraordinario) return 'border-[#9d174d]/35 bg-[#fce7f3] text-[#9d174d] font-bold'
     if (numPedido && isZ8(numPedido)) {
         return 'bg-purple-100 text-purple-700 border-purple-200 font-bold'
     }
@@ -615,7 +616,12 @@ function escenarioCls(esc: 'A' | 'B' | null, numPedido?: string | null) {
     return 'bg-slate-100 text-slate-500 border-slate-200'
 }
 
-function escenarioText(esc: 'A' | 'B' | null, numPedido?: string | null) {
+function escenarioText(esc: 'A' | 'B' | null, numPedido?: string | null, esExtraordinario = false) {
+    if (esExtraordinario) {
+        const suffix = String(numPedido || '').match(/[B-G]$/i)?.[0]?.toUpperCase() || ''
+        const prefix = String(numPedido || '').toLowerCase().includes('carne') ? 'Z8 Carnes' : 'Z8'
+        return `${prefix} ${suffix}`.trim()
+    }
     if (numPedido && isZ8(numPedido)) {
         const num = numPedido.toLowerCase()
         if (num.includes('carne')) return 'Z8 Carnes'
@@ -2492,9 +2498,9 @@ const totalUniqueOCs = computed(() => {
                             <div class="flex items-center gap-2 min-w-0">
                               <span
                                 class="shrink-0 inline-flex text-[9px] font-bold px-1.5 py-0.5 rounded-md border"
-                                :class="escenarioCls(sku.escenario, sku.num_pedido)"
+                                :class="escenarioCls(sku.escenario, sku.num_pedido, sku.es_z8_extraordinario)"
                                 :title="sku.escenario === 'B' ? 'Pedido recalculado' : ''"
-                              >{{ escenarioText(sku.escenario, sku.num_pedido) }}</span>
+                              >{{ escenarioText(sku.escenario, sku.num_pedido, sku.es_z8_extraordinario) }}</span>
                               <button
                                 v-if="sku.no_resurtible_adjusted"
                                 type="button"
@@ -2709,9 +2715,9 @@ const totalUniqueOCs = computed(() => {
                             <div class="flex items-center gap-2">
                               <span
                                 class="shrink-0 inline-flex text-[9px] font-bold px-1.5 py-0.5 rounded-md border"
-                                :class="escenarioCls(sku.escenario, sku.num_pedido)"
+                                :class="escenarioCls(sku.escenario, sku.num_pedido, sku.es_z8_extraordinario)"
                                 :title="sku.escenario === 'B' ? 'Pedido recalculado' : ''"
-                              >{{ escenarioText(sku.escenario, sku.num_pedido) }}</span>
+                              >{{ escenarioText(sku.escenario, sku.num_pedido, sku.es_z8_extraordinario) }}</span>
                               <button
                                 v-if="sku.no_resurtible_adjusted"
                                 type="button"
