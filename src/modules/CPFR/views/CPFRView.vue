@@ -193,6 +193,8 @@ function openChainConfig() {
       v-if="showZ8Manager"
       @close="showZ8Manager = false"
       @deleted="store.loadDashboard()"
+      @created="store.loadDashboard()"
+      @updated="store.loadDashboard()"
     />
 
     <CpfrStoreConfigModal

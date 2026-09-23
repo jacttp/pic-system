@@ -9,8 +9,8 @@ export interface Z8OrderKey {
 
 export interface Z8ExtraSeries {
   aplicable: boolean
-  original: { num_pedido: string; estado: string; fec_pedido_cadena: string } | null
-  extras: Array<{ num_pedido: string; estado: string; eliminado: boolean; fec_pedido_cadena: string }>
+  original: Z8WeeklyOrder | null
+  extras: Z8WeeklyOrder[]
   consumidas: number
   siguiente_letra: Z8Letra | null
 }
@@ -22,7 +22,25 @@ export interface Z8ManagerStore {
   dia_ventas: number
   dia_cadena: number
   series: Record<Z8Tipo, Z8ExtraSeries>
+  fecha_atencion: string | null
+  motivos_en_fecha: Z8CalendarEventType[]
+  pedidos: Z8WeeklyOrder[]
 }
+export type Z8CalendarEventType = 'pedido_creado' | 'fin_embarque' | 'atencion_oficial'
+export interface Z8ManagerContext { timezone: 'America/Mexico_City'; today: string; isoYear: number; isoWeek: number; weekStart: string; weekEnd: string }
+export interface Z8CalendarEvent { fecha: string; tipo: Z8CalendarEventType; id_cliente: string; pedido: Z8OrderKey | null }
+export interface Z8CalendarDay { fecha: string; tiendas_relacionadas: number; tiendas_con_pedidos: number; pedidos_creados: number; pedidos_fin_embarque: number; tiendas_atencion_oficial: number }
+export interface Z8ManagerCalendar { context: Z8ManagerContext; eventos: Z8CalendarEvent[]; dias: Z8CalendarDay[]; tiendas_sin_dia: number }
+export interface Z8WeeklyOrder extends Z8OrderKey {
+  tipo: 'oc' | Z8Tipo; extraordinario: boolean; letra: Z8Letra | null
+  estado_resumen: string; estados: string[]; motivo: string | null
+  detalle_motivo: string | null; fec_envio: string | null; fechas_fin_embarque: string[]
+  total_skus: number; cantidad_solicitada_pz: number | null; cantidad_enviada_pz: number | null
+  capacidades: { puede_editar: boolean; puede_eliminar: boolean; bloqueo_edicion: string | null; bloqueo_eliminacion: string | null }
+  eventos_en_fecha: Z8CalendarEventType[]
+  version: string
+}
+export interface Z8DeletePreview { pedidos: Array<Z8OrderKey & { bloqueo: string | null; lineas_fuente: number; lineas_persistidas: number; estados_fuente: string[]; estados_persistidos: string[] }>; preview_token: string; bloqueado: boolean }
 
 export interface Z8PriorLine {
   sku_muliix: string
@@ -79,7 +97,10 @@ export interface Z8ManagerOrder extends Z8OrderKey {
   detalle_motivo: string | null
   eliminado: boolean
   version: string
-  lineas: Array<Z8CatalogItem & { cantidad_final_uni: number; ajuste: number; ajuste_mix: number; variable_bolsa: 0 | 1 }>
+  lineas: Array<{ sku_muliix: string; sku_nombre: string; estado: string; cantidad_final_uni: number | null; ajuste: number | null; ajuste_mix: number | null; cantidad_solicitada_pz: number | null; cantidad_enviada_pz: number | null }>
+  capacidades: Z8WeeklyOrder['capacidades']
+  fechas_fin_embarque: string[]
+  tipo: 'oc' | Z8Tipo
 }
 
 export interface Z8CalendarOrder extends Z8OrderKey {

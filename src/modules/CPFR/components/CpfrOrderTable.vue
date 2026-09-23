@@ -745,6 +745,10 @@ function calcularFillRateDinamico(sku: any): number | null {
     return sugerido / sku.cant_pedida;
 }
 
+function isExtraordinaryZ8(oc: GroupedOC): boolean {
+    return oc.skus.some(sku => sku.es_z8_extraordinario)
+}
+
 function visibleStoreSuggestedTotal(skus: CpfrSkuDash[]): number {
     return skus.reduce((sum, sku) => sum + Number(sku.pedido_sugerido_pz_red || 0), 0)
 }
@@ -2388,13 +2392,13 @@ const totalUniqueOCs = computed(() => {
                         class="cursor-pointer transition-colors text-[11px] border-b border-slate-200 group/row"
                         :class="[
                           expandedOCGroups[`${tienda.id_cliente}_${ocGroup.group_id}`] === true ? 'bg-slate-100/40' : 'bg-white hover:bg-slate-50/80',
-                          isZ8(ocGroup.num_pedido) ? 'bg-purple-50/30' : ''
+                          isExtraordinaryZ8(ocGroup) ? 'bg-pink-50/30' : isZ8(ocGroup.num_pedido) ? 'bg-purple-50/30' : ''
                         ]"
                         @click="toggleOCGroup(tienda.id_cliente, ocGroup.group_id)"
                       >
                         <!-- Etiqueta OC -->
                         <td colspan="6" class="pl-12 pr-2.5 py-2 text-slate-700 font-semibold border-l-[6px] border-t-[12px] border-t-white"
-                            :class="isZ8(ocGroup.num_pedido) ? 'border-l-purple-500 bg-purple-50/20' : 'border-l-brand-300'">
+                            :class="isExtraordinaryZ8(ocGroup) ? 'border-l-[#9d174d] bg-[#fce7f3]/30' : isZ8(ocGroup.num_pedido) ? 'border-l-purple-500 bg-purple-50/20' : 'border-l-brand-300'">
                           <div class="flex items-center flex-wrap gap-2 min-w-0 max-w-4xl">
                             <i
                               class="fa-solid fa-chevron-right text-slate-300 text-[10px] transition-transform duration-200 shrink-0"
@@ -2404,7 +2408,7 @@ const totalUniqueOCs = computed(() => {
                             
                             <!-- Número + fechas compactas en popover -->
                             <span class="relative group/ocnum flex items-center">
-                              <span class="text-[12px] font-bold tracking-tight cursor-default" :class="ocGroup.num_pedido ? 'text-slate-800' : 'text-slate-400 italic'">
+                              <span class="text-[12px] font-bold tracking-tight cursor-default" :class="isExtraordinaryZ8(ocGroup) ? 'text-[#9d174d]' : ocGroup.num_pedido ? 'text-slate-800' : 'text-slate-400 italic'">
                                 {{ ocGroup.num_pedido || 'Sin número' }}
                               </span>
                               
@@ -3085,20 +3089,20 @@ const totalUniqueOCs = computed(() => {
                                  class="w-full flex flex-col border rounded-xl shadow-sm hover:shadow-md transition-all border-l-4 relative" 
                                   :class="[
                                     isAnySelloutOpenInOC(tienda.id_cliente, oc.skus) ? 'z-50' : '',
-                                    isZ8(oc.num_pedido) ? 'bg-purple-50/30 border-purple-100 border-l-purple-500' : 'bg-white border-slate-100'
+                                    isExtraordinaryZ8(oc) ? 'bg-[#fce7f3]/30 border-[#9d174d]/20 border-l-[#9d174d]' : isZ8(oc.num_pedido) ? 'bg-purple-50/30 border-purple-100 border-l-purple-500' : 'bg-white border-slate-100'
                                   ]" 
                                  
                                  :style="!isZ8(oc.num_pedido) ? `border-left-color: ${estadoBadge(oc.estado_oc).color || '#e2e8f0'}` : ''">
                                 <!-- OC Header -->
                                 <div class="px-3.5 py-2 border-b flex flex-wrap items-center justify-between gap-3 rounded-tr-xl cursor-pointer hover:bg-slate-100 transition-colors"
-                                      :class="isZ8(oc.num_pedido) ? 'bg-purple-100/40 border-purple-100' : 'bg-slate-50 border-slate-100'"
+                                      :class="isExtraordinaryZ8(oc) ? 'bg-[#fce7f3]/40 border-[#9d174d]/20' : isZ8(oc.num_pedido) ? 'bg-purple-100/40 border-purple-100' : 'bg-slate-50 border-slate-100'"
                                      @click.stop="toggleOCGroup(tienda.id_cliente, oc.group_id)">
                                     <div class="flex flex-wrap items-center gap-2.5">
                                         <i class="fa-solid text-slate-300 text-[9px] transition-transform duration-300"
                                            :class="expandedOCGroups[tienda.id_cliente + '_' + oc.group_id] === true ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
                                         <div class="flex items-center gap-1.5">
                                             <i class="fa-solid fa-file-invoice text-slate-400 text-[10px]"></i>
-                                            <span class="text-[10px] font-black text-slate-700 tracking-tight">{{ oc.num_pedido || 'SIN FOLIO' }}</span>
+                                            <span class="text-[10px] font-black tracking-tight" :class="isExtraordinaryZ8(oc) ? 'text-[#9d174d]' : 'text-slate-700'">{{ oc.num_pedido || 'SIN FOLIO' }}</span>
                                         </div>
                                         <span v-if="oc.semana_ic" class="text-[8px] font-bold px-1.5 py-0.5 bg-brand-50 text-brand-700 rounded-md border border-brand-100">Sem. {{ oc.semana_ic }}</span>
                                         
@@ -3181,8 +3185,8 @@ const totalUniqueOCs = computed(() => {
                                                     </button>
                                                 </div>
                                                 <div class="flex flex-wrap items-center gap-2.5">
-                                                    <span class="text-[8px] font-black px-1 py-0.5 rounded border uppercase shadow-xs bg-white" :class="escenarioCls(sku.escenario)">
-                                                        {{ sku.escenario || '—' }}
+                                                    <span class="text-[8px] font-black px-1 py-0.5 rounded border uppercase shadow-xs" :class="escenarioCls(sku.escenario, sku.num_pedido, sku.es_z8_extraordinario)">
+                                                        {{ escenarioText(sku.escenario, sku.num_pedido, sku.es_z8_extraordinario) }}
                                                     </span>
                                                     <div class="flex items-center gap-1 text-[9px] text-slate-400 font-mono bg-white px-1.5 py-0.5 rounded border border-slate-100">
                                                         <span class="font-bold text-slate-300">UPC:</span> {{ sku.upc_cadena }}

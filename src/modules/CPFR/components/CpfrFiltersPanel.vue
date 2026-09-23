@@ -227,13 +227,12 @@ async function toggleChainAdjustments(value: boolean) {
             <i class="fa-solid fa-gear text-[14px]"></i>
           </button>
           <button
+            v-if="store.nom_cadena.toUpperCase() === 'SORIANA'"
             @click.stop="emit('open-z8-manager')"
-            :disabled="!store.filters.dia"
-            class="h-[34px] w-[36px] flex items-center justify-center rounded-lg border transition-all disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-300"
-            :class="store.filters.dia ? 'border-rose-200 bg-rose-50 text-rose-400 hover:text-rose-600 hover:bg-rose-100 hover:border-rose-300' : ''"
-            :title="store.filters.dia ? `Eliminar borradores Z8 del día ${store.filters.dia}` : 'Selecciona un día antes de eliminar borradores Z8'"
+            class="flex h-[34px] items-center gap-2 rounded-lg border border-pic-brand-border bg-pic-brand-soft px-3 text-pic-brand transition-all hover:bg-pic-surface"
+            title="Abrir calendario y gestor Z8"
           >
-            <i class="fa-solid fa-trash-can-arrow-up text-[14px]"></i>
+            <i class="fa-solid fa-calendar-days text-[14px]"></i><span class="text-xs font-semibold">Gestor Z8</span>
           </button>
           <div class="flex h-[34px] items-center rounded-lg border border-slate-200 bg-slate-50 px-2" :title="`Permitir ajustes manuales para todas las tiendas de ${store.nom_cadena}`">
             <StdSwitch

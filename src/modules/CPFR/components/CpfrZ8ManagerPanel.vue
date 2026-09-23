@@ -2,129 +2,279 @@
 import { computed, onMounted, ref } from 'vue'
 import { StdAlert, StdButton } from '@/modules/Shared/components/std'
 import ModalDialog from '@/modules/Shared/components/ModalDialog.vue'
-import { useCpfrStore } from '../stores/cpfrStore'
 import { useCpfrZ8ManagerStore } from '../stores/cpfrZ8ManagerStore'
-import { cpfrApi } from '../services/cpfrApi'
-import type { Z8CatalogItem, Z8ExtraCreateInput, Z8ExtraUpdateInput, Z8ManagerStore, Z8Tipo } from '../types/cpfrZ8ManagerTypes'
-import { Z8_REASON_LABELS } from '../types/cpfrZ8ManagerTypes'
+import type { Z8ExtraLineInput, Z8ManagerOrder, Z8OrderKey, Z8Tipo, Z8WeeklyOrder } from '../types/cpfrZ8ManagerTypes'
+import CpfrZ8Calendar from './CpfrZ8Calendar.vue'
+import CpfrZ8StoreList from './CpfrZ8StoreList.vue'
+import CpfrZ8OrderTreeTable from './CpfrZ8OrderTreeTable.vue'
+import CpfrZ8DeleteDialog from './CpfrZ8DeleteDialog.vue'
+import CpfrZ8ExtraEditor from './CpfrZ8ExtraEditor.vue'
 
-const emit = defineEmits<{ (e: 'close'): void; (e: 'deleted'): void; (e: 'created', numPedido: string): void }>()
-const cpfr = useCpfrStore()
+const emit = defineEmits<{ (e: 'close'): void; (e: 'created', number: string): void; (e: 'updated', number: string): void; (e: 'deleted'): void }>()
 const manager = useCpfrZ8ManagerStore()
-const view = ref<'stores' | 'detail' | 'editor'>('stores')
-const type = ref<Z8Tipo>('z8')
-const storeSearch = ref('')
-const skuSearch = ref('')
+const mode = ref<'browse' | 'editor'>('browse')
+const selected = ref<Z8OrderKey[]>([])
+const deletionDialog = ref(false)
+const quickDeleteOpen = ref(false)
+const quickDeleteStage = ref<'selection' | 'preview'>('selection')
+const quickDeleteSearch = ref('')
+const quickDeleteSelected = ref(new Set<string>())
+const quickDeletePreviewing = ref(false)
+const quickDeleteError = ref('')
+const pendingDeleteKeys = ref<Z8OrderKey[]>([])
+const duplicateDialog = ref(false)
+const discardDialog = ref(false)
+const pendingLeave = ref<(() => void) | null>(null)
+const editExisting = ref(false)
+const editTarget = ref<Z8ManagerOrder | null>(null)
+const kind = ref<Z8Tipo>('z8')
 const quantities = ref<Record<string, number>>({})
 const reason = ref('')
 const reasonDetail = ref('')
 const shipDate = ref('')
-const duplicateDialog = ref(false)
-const deleteDialog = ref(false)
-const legacyDeleteDialog = ref(false)
-const legacyDeleting = ref(false)
-const confirmed = ref(new Set<string>())
-const editingExisting = ref(false)
+const skuSearch = ref('')
 const solicitudId = ref('')
-const today = new Date().toISOString().slice(0, 10)
-
-const stores = computed(() => {
-  const term = storeSearch.value.trim().toLowerCase()
-  return term ? manager.stores.filter(s => `${s.id_cliente} ${s.nombre_tienda} ${s.Jefatura || ''}`.toLowerCase().includes(term)) : manager.stores
+const confirmed = ref(new Set<string>())
+const busyGenerating = ref(false)
+const localError = ref('')
+const officialDayPassed = computed(() => {
+  const date = manager.selectedStore?.fecha_atencion
+  return !!date && date < manager.context.today
 })
-const currentSeries = computed(() => manager.selectedStore?.series[type.value] || null)
-const catalog = computed(() => manager.catalog.filter(item => `${item.sku_muliix} ${item.sku_nombre}`.toLowerCase().includes(skuSearch.value.toLowerCase())))
-const lines = computed(() => manager.catalog.map(item => ({ ...item, cantidad_pz: Number(quantities.value[item.sku_muliix] || 0) })).filter(item => item.cantidad_pz > 0))
-const duplicates = computed(() => lines.value.filter(item => item.antecedentes.length > 0))
-const canSave = computed(() => lines.value.length > 0 && !!shipDate.value && !!reason.value && (reason.value !== 'otro' || !!reasonDetail.value.trim()))
-const shipDateMax = computed(() => manager.context.year ? isoWeekRange(manager.context.year, manager.context.week).end : '')
-
-function typeLabel(value: Z8Tipo) { return value === 'z8carnes' ? 'Z8 Carnes' : 'Z8' }
-function uuid() { return globalThis.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/[x]/g, () => Math.floor(Math.random() * 16).toString(16)) }
-function defaultShipDate(store: Z8ManagerStore) {
-  const now = new Date(); const day = now.getDay() || 7; const delta = store.dia_ventas - day
-  if (delta < 0) return ''; const date = new Date(now); date.setDate(now.getDate() + delta); return date.toISOString().slice(0, 10)
+const missingOriginal = computed(() => {
+  const store = manager.selectedStore
+  return !!store && !officialDayPassed.value && (['z8', 'z8carnes'] as const).some(type => store.series[type].aplicable && !store.series[type].original)
+})
+const selectedDaySummary = computed(() => manager.calendar?.dias.find(day => day.fecha === manager.selectedDay) || null)
+const dirty = computed(() => mode.value === 'editor' && (Object.values(quantities.value).some(value => value > 0) || !!reason.value || !!reasonDetail.value))
+const lines = computed<Z8ExtraLineInput[]>(() => manager.catalog.map(item => ({ sku_muliix: item.sku_muliix, cantidad_pz: Number(quantities.value[item.sku_muliix] || 0) })).filter(item => item.cantidad_pz > 0))
+const repeated = computed(() => manager.catalog.filter(item => lines.value.some(line => line.sku_muliix === item.sku_muliix) && item.antecedentes.length))
+const valid = computed(() => lines.value.length > 0 && !!shipDate.value && !!reason.value && (reason.value !== 'otro' || !!reasonDetail.value.trim()) && lines.value.every(line => { const item = manager.catalog.find(c => c.sku_muliix === line.sku_muliix); return Number.isInteger(line.cantidad_pz) && line.cantidad_pz > 0 && !!item?.pzas_bolsa && line.cantidad_pz % item.pzas_bolsa === 0 }))
+const orderId = (item: Z8OrderKey) => `${item.id_cliente}|${item.num_pedido}|${item.fec_pedido_cadena}`
+const quickDeleteCandidates = computed<Z8OrderKey[]>(() => {
+  const calendar = manager.calendar
+  if (!calendar) return []
+  const candidates = new Map<string, Z8OrderKey>()
+  for (const event of calendar.eventos) {
+    const order = event.pedido
+    if (event.tipo !== 'pedido_creado' || !order || !order.num_pedido.toLowerCase().startsWith('z8')) continue
+    if (order.fec_pedido_cadena < calendar.context.today || order.fec_pedido_cadena > calendar.context.weekEnd) continue
+    candidates.set(orderId(order), order)
+  }
+  return [...candidates.values()].sort((a, b) => b.fec_pedido_cadena.localeCompare(a.fec_pedido_cadena) || a.id_cliente.localeCompare(b.id_cliente) || a.num_pedido.localeCompare(b.num_pedido))
+})
+const quickDeleteVisible = computed(() => {
+  const search = quickDeleteSearch.value.trim().toLowerCase()
+  return search ? quickDeleteCandidates.value.filter(order => `${order.id_cliente} ${order.num_pedido}`.toLowerCase().includes(search)) : quickDeleteCandidates.value
+})
+const quickDeleteKeys = computed(() => quickDeleteCandidates.value.filter(order => quickDeleteSelected.value.has(orderId(order))))
+function guarded(next: () => void) { if (dirty.value) { pendingLeave.value = next; discardDialog.value = true } else next() }
+function leaveEditor() { mode.value = 'browse'; editTarget.value = null; confirmed.value = new Set(); localError.value = '' }
+function discard() { discardDialog.value = false; const next = pendingLeave.value; pendingLeave.value = null; leaveEditor(); next?.() }
+function close() { guarded(() => emit('close')) }
+async function chooseDay(date: string) { guarded(async () => { manager.clearSelection(); selected.value = []; await manager.loadStores(date) }) }
+function chooseStore(store: typeof manager.selectedStore) {
+  if (!store) return
+  guarded(() => {
+    manager.selectStore(store)
+    selected.value = []
+  })
 }
-function quantityStep(item: Z8CatalogItem) { return item.pzas_bolsa || 1 }
-function isoWeekRange(year: number, week: number) {
-  const jan4 = new Date(Date.UTC(year, 0, 4)); const day = jan4.getUTCDay() || 7
-  const monday = new Date(jan4); monday.setUTCDate(jan4.getUTCDate() - day + 1 + ((week - 1) * 7))
-  const start = monday.toISOString().slice(0, 10); const sunday = new Date(monday); sunday.setUTCDate(monday.getUTCDate() + 6)
-  return { start, end: sunday.toISOString().slice(0, 10) }
+function backToStores() {
+  guarded(() => {
+    manager.clearSelection()
+    selected.value = []
+  })
 }
-function setQuantity(item: Z8CatalogItem, event: Event) { quantities.value = { ...quantities.value, [item.sku_muliix]: Number((event.target as HTMLInputElement).value || 0) } }
-async function openStore(store: Z8ManagerStore) { await manager.selectStore(store); view.value = 'detail' }
-async function edit(typeValue: Z8Tipo) {
-  if (!manager.selectedStore?.series[typeValue].original || !manager.selectedStore.series[typeValue].siguiente_letra) return
-  editingExisting.value = false; solicitudId.value = uuid(); type.value = typeValue; quantities.value = {}; reason.value = ''; reasonDetail.value = ''; confirmed.value = new Set(); skuSearch.value = ''; shipDate.value = defaultShipDate(manager.selectedStore)
-  await manager.loadCatalog(typeValue); view.value = 'editor'
+async function expand(order: Z8WeeklyOrder) { await manager.loadOrder(order) }
+function toggle(order: Z8WeeklyOrder) { selected.value = selected.value.some(item => orderId(item) === orderId(order)) ? selected.value.filter(item => orderId(item) !== orderId(order)) : [...selected.value, order] }
+function openQuickDelete() {
+  quickDeleteStage.value = 'selection'
+  quickDeleteSearch.value = ''
+  quickDeleteSelected.value = new Set()
+  quickDeleteError.value = ''
+  quickDeleteOpen.value = true
 }
-async function editExisting() {
-  if (!manager.detail?.es_extraordinario || !manager.selectedStore) return
-  editingExisting.value = true; type.value = manager.detail.num_pedido.toLowerCase().includes('carne') ? 'z8carnes' : 'z8'
-  quantities.value = Object.fromEntries(manager.detail.lineas.map(line => [line.sku_muliix, Number(line.cantidad_final_uni || 0)]))
-  reason.value = manager.detail.motivo || ''; reasonDetail.value = manager.detail.detalle_motivo || ''; shipDate.value = manager.detail.fec_envio || ''; confirmed.value = new Set(); skuSearch.value = ''
-  await manager.loadCatalog(type.value, manager.detail.num_pedido); view.value = 'editor'
+function toggleQuickDelete(order: Z8OrderKey) {
+  const next = new Set(quickDeleteSelected.value)
+  const id = orderId(order)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  quickDeleteSelected.value = next
 }
-async function inspect(order: { id_cliente: string; num_pedido: string; fec_pedido_cadena: string }) { await manager.loadOrder(order) }
+function toggleQuickVisible() {
+  const next = new Set(quickDeleteSelected.value)
+  const visible = quickDeleteVisible.value.map(orderId)
+  if (visible.every(id => next.has(id))) visible.forEach(id => next.delete(id))
+  else visible.forEach(id => next.add(id))
+  quickDeleteSelected.value = next
+}
+function officialDate() { const date = manager.selectedStore?.fecha_atencion; return date && date >= manager.context.today ? date : '' }
+function canCreateExtra(type: Z8Tipo) {
+  const series = manager.selectedStore?.series[type]
+  return !!series?.siguiente_letra && (!!series.original || officialDayPassed.value)
+}
+async function newExtra(type: Z8Tipo) {
+  const series = manager.selectedStore?.series[type]
+  if (!canCreateExtra(type) || !series?.siguiente_letra) return
+  editExisting.value = false; kind.value = type; quantities.value = {}; reason.value = ''; reasonDetail.value = ''; shipDate.value = officialDate(); skuSearch.value = ''; confirmed.value = new Set(); solicitudId.value = crypto.randomUUID(); localError.value = ''
+  await manager.loadCatalog(type); mode.value = 'editor'
+}
+async function openEdit(order: Z8ManagerOrder | null = manager.detail) {
+  if (!order?.capacidades?.puede_editar) return
+  editTarget.value = order; editExisting.value = true; kind.value = order.tipo === 'z8carnes' ? 'z8carnes' : 'z8'; quantities.value = Object.fromEntries(order.lineas.map(line => [line.sku_muliix, Number(line.cantidad_final_uni || 0)])); reason.value = order.motivo || ''; reasonDetail.value = order.detalle_motivo || ''; shipDate.value = order.fec_envio || ''; confirmed.value = new Set(); localError.value = ''
+  await manager.loadCatalog(kind.value, order.num_pedido); mode.value = 'editor'
+}
 async function save() {
-  if (!manager.selectedStore || !canSave.value) return
-  if (duplicates.value.some(item => !confirmed.value.has(item.sku_muliix))) { duplicateDialog.value = true; return }
-  const lineas = lines.value.map(item => ({ sku_muliix: item.sku_muliix, cantidad_pz: item.cantidad_pz }))
-  const confirmaciones_repetidos = duplicates.value.filter(item => item.antecedentes_token).map(item => ({ sku_muliix: item.sku_muliix, antecedentes_token: item.antecedentes_token! }))
+  if (!valid.value || !manager.selectedStore || manager.saving) return
+  if (repeated.value.some(item => !confirmed.value.has(item.sku_muliix))) { duplicateDialog.value = true; return }
+  const target = editTarget.value
+  if (editExisting.value && !target) return
+  const common = { nom_cadena: 'soriana', fec_envio: shipDate.value, motivo: reason.value, detalle_motivo: reasonDetail.value || undefined, lineas: lines.value, confirmaciones_repetidos: repeated.value.filter(item => item.antecedentes_token).map(item => ({ sku_muliix: item.sku_muliix, antecedentes_token: item.antecedentes_token! })) }
   try {
-    const order = editingExisting.value && manager.detail
-      ? await manager.updateExtra({ ...manager.detail, nom_cadena: manager.context.nom_cadena, version: manager.detail.version, fec_envio: shipDate.value, motivo: reason.value, detalle_motivo: reasonDetail.value || undefined, lineas, confirmaciones_repetidos } as Z8ExtraUpdateInput)
-      : await manager.createExtra({ solicitud_id: solicitudId.value, id_cliente: manager.selectedStore.id_cliente, nom_cadena: manager.context.nom_cadena, year: manager.context.year, week: manager.context.week, tipo: type.value, fec_envio: shipDate.value, motivo: reason.value, detalle_motivo: reasonDetail.value || undefined, lineas, confirmaciones_repetidos } as Z8ExtraCreateInput)
-    emit('created', order.num_pedido); emit('deleted'); view.value = 'detail'; await manager.selectStore(manager.selectedStore)
-  } catch { /* el store mantiene la captura */ }
+    const order = editExisting.value && target
+      ? await manager.updateExtra({ ...common, id_cliente: target.id_cliente, num_pedido: target.num_pedido, fec_pedido_cadena: target.fec_pedido_cadena, version: target.version })
+      : await manager.createExtra({ ...common, solicitud_id: solicitudId.value, id_cliente: manager.selectedStore.id_cliente, year: manager.context.year, week: manager.context.week, tipo: kind.value })
+    leaveEditor(); selected.value = []; await manager.loadStores(manager.context.today)
+    const store = manager.stores.find(item => item.id_cliente === order.id_cliente); if (store && manager.selectedStore?.id_cliente !== store.id_cliente) manager.selectStore(store)
+    await manager.loadOrder(order)
+    if (editExisting.value) emit('updated', order.num_pedido); else emit('created', order.num_pedido)
+  } catch (error: any) { localError.value = error?.response?.data?.message || 'No se pudo guardar. Conservamos la captura para que puedas corregirla.'; confirmed.value = new Set(); if (error?.response?.data?.code === 'DUPLICATE_CONFIRMATION_REQUIRED') { for (const changed of error.response.data.details || []) { const item = manager.catalog.find(row => row.sku_muliix === changed.sku_muliix); if (item) { item.antecedentes = changed.antecedentes; item.antecedentes_token = changed.antecedente_token } } duplicateDialog.value = true } }
 }
-async function confirmDuplicates() { confirmed.value = new Set(duplicates.value.map(item => item.sku_muliix)); duplicateDialog.value = false; await save() }
-async function remove() { if (!manager.detail) return; await manager.removeExtra(manager.detail); deleteDialog.value = false; emit('deleted') }
-async function removeLegacyDrafts() {
-  if (!cpfr.filters.dia || !manager.context.year) return
-  legacyDeleting.value = true
+async function confirmRepeated() { confirmed.value = new Set(repeated.value.map(item => item.sku_muliix)); duplicateDialog.value = false; await save() }
+async function generateTraditional() {
+  if (!manager.selectedStore || busyGenerating.value) return
+  busyGenerating.value = true; localError.value = ''
+  try { await manager.generateTraditional(manager.selectedStore); emit('created', 'tradicional') }
+  catch (error: any) { localError.value = error?.response?.data?.message || error?.message || 'No se pudieron generar los tradicionales.' }
+  finally { busyGenerating.value = false }
+}
+async function previewDelete() {
+  if (!selected.value.length) return
+  localError.value = ''
+  try { const keys = [...selected.value]; await manager.previewDelete(keys); pendingDeleteKeys.value = keys; deletionDialog.value = true }
+  catch (error: any) { localError.value = error?.response?.data?.message || 'No fue posible preparar la eliminación.' }
+}
+async function previewQuickDelete() {
+  const keys = quickDeleteKeys.value
+  if (!keys.length || quickDeletePreviewing.value) return
+  quickDeletePreviewing.value = true
+  quickDeleteError.value = ''
+  try { await manager.previewDelete(keys); pendingDeleteKeys.value = keys; quickDeleteStage.value = 'preview' }
+  catch (error: any) { quickDeleteError.value = error?.response?.data?.message || 'No fue posible preparar la eliminación.' }
+  finally { quickDeletePreviewing.value = false }
+}
+async function remove() {
+  if (!pendingDeleteKeys.value.length || manager.deleting) return
   try {
-    const range = isoWeekRange(manager.context.year, manager.context.week)
-    await cpfrApi.deleteZ8Drafts({ fec_inicio: range.start, fec_fin: range.end, nom_cadena: manager.context.nom_cadena, dia_ventas: cpfr.filters.dia })
-    await manager.loadStores(manager.context); legacyDeleteDialog.value = false; emit('deleted')
-  } finally { legacyDeleting.value = false }
+    await manager.removeOrders(pendingDeleteKeys.value)
+    selected.value = []; pendingDeleteKeys.value = []; quickDeleteSelected.value = new Set()
+    deletionDialog.value = false; quickDeleteOpen.value = false; emit('deleted')
+  } catch (error: any) {
+    const message = error?.response?.data?.message || 'La selección cambió. Solicita una vista previa nueva.'
+    if (quickDeleteOpen.value) { quickDeleteStage.value = 'selection'; quickDeleteError.value = message }
+    else { deletionDialog.value = false; localError.value = message }
+  }
 }
-
-onMounted(async () => { if (cpfr.currentWeek) await manager.loadStores({ year: cpfr.currentWeek.anio, week: cpfr.currentWeek.semana, nom_cadena: cpfr.nom_cadena, dia: cpfr.filters.dia }) })
+onMounted(() => manager.loadCalendar())
 </script>
 
 <template>
-  <div class="fixed inset-0 z-40 bg-black/35 backdrop-blur-sm" @click="emit('close')" />
-  <aside class="fixed inset-y-0 right-0 z-50 flex w-full max-w-6xl flex-col border-l border-pic-border bg-pic-background shadow-2xl">
-    <header class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-pic-border bg-pic-surface px-4 py-3 sm:px-5">
-      <div class="flex min-w-0 items-center gap-3"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-pic-brand text-white"><i class="fa-solid fa-truck-fast"></i></span><div><p class="text-[10px] font-black uppercase tracking-[0.14em] text-pic-brand">CPFR / excepción semanal</p><h2 class="text-base font-extrabold text-pic-text-main">Gestión de Z8 extraordinarios</h2><p class="text-xs text-pic-text-muted">{{ manager.context.year ? `Semana ${manager.context.week}/${manager.context.year} · ${manager.context.nom_cadena}` : 'Cargando…' }}</p></div></div>
-      <div class="flex gap-2"><StdButton v-if="view === 'stores'" variant="danger" size="sm" :disabled="!cpfr.filters.dia" icon="fa-solid fa-trash" @click="legacyDeleteDialog = true">Limpiar borradores</StdButton><StdButton v-if="view !== 'stores'" variant="secondary" size="sm" icon="fa-solid fa-arrow-left" @click="view = view === 'editor' ? 'detail' : 'stores'">Regresar</StdButton><button class="grid h-9 w-9 place-items-center rounded-lg text-pic-text-muted hover:bg-pic-brand-soft hover:text-pic-brand" aria-label="Cerrar" @click="emit('close')"><i class="fa-solid fa-xmark"></i></button></div>
+  <Teleport to="body">
+  <div class="fixed inset-0 z-40 bg-black/35" @click="close" />
+  <aside class="fixed inset-y-0 right-0 z-50 flex h-dvh w-full flex-col overflow-hidden bg-pic-background font-sans shadow-2xl sm:w-[94vw] sm:border-l sm:border-pic-border lg:w-[80vw]" aria-label="Gestor Z8 de Soriana">
+    <header class="flex shrink-0 items-center justify-between gap-3 border-b border-pic-border bg-pic-surface px-4 py-3 sm:px-6">
+      <div class="min-w-0"><p class="text-[10px] font-bold uppercase tracking-widest text-pic-brand">CPFR / Soriana</p><h2 class="text-lg font-extrabold tracking-tight text-pic-text-main">Calendario y gestor Z8</h2></div>
+      <div class="flex flex-wrap items-center gap-2">
+        <p class="hidden text-xs font-medium text-pic-text-muted sm:block"><i class="fa-regular fa-calendar-days mr-1.5" />Semana {{ manager.context.week }}/{{ manager.context.year }} · {{ manager.calendar?.context.weekStart }} a {{ manager.calendar?.context.weekEnd }}</p>
+        <StdButton v-if="mode === 'editor'" size="sm" variant="secondary" icon="fa-solid fa-arrow-left" @click="guarded(leaveEditor)">Regresar</StdButton>
+        <button type="button" class="grid h-9 w-9 place-items-center rounded-lg text-pic-text-muted hover:bg-pic-brand-soft focus-visible:outline-2 focus-visible:outline-pic-brand" aria-label="Cerrar gestor" @click="close"><i class="fa-solid fa-xmark" /></button>
+      </div>
     </header>
-    <main class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
-      <StdAlert v-if="manager.error" class="mb-4" tone="danger" title="No fue posible completar la operación" :description="manager.error" />
-
-      <section v-if="view === 'stores'" class="space-y-4">
-        <div class="flex flex-col gap-3 rounded-xl border border-pic-border bg-pic-surface p-4 sm:flex-row sm:items-end sm:justify-between"><div><p class="text-[10px] font-black uppercase tracking-[0.14em] text-pic-brand">Tiendas del día</p><h3 class="mt-1 text-sm font-extrabold text-pic-text-main">Consulta la situación semanal antes de crear una excepción</h3></div><label class="relative w-full sm:w-72"><i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-pic-text-muted"></i><input v-model="storeSearch" type="search" placeholder="Buscar tienda o ID" class="h-10 w-full rounded-lg border border-pic-border bg-pic-surface pl-9 pr-3 text-sm font-semibold outline-none focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border" /></label></div>
-        <div v-if="manager.loadingStores" class="py-16 text-center text-sm text-pic-text-muted"><i class="fa-solid fa-circle-notch fa-spin mr-2 text-pic-brand"></i>Cargando tiendas…</div>
-        <div v-else-if="!stores.length" class="py-16 text-center text-sm text-pic-text-muted">No hay tiendas para los filtros activos.</div>
-        <div v-else class="grid gap-3 lg:grid-cols-2"><button v-for="store in stores" :key="store.id_cliente" type="button" class="group rounded-xl border border-pic-border bg-pic-surface p-4 text-left transition hover:border-pic-brand-border hover:bg-pic-brand-soft" @click="openStore(store)"><div class="flex items-start justify-between gap-3"><div><p class="font-mono text-[10px] font-bold text-pic-text-muted">{{ store.id_cliente }}</p><h3 class="mt-1 text-sm font-extrabold text-pic-text-main">{{ store.nombre_tienda || 'Tienda sin nombre' }}</h3><p class="mt-1 text-xs text-pic-text-muted">{{ store.Jefatura || 'Sin jefatura' }} · Día {{ store.dia_ventas }}</p></div><i class="fa-solid fa-arrow-right mt-2 text-pic-text-muted group-hover:text-pic-brand"></i></div><div class="mt-4 grid grid-cols-2 gap-2"><div v-for="kind in (['z8', 'z8carnes'] as Z8Tipo[])" :key="kind" class="rounded-lg bg-pic-muted-surface px-3 py-2"><p class="text-[10px] font-black uppercase tracking-wide text-pic-text-muted">{{ typeLabel(kind) }}</p><p class="mt-1 text-xs font-bold text-pic-text-main">{{ store.series[kind].original ? `${store.series[kind].consumidas} extra(s)` : 'Original faltante' }}</p></div></div></button></div>
-      </section>
-
-      <section v-else-if="view === 'detail' && manager.selectedStore" class="space-y-4">
-        <div class="flex flex-col gap-3 rounded-xl border border-pic-border bg-pic-surface p-4 sm:flex-row sm:items-center sm:justify-between"><div><p class="font-mono text-[10px] font-bold text-pic-text-muted">{{ manager.selectedStore.id_cliente }}</p><h3 class="mt-1 text-lg font-extrabold text-pic-text-main">{{ manager.selectedStore.nombre_tienda }}</h3><p class="text-xs text-pic-text-muted">Calendario de pedidos oficiales, Z8 y Z8 Carnes.</p></div><div class="flex flex-wrap gap-2"><StdButton v-for="kind in (['z8', 'z8carnes'] as Z8Tipo[])" :key="kind" size="sm" :variant="manager.selectedStore.series[kind].original ? 'primary' : 'secondary'" :disabled="!manager.selectedStore.series[kind].original || !manager.selectedStore.series[kind].siguiente_letra" icon="fa-solid fa-plus" @click="edit(kind)">{{ typeLabel(kind) }} {{ manager.selectedStore.series[kind].siguiente_letra || 'sin cupo' }}</StdButton></div></div>
-        <StdAlert v-if="!manager.selectedStore.series.z8.original && !manager.selectedStore.series.z8carnes.original" tone="warning" title="Falta el pedido tradicional" description="Un extraordinario requiere que exista primero el Z8 tradicional del mismo tipo y semana." />
-        <section class="overflow-hidden rounded-xl border border-pic-border bg-pic-surface"><header class="border-b border-pic-border bg-pic-muted-surface px-4 py-3"><h4 class="text-sm font-bold text-pic-text-main">Pedidos del calendario</h4></header><div v-if="manager.loadingDetail" class="p-8 text-center text-sm text-pic-text-muted"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i>Cargando calendario…</div><div v-else-if="!manager.calendar.length" class="p-8 text-center text-sm text-pic-text-muted">No hay pedidos persistidos en este mes.</div><div v-else class="divide-y divide-pic-border"><button v-for="order in manager.calendar" :key="`${order.num_pedido}-${order.fec_pedido_cadena}`" type="button" class="flex w-full flex-col gap-2 px-4 py-3 text-left transition hover:bg-pic-brand-soft sm:flex-row sm:items-center sm:justify-between" @click="inspect(order)"><div><p class="font-mono text-xs font-bold" :class="order.es_extraordinario ? 'text-[#9d174d]' : 'text-pic-text-main'">{{ order.num_pedido }}</p><p class="mt-1 text-xs text-pic-text-muted">{{ order.fec_envio || 'Sin fecha de envío' }} · {{ order.estado }} · {{ order.total_skus }} SKU</p></div><p class="text-xs font-bold tabular-nums text-pic-text-main">{{ Number(order.total_piezas).toLocaleString('es-MX') }} pzas <span v-if="order.motivo" class="ml-2 text-[#9d174d]">{{ Z8_REASON_LABELS[order.motivo] }}</span></p></button></div></section>
-        <article v-if="manager.detail" class="rounded-xl border border-pic-border bg-pic-surface p-4"><div class="flex flex-wrap items-start justify-between gap-3"><div><p class="font-mono text-xs font-bold" :class="manager.detail.es_extraordinario ? 'text-[#9d174d]' : 'text-pic-text-main'">{{ manager.detail.num_pedido }}</p><p class="mt-1 text-xs text-pic-text-muted">{{ manager.detail.fec_envio || 'Sin fecha' }} · {{ manager.detail.estado }}</p><p v-if="manager.detail.motivo" class="mt-2 text-xs font-medium text-pic-text-main">{{ Z8_REASON_LABELS[manager.detail.motivo] }}<span v-if="manager.detail.detalle_motivo">: {{ manager.detail.detalle_motivo }}</span></p></div><div class="flex gap-2"><StdButton v-if="manager.detail.es_extraordinario && !manager.detail.eliminado && ['pendiente','borrador'].includes(manager.detail.estado)" variant="secondary" size="sm" icon="fa-solid fa-pen" @click="editExisting">Editar</StdButton><StdButton v-if="manager.detail.es_extraordinario && !manager.detail.eliminado && ['pendiente','borrador'].includes(manager.detail.estado)" variant="danger" size="sm" icon="fa-solid fa-trash" @click="deleteDialog = true">Eliminar</StdButton></div></div><div class="mt-4 divide-y divide-pic-border border-y border-pic-border"><div v-for="line in manager.detail.lineas" :key="line.sku_muliix" class="flex items-center justify-between gap-3 py-2"><span class="text-xs font-semibold text-pic-text-main">{{ line.sku_nombre || line.sku_muliix }}</span><span class="font-mono text-xs font-bold tabular-nums">{{ Number(line.cantidad_final_uni || 0) + Number(line.ajuste || 0) + Number(line.ajuste_mix || 0) }} pzas</span></div></div></article>
-      </section>
-
-      <section v-else-if="view === 'editor' && manager.selectedStore" class="space-y-4">
-        <div class="rounded-xl border border-[#9d174d]/30 bg-pic-surface p-4 shadow-[inset_4px_0_0_0_#9d174d]"><p class="text-[10px] font-black uppercase tracking-[0.14em] text-[#9d174d]">{{ editingExisting ? 'Edición de extraordinario' : `Extraordinario ${currentSeries?.siguiente_letra || ''}` }}</p><h3 class="mt-1 text-lg font-extrabold text-pic-text-main">{{ typeLabel(type) }} para {{ manager.selectedStore.nombre_tienda }}</h3><p class="mt-1 text-xs text-pic-text-muted">Captura manual: este pedido no será recalculado ni sometido a Mix.</p></div>
-        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_19rem]"><section class="overflow-hidden rounded-xl border border-pic-border bg-pic-surface"><header class="flex flex-col gap-3 border-b border-pic-border p-3 sm:flex-row sm:items-center sm:justify-between"><h4 class="text-sm font-bold text-pic-text-main">Catálogo {{ typeLabel(type) }}</h4><label class="relative w-full sm:w-64"><i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-pic-text-muted"></i><input v-model="skuSearch" class="h-9 w-full rounded-lg border border-pic-border bg-pic-surface pl-9 pr-3 text-xs font-semibold outline-none focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border" placeholder="Buscar artículo" /></label></header><div class="max-h-[46vh] divide-y divide-pic-border overflow-y-auto"><div v-for="item in catalog" :key="item.sku_muliix" class="grid grid-cols-[minmax(0,1fr)_7rem] items-center gap-3 px-3 py-3"><div><p class="text-xs font-bold text-pic-text-main">{{ item.sku_nombre }}</p><p class="font-mono text-[10px] text-pic-text-muted">{{ item.sku_muliix }} · múltiplo {{ quantityStep(item) }}</p><p v-if="item.antecedentes.length" class="mt-1 text-[10px] font-bold text-pic-warning">Ya solicitado en {{ item.antecedentes.map(row => row.num_pedido).join(', ') }}</p></div><input :value="quantities[item.sku_muliix] || ''" type="number" min="0" :step="quantityStep(item)" class="h-9 rounded-lg border border-pic-border bg-pic-surface px-2 text-right font-mono text-xs font-bold outline-none focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border" @input="setQuantity(item, $event)" /></div></div></section><section class="space-y-4"><div class="rounded-xl border border-pic-border bg-pic-surface p-4"><label class="block text-[10px] font-black uppercase tracking-[0.14em] text-pic-text-muted">Fecha de envío</label><input v-model="shipDate" :min="today" type="date" class="mt-2 h-10 w-full rounded-lg border border-pic-border bg-pic-surface px-3 text-sm font-semibold outline-none focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border" /><label class="mt-4 block text-[10px] font-black uppercase tracking-[0.14em] text-pic-text-muted">Motivo</label><select v-model="reason" class="mt-2 h-10 w-full rounded-lg border border-pic-border bg-pic-surface px-3 text-sm font-semibold outline-none focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border"><option value="">Selecciona un motivo</option><option v-for="(label, value) in Z8_REASON_LABELS" :key="value" :value="value">{{ label }}</option></select><textarea v-if="reason === 'otro'" v-model="reasonDetail" class="mt-2 min-h-24 w-full rounded-lg border border-pic-border bg-pic-surface p-3 text-sm outline-none focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border" placeholder="Explica el motivo" /></div><StdAlert v-if="duplicates.length" tone="warning" title="Hay artículos ya solicitados" description="Al guardar tendrás que confirmar que deben volver a incluirse." /><StdButton class="w-full" variant="primary" :disabled="!canSave || manager.saving" :icon="manager.saving ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-floppy-disk'" @click="save">{{ manager.saving ? 'Guardando…' : `Crear ${typeLabel(type)} ${currentSeries?.siguiente_letra || ''}` }}</StdButton></section></div>
-      </section>
+    <main class="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4 xl:p-5">
+      <p class="mb-3 text-xs font-medium text-pic-text-muted sm:hidden">Semana {{ manager.context.week }}/{{ manager.context.year }} · {{ manager.calendar?.context.weekStart }} a {{ manager.calendar?.context.weekEnd }}</p>
+      <StdAlert v-if="manager.error || localError" class="mb-4" tone="danger" title="Revisa esta operación" :description="localError || manager.error || ''" />
+      <p v-if="manager.loadingCalendar" class="py-12 text-center text-sm text-pic-text-muted">Cargando calendario semanal…</p>
+      <div v-else-if="mode === 'browse' && manager.calendar" class="z8-manager-container min-h-0">
+        <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p class="text-xs text-pic-text-muted"><span class="font-bold text-pic-text-main">Eliminación rápida</span> · {{ quickDeleteCandidates.length }} Z8 creados de hoy al domingo</p>
+          <StdButton size="sm" variant="danger" icon="fa-solid fa-trash" :disabled="!quickDeleteCandidates.length" class="w-full sm:w-auto" @click="openQuickDelete">Revisar Z8 recientes</StdButton>
+        </div>
+        <div class="z8-manager-layout grid min-h-0 items-start gap-4">
+          <div class="space-y-3 lg:sticky lg:top-0 lg:self-start">
+            <CpfrZ8Calendar :data="manager.calendar" :selected="manager.selectedDay" :store-id="manager.selectedStore?.id_cliente" :store-name="manager.selectedStore?.nombre_tienda" @select="chooseDay" />
+            <section v-if="selectedDaySummary" class="rounded-xl border border-pic-border bg-pic-surface px-3 py-3 sm:px-4" aria-live="polite" :aria-label="`Resumen del ${manager.selectedDay}`">
+              <div class="flex items-baseline justify-between gap-2"><h3 class="text-sm font-bold text-pic-text-main">{{ manager.selectedDay }}</h3><span class="text-xs text-pic-text-muted">Resumen del día</span></div>
+              <dl class="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-xs sm:grid-cols-4">
+                <div><dt class="text-pic-text-muted">Tiendas</dt><dd class="font-mono font-bold text-pic-text-main">{{ selectedDaySummary.tiendas_relacionadas }}</dd></div>
+                <div><dt class="text-pic-text-muted">Pedidos creados</dt><dd class="font-mono font-bold text-pic-text-main">{{ selectedDaySummary.pedidos_creados }}</dd></div>
+                <div><dt class="text-pic-text-muted">Fin de embarque</dt><dd class="font-mono font-bold text-pic-text-main">{{ selectedDaySummary.pedidos_fin_embarque }}</dd></div>
+                <div><dt class="text-pic-text-muted">Atención oficial</dt><dd class="font-mono font-bold text-pic-text-main">{{ selectedDaySummary.tiendas_atencion_oficial }}</dd></div>
+              </dl>
+            </section>
+          </div>
+          <CpfrZ8StoreList :stores="manager.stores" :selected-id="manager.selectedStore?.id_cliente" :selected-date="manager.selectedDay" :loading="manager.loadingStores" @select="chooseStore" @back="backToStores">
+            <template #details="{ store }">
+            <div v-if="missingOriginal" class="mb-3 flex justify-end">
+              <StdButton size="sm" variant="primary" icon="fa-solid fa-plus" :disabled="busyGenerating || !store.fecha_atencion" @click="generateTraditional">Generar Z8 y Z8 Carnes</StdButton>
+            </div>
+            <StdAlert v-if="missingOriginal" class="mb-3" tone="warning" title="Falta pedido Z8 tradicional" description="Genera ambos tipos para esta tienda antes de crear un extraordinario." />
+            <CpfrZ8OrderTreeTable :key="store.id_cliente" :orders="store.pedidos" :details="manager.orderDetails" :loading-order-keys="manager.loadingOrderKeys" :selected="selected" embedded @expand="expand" @toggle="toggle" @edit="openEdit">
+              <template #actions>
+                <StdButton size="sm" variant="secondary" icon="fa-solid fa-plus" :disabled="!canCreateExtra('z8')" :title="!manager.selectedStore.series.z8.siguiente_letra ? 'Se agotaron las letras B–G' : !manager.selectedStore.series.z8.original && officialDayPassed ? 'El día oficial ya pasó; puedes crear el extraordinario sin original' : !manager.selectedStore.series.z8.original ? 'Primero genera el Z8 tradicional' : 'Crear Z8 extraordinario'" @click="newExtra('z8')">Z8 {{ manager.selectedStore.series.z8.siguiente_letra || 'B' }}</StdButton>
+                <StdButton size="sm" variant="secondary" icon="fa-solid fa-plus" :disabled="!canCreateExtra('z8carnes')" :title="!manager.selectedStore.series.z8carnes.siguiente_letra ? 'Se agotaron las letras B–G' : !manager.selectedStore.series.z8carnes.original && officialDayPassed ? 'El día oficial ya pasó; puedes crear el extraordinario sin original' : !manager.selectedStore.series.z8carnes.original ? 'Primero genera el Z8 Carnes tradicional' : 'Crear Z8 Carnes extraordinario'" @click="newExtra('z8carnes')">Z8 Carnes {{ manager.selectedStore.series.z8carnes.siguiente_letra || 'B' }}</StdButton>
+                <StdButton size="sm" variant="danger" icon="fa-solid fa-trash" :disabled="!selected.length" title="Selecciona uno o varios Z8 para revisar su eliminación" @click="previewDelete">Eliminar Z8<span v-if="selected.length"> ({{ selected.length }})</span></StdButton>
+              </template>
+            </CpfrZ8OrderTreeTable>
+            </template>
+          </CpfrZ8StoreList>
+        </div>
+      </div>
+      <CpfrZ8ExtraEditor v-else-if="mode === 'editor' && manager.selectedStore" :store-name="manager.selectedStore.nombre_tienda" :kind="kind" :letter="manager.selectedStore.series[kind].siguiente_letra" :editing="editExisting" :past-official-day="!!manager.selectedStore.fecha_atencion && manager.selectedStore.fecha_atencion < manager.context.today" :today="manager.context.today" :week-end="manager.context.weekEnd" :catalog="manager.catalog" :quantities="quantities" :reason="reason" :reason-detail="reasonDetail" :ship-date="shipDate" :sku-search="skuSearch" :total-skus="lines.length" :total-pieces="lines.reduce((sum, line) => sum + line.cantidad_pz, 0)" :valid="valid" :saving="manager.saving" @quantity="(sku, value) => quantities[sku] = value" @update:reason="reason = $event" @update:reason-detail="reasonDetail = $event" @update:ship-date="shipDate = $event" @update:sku-search="skuSearch = $event" @save="save" />
     </main>
   </aside>
-  <ModalDialog v-model="duplicateDialog" title="Artículos ya solicitados" size="xl"><div class="space-y-3"><p class="text-sm text-pic-text-muted">Confirma que deben volver a incluirse, aunque ya tengan cantidad positiva en un pedido previo.</p><div v-for="item in duplicates" :key="item.sku_muliix" class="rounded-lg border border-pic-border bg-pic-muted-surface p-3"><p class="text-sm font-bold text-pic-text-main">{{ item.sku_nombre }}</p><p v-for="prior in item.antecedentes" :key="prior.num_pedido" class="mt-1 font-mono text-xs text-pic-text-muted">{{ prior.num_pedido }} · {{ prior.cantidad_efectiva }} pzas · {{ prior.estado }}</p></div><div class="flex justify-end gap-2"><StdButton variant="secondary" @click="duplicateDialog = false">Volver a editar</StdButton><StdButton variant="primary" icon="fa-solid fa-check" @click="confirmDuplicates">Confirmar y guardar</StdButton></div></div></ModalDialog>
-  <ModalDialog v-model="deleteDialog" title="Eliminar extraordinario" size="md"><div class="space-y-4"><StdAlert tone="danger" title="Se eliminarán las líneas editables" description="La letra queda reservada y no puede reutilizarse." /><div class="flex justify-end gap-2"><StdButton variant="secondary" @click="deleteDialog = false">Cancelar</StdButton><StdButton variant="danger" :disabled="manager.deleting" icon="fa-solid fa-trash" @click="remove">{{ manager.deleting ? 'Eliminando…' : 'Eliminar pedido' }}</StdButton></div></div></ModalDialog>
-  <ModalDialog v-model="legacyDeleteDialog" title="Limpiar borradores Z8" size="md"><div class="space-y-4"><StdAlert tone="danger" title="Eliminar borradores tradicionales" :description="`Borrará cascarones editables de la semana ${manager.context.week}/${manager.context.year} para el día ${cpfr.filters.dia}. Los originales con extraordinarios vigentes quedan protegidos.`" /><div class="flex justify-end gap-2"><StdButton variant="secondary" @click="legacyDeleteDialog = false">Cancelar</StdButton><StdButton variant="danger" :disabled="legacyDeleting" icon="fa-solid fa-trash" @click="removeLegacyDrafts">{{ legacyDeleting ? 'Eliminando…' : 'Eliminar borradores' }}</StdButton></div></div></ModalDialog>
+  </Teleport>
+  <ModalDialog v-model="quickDeleteOpen" title="Eliminación rápida de Z8" size="2xl">
+    <div class="space-y-4 font-sans">
+      <p class="text-sm text-pic-text-muted">Solo se incluyen Z8 y Z8 Carnes creados desde {{ manager.context.today }} hasta {{ manager.context.weekEnd }}. El servidor comprobará estados y dependencias antes de eliminar.</p>
+      <StdAlert v-if="quickDeleteError" tone="danger" title="No se pudo continuar" :description="quickDeleteError" />
+      <template v-if="quickDeleteStage === 'selection'">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <label class="flex-1"><span class="sr-only">Buscar tienda o número de pedido</span><input v-model="quickDeleteSearch" type="search" placeholder="Buscar tienda o número de Z8" class="h-9 w-full rounded-lg border border-pic-border bg-pic-surface px-3 text-sm outline-none focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border" /></label>
+          <StdButton size="sm" variant="secondary" :disabled="!quickDeleteVisible.length || quickDeletePreviewing" @click="toggleQuickVisible">{{ quickDeleteVisible.length && quickDeleteVisible.every(order => quickDeleteSelected.has(orderId(order))) ? 'Quitar visibles' : 'Seleccionar visibles' }}</StdButton>
+        </div>
+        <p class="text-xs font-semibold text-pic-text-muted">{{ quickDeleteKeys.length }} seleccionados · {{ quickDeleteVisible.length }} visibles de {{ quickDeleteCandidates.length }}</p>
+        <div class="max-h-[45vh] divide-y divide-pic-border overflow-y-auto rounded-lg border border-pic-border">
+          <label v-for="order in quickDeleteVisible" :key="orderId(order)" class="flex cursor-pointer items-center gap-3 px-3 py-2.5 transition hover:bg-pic-brand-soft/50">
+            <input type="checkbox" :checked="quickDeleteSelected.has(orderId(order))" :disabled="quickDeletePreviewing" :aria-label="`Seleccionar ${order.num_pedido} de tienda ${order.id_cliente}`" @change="toggleQuickDelete(order)" />
+            <span class="min-w-0"><span class="block break-all font-mono text-xs font-bold text-pic-text-main">{{ order.num_pedido }}</span><span class="block text-[11px] text-pic-text-muted">Tienda <span class="font-mono">{{ order.id_cliente }}</span> · Creado {{ order.fec_pedido_cadena }}</span></span>
+          </label>
+          <p v-if="!quickDeleteVisible.length" class="px-3 py-5 text-center text-xs text-pic-text-muted">No hay Z8 que coincidan con la búsqueda.</p>
+        </div>
+        <div class="flex flex-wrap justify-end gap-2"><StdButton variant="secondary" @click="quickDeleteOpen = false">Cancelar</StdButton><StdButton variant="danger" :disabled="!quickDeleteKeys.length || quickDeletePreviewing" @click="previewQuickDelete">{{ quickDeletePreviewing ? 'Revisando…' : `Revisar eliminación (${quickDeleteKeys.length})` }}</StdButton></div>
+      </template>
+      <template v-else>
+        <p class="text-xs text-pic-text-muted">Revisa todos los pedidos. Una sola orden bloqueada impide eliminar la selección completa.</p>
+        <div class="max-h-[45vh] divide-y divide-pic-border overflow-y-auto rounded-lg border border-pic-border">
+          <div v-for="order in manager.preview?.pedidos || []" :key="orderId(order)" class="px-3 py-2.5 text-xs"><p class="font-mono font-bold text-pic-text-main">{{ order.num_pedido }}</p><p class="text-pic-text-muted">Tienda {{ order.id_cliente }} · {{ order.lineas_fuente }} líneas fuente · {{ order.lineas_persistidas }} persistidas · Estado: {{ (order.estados_persistidos.length ? order.estados_persistidos : order.estados_fuente).join(', ') }}</p><p v-if="order.bloqueo" class="mt-1 font-semibold text-pic-danger">{{ order.bloqueo }}</p></div>
+        </div>
+        <div class="flex flex-wrap justify-end gap-2"><StdButton variant="secondary" @click="quickDeleteStage = 'selection'">Modificar selección</StdButton><StdButton variant="danger" :disabled="!manager.preview || manager.preview.bloqueado || manager.deleting" @click="remove">{{ manager.deleting ? 'Eliminando…' : `Eliminar ${pendingDeleteKeys.length} Z8` }}</StdButton></div>
+      </template>
+    </div>
+  </ModalDialog>
+  <ModalDialog v-model="duplicateDialog" title="Artículos ya solicitados" size="xl"><div class="space-y-3"><p class="text-sm text-pic-text-muted">Confirma que estas piezas deben volver a solicitarse.</p><div v-for="item in repeated" :key="item.sku_muliix" class="border-b border-pic-border py-2"><p class="text-sm font-bold">{{ item.sku_nombre }}</p><p v-for="prior in item.antecedentes" :key="prior.num_pedido" class="font-mono text-xs text-pic-text-muted">{{ prior.num_pedido }} · {{ prior.cantidad_efectiva }} pzas · {{ prior.fec_envio || 'sin fecha' }} · {{ prior.estado }}</p></div><div class="flex justify-end gap-2"><StdButton variant="secondary" @click="duplicateDialog = false">Cancelar</StdButton><StdButton variant="primary" @click="confirmRepeated">Confirmar y guardar</StdButton></div></div></ModalDialog>
+  <CpfrZ8DeleteDialog v-model="deletionDialog" :preview="manager.preview" :deleting="manager.deleting" @confirm="remove" />
+  <ModalDialog v-model="discardDialog" title="Descartar captura" size="sm"><div class="space-y-4"><p class="text-sm text-pic-text-muted">Hay cambios sin guardar. Si sales, perderás la captura.</p><div class="flex justify-end gap-2"><StdButton variant="secondary" @click="discardDialog = false">Seguir editando</StdButton><StdButton variant="danger" @click="discard">Descartar</StdButton></div></div></ModalDialog>
 </template>
+
+<style scoped>
+.z8-manager-container {
+  container-type: inline-size;
+}
+
+@container (min-width: 60rem) {
+  .z8-manager-layout {
+    grid-template-columns: clamp(28rem, 48%, 40rem) minmax(0, 1fr);
+  }
+}
+</style>
