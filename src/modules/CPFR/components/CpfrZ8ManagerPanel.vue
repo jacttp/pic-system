@@ -15,12 +15,6 @@ const manager = useCpfrZ8ManagerStore()
 const mode = ref<'browse' | 'editor'>('browse')
 const selected = ref<Z8OrderKey[]>([])
 const deletionDialog = ref(false)
-const quickDeleteOpen = ref(false)
-const quickDeleteStage = ref<'selection' | 'preview'>('selection')
-const quickDeleteSearch = ref('')
-const quickDeleteSelected = ref(new Set<string>())
-const quickDeletePreviewing = ref(false)
-const quickDeleteError = ref('')
 const pendingDeleteKeys = ref<Z8OrderKey[]>([])
 const duplicateDialog = ref(false)
 const discardDialog = ref(false)
@@ -51,23 +45,6 @@ const lines = computed<Z8ExtraLineInput[]>(() => manager.catalog.map(item => ({ 
 const repeated = computed(() => manager.catalog.filter(item => lines.value.some(line => line.sku_muliix === item.sku_muliix) && item.antecedentes.length))
 const valid = computed(() => lines.value.length > 0 && !!shipDate.value && !!reason.value && (reason.value !== 'otro' || !!reasonDetail.value.trim()) && lines.value.every(line => { const item = manager.catalog.find(c => c.sku_muliix === line.sku_muliix); return Number.isInteger(line.cantidad_pz) && line.cantidad_pz > 0 && !!item?.pzas_bolsa && line.cantidad_pz % item.pzas_bolsa === 0 }))
 const orderId = (item: Z8OrderKey) => `${item.id_cliente}|${item.num_pedido}|${item.fec_pedido_cadena}`
-const quickDeleteCandidates = computed<Z8OrderKey[]>(() => {
-  const calendar = manager.calendar
-  if (!calendar) return []
-  const candidates = new Map<string, Z8OrderKey>()
-  for (const event of calendar.eventos) {
-    const order = event.pedido
-    if (event.tipo !== 'pedido_creado' || !order || !order.num_pedido.toLowerCase().startsWith('z8')) continue
-    if (order.fec_pedido_cadena < calendar.context.today || order.fec_pedido_cadena > calendar.context.weekEnd) continue
-    candidates.set(orderId(order), order)
-  }
-  return [...candidates.values()].sort((a, b) => b.fec_pedido_cadena.localeCompare(a.fec_pedido_cadena) || a.id_cliente.localeCompare(b.id_cliente) || a.num_pedido.localeCompare(b.num_pedido))
-})
-const quickDeleteVisible = computed(() => {
-  const search = quickDeleteSearch.value.trim().toLowerCase()
-  return search ? quickDeleteCandidates.value.filter(order => `${order.id_cliente} ${order.num_pedido}`.toLowerCase().includes(search)) : quickDeleteCandidates.value
-})
-const quickDeleteKeys = computed(() => quickDeleteCandidates.value.filter(order => quickDeleteSelected.value.has(orderId(order))))
 function guarded(next: () => void) { if (dirty.value) { pendingLeave.value = next; discardDialog.value = true } else next() }
 function leaveEditor() { mode.value = 'browse'; editTarget.value = null; confirmed.value = new Set(); localError.value = '' }
 function discard() { discardDialog.value = false; const next = pendingLeave.value; pendingLeave.value = null; leaveEditor(); next?.() }
@@ -88,27 +65,6 @@ function backToStores() {
 }
 async function expand(order: Z8WeeklyOrder) { await manager.loadOrder(order) }
 function toggle(order: Z8WeeklyOrder) { selected.value = selected.value.some(item => orderId(item) === orderId(order)) ? selected.value.filter(item => orderId(item) !== orderId(order)) : [...selected.value, order] }
-function openQuickDelete() {
-  quickDeleteStage.value = 'selection'
-  quickDeleteSearch.value = ''
-  quickDeleteSelected.value = new Set()
-  quickDeleteError.value = ''
-  quickDeleteOpen.value = true
-}
-function toggleQuickDelete(order: Z8OrderKey) {
-  const next = new Set(quickDeleteSelected.value)
-  const id = orderId(order)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  quickDeleteSelected.value = next
-}
-function toggleQuickVisible() {
-  const next = new Set(quickDeleteSelected.value)
-  const visible = quickDeleteVisible.value.map(orderId)
-  if (visible.every(id => next.has(id))) visible.forEach(id => next.delete(id))
-  else visible.forEach(id => next.add(id))
-  quickDeleteSelected.value = next
-}
 function officialDate() { const date = manager.selectedStore?.fecha_atencion; return date && date >= manager.context.today ? date : '' }
 function canCreateExtra(type: Z8Tipo) {
   const series = manager.selectedStore?.series[type]
@@ -155,25 +111,15 @@ async function previewDelete() {
   try { const keys = [...selected.value]; await manager.previewDelete(keys); pendingDeleteKeys.value = keys; deletionDialog.value = true }
   catch (error: any) { localError.value = error?.response?.data?.message || 'No fue posible preparar la eliminación.' }
 }
-async function previewQuickDelete() {
-  const keys = quickDeleteKeys.value
-  if (!keys.length || quickDeletePreviewing.value) return
-  quickDeletePreviewing.value = true
-  quickDeleteError.value = ''
-  try { await manager.previewDelete(keys); pendingDeleteKeys.value = keys; quickDeleteStage.value = 'preview' }
-  catch (error: any) { quickDeleteError.value = error?.response?.data?.message || 'No fue posible preparar la eliminación.' }
-  finally { quickDeletePreviewing.value = false }
-}
 async function remove() {
   if (!pendingDeleteKeys.value.length || manager.deleting) return
   try {
     await manager.removeOrders(pendingDeleteKeys.value)
-    selected.value = []; pendingDeleteKeys.value = []; quickDeleteSelected.value = new Set()
-    deletionDialog.value = false; quickDeleteOpen.value = false; emit('deleted')
+    selected.value = []; pendingDeleteKeys.value = []
+    deletionDialog.value = false; emit('deleted')
   } catch (error: any) {
     const message = error?.response?.data?.message || 'La selección cambió. Solicita una vista previa nueva.'
-    if (quickDeleteOpen.value) { quickDeleteStage.value = 'selection'; quickDeleteError.value = message }
-    else { deletionDialog.value = false; localError.value = message }
+    deletionDialog.value = false; localError.value = message
   }
 }
 onMounted(() => manager.loadCalendar())
@@ -196,10 +142,6 @@ onMounted(() => manager.loadCalendar())
       <StdAlert v-if="manager.error || localError" class="mb-4" tone="danger" title="Revisa esta operación" :description="localError || manager.error || ''" />
       <p v-if="manager.loadingCalendar" class="py-12 text-center text-sm text-pic-text-muted">Cargando calendario semanal…</p>
       <div v-else-if="mode === 'browse' && manager.calendar" class="z8-manager-container min-h-0">
-        <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p class="text-xs text-pic-text-muted"><span class="font-bold text-pic-text-main">Eliminación rápida</span> · {{ quickDeleteCandidates.length }} Z8 creados de hoy al domingo</p>
-          <StdButton size="sm" variant="danger" icon="fa-solid fa-trash" :disabled="!quickDeleteCandidates.length" class="w-full sm:w-auto" @click="openQuickDelete">Revisar Z8 recientes</StdButton>
-        </div>
         <div class="z8-manager-layout grid min-h-0 items-start gap-4">
           <div class="space-y-3 lg:sticky lg:top-0 lg:self-start">
             <CpfrZ8Calendar :data="manager.calendar" :selected="manager.selectedDay" :store-id="manager.selectedStore?.id_cliente" :store-name="manager.selectedStore?.nombre_tienda" @select="chooseDay" />
@@ -234,34 +176,6 @@ onMounted(() => manager.loadCalendar())
     </main>
   </aside>
   </Teleport>
-  <ModalDialog v-model="quickDeleteOpen" title="Eliminación rápida de Z8" size="2xl">
-    <div class="space-y-4 font-sans">
-      <p class="text-sm text-pic-text-muted">Solo se incluyen Z8 y Z8 Carnes creados desde {{ manager.context.today }} hasta {{ manager.context.weekEnd }}. El servidor comprobará estados y dependencias antes de eliminar.</p>
-      <StdAlert v-if="quickDeleteError" tone="danger" title="No se pudo continuar" :description="quickDeleteError" />
-      <template v-if="quickDeleteStage === 'selection'">
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <label class="flex-1"><span class="sr-only">Buscar tienda o número de pedido</span><input v-model="quickDeleteSearch" type="search" placeholder="Buscar tienda o número de Z8" class="h-9 w-full rounded-lg border border-pic-border bg-pic-surface px-3 text-sm outline-none focus:border-pic-brand focus:ring-2 focus:ring-pic-brand-border" /></label>
-          <StdButton size="sm" variant="secondary" :disabled="!quickDeleteVisible.length || quickDeletePreviewing" @click="toggleQuickVisible">{{ quickDeleteVisible.length && quickDeleteVisible.every(order => quickDeleteSelected.has(orderId(order))) ? 'Quitar visibles' : 'Seleccionar visibles' }}</StdButton>
-        </div>
-        <p class="text-xs font-semibold text-pic-text-muted">{{ quickDeleteKeys.length }} seleccionados · {{ quickDeleteVisible.length }} visibles de {{ quickDeleteCandidates.length }}</p>
-        <div class="max-h-[45vh] divide-y divide-pic-border overflow-y-auto rounded-lg border border-pic-border">
-          <label v-for="order in quickDeleteVisible" :key="orderId(order)" class="flex cursor-pointer items-center gap-3 px-3 py-2.5 transition hover:bg-pic-brand-soft/50">
-            <input type="checkbox" :checked="quickDeleteSelected.has(orderId(order))" :disabled="quickDeletePreviewing" :aria-label="`Seleccionar ${order.num_pedido} de tienda ${order.id_cliente}`" @change="toggleQuickDelete(order)" />
-            <span class="min-w-0"><span class="block break-all font-mono text-xs font-bold text-pic-text-main">{{ order.num_pedido }}</span><span class="block text-[11px] text-pic-text-muted">Tienda <span class="font-mono">{{ order.id_cliente }}</span> · Creado {{ order.fec_pedido_cadena }}</span></span>
-          </label>
-          <p v-if="!quickDeleteVisible.length" class="px-3 py-5 text-center text-xs text-pic-text-muted">No hay Z8 que coincidan con la búsqueda.</p>
-        </div>
-        <div class="flex flex-wrap justify-end gap-2"><StdButton variant="secondary" @click="quickDeleteOpen = false">Cancelar</StdButton><StdButton variant="danger" :disabled="!quickDeleteKeys.length || quickDeletePreviewing" @click="previewQuickDelete">{{ quickDeletePreviewing ? 'Revisando…' : `Revisar eliminación (${quickDeleteKeys.length})` }}</StdButton></div>
-      </template>
-      <template v-else>
-        <p class="text-xs text-pic-text-muted">Revisa todos los pedidos. Una sola orden bloqueada impide eliminar la selección completa.</p>
-        <div class="max-h-[45vh] divide-y divide-pic-border overflow-y-auto rounded-lg border border-pic-border">
-          <div v-for="order in manager.preview?.pedidos || []" :key="orderId(order)" class="px-3 py-2.5 text-xs"><p class="font-mono font-bold text-pic-text-main">{{ order.num_pedido }}</p><p class="text-pic-text-muted">Tienda {{ order.id_cliente }} · {{ order.lineas_fuente }} líneas fuente · {{ order.lineas_persistidas }} persistidas · Estado: {{ (order.estados_persistidos.length ? order.estados_persistidos : order.estados_fuente).join(', ') }}</p><p v-if="order.bloqueo" class="mt-1 font-semibold text-pic-danger">{{ order.bloqueo }}</p></div>
-        </div>
-        <div class="flex flex-wrap justify-end gap-2"><StdButton variant="secondary" @click="quickDeleteStage = 'selection'">Modificar selección</StdButton><StdButton variant="danger" :disabled="!manager.preview || manager.preview.bloqueado || manager.deleting" @click="remove">{{ manager.deleting ? 'Eliminando…' : `Eliminar ${pendingDeleteKeys.length} Z8` }}</StdButton></div>
-      </template>
-    </div>
-  </ModalDialog>
   <ModalDialog v-model="duplicateDialog" title="Artículos ya solicitados" size="xl"><div class="space-y-3"><p class="text-sm text-pic-text-muted">Confirma que estas piezas deben volver a solicitarse.</p><div v-for="item in repeated" :key="item.sku_muliix" class="border-b border-pic-border py-2"><p class="text-sm font-bold">{{ item.sku_nombre }}</p><p v-for="prior in item.antecedentes" :key="prior.num_pedido" class="font-mono text-xs text-pic-text-muted">{{ prior.num_pedido }} · {{ prior.cantidad_efectiva }} pzas · {{ prior.fec_envio || 'sin fecha' }} · {{ prior.estado }}</p></div><div class="flex justify-end gap-2"><StdButton variant="secondary" @click="duplicateDialog = false">Cancelar</StdButton><StdButton variant="primary" @click="confirmRepeated">Confirmar y guardar</StdButton></div></div></ModalDialog>
   <CpfrZ8DeleteDialog v-model="deletionDialog" :preview="manager.preview" :deleting="manager.deleting" @confirm="remove" />
   <ModalDialog v-model="discardDialog" title="Descartar captura" size="sm"><div class="space-y-4"><p class="text-sm text-pic-text-muted">Hay cambios sin guardar. Si sales, perderás la captura.</p><div class="flex justify-end gap-2"><StdButton variant="secondary" @click="discardDialog = false">Seguir editando</StdButton><StdButton variant="danger" @click="discard">Descartar</StdButton></div></div></ModalDialog>

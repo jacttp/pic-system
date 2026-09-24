@@ -14,6 +14,7 @@ const emit = defineEmits<{
     (e: 'open-export'): void
     (e: 'open-chain-config'): void
     (e: 'open-z8-manager'): void
+    (e: 'open-z8-delete'): void
 }>()
 
 watch(() => [store.filters.nombre_tienda, store.filters.id_cliente], ([nt, id]) => {
@@ -222,18 +223,23 @@ async function toggleChainAdjustments(value: boolean) {
               <CpfrCriteriaPanel />
             </div>
           </div>
-
+          
           <button @click.stop="emit('open-chain-config')" class="h-[34px] w-[36px] flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-400 hover:text-brand-600 hover:bg-brand-50 hover:border-brand-200 transition-all" title="Abrir Catalogo de Configuracion de Cadena">
             <i class="fa-solid fa-gear text-[14px]"></i>
           </button>
+          
           <button
             v-if="store.nom_cadena.toUpperCase() === 'SORIANA'"
-            @click.stop="emit('open-z8-manager')"
-            class="flex h-[34px] items-center gap-2 rounded-lg border border-pic-brand-border bg-pic-brand-soft px-3 text-pic-brand transition-all hover:bg-pic-surface"
-            title="Abrir calendario y gestor Z8"
+            @click.stop="emit('open-z8-delete')"
+            :disabled="!store.filters.dia"
+            class="h-[34px] w-[36px] flex items-center justify-center rounded-lg border transition-all disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-300"
+            :class="store.filters.dia ? 'border-rose-200 bg-rose-50 text-rose-400 hover:text-rose-600 hover:bg-rose-100 hover:border-rose-300' : ''"
+            :title="store.filters.dia ? `Eliminar borradores Z8 del día ${store.filters.dia}` : 'Selecciona un día antes de eliminar borradores Z8'"
+            aria-label="Eliminar borradores Z8"
           >
-            <i class="fa-solid fa-calendar-days text-[14px]"></i><span class="text-xs font-semibold">Gestor Z8</span>
+            <i class="fa-solid fa-trash-can-arrow-up text-[14px]"></i>
           </button>
+          
           <div class="flex h-[34px] items-center rounded-lg border border-slate-200 bg-slate-50 px-2" :title="`Permitir ajustes manuales para todas las tiendas de ${store.nom_cadena}`">
             <StdSwitch
               :model-value="store.adjustmentsEnabled"
@@ -262,7 +268,7 @@ async function toggleChainAdjustments(value: boolean) {
             >
               <i class="fa-solid text-[11px]" :class="store.forceFillrateLoading ? 'fa-circle-notch fa-spin' : 'fa-percent'"></i>
             </button>
-            <div class="flex flex-col items-end gap-0.5 relative group/z8info">
+            <div class="relative flex items-center gap-1 group/z8info">
               <button
                 class="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 h-8 rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 :class="store.z8Loading
@@ -275,6 +281,14 @@ async function toggleChainAdjustments(value: boolean) {
                 <i class="fa-solid text-[10px]" :class="store.z8Loading ? 'fa-circle-notch fa-spin' : 'fa-bolt'"></i>
                 <span class="cpfr-wide-label">{{ store.z8Loading ? 'Generando...' : 'Generar Z8' }}</span>
               </button>
+              <button
+            v-if="store.nom_cadena.toUpperCase() === 'SORIANA'"
+            @click.stop="emit('open-z8-manager')"
+            class="inline-flex h-8 items-center gap-1.5 rounded-md border border-pic-brand-border bg-pic-brand-soft px-2.5 text-pic-brand transition-all hover:bg-pic-surface"
+            title="Abrir calendario y gestor Z8"
+          >
+            <i class="fa-solid fa-calendar-days text-[14px]"></i><span class="text-xs font-semibold">Z8+</span>
+          </button>
               <span
                 v-if="store.z8Result"
                 class="absolute top-full mt-1 left-0 text-[8px] font-black px-1 truncate max-w-[100px] whitespace-nowrap bg-white/90 rounded"

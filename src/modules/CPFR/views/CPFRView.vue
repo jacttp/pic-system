@@ -10,6 +10,7 @@ import CpfrExportPanel     from '../components/CpfrExportPanel.vue'
 import CpfrStoreConfigModal from '../components/CpfrStoreConfigModal.vue'
 import CpfrInfoModal        from '../components/CpfrInfoModal.vue'
 import CpfrZ8ManagerPanel  from '../components/CpfrZ8ManagerPanel.vue'
+import CpfrZ8DraftDeletePanel from '../components/CpfrZ8DraftDeletePanel.vue'
 import { buildVisibleCpfrDias, cpfrSkuFinalPieces } from '../composables/useCpfrVisibility'
 
 const store = useCpfrStore()
@@ -19,6 +20,7 @@ const router = useRouter()
 const showExportPanel  = ref(false)
 const showInfoModal    = ref(false)
 const showZ8Manager    = ref(false)
+const showZ8Delete     = ref(false)
 const configStore      = ref<{ id: string; nombre: string } | null>(null)
 const chainLabel = computed(() => store.nom_cadena === 'SAMS' ? "Sam's" : 'Soriana')
 
@@ -143,6 +145,7 @@ function openChainConfig() {
       @open-export="showExportPanel = true" 
       @open-chain-config="openChainConfig"
       @open-z8-manager="showZ8Manager = true"
+      @open-z8-delete="showZ8Delete = true"
     />
 
     <!-- ── Content ────────────────────────────────────────────────────────── -->
@@ -195,6 +198,12 @@ function openChainConfig() {
       @deleted="store.loadDashboard()"
       @created="store.loadDashboard()"
       @updated="store.loadDashboard()"
+    />
+
+    <CpfrZ8DraftDeletePanel
+      v-if="showZ8Delete"
+      @close="showZ8Delete = false"
+      @deleted="store.loadDashboard()"
     />
 
     <CpfrStoreConfigModal
