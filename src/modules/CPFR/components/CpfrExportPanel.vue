@@ -28,7 +28,7 @@ const isCentralizedReview = computed(() => panelTab.value === 'centralizados')
 const muliixEnabled = ref(false)
 const muliixResult = ref<CpfrMuliixResponse | null>(null)
 const muliixErrorMessage = ref<string | null>(null)
-const isSoriana = computed(() => store.nom_cadena.trim().toUpperCase() === 'SORIANA')
+const muliixChain = computed(() => store.nom_cadena.trim().toUpperCase())
 
 // ── Day Labels ────────────────────────────────────────────────────────────────
 const DAY_LABELS: Record<number, string> = { 1: 'L', 2: 'M', 3: 'X', 4: 'J', 5: 'V', 6: 'S', 7: 'D' }
@@ -334,7 +334,7 @@ const pdfProcessing = ref(false)
 const excelProcessing = ref(false)
 const reviewProcessing = ref(false)
 const canDownloadExcel = computed(() => panelTab.value === 'aprobada')
-const showMuliixExperimental = computed(() => canDownloadExcel.value && isSoriana.value)
+const showMuliixExperimental = computed(() => canDownloadExcel.value && ['SORIANA', 'SAMS'].includes(muliixChain.value))
 
 watch(showMuliixExperimental, enabled => {
     if (enabled) return
@@ -475,7 +475,7 @@ async function handleExcelExport() {
                     num_pedidos: orderNumbers,
                     year: store.currentWeek.anio,
                     week: store.currentWeek.semana,
-                    nom_cadena: 'SORIANA',
+                    nom_cadena: muliixChain.value as 'SORIANA' | 'SAMS',
                 })
                 // TEMPORAL CPFR/Muliix: retirar después de validar el contrato real del endpoint.
                 console.info('[CpfrExportPanel.muliix.request][TEMPORAL]', result.debug_muliix_requests)

@@ -181,7 +181,7 @@ export const cpfrApi = {
         num_pedidos: string[]
         year: number
         week: number
-        nom_cadena: 'SORIANA'
+        nom_cadena: 'SORIANA' | 'SAMS'
     }): Promise<CpfrMuliixResponse> {
         const response = await api.post('/cpfr/orders/muliix', body, {
             validateStatus: status => status === 200 || status === 206 || status === 412,
