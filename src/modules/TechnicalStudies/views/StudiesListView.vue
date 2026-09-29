@@ -13,12 +13,14 @@ const search = ref('');
 const page = ref(1);
 const columns = [
    { key: 'name', label: 'Estudio' }, { key: 'deadline', label: 'Límite' },
+   { key: 'status', label: 'Estado' },
    { key: 'total', label: 'Tiendas' }, { key: 'submitted', label: 'Enviadas' },
    { key: 'pending', label: 'Pendientes' }, { key: 'expired', label: 'Vencidas' },
 ];
 const rows = computed(() => store.studies.data.map(item => ({
    id: item.id,
    name: item.name,
+   status: item.status === 'PAUSED' ? 'Pausado' : 'Activo',
    deadline: new Date(new Date(item.deadlineAt).getTime() - 1000).toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City' }),
    total: item.totalForms,
    submitted: item.submittedForms,

@@ -1,8 +1,10 @@
-export type FormStatus = 'PENDING' | 'SUBMITTED' | 'EXPIRED';
+export type StudyStatus = 'ACTIVE' | 'PAUSED';
+export type FormStatus = 'PENDING' | 'SUBMITTED' | 'EXPIRED' | 'PAUSED';
 
 export interface StudySummary {
    id: number;
    name: string;
+   status: StudyStatus;
    deadlineAt: string;
    createdAt: string;
    createdByUserId: number;
@@ -22,6 +24,7 @@ export interface StudyPage {
 export interface CreatedStudy {
    id: number;
    name: string;
+   status: StudyStatus;
    deadlineAt: string;
    createdAt: string;
    createdByUserId: number;
@@ -44,6 +47,7 @@ export interface FormSummary {
 export interface StudyDetail {
    id: number;
    name: string;
+   status: StudyStatus;
    deadlineAt: string;
    createdAt: string;
    createdByUserId: number;
@@ -66,6 +70,7 @@ export interface Competitor {
 
 export interface FormDetail extends FormSummary {
    studyName: string;
+   studyStatus: StudyStatus;
    deadlineAt: string;
    canSubmit: boolean;
    store: {

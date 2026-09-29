@@ -62,6 +62,7 @@ watch([studyId, formId], load, { immediate: true });
     <StdAlert v-if="notice" tone="success" title="Envío confirmado" :description="notice" />
     <template v-if="form">
       <StdAlert v-if="form.status === 'SUBMITTED'" tone="success" title="Ficha cerrada" :description="`Enviada por ${form.elaborator?.nombre || 'otro usuario'}${form.elaborator?.noEmp ? ` · No. empleado ${form.elaborator.noEmp}` : ''}.`" />
+      <StdAlert v-else-if="form.status === 'PAUSED'" tone="warning" title="Estudio pausado" description="Esta ficha no admite envíos hasta que el superadmin reanude el estudio." />
       <StdAlert v-else-if="form.status === 'EXPIRED'" tone="warning" title="Plazo vencido" description="La ficha no admite envíos hasta que un administrador amplíe el plazo." />
       <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold text-slate-600">
         {{ form.store.chain || 'Sin cadena' }} · {{ form.store.management || 'Sin gerencia' }} · {{ form.store.leadership || 'Sin jefatura' }}

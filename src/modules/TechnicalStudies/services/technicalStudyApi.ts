@@ -5,6 +5,7 @@ import type {
    StoreSearchResponse,
    StudyDetail,
    StudyPage,
+   StudyStatus,
    SubmitFormPayload,
 } from '../types/technicalStudy.types';
 
@@ -49,6 +50,19 @@ export const technicalStudyApi = {
    async extendDeadline(id: number, deadlineDate: string): Promise<{ deadlineAt: string; reactivatedForms: number }> {
       const { data } = await api.patch(`${base}/${id}/deadline`, { deadlineDate });
       return data.data;
+   },
+
+   async setStudyStatus(id: number, status: StudyStatus): Promise<{ id: number; status: StudyStatus }> {
+      const { data } = await api.patch(`${base}/${id}/status`, { status });
+      return data.data;
+   },
+
+   async deleteStudy(id: number): Promise<void> {
+      await api.delete(`${base}/${id}`);
+   },
+
+   async deleteForm(studyId: number, formId: number): Promise<void> {
+      await api.delete(`${base}/${studyId}/forms/${formId}`);
    },
 
    async getForm(studyId: number, formId: number): Promise<FormDetail> {

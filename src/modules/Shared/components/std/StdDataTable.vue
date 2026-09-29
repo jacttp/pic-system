@@ -8,7 +8,7 @@ export interface StdTableColumn {
   sortable?: boolean;
 }
 
-type StdTableAction = 'view' | 'edit';
+type StdTableAction = 'view' | 'edit' | 'delete';
 
 interface Props {
   columns: StdTableColumn[];
@@ -39,7 +39,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   (e: 'sort', key: string): void;
   (e: 'select-row', key: string | number): void;
-  (e: 'row-action', action: 'view' | 'edit', row: Record<string, unknown>): void;
+  (e: 'row-action', action: StdTableAction, row: Record<string, unknown>): void;
 }>();
 
 const selectedSet = computed(() => new Set(props.selectedKeys));
@@ -149,6 +149,9 @@ const handleSelect = (row: Record<string, unknown>) => {
                   <button v-if="actions.includes('edit')" type="button" class="h-8 w-8 rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-pic-brand" @click="emit('row-action', 'edit', row)">
                     <i class="fa-solid fa-pen"></i>
                   </button>
+                  <button v-if="actions.includes('delete')" type="button" class="h-8 w-8 rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-700" title="Eliminar" @click="emit('row-action', 'delete', row)">
+                    <i class="fa-solid fa-trash-can"></i>
+                  </button>
                 </div>
               </td>
             </tr>
@@ -188,6 +191,9 @@ const handleSelect = (row: Record<string, unknown>) => {
             </button>
             <button v-if="actions.includes('edit')" type="button" class="h-8 w-8 rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-pic-brand" @click="emit('row-action', 'edit', row)">
               <i class="fa-solid fa-pen"></i>
+            </button>
+            <button v-if="actions.includes('delete')" type="button" class="h-8 w-8 rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-700" title="Eliminar" @click="emit('row-action', 'delete', row)">
+              <i class="fa-solid fa-trash-can"></i>
             </button>
           </div>
         </article>

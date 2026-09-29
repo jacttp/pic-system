@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { technicalStudyApi } from '../services/technicalStudyApi';
-import type { FormDetail, StudyDetail, StudyPage, SubmitFormPayload } from '../types/technicalStudy.types';
+import type { FormDetail, StudyDetail, StudyPage, StudyStatus, SubmitFormPayload } from '../types/technicalStudy.types';
 
 export const useTechnicalStudyStore = defineStore('technicalStudies', () => {
    const studies = ref<StudyPage>({ page: 1, limit: 20, total: 0, data: [] });
@@ -72,6 +72,37 @@ export const useTechnicalStudyStore = defineStore('technicalStudies', () => {
       }
    }
 
+   async function changeStatus(id: number, status: StudyStatus) {
+      error.value = null;
+      try {
+         await technicalStudyApi.setStudyStatus(id, status);
+         await loadStudy(id);
+      } catch (reason) {
+         captureError(reason);
+      }
+   }
+
+   async function removeForm(studyId: number, formId: number) {
+      error.value = null;
+      try {
+         await technicalStudyApi.deleteForm(studyId, formId);
+         await loadStudy(studyId);
+      } catch (reason) {
+         captureError(reason);
+      }
+   }
+
+   async function removeStudy(id: number) {
+      error.value = null;
+      try {
+         await technicalStudyApi.deleteStudy(id);
+         selectedStudy.value = null;
+         studies.value = { page: 1, limit: 20, total: 0, data: [] };
+      } catch (reason) {
+         captureError(reason);
+      }
+   }
+
    async function submit(studyId: number, formId: number, payload: SubmitFormPayload) {
       error.value = null;
       try {
@@ -82,5 +113,6 @@ export const useTechnicalStudyStore = defineStore('technicalStudies', () => {
       }
    }
 
-   return { studies, selectedStudy, selectedForm, loading, error, list, loadStudy, loadForm, publish, extend, submit };
+   return { studies, selectedStudy, selectedForm, loading, error, list, loadStudy, loadForm,
+      publish, extend, changeStatus, removeForm, removeStudy, submit };
 });

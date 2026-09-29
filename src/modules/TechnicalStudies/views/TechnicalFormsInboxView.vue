@@ -17,17 +17,19 @@ const activeStudyId = ref<number | null>(null);
 const error = ref('');
 const studyRows = computed(() => store.studies.data.map(item => ({
    id: item.id, name: item.name,
+   status: item.status === 'PAUSED' ? 'Pausado' : 'Activo',
    deadline: new Date(new Date(item.deadlineAt).getTime() - 1000).toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City' }),
    pending: item.pendingForms, submitted: item.submittedForms, expired: item.expiredForms,
 })));
 const formRows = computed(() => store.selectedStudy?.id === activeStudyId.value
    ? store.selectedStudy.forms.map(form => ({
       id: form.id, storeName: form.storeName, clientId: form.clientId,
-      status: form.status === 'SUBMITTED' ? 'Enviada' : form.status === 'EXPIRED' ? 'Vencida' : 'Pendiente',
+      status: form.status === 'SUBMITTED' ? 'Enviada' : form.status === 'EXPIRED' ? 'Vencida' : form.status === 'PAUSED' ? 'Pausada' : 'Pendiente',
       elaborator: form.elaboratorName || '—',
    })) : []);
 const studyColumns = [
    { key: 'name', label: 'Estudio' }, { key: 'deadline', label: 'Límite' },
+   { key: 'status', label: 'Estado' },
    { key: 'pending', label: 'Pendientes' }, { key: 'submitted', label: 'Enviadas' }, { key: 'expired', label: 'Vencidas' },
 ];
 const formColumns = [
