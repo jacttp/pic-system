@@ -95,6 +95,13 @@ export const MODULE_VISUAL_STYLES: Record<string, ModuleVisualStyle> = {
     accent: 'bg-[hsl(var(--pic-accent-blue))]',
     desc: 'Comparativo semanal de ventas en kilogramos y pesos para tres años.',
   },
+  TECHNICAL_STUDIES: {
+    color: 'text-pic-brand',
+    bg: 'bg-pic-brand-soft',
+    border: 'border-pic-brand',
+    accent: 'bg-pic-brand',
+    desc: 'Captura y seguimiento de fichas técnicas por tienda.',
+  },
   SELLOUT_ANALYTICS: {
     color: 'text-[hsl(var(--pic-accent-teal))]',
     bg: 'bg-[hsl(var(--pic-accent-teal-soft))]',

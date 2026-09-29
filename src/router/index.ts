@@ -84,6 +84,36 @@ const router = createRouter({
                meta: { requiresAuth: true }
             },
             {
+               path: 'technical-studies',
+               name: 'technical-studies',
+               component: () => import('@/modules/TechnicalStudies/views/StudiesListView.vue'),
+               meta: { requiresAuth: true, minRoleLevel: 3, moduleKey: 'TECHNICAL_STUDIES' }
+            },
+            {
+               path: 'technical-studies/new',
+               name: 'technical-studies-new',
+               component: () => import('@/modules/TechnicalStudies/views/StudyCreateView.vue'),
+               meta: { requiresAuth: true, minRoleLevel: 3, moduleKey: 'TECHNICAL_STUDIES' }
+            },
+            {
+               path: 'technical-studies/:id',
+               name: 'technical-studies-detail',
+               component: () => import('@/modules/TechnicalStudies/views/StudyDetailView.vue'),
+               meta: { requiresAuth: true, minRoleLevel: 3, moduleKey: 'TECHNICAL_STUDIES' }
+            },
+            {
+               path: 'technical-forms',
+               name: 'technical-forms-inbox',
+               component: () => import('@/modules/TechnicalStudies/views/TechnicalFormsInboxView.vue'),
+               meta: { requiresAuth: true, minRoleLevel: 1, moduleKey: 'TECHNICAL_STUDIES' }
+            },
+            {
+               path: 'technical-forms/:studyId/:formId',
+               name: 'technical-form',
+               component: () => import('@/modules/TechnicalStudies/views/TechnicalFormView.vue'),
+               meta: { requiresAuth: true, minRoleLevel: 1, moduleKey: 'TECHNICAL_STUDIES' }
+            },
+            {
                path: 'products',
                name: 'products',
                component: () => import('@/modules/Products/views/ProductList.vue')
@@ -337,6 +367,13 @@ router.beforeEach(async (to, from, next) => {
       // Cargar módulos si no existen aún (y estamos autenticados)
       if (setupStore.modules.length === 0) {
          await setupStore.fetchModules();
+      }
+
+      // Las rutas administrativas y la bandeja pertenecen al mismo módulo,
+      // aunque no comparten el prefijo Route registrado en SysModulesIC.
+      if (to.meta.moduleKey === 'TECHNICAL_STUDIES') {
+         const technicalModule = setupStore.modules.find(m => m.ModuleKey === 'TECHNICAL_STUDIES');
+         if (!technicalModule?.IsActive) return next('/');
       }
 
       // Buscar si la ruta actual coincide con algún módulo definido
