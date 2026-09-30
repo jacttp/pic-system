@@ -332,6 +332,7 @@ export function buildExportItems(dias: any[]): ExportTiendaItem[] {
 
                 const rows: ExportRow[] = skus.map(sku => {
                     const finalPieces = cpfrSkuFinalPieces(sku)
+                    const mixDescription = String(sku.sku_cadena || sku.sku_nombre || '').trim()
                     return {
                         sku_key: String(sku.oc_id ?? sku.sku_muliix ?? sku.sku_cadena ?? sku.upc_cadena ?? sku.sku_nombre ?? ''),
                         sku_cadena: String(sku.sku_cadena ?? sku.upc_cadena ?? ''),
@@ -350,7 +351,7 @@ export function buildExportItems(dias: any[]): ExportTiendaItem[] {
                         promedio_sellout_pz: sku.promedio_sellout_pz ?? 0,
                         cobertura_calculada: calcularCoberturaDinamica(sku),
                         upc: sku.upc_cadena || '',
-                        desc: sku.desc_art || sku.sku_nombre || '',
+                        desc: sku.is_mix_generated ? mixDescription : (sku.desc_art || sku.sku_nombre || ''),
                         estado_oc: normalizeOrderState(sku.estado_oc ?? sku.estado ?? sku.estado_pedido ?? tienda.estado_pedido)
                     }
                 })
@@ -375,8 +376,8 @@ export function buildExportItems(dias: any[]): ExportTiendaItem[] {
 
 export function useCpfrExport() {
 
-    function generateSamsExcel(selectedItems: ExportTiendaItem[], dayNums: number[]): string {
-        const exportItems = filterPositiveQuantityItems(selectedItems)
+    function generateSamsExcel(selectedItems: ExportTiendaItem[], dayNums: number[], includeZeroQuantity = false): string {
+        const exportItems = includeZeroQuantity ? selectedItems : filterPositiveQuantityItems(selectedItems)
         const allRows: (string | number)[][] = [[
             'Num Artículo',
             'Signing Desc',
@@ -442,12 +443,12 @@ export function useCpfrExport() {
         return filename
     }
 
-    function generateExcel(selectedItems: ExportTiendaItem[], dayNums: number[], nomCadena = 'SORIANA'): string {
+    function generateExcel(selectedItems: ExportTiendaItem[], dayNums: number[], nomCadena = 'SORIANA', includeZeroQuantity = false): string {
         if (String(nomCadena).trim().toUpperCase() === 'SAMS') {
-            return generateSamsExcel(selectedItems, dayNums)
+            return generateSamsExcel(selectedItems, dayNums, includeZeroQuantity)
         }
 
-        const exportItems = filterPositiveQuantityItems(selectedItems)
+        const exportItems = includeZeroQuantity ? selectedItems : filterPositiveQuantityItems(selectedItems)
         const allRows: (string | number)[][] = []
 
         // Headers

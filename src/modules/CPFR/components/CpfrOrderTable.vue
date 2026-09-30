@@ -26,7 +26,10 @@ const router = useRouter()
 const selectedProductContext = ref<{ tienda: CpfrStoreDash; sku: CpfrSkuDash } | null>(null)
 
 const store = useCpfrStore()
-const showZeroZ8 = ref(true)
+const showZeroZ8 = computed({
+  get: () => store.showZeroZ8,
+  set: value => { store.showZeroZ8 = value },
+})
 const showExpiredCloseModal = ref(false)
 const showExpiredDraftCloseModal = ref(false)
 const showApprovedZeroPurgeModal = ref(false)
@@ -57,7 +60,10 @@ const tabs = [
     { id: 'historial',      label: 'Archivo' },
 ]
 
-const selectedFilterWeek = ref<string>('TODAS')
+const selectedFilterWeek = computed({
+  get: () => store.selectedFilterWeek,
+  set: value => { store.selectedFilterWeek = value },
+})
 
 const availableWeeks = computed(() => {
   return store.allCpfrWeeks

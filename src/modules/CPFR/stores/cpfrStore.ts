@@ -106,6 +106,8 @@ export const useCpfrStore = defineStore('cpfr', () => {
     const viewMode = ref<'table' | 'cards'>((localStorage.getItem('cpfr_view_mode') as any) || 'table')
     const activeTab = ref('centralizados')
     const groupByOC = ref(false)
+    const selectedFilterWeek = ref('TODAS')
+    const showZeroZ8 = ref(true)
 
     function setViewMode(mode: 'table' | 'cards') {
         viewMode.value = mode
@@ -1267,7 +1269,7 @@ export const useCpfrStore = defineStore('cpfr', () => {
         historialSelectedWeeks, historialSearch, historialPage, historialPageSize, historialPagination,
         approvalIdsByOrder,
         criterio_global, nom_cadena, adjustmentsEnabled, adjustmentsLoading, adjustmentsSaving, filters, overrides, expandedStores,
-        statusFilters, viewMode, activeTab, groupByOC,
+        statusFilters, viewMode, activeTab, groupByOC, selectedFilterWeek, showZeroZ8,
         // Actions
         init, fetchCurrentWeek, fetchAllCpfrWeeks, loadDashboard, loadHistorial, loadHistorialPage, setHistorialPageSize, recalculate, generateZ8,
         loadExpiredDraftCandidates, closeExpiredDraftCandidates,

@@ -25,6 +25,7 @@ const store = useCpfrStore()
 const { generateExcel, generateStorePdfs } = useCpfrExport()
 const panelTab = computed(() => props.tab || store.activeTab)
 const isCentralizedReview = computed(() => panelTab.value === 'centralizados')
+const isArchive = computed(() => panelTab.value === 'historial')
 const muliixEnabled = ref(false)
 const muliixResult = ref<CpfrMuliixResponse | null>(null)
 const muliixErrorMessage = ref<string | null>(null)
@@ -36,12 +37,25 @@ const DAY_NAMES: Record<number, string>  = { 1: 'Lunes', 2: 'Martes', 3: 'Miérc
 const DAY_CODES: Record<number, string>  = { 1: 'LU', 2: 'MA', 3: 'MI', 4: 'JU', 5: 'VI', 6: 'SA', 7: 'DO' }
 
 // ── Multi-Day Selection ───────────────────────────────────────────────────────
-const visibleDias = computed<CpfrDiaDash[]>(() => buildVisibleCpfrDias({
-    activeTab: panelTab.value,
-    dias: store.dias,
-    statusFilters: store.statusFilters,
-    criterioGlobal: store.criterio_global,
-}))
+const visibleDias = computed<CpfrDiaDash[]>(() => {
+    const dias = buildVisibleCpfrDias({
+        activeTab: panelTab.value,
+        dias: store.dias,
+        statusFilters: store.statusFilters,
+        criterioGlobal: store.criterio_global,
+        selectedFilterWeek: store.selectedFilterWeek,
+    })
+    if (!isArchive.value || store.showZeroZ8) return dias
+    return dias.map(dia => ({
+        ...dia,
+        tiendas: dia.tiendas.map(tienda => ({
+            ...tienda,
+            skus: tienda.skus.filter(sku =>
+                sku.pedido_sugerido_pz_red !== 0 || !String(sku.num_pedido || '').trim().toLowerCase().startsWith('z8')
+            ),
+        })).filter(tienda => tienda.skus.length > 0),
+    })).filter(dia => dia.tiendas.length > 0)
+})
 
 const availableDays = computed(() => {
     const nums = [...new Set(visibleDias.value.map(d => d.dia_num))].sort()
@@ -115,8 +129,9 @@ const candidateItems = computed<ExportTiendaItem[]>(() => {
     const term = search.value.trim().toLowerCase()
 
     return allItems.value.map(i => {
-        const rows = panelTab.value === 'aprobada'
-            ? i.rows.filter(row => normalizeCpfrOrderState(row.estado_oc) === 'aprobado')
+        const requiredState = panelTab.value === 'aprobada' ? 'aprobado' : isArchive.value ? 'enviado' : null
+        const rows = requiredState
+            ? i.rows.filter(row => normalizeCpfrOrderState(row.estado_oc) === requiredState)
             : i.rows
         if (!rows.length) return null
 
@@ -278,7 +293,7 @@ const totalCantidad = computed(() => includedItems.value.reduce((a, i) => a + i.
 const totalKg       = computed(() => includedItems.value.reduce((a, i) => a + sumKg(i.rows), 0))
 
 const excelExportItems = computed<ExportTiendaItem[]>(() => includedItems.value
-    .map(item => ({ ...item, rows: item.rows.filter(row => Number(row.cant_pedida) > 0) }))
+    .map(item => ({ ...item, rows: isArchive.value ? item.rows : item.rows.filter(row => Number(row.cant_pedida) > 0) }))
     .filter(item => item.rows.length > 0)
 )
 
@@ -333,8 +348,8 @@ const storesMap = computed(() => {
 const pdfProcessing = ref(false)
 const excelProcessing = ref(false)
 const reviewProcessing = ref(false)
-const canDownloadExcel = computed(() => panelTab.value === 'aprobada')
-const showMuliixExperimental = computed(() => canDownloadExcel.value && ['SORIANA', 'SAMS'].includes(muliixChain.value))
+const canDownloadExcel = computed(() => panelTab.value === 'aprobada' || isArchive.value)
+const showMuliixExperimental = computed(() => panelTab.value === 'aprobada' && ['SORIANA', 'SAMS'].includes(muliixChain.value))
 
 watch(showMuliixExperimental, enabled => {
     if (enabled) return
@@ -342,7 +357,7 @@ watch(showMuliixExperimental, enabled => {
     muliixResult.value = null
     muliixErrorMessage.value = null
 })
-const excelRestrictionMessage = 'El Excel final solo se genera desde Aprobados: envía las OC con cantidad y cierra las OC oficiales totalmente en cero.'
+const excelRestrictionMessage = 'El Excel se genera desde Aprobados o Archivo.'
 
 function buildExcelAuditDetail(
     filename: string,
@@ -429,6 +444,24 @@ function buildExcelAuditDetail(
 async function handleExcelExport() {
     if (!canDownloadExcel.value) {
         toast({ title: 'Exportación no disponible', description: excelRestrictionMessage, variant: 'destructive' })
+        return
+    }
+
+    if (isArchive.value) {
+        if (excelExportItems.value.length === 0) {
+            toast({ title: 'Atención', description: 'No hay renglones visibles de Archivo para exportar.', variant: 'destructive' })
+            return
+        }
+        excelProcessing.value = true
+        try {
+            const filename = generateExcel(excelExportItems.value, Array.from(selectedDays.value), store.nom_cadena, true)
+            toast({ title: 'Excel generado', description: `${filename} descargado desde Archivo.` })
+        } catch (error) {
+            console.error('[CpfrExportPanel.archiveExcel]', error)
+            toast({ title: 'Error', description: 'No se pudo generar el Excel de Archivo.', variant: 'destructive' })
+        } finally {
+            excelProcessing.value = false
+        }
         return
     }
 
@@ -673,7 +706,9 @@ async function handlePdfExport() {
                 <p class="text-[11px] text-slate-500 font-medium">
                     {{ isCentralizedReview
                         ? 'Selecciona las órdenes de compra que se enviarán a revisión'
-                        : 'Genera el Excel y registra las OC completas como enviadas' }}
+                        : isArchive
+                            ? 'Descarga los renglones visibles de Archivo sin cambiar el estado de las OC'
+                            : 'Genera el Excel y registra las OC completas como enviadas' }}
                 </p>
             </div>
         </div>
@@ -1057,13 +1092,13 @@ async function handlePdfExport() {
                     <button
                         v-else
                         @click="handleExcelExport"
-                        :disabled="!canDownloadExcel || excelProcessing || pdfProcessing || excelOrderNumbers.length === 0"
-                        :title="canDownloadExcel ? 'Generar Excel, enviar las OC con cantidad y cerrar las oficiales totalmente en cero' : excelRestrictionMessage"
+                        :disabled="!canDownloadExcel || excelProcessing || pdfProcessing || (isArchive ? excelExportItems.length === 0 : excelOrderNumbers.length === 0)"
+                        :title="isArchive ? 'Descargar los renglones visibles sin cambiar las OC' : canDownloadExcel ? 'Generar Excel, enviar las OC con cantidad y cerrar las oficiales totalmente en cero' : excelRestrictionMessage"
                         class="w-full h-9 border-2 border-brand-600 text-brand-700 hover:bg-brand-50 disabled:bg-slate-50 disabled:text-slate-300 disabled:border-slate-200 rounded-xl font-black text-[11px] transition-all flex items-center justify-center gap-2 group"
                     >
                         <i v-if="excelProcessing" class="fa-solid fa-circle-notch fa-spin"></i>
                         <i v-else :class="muliixEnabled && showMuliixExperimental ? 'fa-solid fa-plug' : 'fa-solid fa-file-excel'" class="transition-transform group-hover:scale-110"></i>
-                        {{ excelProcessing ? (muliixEnabled ? 'CONECTANDO...' : 'REGISTRANDO...') : (muliixEnabled ? 'GENERAR Y CONECTAR' : 'GENERAR Y ENVIAR') }}
+                        {{ isArchive ? (excelProcessing ? 'GENERANDO...' : 'GENERAR EXCEL') : excelProcessing ? (muliixEnabled ? 'CONECTANDO...' : 'REGISTRANDO...') : (muliixEnabled ? 'GENERAR Y CONECTAR' : 'GENERAR Y ENVIAR') }}
                     </button>
 
                     <button
