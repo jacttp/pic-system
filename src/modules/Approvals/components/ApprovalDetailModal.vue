@@ -1699,11 +1699,11 @@ const handleCancel = async () => {
                                  <div class="grid grid-cols-3 divide-x divide-slate-100 border-b border-slate-100 bg-slate-50/70 text-center md:border-b-0 md:border-r">
                                     <div class="px-1 py-2 md:flex md:flex-col md:justify-center">
                                        <p class="text-[8px] font-black uppercase tracking-wide text-slate-400">Inv. act.</p>
-                                       <p class="mt-0.5 text-[11px] font-black text-brand-700">{{ formatNumber(row.inv_actual_pz, 0) }}</p>
+                                       <p class="mt-0.5 text-[11px] font-black text-brand-700">{{ formatNumber(row.inv_actual_pz, 2) }}</p>
                                     </div>
                                     <div class="px-1 py-2 md:flex md:flex-col md:justify-center">
                                        <p class="text-[8px] font-black uppercase tracking-wide text-slate-400">Sell prom.</p>
-                                       <p class="mt-0.5 text-[11px] font-black text-brand-700">{{ formatNumber(row.promedio_sellout_pz, 0) }}</p>
+                                       <p class="mt-0.5 text-[11px] font-black text-brand-700">{{ formatNumber(row.promedio_sellout_pz, 2) }}</p>
                                     </div>
                                     <div class="px-1 py-2 md:flex md:flex-col md:justify-center" :title="coberturaTooltip(row)">
                                        <p class="text-[8px] font-black uppercase tracking-wide text-slate-400">Cobertura</p>
