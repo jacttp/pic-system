@@ -1,12 +1,19 @@
 <script setup lang="ts">
 // src/modules/CPFR/components/CpfrFiltersPanel.vue
-import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount, useId } from 'vue'
 import { useCpfrStore } from '../stores/cpfrStore'
 import CpfrCriteriaPanel from './CpfrCriteriaPanel.vue'
 import { StdSwitch } from '@/modules/Shared/components/std'
 import { toast } from '@/components/ui/toast/use-toast'
 
 const store = useCpfrStore()
+const collapsed = defineModel<boolean>('collapsed', { default: false })
+const filtersContentId = useId()
+
+function toggleCollapsed() {
+    closeCriteria()
+    collapsed.value = !collapsed.value
+}
 
 const canRunCentralizedActions = computed(() => store.activeTab === 'centralizados')
 
@@ -162,7 +169,7 @@ async function toggleChainAdjustments(value: boolean) {
 
 <template>
   <div class="cpfr-filter-panel bg-white border-b border-slate-200 shadow-sm shrink-0 relative z-40 select-none">
-    <div class="px-3 sm:px-4 xl:px-5 py-3">
+    <div v-show="!collapsed" :id="filtersContentId" class="px-3 sm:px-4 xl:px-5 pt-3 pb-2">
       <div class="cpfr-filter-layout">
         <div class="cpfr-filter-main">
         <div class="flex items-center gap-2 pr-1">
@@ -352,6 +359,20 @@ async function toggleChainAdjustments(value: boolean) {
           <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 pointer-events-none"></i>
         </div>
       </div>
+    </div>
+    <div class="flex min-w-0 justify-center px-3 sm:px-4 xl:px-5">
+      <button
+        type="button"
+        class="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-[10px] font-semibold text-pic-text-muted transition-colors hover:bg-pic-muted-surface hover:text-pic-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-pic-brand"
+        :title="collapsed ? 'Expandir filtros' : 'Contraer filtros'"
+        :aria-label="collapsed ? 'Expandir filtros' : 'Contraer filtros'"
+        :aria-expanded="!collapsed"
+        :aria-controls="filtersContentId"
+        @click.stop="toggleCollapsed"
+      >
+        <i class="fa-solid text-[9px]" :class="collapsed ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
+        <span>{{ collapsed ? 'Mostrar filtros' : 'Ocultar filtros' }}</span>
+      </button>
     </div>
   </div>
 </template>

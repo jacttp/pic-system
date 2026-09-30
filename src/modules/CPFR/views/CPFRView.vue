@@ -18,6 +18,7 @@ const router = useRouter()
 
 // ── Panel state ───────────────────────────────────────────────────────────────
 const showExportPanel  = ref(false)
+const filtersCollapsed = ref(false)
 const showInfoModal    = ref(false)
 const showZ8Manager    = ref(false)
 const showZ8Delete     = ref(false)
@@ -70,7 +71,12 @@ function openChainConfig() {
   <main class="flex flex-col h-full min-h-0 bg-slate-50">
 
     <!-- ── Header ─────────────────────────────────────────────────────────── -->
-    <header class="px-4 xl:px-6 py-3 bg-white border-b border-slate-200 flex items-center justify-between flex-wrap xl:flex-nowrap gap-4 shrink-0">
+    <header
+      class="px-4 xl:px-6 bg-white border-b border-slate-200 items-center shrink-0"
+      :class="filtersCollapsed
+        ? 'grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-2 py-1.5'
+        : 'flex justify-between flex-wrap xl:flex-nowrap gap-4 py-3'"
+    >
 
       <!-- Título -->
       <div class="min-w-0">
@@ -105,7 +111,7 @@ function openChainConfig() {
             </button>
           </div>
         </h1>
-        <p class="text-[10px] xl:text-[11px] text-slate-400 mt-0.5 truncate">
+        <p v-if="!filtersCollapsed" class="text-[10px] xl:text-[11px] text-slate-400 mt-0.5 truncate">
           Reabastecimiento - {{ chainLabel }}
           <span v-if="store.currentWeek" class="ml-2 text-slate-300">
             - Anio {{ store.currentWeek.anio }} - Sem. {{ store.currentWeek.semana_ic }}
@@ -113,10 +119,13 @@ function openChainConfig() {
         </p>
       </div>
 
-      <CpfrChainTabs class="order-3 w-full xl:order-none xl:w-auto" />
+      <CpfrChainTabs
+        :compact="filtersCollapsed"
+        :class="filtersCollapsed ? 'min-w-0 max-w-full justify-self-end' : 'order-3 w-full xl:order-none xl:w-auto'"
+      />
 
       <!-- KPIs del contexto -->
-      <div v-if="store.context" class="flex items-center gap-3 xl:gap-5 shrink-0">
+      <div v-if="store.context && !filtersCollapsed" class="flex items-center gap-3 xl:gap-5 shrink-0">
         <div class="text-center">
           <p class="text-[8px] xl:text-[10px] uppercase tracking-widest text-slate-400 font-bold">Tiendas</p>
           <p class="text-lg xl:text-xl font-bold text-slate-700 leading-tight">{{ orderTotals.tiendas }}</p>
@@ -142,6 +151,7 @@ function openChainConfig() {
 
     <!-- ── Barra de Filtros (Colapsable) ────────────────────────────────────────── -->
     <CpfrFiltersPanel 
+      v-model:collapsed="filtersCollapsed"
       @open-export="showExportPanel = true" 
       @open-chain-config="openChainConfig"
       @open-z8-manager="showZ8Manager = true"
