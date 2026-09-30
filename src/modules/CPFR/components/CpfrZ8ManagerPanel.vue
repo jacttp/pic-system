@@ -44,6 +44,15 @@ const dirty = computed(() => mode.value === 'editor' && (Object.values(quantitie
 const lines = computed<Z8ExtraLineInput[]>(() => manager.catalog.map(item => ({ sku_muliix: item.sku_muliix, cantidad_pz: Number(quantities.value[item.sku_muliix] || 0) })).filter(item => item.cantidad_pz > 0))
 const repeated = computed(() => manager.catalog.filter(item => lines.value.some(line => line.sku_muliix === item.sku_muliix) && item.antecedentes.length))
 const valid = computed(() => lines.value.length > 0 && !!shipDate.value && !!reason.value && (reason.value !== 'otro' || !!reasonDetail.value.trim()) && lines.value.every(line => { const item = manager.catalog.find(c => c.sku_muliix === line.sku_muliix); return Number.isInteger(line.cantidad_pz) && line.cantidad_pz > 0 && !!item?.pzas_bolsa && line.cantidad_pz % item.pzas_bolsa === 0 }))
+function createSolicitudId(): string {
+  const bytes = new Uint8Array(16)
+  if (typeof globalThis.crypto?.getRandomValues === 'function') globalThis.crypto.getRandomValues(bytes)
+  else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256)
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
 const orderId = (item: Z8OrderKey) => `${item.id_cliente}|${item.num_pedido}|${item.fec_pedido_cadena}`
 function guarded(next: () => void) { if (dirty.value) { pendingLeave.value = next; discardDialog.value = true } else next() }
 function leaveEditor() { mode.value = 'browse'; editTarget.value = null; confirmed.value = new Set(); localError.value = '' }
@@ -73,7 +82,7 @@ function canCreateExtra(type: Z8Tipo) {
 async function newExtra(type: Z8Tipo) {
   const series = manager.selectedStore?.series[type]
   if (!canCreateExtra(type) || !series?.siguiente_letra) return
-  editExisting.value = false; kind.value = type; quantities.value = {}; reason.value = ''; reasonDetail.value = ''; shipDate.value = officialDate(); skuSearch.value = ''; confirmed.value = new Set(); solicitudId.value = crypto.randomUUID(); localError.value = ''
+  editExisting.value = false; kind.value = type; quantities.value = {}; reason.value = ''; reasonDetail.value = ''; shipDate.value = officialDate(); skuSearch.value = ''; confirmed.value = new Set(); solicitudId.value = createSolicitudId(); localError.value = ''
   await manager.loadCatalog(type); mode.value = 'editor'
 }
 async function openEdit(order: Z8ManagerOrder | null = manager.detail) {
