@@ -390,7 +390,7 @@ export const cpfrApi = {
         return data.data ?? []
     },
 
-    async getZ8ManagerCatalog(body: { id_cliente: string; nom_cadena: string; year: number; week: number; tipo: Z8Tipo; num_pedido?: string }): Promise<Z8CatalogItem[]> {
+    async getZ8ManagerCatalog(body: { id_cliente: string; nom_cadena: string; year: number; week: number; tipo: Z8Tipo; num_pedido?: string; semanas_sellout?: number }): Promise<Z8CatalogItem[]> {
         const { data } = await api.post('/cpfr/z8/manager/catalog', body)
         return data.data ?? []
     },

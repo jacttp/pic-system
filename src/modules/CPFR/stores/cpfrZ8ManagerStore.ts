@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { cpfrApi } from '../services/cpfrApi'
+import { useCpfrStore } from './cpfrStore'
 import type { Z8CatalogItem, Z8DeletePreview, Z8ExtraCreateInput, Z8ExtraUpdateInput, Z8ManagerCalendar, Z8ManagerOrder, Z8ManagerStore, Z8OrderKey, Z8Tipo } from '../types/cpfrZ8ManagerTypes'
 
 export const useCpfrZ8ManagerStore = defineStore('cpfrZ8Manager', () => {
@@ -55,7 +56,7 @@ export const useCpfrZ8ManagerStore = defineStore('cpfrZ8Manager', () => {
   async function loadCatalog(tipo: Z8Tipo, numPedido?: string) {
     if (!selectedStore.value) return
     loadingDetail.value = true
-    try { catalog.value = await cpfrApi.getZ8ManagerCatalog({ id_cliente: selectedStore.value.id_cliente, nom_cadena: 'soriana', year: context.value.year, week: context.value.week, tipo, num_pedido: numPedido }) }
+    try { catalog.value = await cpfrApi.getZ8ManagerCatalog({ id_cliente: selectedStore.value.id_cliente, nom_cadena: 'soriana', year: context.value.year, week: context.value.week, tipo, num_pedido: numPedido, semanas_sellout: useCpfrStore().filters.semanas_sellout || 6 }) }
     finally { loadingDetail.value = false }
   }
   async function loadOrder(key: Z8OrderKey) {

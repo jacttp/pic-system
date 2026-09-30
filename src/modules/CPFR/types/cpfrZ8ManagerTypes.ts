@@ -59,6 +59,10 @@ export interface Z8CatalogItem {
   pzas_caja: number
   sku_cadena: string | null
   upc_cadena: string | null
+  inv_actual_kg?: number | null
+  inv_actual_pz?: number | null
+  promedio_sellout_kg?: number | null
+  promedio_sellout_pz?: number | null
   antecedentes: Z8PriorLine[]
   antecedentes_token: string | null
 }

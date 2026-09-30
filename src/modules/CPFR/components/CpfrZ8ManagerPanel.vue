@@ -73,7 +73,10 @@ function backToStores() {
   })
 }
 async function expand(order: Z8WeeklyOrder) { await manager.loadOrder(order) }
-function toggle(order: Z8WeeklyOrder) { selected.value = selected.value.some(item => orderId(item) === orderId(order)) ? selected.value.filter(item => orderId(item) !== orderId(order)) : [...selected.value, order] }
+function toggle(order: Z8WeeklyOrder) {
+  if (!order.capacidades.puede_eliminar) return
+  selected.value = selected.value.some(item => orderId(item) === orderId(order)) ? selected.value.filter(item => orderId(item) !== orderId(order)) : [...selected.value, order]
+}
 function officialDate() { const date = manager.selectedStore?.fecha_atencion; return date && date >= manager.context.today ? date : '' }
 function canCreateExtra(type: Z8Tipo) {
   const series = manager.selectedStore?.series[type]
@@ -181,7 +184,7 @@ onMounted(() => manager.loadCalendar())
           </CpfrZ8StoreList>
         </div>
       </div>
-      <CpfrZ8ExtraEditor v-else-if="mode === 'editor' && manager.selectedStore" :store-name="manager.selectedStore.nombre_tienda" :kind="kind" :letter="manager.selectedStore.series[kind].siguiente_letra" :editing="editExisting" :past-official-day="!!manager.selectedStore.fecha_atencion && manager.selectedStore.fecha_atencion < manager.context.today" :today="manager.context.today" :week-end="manager.context.weekEnd" :catalog="manager.catalog" :quantities="quantities" :reason="reason" :reason-detail="reasonDetail" :ship-date="shipDate" :sku-search="skuSearch" :total-skus="lines.length" :total-pieces="lines.reduce((sum, line) => sum + line.cantidad_pz, 0)" :valid="valid" :saving="manager.saving" @quantity="(sku, value) => quantities[sku] = value" @update:reason="reason = $event" @update:reason-detail="reasonDetail = $event" @update:ship-date="shipDate = $event" @update:sku-search="skuSearch = $event" @save="save" />
+      <CpfrZ8ExtraEditor v-else-if="mode === 'editor' && manager.selectedStore" :store-name="manager.selectedStore.nombre_tienda" :store-info="manager.selectedStore" :kind="kind" :letter="manager.selectedStore.series[kind].siguiente_letra" :editing="editExisting" :past-official-day="!!manager.selectedStore.fecha_atencion && manager.selectedStore.fecha_atencion < manager.context.today" :today="manager.context.today" :week-end="manager.context.weekEnd" :catalog="manager.catalog" :quantities="quantities" :reason="reason" :reason-detail="reasonDetail" :ship-date="shipDate" :sku-search="skuSearch" :total-skus="lines.length" :total-pieces="lines.reduce((sum, line) => sum + line.cantidad_pz, 0)" :valid="valid" :saving="manager.saving" @quantity="(sku, value) => quantities[sku] = value" @update:reason="reason = $event" @update:reason-detail="reasonDetail = $event" @update:ship-date="shipDate = $event" @update:sku-search="skuSearch = $event" @save="save" />
     </main>
   </aside>
   </Teleport>
