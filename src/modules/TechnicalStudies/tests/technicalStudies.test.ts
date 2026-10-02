@@ -4,13 +4,15 @@ import { createSSRApp, h } from 'vue';
 import { renderToString } from '@vue/server-renderer';
 import { useTechnicalForm } from '../composables/useTechnicalForm';
 import { useTechnicalStudyStore } from '../stores/technicalStudyStore';
-import { makeCompetitor, parseCount, parseKg, toPayload, validateDraft } from '../utils/formDraft';
+import { competitorLogo, makeCompetitor, parseCount, parseKg, toPayload, validateDraft, validOtherName } from '../utils/formDraft';
 import { dateDeadline, formatDeadline, selectStorePage, validDeadline } from '../utils/technicalStudyUi';
-import type { FormDetail, StoreSearchRow, StudyDetail, StudyPage } from '../types/technicalStudy.types';
+import type { FormDetail, StoreSearchRow, StudyCompetitor, StudyDetail, StudyPage } from '../types/technicalStudy.types';
 import TechnicalFormFields from '../components/TechnicalFormFields.vue';
 import TechnicalFormReview from '../components/TechnicalFormReview.vue';
+import CompetitorNamesEditor from '../components/CompetitorNamesEditor.vue';
+import TechnicalFormView from '../views/TechnicalFormView.vue';
 
-const api = vi.hoisted(() => ({ listStudies: vi.fn(), getStudy: vi.fn(), getForm: vi.fn(), submitForm: vi.fn() }));
+const api = vi.hoisted(() => ({ listStudies: vi.fn(), getStudy: vi.fn(), getForm: vi.fn(), submitForm: vi.fn(), getCompetitors: vi.fn() }));
 vi.mock('../services/technicalStudyApi', () => ({ technicalStudyApi: api }));
 
 function deferred<T>() {
@@ -30,9 +32,36 @@ function form(id: number, studyId = 1): FormDetail {
 const page = (number: number): StudyPage => ({ page: number, limit: 20, total: 0, data: [] });
 const study = (id: number): StudyDetail => ({ id, name: `Estudio ${id}`, status: 'ACTIVE', deadlineAt: '2026-10-31T06:00:00.000Z', createdAt: '', createdByUserId: 1, forms: [] });
 const storeRow = (id: string): StoreSearchRow => ({ IDCLIENTE: id, NOM_CLIENTE: `Tienda ${id}`, Cadena: 'Cadena' });
+const catalog: StudyCompetitor[] = [
+   { id: 12, name: 'Marca A', logo: '/studies/competitors/a.webp', description: 'Referencia de captura', isOther: false },
+   { id: 91, name: 'Otro', logo: null, description: null, isOther: true },
+];
 
 beforeEach(() => { vi.resetAllMocks(); setActivePinia(createPinia()); });
 describe('Captura y validación', () => {
+   it('usa BASE por defecto y conserva IDs y nombre de Otro sin claves locales', () => {
+      const flow = useTechnicalForm(); flow.setCatalog(catalog);
+      expect(makeCompetitor().sellerType).toBe('BASE');
+      expect(flow.add({ name: 'Marca A', competitorId: 12, otherName: null, estimatedMonthlyKg: 0, sellerType: 'BASE', sellerCount: 0 })).toBe(true);
+      expect(flow.add({ name: 'Marca nueva', competitorId: 91, otherName: 'Marca nueva', estimatedMonthlyKg: 1, sellerType: 'BASE', sellerCount: 2 })).toBe(true);
+      expect(flow.add({ name: 'Marca B', competitorId: 91, otherName: 'Marca B', estimatedMonthlyKg: 1, sellerType: 'BASE', sellerCount: 2 })).toBe(true);
+      flow.draft.value.responsableNombre = 'Ana'; flow.next(); flow.next(); flow.next(); flow.next(); flow.next();
+      const item = flow.draft.value.competitors[1]!; const key = item.key;
+      flow.go(2); item.name = ' Marca  editada '; flow.go(4);
+      expect(item.key).toBe(key); expect(item.sellerCountInput).toBe('2');
+      expect(flow.payload()?.competitors[1]).toEqual({ name: 'Marca editada', competitorId: 91, otherName: 'Marca editada', estimatedMonthlyKg: 1, sellerType: 'BASE', sellerCount: 2 });
+      expect(flow.payload()?.competitors[0]).not.toHaveProperty('key');
+   });
+   it('rechaza Otro inseguro, repetido o que ya está en catálogo', () => {
+      for (const value of ['', '---', '<img src=x>', 'https://example.com', 'www.marca.com', 'Marca\nNueva']) expect(validOtherName(value)).toBe(false);
+      expect(validOtherName('Competidor Ñ & Hijos')).toBe(true);
+      const flow = ready(); flow.setCatalog(catalog); flow.go(2);
+      expect(flow.add({ name: 'MARCA A', competitorId: 91, otherName: 'MARCA A', estimatedMonthlyKg: 0, sellerType: 'BASE', sellerCount: 0 })).toBe(false);
+      const other = makeCompetitor({ name: 'Marca nueva', competitorId: 91, otherName: 'Marca nueva', estimatedMonthlyKg: 0, sellerType: 'BASE', sellerCount: 0 });
+      flow.draft.value.competitors.push(other); other.name = 'Marca A';
+      expect(flow.payload()).toBeNull(); expect(flow.step.value).toBe(2);
+      expect(flow.errors.value[`${other.key}-name`]).toContain('lista');
+   });
    it('distingue vacío de cero y normaliza coma decimal sin aceptar miles', () => {
       expect(parseKg('')).toBeNull(); expect(parseCount('')).toBeNull();
       expect(parseKg('0')).toBe(0); expect(parseCount('0')).toBe(0);
@@ -113,6 +142,18 @@ describe('Selección y fechas', () => {
    });
 });
 describe('Solicitudes remotas', () => {
+   it('reintenta el catálogo sin borrar captura ni estado de la ficha y descarta respuestas obsoletas', async () => {
+      const flow = ready(); const original = flow.draft.value.competitors[0]!.key;
+      const store = useTechnicalStudyStore(); store.selectedForm = form(2);
+      api.getCompetitors.mockRejectedValueOnce(new Error('Network')).mockResolvedValueOnce(catalog);
+      expect(await store.loadCatalog()).toBeNull(); expect(store.catalogError).toBeTruthy();
+      expect(store.selectedForm?.id).toBe(2); expect(flow.draft.value.competitors[0]!.key).toBe(original);
+      await store.loadCatalog(); expect(store.catalogError).toBe(''); expect(store.competitorCatalog).toEqual(catalog);
+      const old = deferred<StudyCompetitor[]>(); const latest = deferred<StudyCompetitor[]>();
+      api.getCompetitors.mockReturnValueOnce(old.promise).mockReturnValueOnce(latest.promise);
+      const one = store.loadCatalog(); const two = store.loadCatalog(); latest.resolve(catalog); await two;
+      old.reject(new Error('old')); await one; expect(store.catalogError).toBe(''); expect(store.loadingCatalog).toBe(false);
+   });
    it('descarta listados obsoletos incluso si fallan después de la solicitud vigente', async () => {
       const old = deferred<StudyPage>(); const latest = deferred<StudyPage>();
       api.listStudies.mockReturnValueOnce(old.promise).mockReturnValueOnce(latest.promise);
@@ -133,6 +174,23 @@ describe('Solicitudes remotas', () => {
    });
 });
 describe('Presentación del contrato', () => {
+   it('compila la vista y presenta selección de catálogo con nombre editable solo para Otro', async () => {
+      expect(TechnicalFormView).toBeTruthy();
+      const flow = useTechnicalForm(); flow.reset({ responsableNombre: 'Ana', competitors: [
+         { name: 'Marca A', competitorId: 12, otherName: null, estimatedMonthlyKg: 0, sellerType: 'BASE', sellerCount: 0 },
+         { name: 'Marca nueva', competitorId: 91, otherName: 'Marca nueva', estimatedMonthlyKg: 1, sellerType: 'BASE', sellerCount: 1 },
+      ] });
+      const html = await renderToString(createSSRApp({ render: () => h(CompetitorNamesEditor, { modelValue: flow.draft.value, errors: {}, catalog }) }));
+      expect(html.match(/Nombre observado/g)).toHaveLength(1); expect(html).toContain('Marca nueva'); expect(html).toContain('Otro');
+   });
+   it('muestra la guía como texto y rechaza rutas de imagen inseguras', async () => {
+      expect(competitorLogo('/studies/competitors/a.webp')).toBe('/studies/competitors/a.webp');
+      for (const value of ['javascript:alert(1)', 'http://example.com/a.png', '/studies/competitors/../a.png', '/studies/competitors/%2e%2e/a.png']) expect(competitorLogo(value)).toBeNull();
+      const html = await renderToString(createSSRApp({ render: () => h(TechnicalFormFields, {
+         modelValue: makeCompetitor(answer.competitors[0]), errors: {}, competitor: { ...catalog[0]!, description: '<script>Texto</script>' },
+      }) }));
+      expect(html).toContain('alt="Marca A"'); expect(html).toContain('&lt;script&gt;Texto&lt;/script&gt;'); expect(html).not.toContain('<script>Texto');
+   });
    it('presenta un tipo y una cantidad por competidor con errores accesibles', async () => {
       const item = makeCompetitor(answer.competitors[0]);
       const html = await renderToString(createSSRApp({ render: () => h(TechnicalFormFields, { modelValue: item, errors: { [`${item.key}-kg`]: 'Valor inválido' } }) }));

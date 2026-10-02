@@ -7,11 +7,16 @@ import type {
    StudyPage,
    StudyStatus,
    SubmitFormPayload,
+   StudyCompetitor,
 } from '../types/technicalStudy.types';
 
 const base = '/v2/technical-studies';
 
 export const technicalStudyApi = {
+   async getCompetitors(): Promise<StudyCompetitor[]> {
+      const { data } = await api.get('/v2/study-competitors');
+      return data.data;
+   },
    async getManagements(): Promise<string[]> {
       const { data } = await api.get<string[]>('/filters/gerencias');
       return data;

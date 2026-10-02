@@ -1,17 +1,46 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { StdAlert, StdButton, StdSection } from '@/modules/Shared/components/std'
-import type { SelloutPreviewChain, SelloutPreviewData } from '../types/sellout'
+import type { SelloutPreviewChain, SelloutPreviewData, SelloutUnmappedStore } from '../types/sellout'
 import { SELLOUT_CHAIN_CONFIG } from '../utils/selloutChains'
 
 interface Props {
   preview: SelloutPreviewData
   committing?: boolean
+  registeringStore?: boolean
+  analyzing?: boolean
 }
 
-const props = withDefaults(defineProps<Props>(), { committing: false })
-const emit = defineEmits<{ (event: 'confirm'): void }>()
+const props = withDefaults(defineProps<Props>(), { committing: false, registeringStore: false, analyzing: false })
+const emit = defineEmits<{
+  (event: 'confirm'): void
+  (event: 'register-store', store: SelloutUnmappedStore): void
+}>()
 const showConfirmation = ref(false)
+const storeDialog = ref<HTMLDialogElement | null>(null)
+const selectedStore = ref<SelloutUnmappedStore | null>(null)
+const acceptedStoreWarning = ref(false)
+const isBusy = computed(() => props.committing || props.registeringStore || props.analyzing)
+
+const openStoreConfirmation = (store: SelloutUnmappedStore) => {
+  if (isBusy.value) return
+  selectedStore.value = store
+  acceptedStoreWarning.value = false
+  storeDialog.value?.showModal()
+}
+
+const closeStoreConfirmation = () => {
+  storeDialog.value?.close()
+  selectedStore.value = null
+  acceptedStoreWarning.value = false
+}
+
+const registerStore = () => {
+  if (!selectedStore.value || !acceptedStoreWarning.value || isBusy.value) return
+  const store = selectedStore.value
+  closeStoreConfirmation()
+  emit('register-store', store)
+}
 
 const totals = computed(() => props.preview.chains.reduce((summary, chain) => ({
   prepared: summary.prepared + chain.stats.preparedRows,
@@ -173,9 +202,21 @@ const confirm = () => {
                     <p class="text-[10px] font-black uppercase text-amber-600">{{ store.storeCode }}</p>
                     <p class="truncate text-xs font-bold text-slate-700" :title="store.storeName">{{ store.storeName }}</p>
                   </div>
-                  <span class="shrink-0 rounded-md bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-800">
-                    {{ formatNumber(store.rowCount) }} filas
-                  </span>
+                  <div class="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                    <span class="rounded-md bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-800">
+                      {{ formatNumber(store.rowCount) }} filas
+                    </span>
+                    <button
+                      v-if="chain.chain === 'CHEDRAUI'"
+                      type="button"
+                      class="rounded-md border border-amber-300 bg-white px-2 py-1 text-[10px] font-black text-amber-800 transition-colors hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+                      :disabled="isBusy"
+                      :aria-label="`Identificar como temporal la sucursal ${store.storeCode}`"
+                      @click="openStoreConfirmation(store)"
+                    >
+                      Identificar temporal
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -226,13 +267,40 @@ const confirm = () => {
       <p class="max-w-2xl text-xs font-semibold leading-5 text-slate-500">
         La confirmación elimina el periodo indicado y carga el conjunto preparado dentro de una sola transacción.
       </p>
-      <StdButton variant="primary" icon="fa-solid fa-shield-check" :disabled="committing" @click="showConfirmation = true">
+      <StdButton variant="primary" icon="fa-solid fa-shield-check" :disabled="isBusy" @click="showConfirmation = true">
         {{ committing ? 'Aplicando reemplazo...' : 'Confirmar reemplazo' }}
       </StdButton>
     </div>
   </StdSection>
 
   <Teleport to="body">
+    <dialog
+      ref="storeDialog"
+      aria-labelledby="pending-store-title"
+      aria-describedby="pending-store-warning"
+      class="m-auto w-[calc(100%_-_2rem)] max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl backdrop:bg-slate-950/55 backdrop:backdrop-blur-sm sm:p-6"
+      @cancel.prevent="closeStoreConfirmation"
+    >
+      <p class="text-[10px] font-black uppercase text-amber-600">Confirmación requerida</p>
+      <h3 id="pending-store-title" class="mt-1 text-lg font-black text-slate-950">Identificar tienda como temporal</h3>
+      <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <p class="text-xs font-black text-slate-800">{{ selectedStore?.storeCode }}</p>
+        <p class="mt-1 break-words text-sm font-semibold text-slate-700">{{ selectedStore?.storeName }}</p>
+      </div>
+      <div id="pending-store-warning" class="mt-4 space-y-2 text-sm font-semibold leading-6 text-slate-600">
+        <p>Se dará de alta esta tienda como temporal, pendiente de matriz ERP. Sus filas podrán incluirse cuando confirmes la carga.</p>
+        <p class="font-black text-amber-800">Esta alta no se puede deshacer desde este módulo.</p>
+        <p class="text-amber-800">Dar de alta tiendas que no forman parte de la cartera de clientes puede ensuciar los datos de análisis e incluir ventas o inventarios que no corresponden.</p>
+      </div>
+      <label class="mt-4 flex items-start gap-2 text-xs font-semibold leading-5 text-slate-700">
+        <input v-model="acceptedStoreWarning" type="checkbox" class="mt-1 accent-amber-700">
+        <span>Confirmo que esta tienda pertenece a nuestra cartera de clientes y entiendo que el alta no se puede deshacer desde este módulo.</span>
+      </label>
+      <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <StdButton variant="secondary" @click="closeStoreConfirmation">Cancelar</StdButton>
+        <StdButton variant="primary" :disabled="!acceptedStoreWarning || isBusy" @click="registerStore">Sí, dar de alta como temporal</StdButton>
+      </div>
+    </dialog>
     <div v-if="showConfirmation" class="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/55 p-0 backdrop-blur-sm sm:items-center sm:p-4" @click.self="showConfirmation = false">
       <div class="w-full max-w-lg rounded-t-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:rounded-2xl sm:p-6">
         <div class="flex items-start gap-4">

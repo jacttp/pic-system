@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { technicalStudyApi } from '../services/technicalStudyApi';
-import type { FormDetail, StudyDetail, StudyPage, StudyStatus, SubmitFormPayload } from '../types/technicalStudy.types';
+import type { FormDetail, StudyCompetitor, StudyDetail, StudyPage, StudyStatus, SubmitFormPayload } from '../types/technicalStudy.types';
+import { errorMessage } from '../utils/technicalStudyUi';
 
 export const useTechnicalStudyStore = defineStore('technicalStudies', () => {
    const studies = ref<StudyPage>({ page: 1, limit: 20, total: 0, data: [] });
@@ -10,6 +11,10 @@ export const useTechnicalStudyStore = defineStore('technicalStudies', () => {
    const loadingStudies = ref(false);
    const loadingStudy = ref(false);
    const loadingForm = ref(false);
+   const competitorCatalog = ref<StudyCompetitor[]>([]);
+   const loadingCatalog = ref(false);
+   const catalogError = ref('');
+   let catalogRequest = 0;
    const loading = computed(() => loadingStudies.value || loadingStudy.value || loadingForm.value);
    let listRequest = 0;
    let studyRequest = 0;
@@ -21,6 +26,22 @@ export const useTechnicalStudyStore = defineStore('technicalStudies', () => {
       error.value = response?.data?.message || 'No fue posible completar la operación.';
       throw reason;
    };
+
+   async function loadCatalog() {
+      const request = ++catalogRequest;
+      loadingCatalog.value = true;
+      catalogError.value = '';
+      try {
+         const result = await technicalStudyApi.getCompetitors();
+         if (request !== catalogRequest) return null;
+         competitorCatalog.value = result;
+         if (!result.some(item => item.isOther)) catalogError.value = 'El catálogo aún no tiene el comodín Otro. Solicita su carga al administrador.';
+         return result;
+      } catch (reason) {
+         if (request === catalogRequest) catalogError.value = errorMessage(reason, 'No se pudo cargar la lista. Tu captura sigue disponible.');
+         return null;
+      } finally { if (request === catalogRequest) loadingCatalog.value = false; }
+   }
 
    async function list(params: { page?: number; limit?: number; search?: string } = {}) {
       const request = ++listRequest;
@@ -143,5 +164,5 @@ export const useTechnicalStudyStore = defineStore('technicalStudies', () => {
    }
 
    return { studies, selectedStudy, selectedForm, loading, loadingStudies, loadingStudy, loadingForm, error, list, loadStudy, loadForm,
-      publish, extend, changeStatus, removeForm, removeStudy, submit };
+      publish, extend, changeStatus, removeForm, removeStudy, submit, competitorCatalog, loadingCatalog, catalogError, loadCatalog };
 });

@@ -5,6 +5,8 @@ import type {
   SelloutHistoryFilters,
   SelloutPreviewData,
   SelloutChain,
+  ChedrauiStoreMapping,
+  SelloutUnmappedStore,
 } from '../types/sellout'
 
 const BASE_PATH = `${import.meta.env.VITE_API_V2_PATH}/upload-sellout`
@@ -26,6 +28,13 @@ const createForm = (year: number, month: number, files: Record<SelloutChain, Fil
 }
 
 export const selloutApi = {
+  async createPendingStore(store: SelloutUnmappedStore) {
+    const { data } = await api.post<ApiResponse<ChedrauiStoreMapping>>(
+      `${import.meta.env.VITE_API_V2_PATH}/chedraui/store-mappings`,
+      { codigo_sucursal: store.storeCode, tienda: store.storeName, confirmed: true },
+    )
+    return data.data
+  },
   async preview(year: number, month: number, files: Record<SelloutChain, File | null>) {
     const form = createForm(year, month, files)
     const { data } = await api.post<ApiResponse<SelloutPreviewData>>(`${BASE_PATH}/preview`, form, {

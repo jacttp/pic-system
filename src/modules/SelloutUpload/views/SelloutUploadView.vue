@@ -7,11 +7,12 @@ import { useSelloutStore } from '../stores/selloutStore'
 import SelloutDropZone from '../components/SelloutDropZone.vue'
 import SelloutPreview from '../components/SelloutPreview.vue'
 import SelloutHistory from '../components/SelloutHistory.vue'
-import type { SelloutChain } from '../types/sellout'
+import type { SelloutChain, SelloutUnmappedStore } from '../types/sellout'
 import { SELLOUT_CHAINS } from '../utils/selloutChains'
 
 const store = useSelloutStore()
-const { files, previewData, lastCommit, isPreviewing, isCommitting, error, hasFiles } = storeToRefs(store)
+const { files, previewData, lastCommit, isPreviewing, isCommitting, isRegisteringStore, error, hasFiles } = storeToRefs(store)
+const isBusy = computed(() => isPreviewing.value || isCommitting.value || isRegisteringStore.value)
 const { toast } = useToast()
 
 const selectedYear = ref(store.year)
@@ -53,6 +54,15 @@ const commit = async () => {
     toast({ title: 'Carga no aplicada', description: store.error, variant: 'destructive' })
   }
 }
+
+const registerPendingStore = async (pendingStore: SelloutUnmappedStore) => {
+  try {
+    await store.registerPendingStore(pendingStore)
+    toast({ title: 'Sucursal identificada como temporal', description: 'Se actualizó el manifiesto. Revisa los datos antes de confirmar la carga.' })
+  } catch {
+    toast({ title: 'El registro requiere atención', description: store.error, variant: 'destructive' })
+  }
+}
 </script>
 
 <template>
@@ -89,11 +99,11 @@ const commit = async () => {
         <div class="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[180px_minmax(220px,1fr)_auto] sm:items-end">
           <label>
             <span class="mb-1.5 block text-[10px] font-black uppercase text-slate-500">Año</span>
-            <input v-model.number="selectedYear" type="number" min="2000" max="2100" class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-800 outline-none focus:border-pic-brand-border focus:ring-2 focus:ring-pic-brand-border" @change="updatePeriod">
+            <input v-model.number="selectedYear" :disabled="isBusy" type="number" min="2000" max="2100" class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-800 outline-none focus:border-pic-brand-border focus:ring-2 focus:ring-pic-brand-border" @change="updatePeriod">
           </label>
           <label>
             <span class="mb-1.5 block text-[10px] font-black uppercase text-slate-500">Mes a reemplazar</span>
-            <select v-model.number="selectedMonth" class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-800 outline-none focus:border-pic-brand-border focus:ring-2 focus:ring-pic-brand-border" @change="updatePeriod">
+            <select v-model.number="selectedMonth" :disabled="isBusy" class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-800 outline-none focus:border-pic-brand-border focus:ring-2 focus:ring-pic-brand-border" @change="updatePeriod">
               <option v-for="(month, index) in months" :key="month" :value="index + 1">{{ month }}</option>
             </select>
           </label>
@@ -109,7 +119,7 @@ const commit = async () => {
             :key="chain"
             :chain="chain"
             :file="files[chain]"
-            :disabled="isPreviewing || isCommitting"
+            :disabled="isBusy"
             @change="updateFile(chain, $event)"
           />
         </div>
@@ -118,13 +128,13 @@ const commit = async () => {
           <p class="text-xs font-semibold leading-5 text-slate-500">
             Los archivos se analizan en el servidor y no se almacenan. Límite: 25 MB por archivo.
           </p>
-          <StdButton variant="primary" icon="fa-solid fa-magnifying-glass-chart" :disabled="!hasFiles || isPreviewing || isCommitting" @click="analyze">
+          <StdButton variant="primary" icon="fa-solid fa-magnifying-glass-chart" :disabled="!hasFiles || isBusy" @click="analyze">
             {{ isPreviewing ? 'Analizando archivos...' : 'Analizar selección' }}
           </StdButton>
         </div>
       </StdSection>
 
-      <SelloutPreview v-if="previewData" :preview="previewData" :committing="isCommitting" @confirm="commit" />
+      <SelloutPreview v-if="previewData" :preview="previewData" :committing="isCommitting" :registering-store="isRegisteringStore" :analyzing="isPreviewing" @confirm="commit" @register-store="registerPendingStore" />
 
       <SelloutHistory />
     </div>

@@ -18,6 +18,13 @@ export interface SelloutUnmappedStore {
   rowCount: number
 }
 
+export interface ChedrauiStoreMapping {
+  id: number
+  codigo_sucursal: string
+  tienda: string
+  matriz: null
+}
+
 export interface SelloutProvisionalStore extends SelloutUnmappedStore {
   temporaryCode: string
   ventaUSum: number

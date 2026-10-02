@@ -8,6 +8,7 @@ import type {
   SelloutHistoryEntry,
   SelloutHistoryFilters,
   SelloutPreviewData,
+  SelloutUnmappedStore,
 } from '../types/sellout'
 
 const now = new Date()
@@ -29,6 +30,7 @@ export const useSelloutStore = defineStore('selloutUpload', () => {
   const lastCommit = ref<SelloutCommitData | null>(null)
   const isPreviewing = ref(false)
   const isCommitting = ref(false)
+  const isRegisteringStore = ref(false)
   const error = ref('')
 
   const historyEntries = ref<SelloutHistoryEntry[]>([])
@@ -42,7 +44,7 @@ export const useSelloutStore = defineStore('selloutUpload', () => {
   })
 
   const hasFiles = computed(() => Boolean(files.SORIANA || files.WALMART || files.CHEDRAUI))
-  const canCommit = computed(() => Boolean(previewData.value?.previewToken) && !isCommitting.value)
+  const canCommit = computed(() => Boolean(previewData.value?.previewToken) && !isCommitting.value && !isPreviewing.value && !isRegisteringStore.value)
 
   const invalidatePreview = () => {
     previewData.value = null
@@ -77,7 +79,7 @@ export const useSelloutStore = defineStore('selloutUpload', () => {
   }
 
   const commit = async () => {
-    if (!previewData.value) return
+    if (!previewData.value || isRegisteringStore.value || isPreviewing.value) return
     isCommitting.value = true
     error.value = ''
     try {
@@ -97,6 +99,27 @@ export const useSelloutStore = defineStore('selloutUpload', () => {
       throw cause
     } finally {
       isCommitting.value = false
+    }
+  }
+
+  const registerPendingStore = async (store: SelloutUnmappedStore) => {
+    if (isRegisteringStore.value || isCommitting.value || isPreviewing.value) return
+    isRegisteringStore.value = true
+    error.value = ''
+    let registered = false
+    try {
+      await selloutApi.createPendingStore(store)
+      registered = true
+      invalidatePreview()
+      await preview()
+    } catch (cause) {
+      previewData.value = null
+      error.value = registered
+        ? 'La sucursal quedó registrada como temporal, pero no se pudo actualizar el manifiesto. Vuelve a pulsar Analizar selección.'
+        : getErrorMessage(cause, 'No fue posible registrar la sucursal. Vuelve a analizar antes de reintentar.')
+      throw cause
+    } finally {
+      isRegisteringStore.value = false
     }
   }
 
@@ -121,6 +144,7 @@ export const useSelloutStore = defineStore('selloutUpload', () => {
     lastCommit,
     isPreviewing,
     isCommitting,
+    isRegisteringStore,
     error,
     historyEntries,
     historyTotal,
@@ -132,6 +156,7 @@ export const useSelloutStore = defineStore('selloutUpload', () => {
     setPeriod,
     preview,
     commit,
+    registerPendingStore,
     fetchHistory,
   }
 })

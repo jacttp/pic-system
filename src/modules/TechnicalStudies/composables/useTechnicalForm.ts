@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue';
-import type { SubmitFormPayload } from '../types/technicalStudy.types';
+import type { Competitor, StudyCompetitor, SubmitFormPayload } from '../types/technicalStudy.types';
 import type { FieldErrors } from '../types/technicalStudy.ui';
-import { competitorErrors, draftSignature, makeCompetitor, makeDraft, nameErrors, responsibleErrors, toPayload, validateDraft } from '../utils/formDraft';
+import { catalogNameError, competitorErrors, draftSignature, makeCompetitor, makeDraft, nameErrors, responsibleErrors, toPayload, validateDraft } from '../utils/formDraft';
 import { errorMessage, httpStatus } from '../utils/technicalStudyUi';
 
 export function useTechnicalForm() {
@@ -13,12 +13,27 @@ export function useTechnicalForm() {
    const errors = ref<FieldErrors>({});
    const busy = ref(false);
    const submissionError = ref('');
+   const catalog = ref<StudyCompetitor[]>([]);
+   function setCatalog(items: StudyCompetitor[]) { catalog.value = items; }
+   function names() {
+      const issues = nameErrors(draft.value);
+      for (const item of draft.value.competitors) if (item.otherName != null) {
+         const error = catalogNameError(item.name, catalog.value);
+         if (error) issues[`${item.key}-name`] = error;
+      }
+      return issues;
+   }
+   function validate() { return { ...validateDraft(draft.value), ...names() }; }
    const active = computed(() => draft.value.competitors.find(item => item.key === activeKey.value));
    const activeIndex = computed(() => draft.value.competitors.findIndex(item => item.key === activeKey.value));
    const dirty = computed(() => draftSignature(draft.value) !== baseline.value);
+   function isComplete(key: string) {
+      const item = draft.value.competitors.find(row => row.key === key);
+      return !!item && !names()[`${key}-name`] && !Object.keys(competitorErrors(item)).length;
+   }
    const completedCount = computed(() => {
-      const names = nameErrors(draft.value);
-      return draft.value.competitors.filter(item => !names[`${item.key}-name`] && !Object.keys(competitorErrors(item)).length).length;
+      const issues = names();
+      return draft.value.competitors.filter(item => !issues[`${item.key}-name`] && !Object.keys(competitorErrors(item)).length).length;
    });
    function reset(answer?: SubmitFormPayload) {
       draft.value = makeDraft(answer); baseline.value = draftSignature(draft.value);
@@ -30,9 +45,11 @@ export function useTechnicalForm() {
       if (busy.value || target < 1 || target > reachedStep.value) return;
       step.value = target; errors.value = {};
    }
-   function add(name: string) {
+   function add(value: string | Competitor) {
       if (busy.value || draft.value.competitors.length >= 100) return false;
-      const item = makeCompetitor(); item.name = name.trim();
+      const item = typeof value === 'string' ? makeCompetitor() : makeCompetitor(value);
+      if (typeof value === 'string') item.name = value.trim();
+      if (item.otherName != null && catalogNameError(item.name, catalog.value)) return false;
       const candidate = { ...draft.value, competitors: [...draft.value.competitors, item] };
       const issues = nameErrors(candidate);
       if (issues[`${item.key}-name`] || issues.competitors) return false;
@@ -61,14 +78,14 @@ export function useTechnicalForm() {
    function next() {
       if (busy.value) return false;
       errors.value = step.value === 1 ? responsibleErrors(draft.value)
-         : step.value === 2 ? nameErrors(draft.value)
+         : step.value === 2 ? names()
          : active.value ? competitorErrors(active.value) : { competitors: 'Agrega al menos un competidor.' };
       if (Object.keys(errors.value).length) return false;
       if (step.value === 3 && activeIndex.value < draft.value.competitors.length - 1) {
          activeKey.value = draft.value.competitors[activeIndex.value + 1]!.key; return true;
       }
       if (step.value === 3) {
-         errors.value = validateDraft(draft.value);
+         errors.value = validate();
          if (Object.keys(errors.value).length) { revealFirstError(); return false; }
       }
       step.value = Math.min(4, step.value + 1); reachedStep.value = Math.max(reachedStep.value, step.value);
@@ -82,7 +99,7 @@ export function useTechnicalForm() {
       else step.value = Math.max(1, step.value - 1);
    }
    function payload() {
-      errors.value = validateDraft(draft.value);
+      errors.value = validate();
       if (Object.keys(errors.value).length) { revealFirstError(); return null; }
       return toPayload(draft.value);
    }
@@ -103,5 +120,5 @@ export function useTechnicalForm() {
       } finally { busy.value = false; }
    }
    return { draft, step, reachedStep, activeKey, active, activeIndex, errors, busy, dirty, completedCount, submissionError,
-      reset, accept, go, add, remove, select, next, previous, payload, mayLeave, send };
+      reset, accept, go, add, remove, select, next, previous, payload, mayLeave, send, setCatalog, isComplete };
 }

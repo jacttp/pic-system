@@ -3,6 +3,8 @@ import type { SellerType } from './technicalStudy.types';
 export interface CompetitorDraft {
    key: string;
    name: string;
+   competitorId?: number;
+   otherName?: string | null;
    estimatedMonthlyKgInput: string;
    sellerType: SellerType | '';
    sellerCountInput: string;

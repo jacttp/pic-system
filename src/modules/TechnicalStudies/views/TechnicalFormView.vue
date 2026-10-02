@@ -13,7 +13,7 @@ import TechnicalFormFields from '../components/TechnicalFormFields.vue';
 import TechnicalFormReview from '../components/TechnicalFormReview.vue';
 import { useTechnicalStudyStore } from '../stores/technicalStudyStore';
 import { useTechnicalForm } from '../composables/useTechnicalForm';
-import { competitorErrors, makeDraft, nameErrors } from '../utils/formDraft';
+import { makeDraft } from '../utils/formDraft';
 import { errorMessage, formatDeadline, formatInstant } from '../utils/technicalStudyUi';
 
 const route = useRoute(); const router = useRouter(); const store = useTechnicalStudyStore();
@@ -22,13 +22,14 @@ const { draft, step, reachedStep, active, activeKey, activeIndex, errors, busy, 
 const studyId = computed(() => Number(route.params.studyId)); const formId = computed(() => Number(route.params.formId));
 const form = computed(() => store.selectedForm?.id === formId.value && store.selectedForm.studyId === studyId.value ? store.selectedForm : null);
 const error = ref(''); const notice = ref(''); const root = ref<HTMLElement | null>(null);
+const activeCatalogEntry = computed(() => store.competitorCatalog.find(item => item.id === active.value?.competitorId));
+watch(() => store.competitorCatalog, items => flow.setCatalog(items), { immediate: true });
 let loadedKey = '';
 const readOnlyDraft = computed(() => makeDraft(form.value ? { responsableNombre: form.value.responsableNombre || '', competitors: form.value.competitors } : undefined));
 const titles = ['Responsable en tienda', 'Competidores observados', 'Captura por competidor', 'Revisa antes de enviar'];
 const nextLabel = computed(() => step.value === 3 ? activeIndex.value < draft.value.competitors.length - 1 ? 'Siguiente competidor' : 'Revisar ficha' : 'Continuar');
 function complete(key: string) {
-   const item = draft.value.competitors.find(item => item.key === key);
-   return !!item && !nameErrors(draft.value)[`${key}-name`] && !Object.keys(competitorErrors(item)).length;
+   return flow.isComplete(key);
 }
 async function focusStep() {
    await nextTick();
@@ -45,6 +46,7 @@ async function load() {
          if (loadedKey !== key) flow.reset({ responsableNombre: result.responsableNombre || '', competitors: result.competitors });
          if (!result.canSubmit) flow.accept();
          loadedKey = key;
+         if (result.canSubmit && !store.competitorCatalog.length && !store.loadingCatalog) void store.loadCatalog();
       }
    } catch (reason) { error.value = errorMessage(reason, 'No se pudo abrir la ficha.'); }
 }
@@ -91,13 +93,13 @@ watch([studyId, formId], load, { immediate: true });
           <h2 data-step-heading tabindex="-1" class="mb-5 text-lg font-semibold outline-none">{{ titles[step - 1] }}</h2>
           <div v-if="step === 1" class="grid gap-5 sm:grid-cols-2">
             <div><p class="ts-muted">Elabora · usuario PIC</p><p class="mt-2 font-semibold">{{ form.currentElaborator?.nombre || '—' }}</p><p class="ts-code mt-1">No. empleado {{ form.currentElaborator?.noEmp || '—' }}</p></div>
-            <label class="ts-label" for="responsable">Responsable del departamento en tienda<input id="responsable" v-model="draft.responsableNombre" class="ts-input" maxlength="200" autocomplete="name" :disabled="busy" :aria-invalid="!!errors.responsable" aria-describedby="responsable-error" placeholder="Nombre de la persona en tienda"><span id="responsable-error" class="ts-error block" aria-live="polite">{{ errors.responsable }}</span></label>
+            <label class="ts-label" for="responsable">Gerente o encargado de la tienda<input id="responsable" v-model="draft.responsableNombre" class="ts-input" maxlength="200" autocomplete="name" :disabled="busy" :aria-invalid="!!errors.responsable" aria-describedby="responsable-error" placeholder="Nombre de la persona en tienda"><span id="responsable-error" class="ts-error block" aria-live="polite">{{ errors.responsable }}</span></label>
           </div>
-          <CompetitorNamesEditor v-else-if="step === 2" v-model="draft" :errors="errors" :busy="busy" @add="flow.add" @remove="flow.remove" />
+          <CompetitorNamesEditor v-else-if="step === 2" v-model="draft" :errors="errors" :busy="busy" :catalog="store.competitorCatalog" :loading="store.loadingCatalog" :catalog-error="store.catalogError" @retry="store.loadCatalog" @add="flow.add" @remove="flow.remove" />
           <div v-else-if="step === 3">
             <p class="ts-muted mb-3">{{ completedCount }} de {{ draft.competitors.length }} competidores completos</p>
             <nav aria-label="Competidores" class="mb-5 flex gap-2 overflow-x-auto pb-2"><button v-for="(item, index) in draft.competitors" :key="item.key" type="button" class="shrink-0 rounded-lg border px-3 text-sm" :class="activeKey === item.key ? 'border-pic-brand bg-pic-brand-soft text-pic-brand' : 'border-pic-border'" :disabled="busy" :aria-current="activeKey === item.key ? 'true' : undefined" @click="flow.select(item.key)"><span class="mr-2">{{ complete(item.key) ? '✓' : index + 1 }}</span>{{ item.name }}<span class="sr-only">{{ complete(item.key) ? 'completo' : 'incompleto' }}</span></button></nav>
-            <template v-if="active"><h3 class="mb-4 font-semibold">{{ active.name }}</h3><TechnicalFormFields :key="active.key" v-model="draft.competitors[activeIndex]!" :errors="errors" :busy="busy" /></template>
+            <template v-if="active"><h3 class="mb-4 font-semibold">{{ active.name }}</h3><TechnicalFormFields :key="active.key" v-model="draft.competitors[activeIndex]!" :errors="errors" :busy="busy" :competitor="activeCatalogEntry" /></template>
           </div>
           <TechnicalFormReview v-else :draft="draft" :elaborator="form.currentElaborator" editable :busy="busy" @edit-responsible="flow.go(1); focusStep()" @edit-competitor="flow.select($event); flow.go(3); focusStep()" />
         </section>

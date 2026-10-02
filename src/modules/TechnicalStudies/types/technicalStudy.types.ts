@@ -61,8 +61,17 @@ export interface PersonIdentity {
 }
 
 export type SellerType = 'PARCIAL' | 'BASE' | 'APOYO' | 'LIDERES' | 'CELULAS';
+export interface StudyCompetitor {
+   id: number;
+   name: string;
+   logo: string | null;
+   description: string | null;
+   isOther: boolean;
+}
 export interface Competitor {
    name: string;
+   competitorId?: number;
+   otherName?: string | null;
    estimatedMonthlyKg: number | null;
    sellerType: SellerType | '';
    sellerCount: number | null;
