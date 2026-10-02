@@ -4,7 +4,7 @@ withDefaults(defineProps<{ page: number; total: number; limit?: number; busy?: b
 defineEmits<{ change: [page: number] }>();
 </script>
 <template>
-  <div class="ts-actions text-sm">
+  <div class="ts-pagination ts-actions text-sm">
     <p class="ts-muted">{{ total ? (page - 1) * limit + 1 : 0 }}–{{ Math.min(page * limit, total) }} de {{ total }} resultados</p>
     <nav class="flex items-center gap-2" aria-label="Paginación">
       <StdButton class="ts-button-secondary" size="sm" :disabled="busy || page <= 1" @click="$emit('change', page - 1)">Anterior</StdButton>

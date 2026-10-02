@@ -19,7 +19,7 @@ async function load(target = page.value) {
 onMounted(() => load());
 </script>
 <template>
-  <TechnicalPage>
+  <TechnicalPage class="ts-study-admin">
     <StdPageHeader class="ts-header" eyebrow="Fichas técnicas · administración" title="Estudios" description="Publica estudios y da seguimiento a la respuesta de cada tienda." icon="fa-solid fa-clipboard-list">
       <template #actions><StdButton class="ts-button-secondary" @click="router.push('/admin/technical-forms')">Bandeja de fichas</StdButton><StdButton variant="primary" icon="fa-solid fa-plus" @click="router.push('/admin/technical-studies/new')">Crear estudio</StdButton></template>
     </StdPageHeader>

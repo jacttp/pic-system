@@ -10,7 +10,7 @@ withDefaults(defineProps<{ columns: StdTableColumn[]; rows: Record<string, unkno
       <StdDataTable class="ts-table hidden md:block" :columns="columns" :rows="rows" :selected-keys="selectedKeys" :show-actions="false">
         <template v-for="(_, name) in $slots" #[name]="scope"><slot :name="name" v-bind="scope" /></template>
       </StdDataTable>
-      <div class="md:hidden"><article v-for="row in rows" :key="String(row.id)" class="ts-mobile-row" :class="selectedKeys.includes(String(row.id)) ? 'ts-selection-row' : ''"><slot name="mobile" :row="row" /></article></div>
+      <div class="ts-mobile-list md:hidden"><article v-for="row in rows" :key="String(row.id)" class="ts-mobile-row" :class="selectedKeys.includes(String(row.id)) ? 'ts-selection-row' : ''"><slot name="mobile" :row="row" /></article></div>
     </template>
   </div>
 </template>

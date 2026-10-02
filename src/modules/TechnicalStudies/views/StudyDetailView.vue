@@ -70,7 +70,7 @@ onBeforeRouteLeave(() => !busy.value); onBeforeRouteUpdate(() => !busy.value);
 watch(id, load, { immediate: true });
 </script>
 <template>
-  <TechnicalPage>
+  <TechnicalPage class="ts-study-admin">
     <StdPageHeader class="ts-header" eyebrow="Fichas técnicas · seguimiento" :title="study?.name || 'Estudio'" description="Consulta el avance y las respuestas por tienda." icon="fa-solid fa-clipboard-check"><template #actions><StdButton class="ts-button-secondary" :disabled="busy" @click="router.push('/admin/technical-studies')">Volver a estudios</StdButton></template></StdPageHeader>
     <TechnicalNotice v-if="error" tone="danger" title="No se pudo completar la operación" :description="error" />
     <TechnicalNotice v-if="notice" tone="success" title="Estudio actualizado" :description="notice" />
@@ -78,15 +78,15 @@ watch(id, load, { immediate: true });
     <template v-else-if="study">
       <StdSection class="ts-section" title="Plazo y avance">
         <div class="ts-actions"><div><p class="ts-muted">Fecha límite · Ciudad de México</p><div class="mt-2 flex flex-wrap items-center gap-3"><strong class="text-2xl font-semibold tabular-nums">{{ formatDeadline(study.deadlineAt) }}</strong><TechnicalStatus :status="study.status" study /></div></div><div class="min-w-[200px] flex-1 sm:max-w-sm"><p class="mb-2 flex justify-between text-sm"><span>{{ submitted }} de {{ forms.length }} fichas enviadas</span><strong>{{ progress(submitted, forms.length) }}%</strong></p><div class="ts-progress"><span :style="{ width: `${progress(submitted, forms.length)}%` }"></span></div></div></div>
-        <dl class="ts-summary ts-divider"><div><dt>Tiendas</dt><dd>{{ forms.length }}</dd></div><div><dt>Enviadas</dt><dd>{{ submitted }}</dd></div><div><dt>Pendientes</dt><dd>{{ pending }}</dd></div><div><dt>Vencidas</dt><dd>{{ expired }}</dd></div></dl>
+        <dl class="ts-summary ts-divider"><div class="ts-tone-info"><dt>Tiendas</dt><dd>{{ forms.length }}</dd></div><div class="ts-tone-success"><dt>Enviadas</dt><dd>{{ submitted }}</dd></div><div class="ts-tone-info"><dt>Pendientes</dt><dd>{{ pending }}</dd></div><div class="ts-tone-warning"><dt>Vencidas</dt><dd>{{ expired }}</dd></div></dl>
         <form class="ts-toolbar ts-divider" @submit.prevent="extend"><label class="ts-label" for="new-deadline">Nueva fecha límite<input id="new-deadline" v-model="deadlineDate" class="ts-input sm:max-w-xs" type="date" :min="localDate()" :disabled="busy" :aria-invalid="!!dateError" aria-describedby="deadline-error"><span id="deadline-error" class="ts-error block">{{ dateError }}</span></label><StdButton class="ts-button-secondary" type="submit" :disabled="busy || !deadlineDate">{{ extending ? 'Ampliando…' : 'Ampliar plazo' }}</StdButton></form>
         <div v-if="isSuperAdmin" class="ts-divider ts-actions"><div><StdButton class="ts-button-secondary" :disabled="busy" @click="changeStatus">{{ managing ? 'Actualizando…' : study.status === 'PAUSED' ? 'Reanudar estudio' : 'Pausar estudio' }}</StdButton><p class="ts-muted mt-2">Controla temporalmente la recepción de respuestas.</p></div><div class="sm:text-right"><StdButton variant="danger" :disabled="busy || submitted > 0" @click="requestDelete()">Eliminar estudio</StdButton><p v-if="submitted" class="ts-muted mt-2 max-w-sm">Para eliminar el estudio, elimina primero sus {{ submitted }} fichas enviadas.</p></div></div>
       </StdSection>
-      <section><h2 class="mb-4 text-lg font-semibold">Tiendas del estudio</h2><FormResults :key="id" :forms="forms" :can-delete="isSuperAdmin" :busy="busy" @open="openForm" @remove="requestDelete" /></section>
+      <section><h2 class="ts-section-heading mb-4">Tiendas del estudio</h2><FormResults :key="id" :forms="forms" :can-delete="isSuperAdmin" :busy="busy" @open="openForm" @remove="requestDelete" /></section>
     </template>
     <StdButton v-else class="ts-button-secondary" @click="load">Volver a intentar</StdButton>
-    <ModalDialog class="ts-dialog" :model-value="!!deletion" :title="deletion?.kind === 'study' ? 'Eliminar estudio' : 'Eliminar ficha'" @update:model-value="closeDelete">
-      <p>Se eliminará definitivamente <strong>{{ deletion?.name }}</strong>{{ deletion?.kind === 'study' ? ' y todas sus fichas pendientes.' : ' y todos los datos de su ficha.' }} Esta acción no se puede deshacer.</p>
+    <ModalDialog :model-value="!!deletion" :title="deletion?.kind === 'study' ? 'Eliminar estudio' : 'Eliminar ficha'" @update:model-value="closeDelete">
+      <p class="ts-dialog-content">Se eliminará definitivamente <strong>{{ deletion?.name }}</strong>{{ deletion?.kind === 'study' ? ' y todas sus fichas pendientes.' : ' y todos los datos de su ficha.' }} Esta acción no se puede deshacer.</p>
       <template #footer><StdButton variant="danger" :disabled="busy" @click="confirmDelete">{{ managing ? 'Eliminando…' : 'Eliminar definitivamente' }}</StdButton><StdButton class="mr-2" :disabled="busy" @click="closeDelete">Cancelar</StdButton></template>
     </ModalDialog>
   </TechnicalPage>

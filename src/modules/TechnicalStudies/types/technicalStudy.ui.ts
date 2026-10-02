@@ -5,6 +5,7 @@ export interface CompetitorDraft {
    name: string;
    competitorId?: number;
    otherName?: string | null;
+   excluded: boolean;
    estimatedMonthlyKgInput: string;
    sellerType: SellerType | '';
    sellerCountInput: string;

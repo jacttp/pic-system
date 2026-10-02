@@ -45,7 +45,7 @@ watch([page, search], () => { searchInput.value = search.value; void loadList();
 watch(activeStudyId, loadStudy, { immediate: true });
 </script>
 <template>
-  <TechnicalPage>
+  <TechnicalPage class="ts-study-admin">
     <StdPageHeader class="ts-header" eyebrow="Fichas técnicas · estructura comercial" title="Bandeja de fichas" description="Elige un estudio y abre las fichas de las tiendas de tu estructura comercial." icon="fa-solid fa-inbox">
       <template #actions><StdButton v-if="auth.isAdmin" class="ts-button-secondary" @click="router.push('/admin/technical-studies')">Administrar estudios</StdButton></template>
     </StdPageHeader>
@@ -57,7 +57,7 @@ watch(activeStudyId, loadStudy, { immediate: true });
       <StdButton v-else class="ts-button-secondary" @click="loadList">Volver a intentar</StdButton>
     </template>
     <template v-else>
-      <div class="ts-actions"><div><p class="ts-muted">Estudio seleccionado</p><h2 class="mt-1 text-xl font-semibold">{{ study?.name || 'Cargando estudio…' }}</h2><p v-if="study" class="ts-muted mt-1">Límite: {{ formatDeadline(study.deadlineAt) }}</p></div><StdButton class="ts-button-secondary" @click="changeStudy">Cambiar estudio</StdButton></div>
+      <div class="ts-context ts-actions"><div><p class="ts-muted">Estudio seleccionado</p><h2 class="mt-1 text-xl font-semibold">{{ study?.name || 'Cargando estudio…' }}</h2><p v-if="study" class="ts-muted mt-1">Límite: {{ formatDeadline(study.deadlineAt) }}</p></div><StdButton class="ts-button-secondary" @click="changeStudy">Cambiar estudio</StdButton></div>
       <TechnicalNotice v-if="detailError" tone="danger" title="No se pudieron cargar las fichas" :description="detailError" />
       <FormResults v-if="!detailError" :key="activeStudyId" :forms="study?.forms || []" :loading="store.loadingStudy" @open="openForm" />
       <StdButton v-else class="ts-button-secondary" @click="loadStudy">Volver a intentar</StdButton>

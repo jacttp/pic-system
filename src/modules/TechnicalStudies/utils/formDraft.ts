@@ -3,7 +3,7 @@ import { sellerTypes, type CompetitorDraft, type FieldErrors, type FormDraft } f
 
 let nextKey = 0;
 export function makeCompetitor(item?: Competitor): CompetitorDraft {
-   return { key: `competitor-${++nextKey}`, name: item?.name || '',
+   return { key: `competitor-${++nextKey}`, name: item?.name || '', excluded: false,
       ...(item?.competitorId !== undefined ? { competitorId: item.competitorId, otherName: item.otherName ?? null } : {}),
       estimatedMonthlyKgInput: item?.estimatedMonthlyKg == null ? '' : String(item.estimatedMonthlyKg),
       sellerType: item?.sellerType ?? 'BASE', sellerCountInput: item?.sellerCount == null ? '' : String(item.sellerCount) };
@@ -42,9 +42,10 @@ export function competitorLogo(logo: string | null | undefined): string | null {
 }
 export function nameErrors(draft: FormDraft): FieldErrors {
    const errors: FieldErrors = {};
-   if (!draft.competitors.length || draft.competitors.length > 100) errors.competitors = 'Agrega entre 1 y 100 competidores.';
+   const included = draft.competitors.filter(item => !item.excluded);
+   if (!included.length || included.length > 100) errors.competitors = 'Captura entre 1 y 100 marcas.';
    const groups = new Map<string, CompetitorDraft[]>();
-   for (const item of draft.competitors) {
+   for (const item of included) {
       const name = normalizeCompetitorName(item.name);
       if (!name || name.length > 100) errors[`${item.key}-name`] = 'Escribe un nombre de 1 a 100 caracteres.';
       if (item.otherName != null && !validOtherName(item.name)) errors[`${item.key}-name`] = 'Escribe un nombre de 1 a 100 caracteres, sin HTML ni URLs.';
@@ -55,7 +56,7 @@ export function nameErrors(draft: FormDraft): FieldErrors {
       for (const item of items) errors[`${item.key}-name`] = 'Este competidor ya está en la ficha.';
    }
    const ids = new Map<number, CompetitorDraft[]>();
-   for (const item of draft.competitors) if (item.competitorId !== undefined && item.otherName == null) {
+   for (const item of included) if (item.competitorId !== undefined && item.otherName == null) {
       ids.set(item.competitorId, [...(ids.get(item.competitorId) || []), item]);
    }
    for (const items of ids.values()) if (items.length > 1) for (const item of items) errors[`${item.key}-name`] = 'Este competidor ya está en la ficha.';
@@ -63,6 +64,7 @@ export function nameErrors(draft: FormDraft): FieldErrors {
 }
 export function competitorErrors(item: CompetitorDraft): FieldErrors {
    const errors: FieldErrors = {};
+   if (item.excluded) return errors;
    if (parseKg(item.estimatedMonthlyKgInput) === null) errors[`${item.key}-kg`] = 'Ingresa kg entre 0 y 999999999.99, con hasta dos decimales.';
    if (!sellerTypes.some(type => type.value === item.sellerType)) errors[`${item.key}-type`] = 'Selecciona un tipo de vendedor.';
    if (parseCount(item.sellerCountInput) === null) errors[`${item.key}-count`] = 'Ingresa una cantidad entera entre 0 y 2147483647.';
@@ -77,7 +79,7 @@ export function validateDraft(draft: FormDraft): FieldErrors {
 }
 export function toPayload(draft: FormDraft): SubmitFormPayload {
    if (Object.keys(validateDraft(draft)).length) throw new Error('La ficha contiene datos incompletos o inválidos.');
-   return { responsableNombre: draft.responsableNombre.trim(), competitors: draft.competitors.map(item => ({
+   return { responsableNombre: draft.responsableNombre.trim(), competitors: draft.competitors.filter(item => !item.excluded).map(item => ({
       name: normalizeCompetitorName(item.name), estimatedMonthlyKg: parseKg(item.estimatedMonthlyKgInput),
       sellerType: item.sellerType, sellerCount: parseCount(item.sellerCountInput),
       ...(item.competitorId !== undefined ? { competitorId: item.competitorId,

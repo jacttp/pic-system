@@ -43,7 +43,7 @@ function closeConfirmation() { if (!submitting.value) showConfirmation.value = f
 onBeforeRouteLeave(() => !submitting.value);
 </script>
 <template>
-  <TechnicalPage>
+  <TechnicalPage class="ts-study-admin">
     <StdPageHeader class="ts-header" eyebrow="Fichas técnicas · administración" title="Crear estudio" description="Define el plazo y las tiendas que recibirán una ficha técnica." icon="fa-solid fa-file-circle-plus"><template #actions><StdButton class="ts-button-secondary" :disabled="submitting" @click="router.push('/admin/technical-studies')">Volver a estudios</StdButton></template></StdPageHeader>
     <TechnicalNotice v-if="error" tone="danger" title="No se publicó el estudio" :description="error" />
     <TechnicalNotice v-if="invalidStoreIds.length" tone="warning" title="Revisa las tiendas señaladas" :description="`No son válidas o no tienen un jefe elegible: ${invalidStoreIds.join(', ')}. Tu selección se conserva.`" />
@@ -54,6 +54,6 @@ onBeforeRouteLeave(() => !submitting.value);
       <StdSection class="ts-section" title="2. Tiendas de autoservicio" description="Selecciona hasta 200 tiendas. La selección se conserva al cambiar de página o filtros."><p v-if="errors.stores" data-stores-error tabindex="-1" class="ts-error mb-3" role="alert">{{ errors.stores }}</p><StoreSelector v-model="selectedStores" :disabled="submitting" :invalid-store-ids="invalidStoreIds" /></StdSection>
       <div class="ts-sticky ts-actions"><p class="ts-muted">Se crearán <strong class="text-pic-text-main">{{ selectedStores.length }} fichas</strong>, una por tienda, y se avisará a los jefes elegibles.</p><StdButton variant="primary" type="submit" icon="fa-solid fa-paper-plane" :disabled="submitting">Publicar estudio</StdButton></div>
     </form>
-    <ModalDialog class="ts-dialog" :model-value="showConfirmation" title="Confirmar publicación" @update:model-value="closeConfirmation"><p>Se publicará <strong>{{ name.trim() }}</strong> con límite el <strong>{{ formattedDate }}</strong> y <strong>{{ selectedStores.length }} fichas</strong>.</p><p class="mt-3 text-sm text-pic-text-muted">La publicación se realiza completa o no se realiza. Se avisará a los jefes elegibles.</p><template #footer><StdButton variant="primary" :disabled="submitting" @click="publish">{{ submitting ? 'Publicando…' : 'Confirmar publicación' }}</StdButton><StdButton class="mr-2" :disabled="submitting" @click="closeConfirmation">Revisar selección</StdButton></template></ModalDialog>
+    <ModalDialog :model-value="showConfirmation" title="Confirmar publicación" @update:model-value="closeConfirmation"><p class="ts-dialog-content">Se publicará <strong>{{ name.trim() }}</strong> con límite el <strong>{{ formattedDate }}</strong> y <strong>{{ selectedStores.length }} fichas</strong>.</p><p class="mt-3 text-sm text-pic-text-muted">La publicación se realiza completa o no se realiza. Se avisará a los jefes elegibles.</p><template #footer><StdButton variant="primary" :disabled="submitting" @click="publish">{{ submitting ? 'Publicando…' : 'Confirmar publicación' }}</StdButton><StdButton class="mr-2" :disabled="submitting" @click="closeConfirmation">Revisar selección</StdButton></template></ModalDialog>
   </TechnicalPage>
 </template>
